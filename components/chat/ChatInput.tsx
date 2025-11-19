@@ -1,4 +1,8 @@
+"use client";
+
 import { useRef, useEffect } from "react";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import * as Label from "@radix-ui/react-label";
 import { VideoPreview } from "./VideoPreview";
 
 interface ChatInputProps {
@@ -80,13 +84,19 @@ export function ChatInput({
 
         <div className="flex items-center gap-2">
           <div className="flex-1 relative">
+            <Label.Root htmlFor="chat-input" className="sr-only">
+              Chat input
+            </Label.Root>
             <textarea
+              id="chat-input"
               ref={textareaRef}
               value={prompt}
               onChange={handleTextareaChange}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything sports related"
+              aria-label="Chat input"
+              aria-describedby="chat-input-description"
               className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white resize-none overflow-y-auto"
               rows={1}
               style={{
@@ -95,49 +105,81 @@ export function ChatInput({
                 height: "52px",
               }}
             />
+            <span id="chat-input-description" className="sr-only">
+              Type your message and press Enter to send, Shift+Enter for new line
+            </span>
             <div className="absolute right-2 bottom-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onPickleballCoachClick}
-                className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1.5 whitespace-nowrap"
-                title="Use Pickleball Coach prompt"
-              >
-                <span>🎾</span>
-                <span>Coach</span>
-              </button>
+              <Tooltip.Provider>
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <button
+                      type="button"
+                      onClick={onPickleballCoachClick}
+                      className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <span>🎾</span>
+                      <span>Coach</span>
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md px-2 py-1 z-50 shadow-lg"
+                      sideOffset={5}
+                    >
+                      Use Pickleball Coach prompt
+                      <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </Tooltip.Provider>
             </div>
           </div>
 
-          <div
-            className={`
-                border-2 border-dashed rounded-lg p-3 transition-colors cursor-pointer flex items-center justify-center
-                border-gray-300 dark:border-gray-600
-              `}
-            style={{ minHeight: "52px", minWidth: "52px", marginBottom: "6px" }}
-          >
-            <input
-              id="video"
-              type="file"
-              accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
-              onChange={onVideoChange}
-              className="hidden"
-            />
-            <label htmlFor="video" className="cursor-pointer flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </label>
-          </div>
+          <Tooltip.Provider>
+            <Tooltip.Root>
+              <Tooltip.Trigger asChild>
+                <div
+                  className={`
+                    border-2 border-dashed rounded-lg p-3 transition-colors cursor-pointer flex items-center justify-center
+                    border-gray-300 dark:border-gray-600
+                  `}
+                  style={{ minHeight: "52px", minWidth: "52px", marginBottom: "6px" }}
+                >
+                  <input
+                    id="video"
+                    type="file"
+                    accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={onVideoChange}
+                    className="hidden"
+                  />
+                  <label htmlFor="video" className="cursor-pointer flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </label>
+                </div>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md px-2 py-1 z-50 shadow-lg"
+                  sideOffset={5}
+                >
+                  Upload video or image
+                  <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          </Tooltip.Provider>
         </div>
       </form>
     </div>

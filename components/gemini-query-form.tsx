@@ -9,6 +9,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { DragOverlay } from "@/components/chat/DragOverlay";
+import { ErrorToast } from "@/components/ui/Toast";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
 import type { Message } from "@/types/chat";
 
@@ -93,13 +94,11 @@ export function GeminiQueryForm() {
   };
 
   const handleClearConversation = () => {
-    if (confirm("Are you sure you want to clear the conversation? This cannot be undone.")) {
-      clearMessages();
-      setPrompt("");
-      clearVideo();
-      setVideoError(null);
-      setApiError(null);
-    }
+    clearMessages();
+    setPrompt("");
+    clearVideo();
+    setVideoError(null);
+    setApiError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,8 +114,9 @@ export function GeminiQueryForm() {
     const conversationHistory = messages;
 
     // Add user message
+    const userMessageId = `user-${Date.now()}`;
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: userMessageId,
       role: "user",
       content: currentPrompt,
       videoFile: currentVideoFile,
@@ -168,7 +168,11 @@ export function GeminiQueryForm() {
           (id, content) => updateMessage(id, { content }),
           setUploadProgress,
           setProgressStage,
-          conversationHistory
+          conversationHistory,
+          (s3Url) => {
+            // Update user message with S3 URL for video playback
+            updateMessage(userMessageId, { videoUrl: s3Url });
+          }
         );
       }
     } catch (err) {
@@ -219,7 +223,7 @@ export function GeminiQueryForm() {
           prompt={prompt}
           videoFile={videoFile}
           videoPreview={videoPreview}
-          error={error}
+          error={null}
           loading={loading}
           onPromptChange={setPrompt}
           onVideoRemove={clearVideo}
@@ -228,6 +232,9 @@ export function GeminiQueryForm() {
           onPickleballCoachClick={handlePickleballCoachPrompt}
         />
       </div>
+
+      {/* Toast for error notifications */}
+      <ErrorToast error={error} />
     </div>
   );
 }

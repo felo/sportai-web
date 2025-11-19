@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import * as Avatar from "@radix-ui/react-avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
@@ -13,8 +14,11 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Use S3 URL if available, otherwise fall back to preview (blob URL)
+  const videoSrc = message.videoUrl || message.videoPreview;
+
   useEffect(() => {
-    if (videoRef.current && message.videoPreview && message.videoFile && !message.videoFile.type.startsWith("image/")) {
+    if (videoRef.current && videoSrc && message.videoFile && !message.videoFile.type.startsWith("image/")) {
       const video = videoRef.current;
       
       const playVideo = async () => {
@@ -56,18 +60,22 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         video.removeEventListener("loadeddata", handleLoadedData);
       };
     }
-  }, [message.videoPreview, message.videoFile]);
+  }, [videoSrc, message.videoFile]);
 
   return (
     <div
       className={`flex gap-4 ${
         message.role === "user" ? "justify-end" : "justify-start"
       }`}
+      role="article"
+      aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
     >
       {message.role === "assistant" && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-          AI
-        </div>
+        <Avatar.Root className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+          <Avatar.Fallback className="w-full h-full rounded-full flex items-center justify-center">
+            AI
+          </Avatar.Fallback>
+        </Avatar.Root>
       )}
 
       <div
@@ -76,22 +84,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ? "bg-blue-600 text-white"
             : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         }`}
+        role={message.role === "user" ? "user-message" : "assistant-message"}
       >
         {message.role === "user" && (
           <div className="mb-2">
             <p className="whitespace-pre-wrap">{message.content}</p>
-            {message.videoPreview && message.videoFile && (
+            {videoSrc && message.videoFile && (
               <div className="mt-2">
                 {message.videoFile.type.startsWith("image/") ? (
                   <img
-                    src={message.videoPreview}
+                    src={videoSrc}
                     alt="Uploaded image"
                     className="max-w-full rounded-md"
                   />
                 ) : (
                   <video
                     ref={videoRef}
-                    src={message.videoPreview}
+                    src={videoSrc}
                     controls
                     autoPlay
                     muted
@@ -125,9 +134,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
 
       {message.role === "user" && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-300 text-sm font-semibold">
-          You
-        </div>
+        <Avatar.Root className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-300 text-sm font-semibold">
+          <Avatar.Fallback className="w-full h-full rounded-full flex items-center justify-center">
+            You
+          </Avatar.Fallback>
+        </Avatar.Root>
       )}
     </div>
   );

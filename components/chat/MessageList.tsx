@@ -1,3 +1,5 @@
+"use client";
+
 import { MessageBubble } from "./MessageBubble";
 import { ProgressIndicator } from "./ProgressIndicator";
 import type { Message, ProgressStage } from "@/types/chat";
@@ -20,9 +22,9 @@ export function MessageList({
   messagesEndRef,
 }: MessageListProps) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-6">
+    <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-6" role="log" aria-label="Chat messages">
       {messages.length === 0 && (
-        <div className="text-center text-gray-500 dark:text-gray-400 mt-12">
+        <div className="text-center text-gray-500 dark:text-gray-400 mt-12" role="status">
           <p className="text-lg mb-2">Start analysing with SportAI</p>
           <p className="text-sm">Ask questions or upload a sports video for analysis</p>
         </div>
@@ -40,7 +42,7 @@ export function MessageList({
         />
       )}
 
-      <div ref={messagesEndRef} />
+      <div ref={messagesEndRef} aria-hidden="true" />
     </div>
   );
 }

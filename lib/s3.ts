@@ -44,6 +44,64 @@ export interface PresignedUrlResponse {
   url: string;
   key: string;
   publicUrl: string;
+  downloadUrl?: string; // Presigned download URL
+}
+
+/**
+ * Generate a presigned URL for downloading a file from S3
+ * @param key - S3 object key
+ * @param expiresIn - URL expiration time in seconds (default: 7 days)
+ * @returns Presigned download URL
+ */
+export async function generatePresignedDownloadUrl(
+  key: string,
+  expiresIn: number = 7 * 24 * 3600 // 7 days default
+): Promise<string> {
+  const requestId = `s3_dl_url_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  
+  // This function should only be called server-side
+  if (!isServer) {
+    throw new Error("generatePresignedDownloadUrl can only be called server-side");
+  }
+  
+  if (!s3Client) {
+    throw new Error("S3 client not initialized");
+  }
+  
+  // Check credentials first
+  if (!hasCredentials) {
+    const errorMsg = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.";
+    logger.error(`[${requestId}] ${errorMsg}`);
+    console.error(`[S3] ❌ ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+  
+  logger.info(`[${requestId}] Generating presigned download URL for: ${key}`);
+  console.log(`[S3] Generating presigned download URL for key: ${key}`);
+  
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    
+    logger.info(`[${requestId}] Presigned download URL generated successfully`);
+    logger.debug(`[${requestId}] Download URL expires in ${expiresIn} seconds`);
+    console.log(`[S3] ✅ Presigned download URL generated successfully`);
+    
+    return url;
+  } catch (error) {
+    logger.error(`[${requestId}] Failed to generate presigned download URL:`, error);
+    console.error(`[S3] ❌ Failed to generate presigned download URL:`, error);
+    
+    throw new Error(
+      error instanceof Error
+        ? `Failed to generate download URL: ${error.message}`
+        : "Failed to generate download URL"
+    );
+  }
 }
 
 /**
@@ -108,14 +166,27 @@ export async function generatePresignedUploadUrl(
     
     const publicUrl = `https://${BUCKET_NAME}.s3.${BUCKET_REGION}.amazonaws.com/${key}`;
     
+    // Generate presigned download URL (valid for 7 days)
+    let downloadUrl: string | undefined;
+    try {
+      downloadUrl = await generatePresignedDownloadUrl(key, 7 * 24 * 3600);
+    } catch (error) {
+      logger.error(`[${requestId}] Failed to generate presigned download URL, will use public URL:`, error);
+      console.warn(`[S3] ⚠️ Failed to generate presigned download URL, will use public URL`);
+    }
+    
     logger.info(`[${requestId}] Presigned URL generated successfully`);
     logger.debug(`[${requestId}] Public URL: ${publicUrl}`);
+    if (downloadUrl) {
+      logger.debug(`[${requestId}] Download URL: ${downloadUrl.substring(0, 100)}...`);
+    }
     console.log(`[S3] ✅ Presigned URL generated successfully`);
     
     return {
       url,
       key,
       publicUrl,
+      downloadUrl,
     };
   } catch (error) {
     logger.error(`[${requestId}] Failed to generate presigned URL:`, error);
@@ -273,13 +344,20 @@ export async function downloadFromS3(
   
   try {
     // Extract bucket and key from URL
-    // URL format: https://bucket-name.s3.region.amazonaws.com/key
-    const urlMatch = url.match(/https:\/\/([^\.]+)\.s3\.([^\.]+)\.amazonaws\.com\/(.+)/);
+    // URL format: https://bucket-name.s3.region.amazonaws.com/key or presigned URL with query params
+    // For presigned URLs, we need to extract the key before the query parameters
+    let urlMatch = url.match(/https:\/\/([^\.]+)\.s3\.([^\.]+)\.amazonaws\.com\/([^?]+)/);
+    if (!urlMatch) {
+      // Try alternative S3 URL formats
+      urlMatch = url.match(/https:\/\/([^\.]+)\.s3-([^\.]+)\.amazonaws\.com\/([^?]+)/);
+    }
     if (!urlMatch) {
       throw new Error(`Invalid S3 URL format: ${url}`);
     }
     
-    const [, bucketFromUrl, , key] = urlMatch;
+    const [, bucketFromUrl, , keyWithPath] = urlMatch;
+    // Decode the key (it might be URL encoded)
+    const key = decodeURIComponent(keyWithPath);
     
     // Verify bucket matches (or use from URL)
     const bucket = bucketFromUrl || BUCKET_NAME;
@@ -289,7 +367,7 @@ export async function downloadFromS3(
     // Download using AWS SDK
     const command = new GetObjectCommand({
       Bucket: bucket,
-      Key: decodeURIComponent(key),
+      Key: key,
     });
     
     const response = await s3Client.send(command);

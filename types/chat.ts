@@ -12,5 +12,6 @@ export type Message = {
   content: string;
   videoFile?: File | null;
   videoPreview?: string | null;
+  videoUrl?: string | null; // S3 URL for video playback
 };
 

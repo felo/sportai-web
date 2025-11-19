@@ -1,3 +1,6 @@
+"use client";
+
+import * as Progress from "@radix-ui/react-progress";
 import type { ProgressStage } from "@/types/chat";
 
 interface ProgressIndicatorProps {
@@ -26,12 +29,15 @@ export function ProgressIndicator({
           {progressStage === "generating" && "Generating response..."}
         </div>
         {hasVideo && progressStage === "analyzing" && (
-          <div className="mt-2 w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+          <Progress.Root
+            className="mt-2 w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden"
+            value={uploadProgress}
+          >
+            <Progress.Indicator
+              className="bg-blue-600 h-full rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
-          </div>
+          </Progress.Root>
         )}
       </div>
     </div>
