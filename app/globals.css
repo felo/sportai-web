@@ -2,10 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Set base background colors - dark theme */
+html,
+body {
+  background-color: var(--gray-1, #1C1C1C) !important;
+}
+
+/* Custom brand color palette - overrides Radix colors with brand colors */
+[data-radix-theme] {
+  /* Mint color scale based on brand colors */
+  --mint-1: #D7F4DD; /* lightMint - lightest */
+  --mint-2: #C4E8D0;
+  --mint-3: #B0DCC3;
+  --mint-4: #9DD0B6;
+  --mint-5: #89C4A9;
+  --mint-6: #74BC9C; /* darkMint - primary brand color */
+  --mint-7: #66A88A;
+  --mint-8: #589478;
+  --mint-9: #4A8066;
+  --mint-10: #3C6C54;
+  --mint-11: #2E5842;
+  --mint-12: #002B1A; /* darkGreen - darkest */
+  
+  /* Icon accent color - mint green for icons (using lighter mint for visibility) */
+  --icon-accent: #B0DCC3; /* mint-3 - lighter mint that's visible on dark backgrounds */
+  
+  /* Gray scale - Dark mode colors */
+  --gray-1: #1C1C1C; /* dark background */
+  --gray-2: #252525;
+  --gray-3: #2E2E2E;
+  --gray-4: #383838;
+  --gray-5: #404040;
+  --gray-6: #4A4A4A;
+  --gray-7: #545454;
+  --gray-8: #5E5E5E;
+  --gray-9: #686868;
+  --gray-10: #727272;
+  --gray-11: #7C7C7C;
+  --gray-12: #002B1A; /* darkGreen - darkest */
+  
+  /* Override the main background color variable */
+  --color-background: var(--gray-1);
+  
+  /* Ensure the theme wrapper itself has dark background */
+  background-color: var(--gray-1) !important;
+}
+
+/* Target Radix Theme component directly for dark mode */
+[data-radix-theme] > * {
+  background-color: var(--gray-1) !important;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  background-color: var(--gray-1, #1C1C1C) !important;
+}
+
+main {
+  background-color: var(--gray-1, #1C1C1C) !important;
+}
+
+/* Hide scrollbars while maintaining scroll functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 /* Radix UI Toast animations */

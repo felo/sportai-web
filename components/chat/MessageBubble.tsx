@@ -21,10 +21,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     if (videoRef.current && videoSrc && message.videoFile && !message.videoFile.type.startsWith("image/")) {
       const video = videoRef.current;
       
+      // Set muted explicitly for autoplay
+      video.muted = true;
+      
       const playVideo = async () => {
         try {
-          video.muted = true;
-          await video.play();
+          if (video.readyState >= 3) {
+            await video.play();
+          }
         } catch (error) {
           // Autoplay was prevented, but that's okay - user can still play manually
           console.log("Autoplay prevented:", error);
@@ -39,18 +43,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         playVideo();
       };
 
-      // Set muted explicitly
-      video.muted = true;
-      
+      // Add event listeners
       video.addEventListener("canplay", handleCanPlay);
       video.addEventListener("loadeddata", handleLoadedData);
       
-      // Try to play immediately and also when ready
-      requestAnimationFrame(() => {
-        playVideo();
-      });
-      
-      // Also try to play if video is already loaded
+      // Try to play if video is already loaded
       if (video.readyState >= 3) {
         playVideo();
       }
@@ -73,8 +70,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <Avatar
           size="2"
           radius="full"
+          src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763589692/sai-icon_s0u6ni.png"
           fallback="AI"
-          color="blue"
+          style={{
+            backgroundColor: "white",
+            border: "2px solid var(--mint-6)",
+          }}
         />
       )}
 
@@ -86,7 +87,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           backgroundColor:
             message.role === "user"
               ? "var(--accent-9)"
-              : "var(--gray-3)",
+              : "transparent",
           color:
             message.role === "user"
               ? "var(--accent-contrast)"
@@ -111,12 +112,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 ) : (
                   <video
                     ref={videoRef}
-                    src={videoSrc}
+                    src={videoSrc || undefined}
                     controls
                     autoPlay
                     muted
                     playsInline
                     preload="auto"
+                    onError={(e) => {
+                      console.error("Video playback error:", e);
+                      const video = e.currentTarget;
+                      console.error("Video error details:", {
+                        error: video.error,
+                        networkState: video.networkState,
+                        readyState: video.readyState,
+                        src: video.src,
+                      });
+                    }}
+                    onLoadStart={() => {
+                      console.log("Video load started:", videoSrc);
+                    }}
+                    onLoadedMetadata={() => {
+                      console.log("Video metadata loaded");
+                    }}
                     style={{
                       maxWidth: "100%",
                       borderRadius: "var(--radius-2)",
@@ -146,15 +163,6 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </Box>
         )}
       </Box>
-
-      {message.role === "user" && (
-        <Avatar
-          size="2"
-          radius="full"
-          fallback="You"
-          color="gray"
-        />
-      )}
     </Flex>
   );
 }

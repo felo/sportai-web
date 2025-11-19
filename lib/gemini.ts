@@ -6,6 +6,7 @@ import {
   calculatePricing,
   formatCost,
 } from "./token-utils";
+import { SYSTEM_PROMPT } from "@/utils/prompts";
 
 const MODEL_NAME = "gemini-3-pro-preview";
 
@@ -35,13 +36,17 @@ export async function queryGemini(
 ): Promise<string> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
+  // Prepend system prompt to user prompt
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+  
   logger.info(`[${requestId}] Starting Gemini query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
-  logger.debug(`[${requestId}] Prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
-  // Estimate input tokens
-  let estimatedInputTokens = estimateTextTokens(prompt);
+  // Estimate input tokens (using full prompt with system prompt)
+  let estimatedInputTokens = estimateTextTokens(fullPrompt);
   
   // Add tokens from conversation history
   if (conversationHistory && conversationHistory.length > 0) {
@@ -84,8 +89,8 @@ export async function queryGemini(
     // Using Gemini 3 Pro - uses dynamic thinking (high) by default
     const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
     
-    // Build current message parts
-    const parts: any[] = [{ text: prompt }];
+    // Build current message parts (using full prompt with system prompt)
+    const parts: any[] = [{ text: fullPrompt }];
     
     // Add media (video or image) if provided
     if (videoData) {
@@ -217,15 +222,19 @@ export async function* streamGemini(
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
+  // Prepend system prompt to user prompt
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+  
   logger.info(`[${requestId}] Starting Gemini stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
-  logger.debug(`[${requestId}] Prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
   try {
     const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
     
-    const parts = [{ text: prompt }];
+    const parts = [{ text: fullPrompt }];
     
     // For conversation history, use startChat() if history exists, otherwise use generateContentStream()
     let result: any;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import { TextArea, Button, Tooltip, Box, Flex, Callout } from "@radix-ui/themes";
-import { VideoIcon } from "@radix-ui/react-icons";
+import { TextArea, Button, Tooltip, Box, Flex, Callout, Text } from "@radix-ui/themes";
+import { ArrowUpIcon, PlusIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "./VideoPreview";
 
 interface ChatInputProps {
@@ -33,66 +33,97 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Resize textarea when prompt changes (e.g., from Pickleball Coach button)
-    // Use multiple approaches to ensure it works with Radix Themes
-    const resizeTextarea = () => {
-      if (textareaRef.current) {
-        const textarea = textareaRef.current;
-        // Reset height to auto to get accurate scrollHeight
-        textarea.style.height = "auto";
-        // Calculate new height based on content
-        const newHeight = Math.max(52, Math.min(textarea.scrollHeight, 200));
-        textarea.style.height = `${newHeight}px`;
-      }
-    };
+    // Set initial height to two lines (80px total including padding)
+    if (textareaRef.current) {
+      // Ensure it starts at exactly 80px
+      textareaRef.current.style.height = "80px";
+    }
+  }, []);
 
-    // Try immediately
-    resizeTextarea();
-    
-    // Use requestAnimationFrame to ensure DOM is updated
-    requestAnimationFrame(resizeTextarea);
-    
-    // Also use a small timeout as fallback
-    const timeoutId = setTimeout(resizeTextarea, 0);
-    const timeoutId2 = setTimeout(resizeTextarea, 10);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      clearTimeout(timeoutId2);
-    };
+  useEffect(() => {
+    // Skip resize on initial mount if empty
+    if (!prompt.trim()) {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "80px";
+      }
+      return;
+    }
+
+    // Resize when prompt changes (e.g., from Pickleball Coach button)
+    // Use double requestAnimationFrame to ensure DOM is fully updated
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const textarea = textareaRef.current;
+          // Temporarily set to auto to measure scrollHeight
+          textarea.style.height = "auto";
+          const scrollHeight = textarea.scrollHeight;
+          
+          // Base height is 80px (includes padding)
+          // Only resize if content actually exceeds this base height
+          if (scrollHeight > 80) {
+            textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
+          } else {
+            // Keep at two lines
+            textarea.style.height = "80px";
+          }
+        }
+      });
+    });
   }, [prompt]);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onPromptChange(e.target.value);
-    // Auto-resize textarea - use ref to ensure we get the correct element
-    if (textareaRef.current) {
-      const textarea = textareaRef.current;
-      textarea.style.height = "auto";
-      const newHeight = Math.min(textarea.scrollHeight, 200);
-      textarea.style.height = `${newHeight}px`;
-    }
+    const newValue = e.target.value;
+    onPromptChange(newValue);
+    
+    // Use requestAnimationFrame to ensure DOM is updated before measuring
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        const textarea = textareaRef.current;
+        
+        // If empty, keep at two lines
+        if (!newValue.trim()) {
+          textarea.style.height = "80px";
+          return;
+        }
+        
+        // Temporarily set to auto to measure scrollHeight
+        textarea.style.height = "auto";
+        const scrollHeight = textarea.scrollHeight;
+        
+        // Base height is 80px (includes padding)
+        // Only resize if content actually exceeds this base height
+        if (scrollHeight > 80) {
+          textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
+        } else {
+          // Keep at two lines
+          textarea.style.height = "80px";
+        }
+      }
+    });
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     // Handle paste and resize after paste content is inserted
-    // Use multiple timeouts to ensure resize happens after paste is fully processed
+    // Use timeout to ensure resize happens after paste is fully processed
     setTimeout(() => {
       if (textareaRef.current) {
         const textarea = textareaRef.current;
+        
+        // Temporarily set to auto to measure scrollHeight
         textarea.style.height = "auto";
-        const newHeight = Math.min(textarea.scrollHeight, 200);
-        textarea.style.height = `${newHeight}px`;
+        const scrollHeight = textarea.scrollHeight;
+        
+        // Base height is 80px (includes padding)
+        // Only resize if content actually exceeds this base height
+        if (scrollHeight > 80) {
+          textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
+        } else {
+          // Keep at two lines
+          textarea.style.height = "80px";
+        }
       }
     }, 0);
-    // Also resize after a slightly longer delay to catch any async updates
-    setTimeout(() => {
-      if (textareaRef.current) {
-        const textarea = textareaRef.current;
-        textarea.style.height = "auto";
-        const newHeight = Math.min(textarea.scrollHeight, 200);
-        textarea.style.height = `${newHeight}px`;
-      }
-    }, 10);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -108,7 +139,7 @@ export function ChatInput({
       style={{
         borderTop: "1px solid var(--gray-6)",
         backgroundColor: "var(--color-background)",
-        padding: "var(--space-4)",
+        paddingBottom: "var(--space-8)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -119,7 +150,7 @@ export function ChatInput({
       )}
 
       <form onSubmit={onSubmit}>
-        <Flex direction="column" gap="3">
+        <Flex direction="column" gap="4">
           {videoFile && videoPreview && (
             <VideoPreview
               videoFile={videoFile}
@@ -128,79 +159,111 @@ export function ChatInput({
             />
           )}
 
-          <Flex gap="2" align="center">
-            <Box position="relative" style={{ flex: 1 }}>
-              <TextArea
-                ref={textareaRef}
-                value={prompt}
-                onChange={handleTextareaChange}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask anything sports related"
-                aria-label="Chat input"
-                rows={1}
-                resize="none"
-                style={{
-                  minHeight: "52px",
-                  maxHeight: "200px",
-                  paddingRight: "100px",
-                  overflowY: "auto",
-                }}
-              />
-              <Box
-                position="absolute"
-                style={{
-                  right: "var(--space-2)",
-                  bottom: "var(--space-2)",
-                }}
-              >
-                <Tooltip content="Use Pickleball Coach prompt">
-                  <Button
-                    type="button"
-                    onClick={onPickleballCoachClick}
-                    size="1"
-                    color="green"
-                    variant="solid"
-                  >
-                    🎾 Coach
-                  </Button>
-                </Tooltip>
-              </Box>
+          <Box position="relative" style={{ width: "100%" }}>
+            <TextArea
+              ref={textareaRef}
+              value={prompt}
+              onChange={handleTextareaChange}
+              onPaste={handlePaste}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything sports related"
+              aria-label="Chat input"
+              resize="none"
+              style={{
+                maxHeight: "300px",
+                padding: "var(--space-3)",
+                paddingBottom: "48px",
+                overflowY: "auto",
+                backgroundColor: "var(--color-background)",
+              }}
+            />
+            
+            {/* Plus button - bottom left */}
+            <Box
+              position="absolute"
+              style={{
+                left: "var(--space-3)",
+                bottom: "var(--space-3)",
+              }}
+            >
+              <Tooltip content="Upload video or image">
+                <label
+                  htmlFor="video"
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    backgroundColor: "var(--gray-3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                    border: "none",
+                  }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLLabelElement>) => {
+                    e.currentTarget.style.backgroundColor = "var(--gray-4)";
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLLabelElement>) => {
+                    e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                  }}
+                >
+                  <input
+                    id="video"
+                    type="file"
+                    accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={onVideoChange}
+                    style={{ display: "none" }}
+                  />
+                  <PlusIcon width="16" height="16" color="var(--gray-11)" />
+                </label>
+              </Tooltip>
             </Box>
 
-            <Tooltip content="Upload video or image">
-              <label
-                htmlFor="video"
-                style={{
-                  border: "2px dashed var(--gray-6)",
-                  borderRadius: "var(--radius-3)",
-                  padding: "var(--space-3)",
-                  minHeight: "52px",
-                  minWidth: "52px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "border-color 0.2s",
-                }}
-                onMouseEnter={(e: React.MouseEvent<HTMLLabelElement>) => {
-                  e.currentTarget.style.borderColor = "var(--gray-8)";
-                }}
-                onMouseLeave={(e: React.MouseEvent<HTMLLabelElement>) => {
-                  e.currentTarget.style.borderColor = "var(--gray-6)";
-                }}
-              >
-                <input
-                  id="video"
-                  type="file"
-                  accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={onVideoChange}
-                  style={{ display: "none" }}
-                />
-                <VideoIcon width="24" height="24" color="var(--gray-9)" />
-              </label>
-            </Tooltip>
-          </Flex>
+            {/* Submit button - bottom right */}
+            <Box
+              position="absolute"
+              style={{
+                right: "var(--space-3)",
+                bottom: "var(--space-3)",
+              }}
+            >
+              <Tooltip content="Send message">
+                <button
+                  type="submit"
+                  disabled={loading || !prompt.trim()}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    backgroundColor: loading || !prompt.trim() ? "var(--gray-3)" : "var(--gray-3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: loading || !prompt.trim() ? "not-allowed" : "pointer",
+                    transition: "background-color 0.2s",
+                    border: "none",
+                    opacity: loading || !prompt.trim() ? 0.5 : 1,
+                  }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    if (!loading && prompt.trim()) {
+                      e.currentTarget.style.backgroundColor = "var(--gray-4)";
+                    }
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                  }}
+                >
+                  <ArrowUpIcon width="16" height="16" color={loading || !prompt.trim() ? "var(--gray-9)" : "var(--gray-11)"} />
+                </button>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          {/* Disclaimer text */}
+          <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)" }}>
+            This is a demo of the SportAI API, and may contain errors. For enterprise-level precision, performance, and dedicated support, please contact us.
+          </Text>
         </Flex>
       </form>
     </Box>

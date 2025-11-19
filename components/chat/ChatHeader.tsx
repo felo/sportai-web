@@ -1,20 +1,23 @@
 "use client";
 
-import { AlertDialog, Button, Flex, Heading, Text, Box } from "@radix-ui/themes";
-import { TrashIcon } from "@radix-ui/react-icons";
+import { Flex, Box } from "@radix-ui/themes";
 import Image from "next/image";
 import { URLs } from "@/lib/config";
+import { useSidebar } from "@/components/SidebarContext";
 
 interface ChatHeaderProps {
-  onClear: () => void;
   messageCount: number;
 }
 
-export function ChatHeader({ onClear, messageCount }: ChatHeaderProps) {
+export function ChatHeader({ messageCount }: ChatHeaderProps) {
+  const { isCollapsed } = useSidebar();
+  const sidebarWidth = isCollapsed ? "64px" : "280px";
+
   return (
     <Box
-      className="fixed top-0 left-0 right-0 z-20"
+      className="fixed top-0 right-0 z-20"
       style={{
+        left: sidebarWidth, // Start to the right of sidebar
         borderBottom: "1px solid var(--gray-6)",
         backgroundColor: "var(--color-background)",
         backdropFilter: "blur(8px)",
@@ -23,43 +26,16 @@ export function ChatHeader({ onClear, messageCount }: ChatHeaderProps) {
         alignItems: "center",
         justifyContent: "space-between",
         boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+        transition: "left 0.2s ease-in-out",
       }}
     >
       <Image
         src={URLs.logo}
         alt="SportAI Web"
         width={120}
-        height={40}
+        height={38}
         style={{ objectFit: "contain", height: "auto" }}
       />
-      {messageCount > 0 && (
-        <AlertDialog.Root>
-          <AlertDialog.Trigger>
-            <Button variant="ghost" color="gray" size="2">
-              <TrashIcon width="16" height="16" />
-              Clear
-            </Button>
-          </AlertDialog.Trigger>
-          <AlertDialog.Content maxWidth="450px">
-            <AlertDialog.Title>Clear conversation?</AlertDialog.Title>
-            <AlertDialog.Description size="2">
-              This will permanently delete all messages in this conversation. This action cannot be undone.
-            </AlertDialog.Description>
-            <Flex gap="3" mt="4" justify="end">
-              <AlertDialog.Cancel>
-                <Button variant="soft" color="gray">
-                  Cancel
-                </Button>
-              </AlertDialog.Cancel>
-              <AlertDialog.Action>
-                <Button variant="solid" color="red" onClick={onClear}>
-                  Clear
-                </Button>
-              </AlertDialog.Action>
-            </Flex>
-          </AlertDialog.Content>
-        </AlertDialog.Root>
-      )}
     </Box>
   );
 }

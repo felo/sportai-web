@@ -10,6 +10,8 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { DragOverlay } from "@/components/chat/DragOverlay";
 import { ErrorToast } from "@/components/ui/Toast";
+import { Sidebar } from "@/components/Sidebar";
+import { useSidebar } from "@/components/SidebarContext";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
 import type { Message } from "@/types/chat";
 
@@ -17,6 +19,7 @@ export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { isCollapsed: isSidebarCollapsed } = useSidebar();
 
   const {
     videoFile,
@@ -65,6 +68,14 @@ export function GeminiQueryForm() {
       setVideoError(error);
     },
   });
+
+  // Auto-populate prompt when video is added and prompt is empty
+  useEffect(() => {
+    if (videoFile && !prompt.trim()) {
+      setPrompt("Please analyse this video for me");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFile]); // Only depend on videoFile to avoid loops
 
   const error = videoError || apiError;
   const hasScrolledToBottomRef = useRef(false);
@@ -191,46 +202,85 @@ export function GeminiQueryForm() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header with clear button - fixed at top */}
-      <ChatHeader
-        onClear={handleClearConversation}
+      {/* Header - fixed at top */}
+      <ChatHeader messageCount={messages.length} />
+
+      {/* Sidebar */}
+      <Sidebar 
+        onClearChat={handleClearConversation}
         messageCount={messages.length}
       />
 
-      {/* Scrollable content area */}
+      {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
-        ref={containerRef}
-        className={`flex flex-col flex-1 max-w-4xl mx-auto w-full transition-colors overflow-hidden pt-[57px] ${
-          isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""
-        }`}
-        {...dragHandlers}
+        style={{
+          marginLeft: isSidebarCollapsed ? "64px" : "280px",
+          transition: "margin-left 0.2s ease-in-out",
+          width: `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
+          height: "calc(100vh - 57px)", // Full height minus header
+          marginTop: "57px", // Start below header
+          display: "flex",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
       >
-        {/* Drag overlay */}
-        {isDragging && <DragOverlay />}
+        {/* Scrollable content area - centered and responsive */}
+        <div
+          ref={containerRef}
+          className={`flex flex-col max-w-4xl w-full h-full transition-all ${
+            isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""
+          }`}
+          style={{
+            position: "relative",
+            overflow: "hidden",
+          }}
+          {...dragHandlers}
+        >
+          {/* Drag overlay */}
+          {isDragging && <DragOverlay />}
 
-        {/* Messages area - this is the scrolling container */}
-        <MessageList
-          messages={messages}
-          loading={loading}
-          videoFile={videoFile}
-          progressStage={progressStage}
-          uploadProgress={uploadProgress}
-          messagesEndRef={messagesEndRef}
-        />
+          {/* Messages area - this is the scrolling container with fade overlay */}
+          <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <div style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+              <MessageList
+                messages={messages}
+                loading={loading}
+                videoFile={videoFile}
+                progressStage={progressStage}
+                uploadProgress={uploadProgress}
+                messagesEndRef={messagesEndRef}
+              />
+            </div>
+            
+            {/* Bottom fade overlay - fades content at bottom */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "60px",
+                background: `linear-gradient(to top, var(--gray-1, #1C1C1C) 0%, transparent 100%)`,
+                pointerEvents: "none",
+                zIndex: 1000,
+              }}
+            />
+          </div>
 
-        {/* Input area */}
-        <ChatInput
-          prompt={prompt}
-          videoFile={videoFile}
-          videoPreview={videoPreview}
-          error={null}
-          loading={loading}
-          onPromptChange={setPrompt}
-          onVideoRemove={clearVideo}
-          onVideoChange={handleVideoChange}
-          onSubmit={handleSubmit}
-          onPickleballCoachClick={handlePickleballCoachPrompt}
-        />
+          {/* Input area - docked at bottom */}
+          <ChatInput
+            prompt={prompt}
+            videoFile={videoFile}
+            videoPreview={videoPreview}
+            error={null}
+            loading={loading}
+            onPromptChange={setPrompt}
+            onVideoRemove={clearVideo}
+            onVideoChange={handleVideoChange}
+            onSubmit={handleSubmit}
+            onPickleballCoachClick={handlePickleballCoachPrompt}
+          />
+        </div>
       </div>
 
       {/* Toast for error notifications */}

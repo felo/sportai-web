@@ -8,8 +8,8 @@ type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "te
 type GrayColor = "gray" | "mauve" | "slate" | "sage" | "olive" | "sand";
 
 export function RadixThemeProvider({ children }: { children: React.ReactNode }) {
-  const [appearance, setAppearance] = useState<Appearance>("light");
-  const [accentColor, setAccentColor] = useState<AccentColor>("blue");
+  const [appearance, setAppearance] = useState<Appearance>("dark");
+  const [accentColor, setAccentColor] = useState<AccentColor>("mint");
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
   useEffect(() => {
@@ -18,8 +18,8 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
     if (stored) {
       try {
         const theme = JSON.parse(stored);
-        setAppearance(theme.appearance || "light");
-        setAccentColor(theme.accentColor || "blue");
+        setAppearance(theme.appearance || "dark");
+        setAccentColor(theme.accentColor || "mint");
         setGrayColor(theme.grayColor || "gray");
       } catch (e) {
         // Invalid stored theme, use defaults
@@ -36,8 +36,8 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
       if (stored) {
         try {
           const theme = JSON.parse(stored);
-          setAppearance(theme.appearance || "light");
-          setAccentColor(theme.accentColor || "blue");
+          setAppearance(theme.appearance || "dark");
+          setAccentColor(theme.accentColor || "mint");
           setGrayColor(theme.grayColor || "gray");
         } catch (e) {
           // Invalid stored theme
