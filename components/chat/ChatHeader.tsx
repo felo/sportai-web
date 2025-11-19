@@ -5,7 +5,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ onClear, messageCount }: ChatHeaderProps) {
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+    <div className="fixed top-0 left-0 right-0 z-20 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between shadow-sm">
       <h1 className="text-xl font-semibold">SportAI Web</h1>
       {messageCount > 0 && (
         <button

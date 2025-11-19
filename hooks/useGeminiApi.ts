@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { ProgressStage, Message } from "@/types/chat";
 import { getConversationContext, trimMessagesByTokens, formatMessagesForGemini } from "@/utils/context-utils";
+import { uploadToS3 } from "@/lib/s3";
 
 interface UseGeminiApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
@@ -92,103 +93,229 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       setStage: (stage: ProgressStage) => void,
       conversationHistory?: Message[]
     ) => {
-      const formData = new FormData();
-      formData.append("prompt", prompt);
-      formData.append("video", videoFile);
-
-      // Add conversation history if provided and not empty
-      // Note: With video uploads, we need to be more conservative with history size
-      // For first message, conversationHistory should be empty, so we skip this
-      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-        const context = getConversationContext(conversationHistory);
-        if (context.length > 0) {
-          const historyJson = JSON.stringify(context);
-          // With video, be more conservative - limit to 15MB for history (leaves 5MB for video)
-          const MAX_HISTORY_SIZE_WITH_VIDEO = 15 * 1024 * 1024; // 15MB
-          if (historyJson.length <= MAX_HISTORY_SIZE_WITH_VIDEO) {
-            formData.append("history", historyJson);
-          } else {
-            console.warn(`Conversation history too large for video upload (${historyJson.length} bytes), skipping`);
-            // Don't send history if too large with video
-          }
-        }
-      }
-
       setStage("uploading");
+      setProgress(0);
 
-      const res = await new Promise<Response>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100;
-            setProgress(percentComplete);
-          }
+      // Step 1: Get presigned URL for S3 upload
+      let s3Url: string;
+      try {
+        console.log("[S3] Requesting presigned URL for upload...", {
+          fileName: videoFile.name,
+          fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
+          contentType: videoFile.type,
         });
 
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const response = {
-              ok: true,
-              status: xhr.status,
-              statusText: xhr.statusText,
-              json: async () => JSON.parse(xhr.responseText),
-              text: async () => xhr.responseText,
-            } as Response;
-            resolve(response);
-          } else {
-            try {
-              const errorData = JSON.parse(xhr.responseText);
-              reject(
-                new Error(
-                  errorData.error || `HTTP ${xhr.status}: ${xhr.statusText}`
-                )
-              );
-            } catch {
-              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+        const urlResponse = await fetch("/api/s3/upload-url", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileName: videoFile.name,
+            contentType: videoFile.type,
+          }),
+        });
+
+        if (!urlResponse.ok) {
+          const errorData = await urlResponse.json();
+          console.error("[S3] ❌ Failed to get presigned URL", errorData);
+          throw new Error(errorData.error || "Failed to get upload URL");
+        }
+
+        const { url: presignedUrl, publicUrl, key } = await urlResponse.json();
+        s3Url = publicUrl;
+
+        console.log("[S3] ✅ Presigned URL received", {
+          key,
+          publicUrl: s3Url,
+          fileName: videoFile.name,
+        });
+
+        // Step 2: Upload file to S3 using presigned URL
+        console.log("[S3] Starting file upload to S3...");
+        await uploadToS3(presignedUrl, videoFile, (progress) => {
+          // Scale upload progress to 0-80% (leaving 20% for processing)
+          setProgress(progress * 0.8);
+        });
+
+        console.log("[S3] ✅ File uploaded successfully to S3!", {
+          s3Url: s3Url,
+          fileName: videoFile.name,
+        });
+
+        setProgress(80);
+        
+        // Step 2: Send S3 URL to Gemini API - backend will download it efficiently
+        setStage("processing");
+        console.log("[S3] Sending S3 URL to Gemini API (backend will download)...", {
+          s3Url: s3Url,
+          promptLength: prompt.length,
+        });
+
+        const formData = new FormData();
+        formData.append("prompt", prompt);
+        formData.append("videoUrl", s3Url);
+
+        // Add conversation history if provided
+        if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+          const context = getConversationContext(conversationHistory);
+          if (context.length > 0) {
+            const historyJson = JSON.stringify(context);
+            // With S3 URL, we have more room for history since video isn't in the payload
+            const MAX_HISTORY_SIZE_WITH_S3 = 18 * 1024 * 1024; // 18MB
+            if (historyJson.length <= MAX_HISTORY_SIZE_WITH_S3) {
+              formData.append("history", historyJson);
+            } else {
+              console.warn(`Conversation history too large (${historyJson.length} bytes), skipping`);
             }
           }
+        }
+
+        const res = await fetch("/api/gemini", {
+          method: "POST",
+          body: formData,
         });
 
-        xhr.addEventListener("error", () => {
-          reject(new Error("Network error"));
-        });
+        setProgress(90);
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        xhr.addEventListener("abort", () => {
-          reject(new Error("Request aborted"));
-        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to get response");
+        }
 
-        xhr.open("POST", "/api/gemini");
-        xhr.send(formData);
-      });
+        setStage("analyzing");
+        const estimatedSeconds = Math.max(
+          5,
+          Math.min(30, (videoFile.size / (1024 * 1024)) * 1.5)
+        );
+        const analysisStartTime = Date.now();
+        const progressInterval = setInterval(() => {
+          const elapsed = (Date.now() - analysisStartTime) / 1000;
+          if (elapsed < estimatedSeconds) {
+            const fakeProgress = Math.min(95, 50 + (elapsed / estimatedSeconds) * 45);
+            setProgress(fakeProgress);
+          }
+        }, 200);
 
-      setStage("processing");
-      setProgress(100);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to get response");
+        clearInterval(progressInterval);
+
+        updateMessage(assistantMessageId, data.response);
+        return;
+      } catch (error) {
+        // If S3 upload fails, log the error and check if we should fall back
+        console.error("[S3] ❌ S3 upload failed:", error);
+        console.error("[S3] Error details:", {
+          error: error instanceof Error ? error.message : String(error),
+          fileName: videoFile.name,
+          fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
+        });
+        
+        // Check file size - if too large, fail with error (don't fall back)
+        const fileSizeMB = videoFile.size / (1024 * 1024);
+        if (fileSizeMB > 4.5) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          throw new Error(
+            `S3 upload failed: ${errorMessage}. File is too large (${fileSizeMB.toFixed(2)} MB) for direct upload. Please check your S3 configuration or compress your video.`
+          );
+        }
+        
+        console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
+
+        // Fall back to direct upload
+        const formData = new FormData();
+        formData.append("prompt", prompt);
+        formData.append("video", videoFile);
+
+        // Add conversation history
+        if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+          const context = getConversationContext(conversationHistory);
+          if (context.length > 0) {
+            const historyJson = JSON.stringify(context);
+            const MAX_HISTORY_SIZE_WITH_VIDEO = 15 * 1024 * 1024; // 15MB
+            if (historyJson.length <= MAX_HISTORY_SIZE_WITH_VIDEO) {
+              formData.append("history", historyJson);
+            }
+          }
+        }
+
+        const res = await new Promise<Response>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              setProgress(percentComplete * 0.8); // Scale to 0-80%
+            }
+          });
+
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const response = {
+                ok: true,
+                status: xhr.status,
+                statusText: xhr.statusText,
+                json: async () => JSON.parse(xhr.responseText),
+                text: async () => xhr.responseText,
+              } as Response;
+              resolve(response);
+            } else {
+              try {
+                const errorData = JSON.parse(xhr.responseText);
+                reject(
+                  new Error(
+                    errorData.error || `HTTP ${xhr.status}: ${xhr.statusText}`
+                  )
+                );
+              } catch {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+              }
+            }
+          });
+
+          xhr.addEventListener("error", () => {
+            reject(new Error("Network error"));
+          });
+
+          xhr.addEventListener("abort", () => {
+            reject(new Error("Request aborted"));
+          });
+
+          xhr.open("POST", "/api/gemini");
+          xhr.send(formData);
+        });
+
+        setStage("processing");
+        setProgress(100);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to get response");
+        }
+
+        setStage("analyzing");
+        const estimatedSeconds = Math.max(
+          5,
+          Math.min(30, (videoFile.size / (1024 * 1024)) * 1.5)
+        );
+        const analysisStartTime = Date.now();
+        const progressInterval = setInterval(() => {
+          const elapsed = (Date.now() - analysisStartTime) / 1000;
+          if (elapsed < estimatedSeconds) {
+            const fakeProgress = Math.min(95, 50 + (elapsed / estimatedSeconds) * 45);
+            setProgress(fakeProgress);
+          }
+        }, 200);
+
+        const data = await res.json();
+        clearInterval(progressInterval);
+
+        updateMessage(assistantMessageId, data.response);
+        return;
       }
 
-      setStage("analyzing");
-      const estimatedSeconds = Math.max(
-        5,
-        Math.min(30, (videoFile.size / (1024 * 1024)) * 1.5)
-      );
-      const analysisStartTime = Date.now();
-      const progressInterval = setInterval(() => {
-        const elapsed = (Date.now() - analysisStartTime) / 1000;
-        if (elapsed < estimatedSeconds) {
-          const fakeProgress = Math.min(95, 50 + (elapsed / estimatedSeconds) * 45);
-          setProgress(fakeProgress);
-        }
-      }, 200);
-
-      const data = await res.json();
-      clearInterval(progressInterval);
-
-      updateMessage(assistantMessageId, data.response);
     },
     []
   );

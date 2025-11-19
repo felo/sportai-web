@@ -186,16 +186,17 @@ export function GeminiQueryForm() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header with clear button */}
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Header with clear button - fixed at top */}
       <ChatHeader
         onClear={handleClearConversation}
         messageCount={messages.length}
       />
 
+      {/* Scrollable content area */}
       <div
         ref={containerRef}
-        className={`flex flex-col flex-1 max-w-4xl mx-auto w-full transition-colors ${
+        className={`flex flex-col flex-1 max-w-4xl mx-auto w-full transition-colors overflow-hidden pt-[57px] ${
           isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""
         }`}
         {...dragHandlers}
@@ -203,15 +204,15 @@ export function GeminiQueryForm() {
         {/* Drag overlay */}
         {isDragging && <DragOverlay />}
 
-        {/* Messages area */}
-      <MessageList
-        messages={messages}
-        loading={loading}
-        videoFile={videoFile}
-        progressStage={progressStage}
-        uploadProgress={uploadProgress}
-        messagesEndRef={messagesEndRef}
-      />
+        {/* Messages area - this is the scrolling container */}
+        <MessageList
+          messages={messages}
+          loading={loading}
+          videoFile={videoFile}
+          progressStage={progressStage}
+          uploadProgress={uploadProgress}
+          messagesEndRef={messagesEndRef}
+        />
 
         {/* Input area */}
         <ChatInput

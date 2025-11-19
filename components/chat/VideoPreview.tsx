@@ -9,9 +9,19 @@ export function VideoPreview({
   videoPreview,
   onRemove,
 }: VideoPreviewProps) {
+  const isImage = videoFile.type.startsWith("image/");
+  
   return (
     <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
-      <video src={videoPreview || undefined} className="h-12 rounded" />
+      {isImage ? (
+        <img 
+          src={videoPreview || undefined} 
+          alt={videoFile.name}
+          className="h-12 w-auto rounded object-cover" 
+        />
+      ) : (
+        <video src={videoPreview || undefined} className="h-12 rounded" />
+      )}
       <span className="text-sm text-gray-600 dark:text-gray-400 flex-1 truncate">
         {videoFile.name}
       </span>

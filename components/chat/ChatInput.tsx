@@ -62,7 +62,7 @@ export function ChatInput({
   };
 
   return (
-    <div className="sticky bottom-0 z-10 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-lg">
+    <div className="sticky bottom-0 z-20 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-lg">
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
           <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
@@ -78,7 +78,7 @@ export function ChatInput({
           />
         )}
 
-        <div className="flex items-end gap-2">
+        <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
@@ -113,12 +113,12 @@ export function ChatInput({
                 border-2 border-dashed rounded-lg p-3 transition-colors cursor-pointer flex items-center justify-center
                 border-gray-300 dark:border-gray-600
               `}
-            style={{ minHeight: "52px", minWidth: "52px" }}
+            style={{ minHeight: "52px", minWidth: "52px", marginBottom: "6px" }}
           >
             <input
               id="video"
               type="file"
-              accept="video/*"
+              accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
               onChange={onVideoChange}
               className="hidden"
             />

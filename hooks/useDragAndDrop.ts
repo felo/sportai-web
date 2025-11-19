@@ -49,12 +49,16 @@ export function useDragAndDrop({
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find((file) => file.type.startsWith("video/"));
+    // Accept both videos and images
+    const mediaFile = files.find((file) => 
+      file.type.startsWith("video/") || 
+      file.type.startsWith("image/")
+    );
 
-    if (videoFile) {
-      onFileDrop(videoFile);
+    if (mediaFile) {
+      onFileDrop(mediaFile);
     } else if (files.length > 0) {
-      onError?.("Please drop a valid video file");
+      onError?.("Please drop a valid video or image file");
     }
   };
 

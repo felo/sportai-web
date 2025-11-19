@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
@@ -8,6 +11,53 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && message.videoPreview && message.videoFile && !message.videoFile.type.startsWith("image/")) {
+      const video = videoRef.current;
+      
+      const playVideo = async () => {
+        try {
+          video.muted = true;
+          await video.play();
+        } catch (error) {
+          // Autoplay was prevented, but that's okay - user can still play manually
+          console.log("Autoplay prevented:", error);
+        }
+      };
+
+      const handleCanPlay = () => {
+        playVideo();
+      };
+
+      const handleLoadedData = () => {
+        playVideo();
+      };
+
+      // Set muted explicitly
+      video.muted = true;
+      
+      video.addEventListener("canplay", handleCanPlay);
+      video.addEventListener("loadeddata", handleLoadedData);
+      
+      // Try to play immediately and also when ready
+      requestAnimationFrame(() => {
+        playVideo();
+      });
+      
+      // Also try to play if video is already loaded
+      if (video.readyState >= 3) {
+        playVideo();
+      }
+
+      return () => {
+        video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("loadeddata", handleLoadedData);
+      };
+    }
+  }, [message.videoPreview, message.videoFile]);
+
   return (
     <div
       className={`flex gap-4 ${
@@ -30,13 +80,26 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {message.role === "user" && (
           <div className="mb-2">
             <p className="whitespace-pre-wrap">{message.content}</p>
-            {message.videoPreview && (
+            {message.videoPreview && message.videoFile && (
               <div className="mt-2">
-                <video
-                  src={message.videoPreview}
-                  controls
-                  className="max-w-full rounded-md"
-                />
+                {message.videoFile.type.startsWith("image/") ? (
+                  <img
+                    src={message.videoPreview}
+                    alt="Uploaded image"
+                    className="max-w-full rounded-md"
+                  />
+                ) : (
+                  <video
+                    ref={videoRef}
+                    src={message.videoPreview}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    preload="auto"
+                    className="max-w-full rounded-md"
+                  />
+                )}
               </div>
             )}
           </div>

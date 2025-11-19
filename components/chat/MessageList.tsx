@@ -20,7 +20,7 @@ export function MessageList({
   messagesEndRef,
 }: MessageListProps) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6">
+    <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-6">
       {messages.length === 0 && (
         <div className="text-center text-gray-500 dark:text-gray-400 mt-12">
           <p className="text-lg mb-2">Start analysing with SportAI</p>

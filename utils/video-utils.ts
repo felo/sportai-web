@@ -6,18 +6,30 @@ export interface VideoValidationResult {
   error?: string;
 }
 
+// Supported image MIME types
+const SUPPORTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
 export function validateVideoFile(file: File): VideoValidationResult {
-  if (!file.type.startsWith("video/")) {
+  const isVideo = file.type.startsWith("video/");
+  const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+
+  if (!isVideo && !isImage) {
     return {
       valid: false,
-      error: "Please select a valid video file",
+      error: "Please select a valid video or image file (JPEG, PNG, GIF, WebP)",
     };
   }
 
   if (file.size > MAX_VIDEO_SIZE_BYTES) {
     return {
       valid: false,
-      error: `Video file size must be less than ${MAX_VIDEO_SIZE_MB}MB`,
+      error: `File size must be less than ${MAX_VIDEO_SIZE_MB}MB`,
     };
   }
 

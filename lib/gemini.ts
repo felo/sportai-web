@@ -54,13 +54,27 @@ export async function queryGemini(
   }
   
   if (videoData) {
-    const videoSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
-    const videoTokens = estimateVideoTokens(videoData.data.length, videoData.mimeType);
-    estimatedInputTokens += videoTokens;
-    logger.info(`[${requestId}] Video attached: ${videoData.mimeType}, ${videoSizeMB} MB`);
-    logger.debug(`[${requestId}] Estimated video tokens: ${videoTokens.toLocaleString()}`);
+    const isImage = videoData.mimeType.startsWith("image/");
+    const mediaType = isImage ? "image" : "video";
+    const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
+    
+    // Images use different token estimation than videos
+    // For images: roughly 257 tokens per image (base) + size-based estimation
+    // For videos: use existing video token estimation
+    let mediaTokens: number;
+    if (isImage) {
+      // Gemini images: base 257 tokens + ~85 tokens per 100KB
+      const imageSizeKB = videoData.data.length / 1024;
+      mediaTokens = 257 + Math.ceil((imageSizeKB / 100) * 85);
+    } else {
+      mediaTokens = estimateVideoTokens(videoData.data.length, videoData.mimeType);
+    }
+    
+    estimatedInputTokens += mediaTokens;
+    logger.info(`[${requestId}] ${mediaType} attached: ${videoData.mimeType}, ${mediaSizeMB} MB`);
+    logger.debug(`[${requestId}] Estimated ${mediaType} tokens: ${mediaTokens.toLocaleString()}`);
   } else {
-    logger.debug(`[${requestId}] No video attached`);
+    logger.debug(`[${requestId}] No media attached`);
   }
   logger.debug(`[${requestId}] Estimated input tokens: ${estimatedInputTokens.toLocaleString()}`);
   
@@ -73,10 +87,11 @@ export async function queryGemini(
     // Build current message parts
     const parts: any[] = [{ text: prompt }];
     
-    // Add video if provided
+    // Add media (video or image) if provided
     if (videoData) {
       const base64Length = videoData.data.toString("base64").length;
-      logger.debug(`[${requestId}] Video base64 length: ${base64Length} characters`);
+      const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
+      logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
       
       parts.push({
         inlineData: {

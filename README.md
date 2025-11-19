@@ -8,6 +8,7 @@ A Next.js application with minimal UI, Radix UI components, server-side renderin
 - 🎨 Radix UI components for accessible UI
 - 🔄 Server-side rendering
 - 🤖 Gemini 3 API integration
+- 📹 Video and image upload support with S3 integration
 - 💅 Tailwind CSS for styling
 - 📝 TypeScript for type safety
 
@@ -17,6 +18,7 @@ A Next.js application with minimal UI, Radix UI components, server-side renderin
 
 - Node.js 18+ installed
 - A Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+- (Optional) AWS S3 bucket for video uploads - see [S3 Configuration](#s3-configuration) below
 
 ### Installation
 
@@ -25,14 +27,16 @@ A Next.js application with minimal UI, Radix UI components, server-side renderin
 npm install
 ```
 
-2. Create a `.env.local` file in the root directory:
-```bash
-cp .env.example .env.local
-```
-
-3. Add your Gemini API key to `.env.local`:
+2. Create a `.env.local` file in the root directory and add your environment variables:
 ```
 GEMINI_API_KEY=your_api_key_here
+
+# Optional: AWS S3 configuration for video uploads
+# If not configured, the app will fall back to direct uploads (limited to 4.5MB on Vercel)
+AWS_REGION=eu-north-1
+AWS_S3_BUCKET_NAME=sportai-llm-uploads
+AWS_ACCESS_KEY_ID=your_access_key_id
+AWS_SECRET_ACCESS_KEY=your_secret_access_key
 ```
 
 4. Run the development server:
@@ -62,6 +66,135 @@ npm run dev
 ## Usage
 
 The app includes a simple form where you can query Gemini 3. The queries are processed server-side through the API route at `/api/gemini`.
+
+### Video Uploads
+
+The app supports uploading videos and images for analysis. There are two upload methods:
+
+1. **S3 Upload (Recommended)**: Videos are uploaded directly to AWS S3 using presigned URLs, bypassing server size limits. This allows for larger file uploads (up to 20MB by default).
+
+2. **Direct Upload (Fallback)**: If S3 is not configured, videos are uploaded directly to the API route. This is limited to 4.5MB on Vercel deployments.
+
+### S3 Configuration
+
+To enable S3 uploads, you need to:
+
+1. **Create an S3 bucket** in AWS (or use an existing one)
+   - Bucket name: `sportai-llm-uploads` (or configure via `AWS_S3_BUCKET_NAME`)
+   - Region: `eu-north-1` (or configure via `AWS_REGION`)
+   - Make the bucket public or configure CORS appropriately
+
+2. **Create an IAM user** with S3 permissions:
+   - Create a new IAM user in AWS Console
+   - Attach a policy with `s3:PutObject` permission for your bucket
+   - Generate access keys for the user
+
+3. **Configure bucket CORS** (REQUIRED for browser uploads):
+   
+   **Step-by-step instructions:**
+   
+   a. Go to AWS Console → S3 → Click on your bucket (`sportai-llm-uploads`)
+   
+   b. Click on the **Permissions** tab (at the top)
+   
+   c. Scroll down to find **Cross-origin resource sharing (CORS)** section
+   
+   d. Click **Edit** button
+   
+   e. Delete any existing CORS configuration and paste this (includes localhost for development):
+   ```json
+   [
+     {
+       "AllowedHeaders": ["*"],
+       "AllowedMethods": ["PUT", "POST", "GET", "HEAD"],
+       "AllowedOrigins": [
+         "http://localhost:3000",
+         "https://sportai-web-llm-git-main-sport-ai.vercel.app",
+         "https://llm.sportai.com"
+       ],
+       "ExposeHeaders": ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+   
+   f. Click **Save changes**
+   
+   **Note**: The `AllowedOrigins: ["*"]` allows all origins. For production, you should restrict this to your domain (e.g., `["https://yourdomain.com"]`). For local development, you can also add `["*", "http://localhost:3000"]` to be explicit.
+   
+   **If you get an error**, try this more permissive configuration:
+   ```json
+   [
+     {
+       "AllowedHeaders": ["*"],
+       "AllowedMethods": ["PUT", "POST", "GET", "HEAD", "DELETE"],
+       "AllowedOrigins": ["*"],
+       "ExposeHeaders": ["*"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+4. **Set bucket policy** to allow public reads (if bucket is public):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "PublicReadGetObject",
+         "Effect": "Allow",
+         "Principal": "*",
+         "Action": "s3:GetObject",
+         "Resource": "arn:aws:s3:::sportai-llm-uploads/*"
+       }
+     ]
+   }
+   ```
+
+5. **Add environment variables** to your `.env.local`:
+   ```
+   AWS_REGION=eu-north-1
+   AWS_S3_BUCKET_NAME=sportai-llm-uploads
+   AWS_ACCESS_KEY_ID=your_access_key_id
+   AWS_SECRET_ACCESS_KEY=your_secret_access_key
+   ```
+
+**Note**: The bucket URL you provided (`https://sportai-llm-uploads.s3.eu-north-1.amazonaws.com/test/`) suggests the bucket is already set up. You just need to add the AWS credentials to your environment variables.
+
+### Troubleshooting S3 Uploads
+
+If you get "Upload failed due to network error" or CORS errors:
+
+1. **Check CORS configuration**: Make sure CORS is properly configured (see step 3 above). The error usually means CORS is missing or incorrect.
+
+2. **Check IAM permissions**: Your IAM user needs both `s3:PutObject` (for uploads) and `s3:GetObject` (for downloads). The policy should look like:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "s3:PutObject",
+           "s3:GetObject"
+         ],
+         "Resource": "arn:aws:s3:::sportai-llm-uploads/*"
+       }
+     ]
+   }
+   ```
+   
+   **To fix the current error:**
+   - Go to AWS Console → IAM → Users → `WebLLM`
+   - Click on the policy attached to this user
+   - Edit the policy and add `s3:GetObject` to the Action array
+   - Save the changes
+
+3. **Check browser console**: Open browser DevTools (F12) → Console tab. Look for CORS errors or detailed error messages.
+
+4. **Verify bucket region**: Make sure `AWS_REGION` matches your bucket's actual region.
+
+5. **Test presigned URL**: The console logs will show if the presigned URL is generated successfully. If it fails at that step, check your AWS credentials.
 
 ## Tech Stack
 

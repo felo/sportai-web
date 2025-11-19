@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryGemini, streamGemini, type ConversationHistory } from "@/lib/gemini";
 import { logger } from "@/lib/logger";
+import { downloadFromS3 } from "@/lib/s3";
+
+// Ensure this route uses Node.js runtime (required for file uploads and Buffer)
+export const runtime = "nodejs";
+export const maxDuration = 300; // 5 minutes for video processing
 
 export async function POST(request: NextRequest) {
   const requestId = `api_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -9,12 +14,27 @@ export async function POST(request: NextRequest) {
   logger.info(`[${requestId}] Received POST request to /api/gemini`);
   
   // Check content length to catch 413 errors early
-  // Note: Vercel has a hard limit of 4.5MB, but we allow up to 20MB for other deployments
-  const MAX_PAYLOAD_SIZE_MB = 20;
+  // Note: Vercel has a hard limit of 4.5MB for serverless functions
+  // Requests larger than this may return 404 before reaching the handler
+  const VERCEL_MAX_SIZE_MB = 4.5;
+  const MAX_PAYLOAD_SIZE_MB = 20; // For other deployments
   const contentLength = request.headers.get("content-length");
+  
   if (contentLength) {
     const sizeMB = parseInt(contentLength) / (1024 * 1024);
     logger.debug(`[${requestId}] Request size: ${sizeMB.toFixed(2)} MB`);
+    
+    // Vercel-specific check - return clear error before Vercel rejects it
+    if (sizeMB > VERCEL_MAX_SIZE_MB) {
+      logger.error(`[${requestId}] Request too large for Vercel: ${sizeMB.toFixed(2)} MB (Vercel limit: ${VERCEL_MAX_SIZE_MB} MB)`);
+      return NextResponse.json(
+        { 
+          error: `Request payload too large (${sizeMB.toFixed(2)} MB). Vercel has a ${VERCEL_MAX_SIZE_MB}MB limit for serverless functions. Please use a smaller video file or compress it.` 
+        },
+        { status: 413 }
+      );
+    }
+    
     if (sizeMB > MAX_PAYLOAD_SIZE_MB) {
       logger.error(`[${requestId}] Request too large: ${sizeMB.toFixed(2)} MB (limit: ${MAX_PAYLOAD_SIZE_MB} MB)`);
       return NextResponse.json(
@@ -29,10 +49,12 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const prompt = formData.get("prompt") as string;
     const videoFile = formData.get("video") as File | null;
+    const videoUrl = formData.get("videoUrl") as string | null;
     const historyJson = formData.get("history") as string | null;
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
-    logger.debug(`[${requestId}] Video file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
+    logger.debug(`[${requestId}] Media file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
+    logger.debug(`[${requestId}] Media URL: ${videoUrl || "none"}`);
     logger.debug(`[${requestId}] History JSON: ${historyJson ? `${historyJson.length} characters` : "none"}`);
 
     if (!prompt || typeof prompt !== "string") {
@@ -57,9 +79,30 @@ export async function POST(request: NextRequest) {
 
     let videoData: { data: Buffer; mimeType: string } | null = null;
     
-    if (videoFile) {
-      logger.info(`[${requestId}] Processing video file: ${videoFile.name}`);
-      logger.time(`[${requestId}] Video processing`);
+    // Priority: videoUrl (S3) > videoFile (direct upload)
+    if (videoUrl) {
+      // Download from S3 using AWS SDK (efficient server-side download)
+      logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
+      console.log(`[Gemini API] 📥 Downloading from S3 (server-side): ${videoUrl}`);
+      logger.time(`[${requestId}] S3 download`);
+      
+      try {
+        videoData = await downloadFromS3(videoUrl);
+        logger.timeEnd(`[${requestId}] S3 download`);
+        logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`[Gemini API] ✅ Successfully downloaded from S3: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+      } catch (error) {
+        logger.error(`[${requestId}] Failed to download from S3:`, error);
+        console.error(`[Gemini API] ❌ Failed to download from S3:`, error);
+        return NextResponse.json(
+          { error: `Failed to download media from S3: ${error instanceof Error ? error.message : "Unknown error"}` },
+          { status: 500 }
+        );
+      }
+    } else if (videoFile) {
+      const fileType = videoFile.type.startsWith("video/") ? "video" : "image";
+      logger.info(`[${requestId}] Processing ${fileType} file: ${videoFile.name}`);
+      logger.time(`[${requestId}] ${fileType} processing`);
       
       // Convert file to buffer
       const arrayBuffer = await videoFile.arrayBuffer();
@@ -69,8 +112,8 @@ export async function POST(request: NextRequest) {
         mimeType: videoFile.type,
       };
       
-      logger.timeEnd(`[${requestId}] Video processing`);
-      logger.debug(`[${requestId}] Video buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
+      logger.timeEnd(`[${requestId}] ${fileType} processing`);
+      logger.debug(`[${requestId}] ${fileType} buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     }
 
     // Check if streaming is requested (only for text-only queries)
