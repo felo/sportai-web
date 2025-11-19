@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog } from "@radix-ui/themes";
-import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -19,6 +19,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
   const [alertOpen, setAlertOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>("dark");
+  const [chatsExpanded, setChatsExpanded] = useState(true);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -144,6 +145,69 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                   New chat
                 </Text>
               </Button>
+              
+              {/* Chats Section */}
+              <Flex direction="column" gap="2">
+                <Button
+                  variant="ghost"
+                  size="2"
+                  onClick={() => setChatsExpanded(!chatsExpanded)}
+                  style={{
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  {chatsExpanded ? (
+                    <ChevronDownIcon width="16" height="16" />
+                  ) : (
+                    <ChevronRightIcon width="16" height="16" />
+                  )}
+                  <Text size="2" ml="2" weight="medium">
+                    Chats
+                  </Text>
+                </Button>
+                {chatsExpanded && (
+                  <Flex direction="column" gap="1" style={{ paddingLeft: "calc(16px + var(--space-1) + var(--space-2))", paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
+                    <Button
+                      variant="ghost"
+                      size="2"
+                      style={{
+                        justifyContent: "flex-start",
+                        padding: "var(--space-2) var(--space-3)",
+                      }}
+                    >
+                      <Text size="2" color="gray">
+                        Chat 1
+                      </Text>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="2"
+                      style={{
+                        justifyContent: "flex-start",
+                        padding: "var(--space-2) var(--space-3)",
+                      }}
+                    >
+                      <Text size="2" color="gray">
+                        Chat 2
+                      </Text>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="2"
+                      style={{
+                        justifyContent: "flex-start",
+                        padding: "var(--space-2) var(--space-3)",
+                      }}
+                    >
+                      <Text size="2" color="gray">
+                        Chat 3
+                      </Text>
+                    </Button>
+                  </Flex>
+                )}
+              </Flex>
+              
               <Separator size="4" />
               <Flex direction="column" gap="2">
                 <Button
