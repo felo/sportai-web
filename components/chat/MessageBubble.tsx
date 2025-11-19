@@ -35,16 +35,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   // Show video if we have a video URL (persisted S3 URL) or a video file with preview
   const hasVideo = videoSrc && (message.videoUrl || message.videoFile);
   
-  // Rotate thinking messages every 3 seconds
+  // Rotate thinking messages every 3 seconds (only when uploading video)
   useEffect(() => {
-    if (!message.content && message.role === "assistant") {
+    if (!message.content && message.role === "assistant" && hasVideo) {
       const interval = setInterval(() => {
         setThinkingMessageIndex((prev) => (prev + 1) % THINKING_MESSAGES.length);
       }, 3000);
       
       return () => clearInterval(interval);
     }
-  }, [message.content, message.role]);
+  }, [message.content, message.role, hasVideo]);
 
   useEffect(() => {
     // Check if this is a video (not an image)
@@ -194,7 +194,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ) : (
               <Flex gap="2" align="center">
                 <Spinner size="1" />
-                <Text color="gray">{THINKING_MESSAGES[thinkingMessageIndex]}</Text>
+                <Text color="gray">{hasVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
               </Flex>
             )}
           </Box>

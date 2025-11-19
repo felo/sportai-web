@@ -261,13 +261,50 @@ export async function uploadToS3(
         });
         resolve();
       } else {
+        // Parse XML error response from S3
+        let errorMessage = `Upload failed with status ${xhr.status}: ${xhr.statusText}`;
+        let errorCode = "";
+        let errorDetails = "";
+        
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xhr.responseText, "text/xml");
+          const errorCodeElement = xmlDoc.querySelector("Code");
+          const errorMessageElement = xmlDoc.querySelector("Message");
+          
+          if (errorCodeElement) {
+            errorCode = errorCodeElement.textContent || "";
+          }
+          if (errorMessageElement) {
+            errorDetails = errorMessageElement.textContent || "";
+            errorMessage = `S3 Upload Failed (${errorCode}): ${errorDetails}`;
+          }
+        } catch (e) {
+          // If XML parsing fails, use the raw response
+          errorDetails = xhr.responseText.substring(0, 500);
+        }
+        
         console.error("[S3 Upload] ❌ Upload failed", {
           status: xhr.status,
           statusText: xhr.statusText,
-          responseText: xhr.responseText,
+          errorCode,
+          errorDetails,
+          responseText: xhr.responseText.substring(0, 500),
           fileName: file.name,
         });
-        reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText || xhr.responseText || "Unknown error"}`));
+        
+        // Provide helpful error message based on error code
+        if (errorCode === "AccessDenied" || xhr.status === 403) {
+          const helpfulMessage = `${errorMessage}\n\n` +
+            `This is a permissions issue. Please check:\n` +
+            `1. Your IAM user has 's3:PutObject' permission for the bucket\n` +
+            `2. The bucket policy allows uploads\n` +
+            `3. The AWS credentials in Vercel are correct and have the right permissions\n` +
+            `4. The bucket region matches AWS_REGION environment variable (currently: eu-north-1)`;
+          reject(new Error(helpfulMessage));
+        } else {
+          reject(new Error(errorMessage));
+        }
       }
     });
 

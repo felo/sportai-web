@@ -165,7 +165,7 @@ export function ChatInput({
               onChange={handleTextareaChange}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything sports related"
+              placeholder="Ask anything sports related…"
               aria-label="Chat input"
               resize="none"
               size="3"
