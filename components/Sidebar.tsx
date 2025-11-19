@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog } from "@radix-ui/themes";
 import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 type Appearance = "light" | "dark";
 
@@ -17,6 +18,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [alertOpen, setAlertOpen] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>("dark");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Load current appearance from localStorage
@@ -64,6 +66,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
     window.dispatchEvent(new Event("theme-change"));
   };
 
+  // Don't render sidebar on mobile
+  if (isMobile) {
+    return null;
+  }
+
   return (
     <Box
       style={{
@@ -79,10 +86,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
         display: "flex",
         flexDirection: "column",
         padding: "var(--space-4)",
-        paddingTop: "calc(var(--space-4) + 57px)", // Account for header height
+        paddingTop: "calc(var(--space-4) + 57px)", // Account for header height on desktop
       }}
     >
-      {/* Toggle Button - Aligned with logo center vertically */}
+      {/* Toggle Button - Aligned with header */}
       <Box
         style={{
           position: "absolute",

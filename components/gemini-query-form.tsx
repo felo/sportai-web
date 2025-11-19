@@ -5,6 +5,7 @@ import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useGeminiChat } from "@/hooks/useGeminiChat";
 import { useGeminiApi } from "@/hooks/useGeminiApi";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -20,6 +21,7 @@ export function GeminiQueryForm() {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
+  const isMobile = useIsMobile();
 
   const {
     videoFile,
@@ -235,8 +237,8 @@ export function GeminiQueryForm() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header - fixed at top */}
-      <ChatHeader messageCount={messages.length} />
+      {/* Header - hidden on mobile */}
+      {!isMobile && <ChatHeader messageCount={messages.length} />}
 
       {/* Sidebar */}
       <Sidebar 
@@ -247,11 +249,12 @@ export function GeminiQueryForm() {
       {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
         style={{
-          marginLeft: isSidebarCollapsed ? "64px" : "280px",
+          marginLeft: isMobile ? "16px" : (isSidebarCollapsed ? "64px" : "280px"),
+          marginRight: isMobile ? "16px" : "0",
           transition: "margin-left 0.2s ease-in-out",
-          width: `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
-          height: "calc(100vh - 57px)", // Full height minus header
-          marginTop: "57px", // Start below header
+          width: isMobile ? "calc(100% - 32px)" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
+          height: isMobile ? "100vh" : "calc(100vh - 57px)", // Full height on mobile, minus header on desktop
+          marginTop: isMobile ? "0" : "57px", // Start below header on desktop
           display: "flex",
           justifyContent: "center",
           overflow: "hidden",

@@ -138,7 +138,7 @@ export function ChatInput({
       className="sticky bottom-0 z-20"
       style={{
         backgroundColor: "var(--color-background)",
-        paddingBottom: "var(--space-8)",
+        paddingBottom: "var(--space-4)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -171,8 +171,7 @@ export function ChatInput({
               size="3"
               style={{
                 maxHeight: "300px",
-                padding: "var(--space-3)",
-                paddingBottom: "48px",
+                padding: "var(--space-1)",
                 overflowY: "auto",
                 backgroundColor: "var(--color-background)",
               }}
@@ -261,7 +260,7 @@ export function ChatInput({
           </Box>
 
           {/* Disclaimer text */}
-          <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)" }}>
+          <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
             This is a demo of the SportAI API, and may contain errors. For enterprise-level precision, performance, and dedicated support, please contact us.
           </Text>
         </Flex>
