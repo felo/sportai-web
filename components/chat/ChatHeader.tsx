@@ -31,7 +31,7 @@ export function ChatHeader({ messageCount }: ChatHeaderProps) {
     >
       <Image
         src={URLs.logo}
-        alt="SportAI Web"
+        alt="SportAI"
         width={120}
         height={38}
         style={{ objectFit: "contain", height: "auto" }}

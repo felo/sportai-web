@@ -19,6 +19,7 @@ let s3Client: S3Client | null = null;
 
 // Bucket configuration (defaults for client-side, actual values from env on server)
 const BUCKET_NAME = (isServer && process.env.AWS_S3_BUCKET_NAME) || "sportai-llm-uploads";
+// Default to eu-north-1 (Europe). Override via AWS_REGION environment variable if needed.
 const BUCKET_REGION = (isServer && process.env.AWS_REGION) || "eu-north-1";
 
 if (isServer) {
@@ -280,8 +281,17 @@ export async function uploadToS3(
       });
       
       // Check if it's a CORS error
-      if (xhr.status === 0 && xhr.readyState === 0) {
-        reject(new Error("Upload failed due to CORS or network error. Please check your S3 bucket CORS configuration."));
+      if (xhr.status === 0) {
+        const currentOrigin = typeof window !== "undefined" ? window.location.origin : "unknown";
+        const errorMsg = `Upload failed due to CORS error. The S3 bucket must allow requests from: ${currentOrigin}\n\n` +
+          `To fix this:\n` +
+          `1. Go to AWS Console → S3 → Your bucket → Permissions → CORS\n` +
+          `2. Add your origin (${currentOrigin}) to AllowedOrigins\n` +
+          `3. Ensure AllowedMethods includes "PUT"\n` +
+          `4. Ensure AllowedHeaders includes "*" or at least "Content-Type"\n\n` +
+          `See README.md for detailed CORS configuration instructions.`;
+        console.error("[S3 Upload] CORS Error Details:", errorMsg);
+        reject(new Error(errorMsg));
       } else {
         reject(new Error(`Upload failed due to network error: ${xhr.statusText || "Unknown error"}`));
       }

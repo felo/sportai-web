@@ -33,6 +33,7 @@ GEMINI_API_KEY=your_api_key_here
 
 # Optional: AWS S3 configuration for video uploads
 # If not configured, the app will fall back to direct uploads (limited to 4.5MB on Vercel)
+# Default region is eu-north-1 (Europe). Set this in Vercel to force Europe region.
 AWS_REGION=eu-north-1
 AWS_S3_BUCKET_NAME=sportai-llm-uploads
 AWS_ACCESS_KEY_ID=your_access_key_id
@@ -81,7 +82,7 @@ To enable S3 uploads, you need to:
 
 1. **Create an S3 bucket** in AWS (or use an existing one)
    - Bucket name: `sportai-llm-uploads` (or configure via `AWS_S3_BUCKET_NAME`)
-   - Region: `eu-north-1` (or configure via `AWS_REGION`)
+   - Region: `eu-north-1` (default, Europe). Set `AWS_REGION=eu-north-1` in Vercel to force Europe region.
    - Make the bucket public or configure CORS appropriately
 
 2. **Create an IAM user** with S3 permissions:
@@ -101,7 +102,7 @@ To enable S3 uploads, you need to:
    
    d. Click **Edit** button
    
-   e. Delete any existing CORS configuration and paste this (includes localhost for development):
+   e. Delete any existing CORS configuration and paste this (includes localhost for development and production):
    ```json
    [
      {
@@ -110,6 +111,7 @@ To enable S3 uploads, you need to:
        "AllowedOrigins": [
          "http://localhost:3000",
          "https://sportai-web-llm-git-main-sport-ai.vercel.app",
+         "https://*.vercel.app",
          "https://llm.sportai.com"
        ],
        "ExposeHeaders": ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"],
@@ -117,6 +119,8 @@ To enable S3 uploads, you need to:
      }
    ]
    ```
+   
+   **Important**: If you're using Vercel preview deployments, you may need to add `"https://*.vercel.app"` or be more specific with your production domain. The wildcard `*.vercel.app` covers all Vercel preview deployments.
    
    f. Click **Save changes**
    
@@ -151,21 +155,29 @@ To enable S3 uploads, you need to:
    }
    ```
 
-5. **Add environment variables** to your `.env.local`:
+5. **Add environment variables** to your `.env.local` (and **set them in Vercel for production**):
    ```
    AWS_REGION=eu-north-1
    AWS_S3_BUCKET_NAME=sportai-llm-uploads
    AWS_ACCESS_KEY_ID=your_access_key_id
    AWS_SECRET_ACCESS_KEY=your_secret_access_key
    ```
+   
+   **⚠️ CRITICAL**: Set `AWS_REGION=eu-north-1` in Vercel environment variables to force the Europe region. This ensures all S3 operations use the European bucket.
 
-**Note**: The bucket URL you provided (`https://sportai-llm-uploads.s3.eu-north-1.amazonaws.com/test/`) suggests the bucket is already set up. You just need to add the AWS credentials to your environment variables.
+**Note**: Make sure your `AWS_REGION` environment variable matches your bucket's actual region. You can check your bucket's region in the AWS Console. The bucket URL format is `https://bucket-name.s3.region.amazonaws.com/`.
 
 ### Troubleshooting S3 Uploads
 
 If you get "Upload failed due to network error" or CORS errors:
 
 1. **Check CORS configuration**: Make sure CORS is properly configured (see step 3 above). The error usually means CORS is missing or incorrect.
+   
+   **Common CORS Error**: If you see `"No 'Access-Control-Allow-Origin' header is present"`:
+   - Your production domain must be in the `AllowedOrigins` array
+   - For Vercel deployments, add `"https://*.vercel.app"` or your specific domain
+   - Make sure `AllowedMethods` includes `"PUT"`
+   - Make sure `AllowedHeaders` includes `"*"` or at least `"Content-Type"`
 
 2. **Check IAM permissions**: Your IAM user needs both `s3:PutObject` (for uploads) and `s3:GetObject` (for downloads). The policy should look like:
    ```json

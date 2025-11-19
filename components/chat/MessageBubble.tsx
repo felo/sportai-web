@@ -32,8 +32,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   // Use S3 URL if available, otherwise fall back to preview (blob URL)
   const videoSrc = message.videoUrl || message.videoPreview;
   
-  // Only process video if this message has a video file
-  const hasVideo = videoSrc && message.videoFile;
+  // Show video if we have a video URL (persisted S3 URL) or a video file with preview
+  const hasVideo = videoSrc && (message.videoUrl || message.videoFile);
   
   // Rotate thinking messages every 3 seconds
   useEffect(() => {
@@ -47,7 +47,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }, [message.content, message.role]);
 
   useEffect(() => {
-    if (videoRef.current && hasVideo && !message.videoFile?.type.startsWith("image/")) {
+    // Check if this is a video (not an image)
+    const isImage = message.videoFile?.type.startsWith("image/") || 
+                    (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i));
+    
+    if (videoRef.current && hasVideo && !isImage) {
       const video = videoRef.current;
       
       // Set muted explicitly for autoplay
@@ -86,7 +90,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         video.removeEventListener("loadeddata", handleLoadedData);
       };
     }
-  }, [hasVideo, message.videoFile]);
+  }, [hasVideo, message.videoFile, message.videoUrl]);
 
   return (
     <Flex
@@ -129,7 +133,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {/* Show video if present */}
             {hasVideo && (
               <Box mb={message.content.trim() ? "2" : "0"}>
-                {message.videoFile?.type.startsWith("image/") ? (
+                {message.videoFile?.type.startsWith("image/") || (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ? (
                   <img
                     src={videoSrc}
                     alt="Uploaded image"
