@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog } from "@radix-ui/themes";
-import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -17,6 +17,7 @@ interface SidebarProps {
 export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProps) {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [alertOpen, setAlertOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>("dark");
   const isMobile = useIsMobile();
 
@@ -130,13 +131,90 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
         <Box style={{ flex: 1, overflowY: "auto" }}>
           {children || (
             <Flex direction="column" gap="3">
-              <Text size="2" weight="medium" color="gray">
-                Navigation
-              </Text>
+              <Button
+                variant="ghost"
+                size="2"
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <PlusIcon width="16" height="16" />
+                <Text size="2" ml="2">
+                  New chat
+                </Text>
+              </Button>
               <Separator size="4" />
-              <Text size="2" color="gray">
-                Sidebar content goes here
-              </Text>
+              <Flex direction="column" gap="2">
+                <Button
+                  variant="ghost"
+                  size="2"
+                  asChild
+                  style={{
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  <a
+                    href="https://sportai.com/platform"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Text size="2">SportAI Platform</Text>
+                  </a>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="2"
+                  asChild
+                  style={{
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  <a
+                    href="https://sportai.mintlify.app/api-reference/introduction"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Text size="2">API Documentation</Text>
+                  </a>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="2"
+                  asChild
+                  style={{
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  <a
+                    href="https://sportai.com/contact"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Text size="2">Contact Us</Text>
+                  </a>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="2"
+                  asChild
+                  style={{
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  <a
+                    href="https://sportai.com/about-us"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Text size="2">About Us</Text>
+                  </a>
+                </Button>
+              </Flex>
             </Flex>
           )}
         </Box>
@@ -151,7 +229,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
           right: "var(--space-4)",
         }}
       >
-        <DropdownMenu.Root>
+        <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <DropdownMenu.Trigger>
             <Button
               variant="ghost"
@@ -232,6 +310,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                     onClick={() => {
                       onClearChat();
                       setAlertOpen(false);
+                      setDropdownOpen(false);
                     }}
                   >
                     Clear

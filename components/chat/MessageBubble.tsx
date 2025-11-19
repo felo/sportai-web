@@ -115,16 +115,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <Box
         style={{
           maxWidth: "80%",
-          borderRadius: "var(--radius-3)",
-          padding: "var(--space-3) var(--space-4)",
+          borderRadius: message.role === "user" && !hasVideo
+            ? "24px 8px 24px 24px" 
+            : "var(--radius-3)",
+          padding: message.role === "user" && hasVideo ? "0" : "var(--space-3) var(--space-4)",
           backgroundColor:
             message.role === "user"
-              ? "var(--accent-9)"
+              ? "transparent"
               : "transparent",
           color:
             message.role === "user"
-              ? "var(--accent-contrast)"
+              ? "white"
               : "var(--gray-12)",
+          border: message.role === "user" ? "1px solid var(--mint-6)" : "none",
         }}
         role={message.role === "user" ? "user-message" : "assistant-message"}
       >
@@ -132,14 +135,22 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <Box>
             {/* Show video if present */}
             {hasVideo && (
-              <Box mb={message.content.trim() ? "2" : "0"}>
+              <Box 
+                mb={message.content.trim() ? "2" : "0"}
+                style={{
+                  overflow: "hidden",
+                  borderRadius: message.role === "user" && hasVideo 
+                    ? "var(--radius-3)" 
+                    : "0",
+                }}
+              >
                 {message.videoFile?.type.startsWith("image/") || (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ? (
                   <img
                     src={videoSrc}
                     alt="Uploaded image"
                     style={{
                       maxWidth: "100%",
-                      borderRadius: "var(--radius-2)",
+                      display: "block",
                     }}
                   />
                 ) : (
@@ -169,7 +180,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     }}
                     style={{
                       maxWidth: "100%",
-                      borderRadius: "var(--radius-2)",
+                      display: "block",
                     }}
                   />
                 )}

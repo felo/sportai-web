@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { TextArea, Button, Tooltip, Box, Flex, Callout, Text } from "@radix-ui/themes";
 import { ArrowUpIcon, PlusIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "./VideoPreview";
@@ -31,6 +31,7 @@ export function ChatInput({
   onPickleballCoachClick,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     // Set initial height to two lines (80px total including padding)
@@ -158,33 +159,55 @@ export function ChatInput({
             />
           )}
 
-          <Box position="relative" style={{ width: "100%" }}>
+          <Box
+            style={{
+              width: "100%",
+              border: isFocused ? "1px solid var(--mint-6)" : "1px solid var(--gray-6)",
+              borderRadius: "var(--radius-3)",
+              backgroundColor: "var(--color-background)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "visible",
+              filter: isFocused 
+                ? "drop-shadow(0 2px 1px rgba(116, 188, 156, 0.3)) drop-shadow(0 2px 2px rgba(116, 188, 156, 0.4)) drop-shadow(0 8px 12px rgba(116, 188, 156, 0.2))" 
+                : "none",
+              transition: "border-color 0.2s ease, filter 0.2s ease",
+            }}
+          >
             <TextArea
               ref={textareaRef}
               value={prompt}
               onChange={handleTextareaChange}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               placeholder="Ask anything sports related…"
               aria-label="Chat input"
               resize="none"
               size="3"
               style={{
                 maxHeight: "300px",
-                padding: "var(--space-1)",
+                padding: "var(--space-3)",
+                paddingBottom: "var(--space-2)",
                 overflowY: "auto",
-                backgroundColor: "var(--color-background)",
+                backgroundColor: "transparent",
+                border: "none",
+                borderRadius: 0,
+                outline: "none",
+                boxShadow: "none",
               }}
             />
             
-            {/* Plus button - bottom left */}
-            <Box
-              position="absolute"
+            {/* Buttons row */}
+            <Flex
+              align="center"
+              justify="between"
               style={{
-                left: "var(--space-3)",
-                bottom: "var(--space-3)",
+                padding: "var(--space-2) var(--space-3)",
               }}
             >
+              {/* Plus button */}
               <Tooltip content="Upload video or image">
                 <label
                   htmlFor="video"
@@ -217,16 +240,8 @@ export function ChatInput({
                   <PlusIcon width="16" height="16" color="var(--gray-11)" />
                 </label>
               </Tooltip>
-            </Box>
 
-            {/* Submit button - bottom right */}
-            <Box
-              position="absolute"
-              style={{
-                right: "var(--space-3)",
-                bottom: "var(--space-3)",
-              }}
-            >
+              {/* Submit button */}
               <Tooltip content="Send message">
                 <button
                   type="submit"
@@ -256,7 +271,7 @@ export function ChatInput({
                   <ArrowUpIcon width="16" height="16" color={loading || !prompt.trim() ? "var(--gray-9)" : "var(--gray-11)"} />
                 </button>
               </Tooltip>
-            </Box>
+            </Flex>
           </Box>
 
           {/* Disclaimer text */}
