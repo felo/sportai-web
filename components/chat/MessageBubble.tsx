@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import * as Avatar from "@radix-ui/react-avatar";
+import { Avatar, Box, Flex, Spinner, Text } from "@radix-ui/themes";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
@@ -63,39 +63,50 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }, [videoSrc, message.videoFile]);
 
   return (
-    <div
-      className={`flex gap-4 ${
-        message.role === "user" ? "justify-end" : "justify-start"
-      }`}
+    <Flex
+      gap="4"
+      justify={message.role === "user" ? "end" : "start"}
       role="article"
       aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
     >
       {message.role === "assistant" && (
-        <Avatar.Root className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-          <Avatar.Fallback className="w-full h-full rounded-full flex items-center justify-center">
-            AI
-          </Avatar.Fallback>
-        </Avatar.Root>
+        <Avatar
+          size="2"
+          radius="full"
+          fallback="AI"
+          color="blue"
+        />
       )}
 
-      <div
-        className={`max-w-[80%] rounded-lg px-4 py-3 ${
-          message.role === "user"
-            ? "bg-blue-600 text-white"
-            : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-        }`}
+      <Box
+        style={{
+          maxWidth: "80%",
+          borderRadius: "var(--radius-3)",
+          padding: "var(--space-3) var(--space-4)",
+          backgroundColor:
+            message.role === "user"
+              ? "var(--accent-9)"
+              : "var(--gray-3)",
+          color:
+            message.role === "user"
+              ? "var(--accent-contrast)"
+              : "var(--gray-12)",
+        }}
         role={message.role === "user" ? "user-message" : "assistant-message"}
       >
         {message.role === "user" && (
-          <div className="mb-2">
-            <p className="whitespace-pre-wrap">{message.content}</p>
+          <Box>
+            <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
             {videoSrc && message.videoFile && (
-              <div className="mt-2">
+              <Box mt="2">
                 {message.videoFile.type.startsWith("image/") ? (
                   <img
                     src={videoSrc}
                     alt="Uploaded image"
-                    className="max-w-full rounded-md"
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: "var(--radius-2)",
+                    }}
                   />
                 ) : (
                   <video
@@ -106,16 +117,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     muted
                     playsInline
                     preload="auto"
-                    className="max-w-full rounded-md"
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: "var(--radius-2)",
+                    }}
                   />
                 )}
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         )}
 
         {message.role === "assistant" && (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
+          <Box className="prose prose-sm dark:prose-invert" style={{ maxWidth: "none" }}>
             {message.content ? (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -124,23 +138,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 {message.content}
               </ReactMarkdown>
             ) : (
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span>Thinking...</span>
-              </div>
+              <Flex gap="2" align="center">
+                <Spinner size="1" />
+                <Text size="2" color="gray">Thinking...</Text>
+              </Flex>
             )}
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       {message.role === "user" && (
-        <Avatar.Root className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-300 text-sm font-semibold">
-          <Avatar.Fallback className="w-full h-full rounded-full flex items-center justify-center">
-            You
-          </Avatar.Fallback>
-        </Avatar.Root>
+        <Avatar
+          size="2"
+          radius="full"
+          fallback="You"
+          color="gray"
+        />
       )}
-    </div>
+    </Flex>
   );
 }
 

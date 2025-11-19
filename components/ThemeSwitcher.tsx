@@ -1,61 +1,91 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import * as Select from "@radix-ui/react-select";
-import { applyTheme, getInitialTheme, themes, type ThemeName } from "@/lib/themes";
+import { Select, Box, Flex, Text } from "@radix-ui/themes";
+
+type Appearance = "light" | "dark";
+type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
+type GrayColor = "gray" | "mauve" | "slate" | "sage" | "olive" | "sand";
 
 export function ThemeSwitcher() {
-  const [currentTheme, setCurrentTheme] = useState<ThemeName>(getInitialTheme());
+  const [appearance, setAppearance] = useState<Appearance>("light");
+  const [accentColor, setAccentColor] = useState<AccentColor>("blue");
+  const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
   useEffect(() => {
-    applyTheme(currentTheme);
-    document.documentElement.setAttribute("data-theme", currentTheme);
-  }, [currentTheme]);
+    // Load from localStorage
+    const stored = localStorage.getItem("radix-theme");
+    if (stored) {
+      try {
+        const theme = JSON.parse(stored);
+        setAppearance(theme.appearance || "light");
+        setAccentColor(theme.accentColor || "blue");
+        setGrayColor(theme.grayColor || "gray");
+      } catch (e) {
+        // Invalid stored theme
+      }
+    }
+  }, []);
 
-  const handleThemeChange = (theme: ThemeName) => {
-    setCurrentTheme(theme);
-    applyTheme(theme);
-    document.documentElement.setAttribute("data-theme", theme);
+  const saveTheme = (theme: { appearance: Appearance; accentColor: AccentColor; grayColor: GrayColor }) => {
+    localStorage.setItem("radix-theme", JSON.stringify(theme));
+    // Trigger theme update in RadixThemeProvider
+    window.dispatchEvent(new Event("theme-change"));
   };
 
   return (
-    <Select.Root value={currentTheme} onValueChange={handleThemeChange}>
-      <Select.Trigger className="px-3 py-1.5 text-sm border border-border rounded-md bg-card text-foreground hover:bg-hover transition-colors">
-        <Select.Value>
-          <span className="capitalize">{currentTheme}</span>
-        </Select.Value>
-        <Select.Icon className="ml-2">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </Select.Icon>
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content className="bg-card border border-border rounded-md shadow-lg p-1 z-50 min-w-[120px]">
-          <Select.Viewport>
-            {Object.keys(themes).map((themeName) => (
-              <Select.Item
-                key={themeName}
-                value={themeName}
-                className="px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-hover hover:text-hoverForeground focus:bg-hover focus:text-hoverForeground outline-none capitalize"
-              >
-                <Select.ItemText>{themeName}</Select.ItemText>
-              </Select.Item>
-            ))}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
+    <Flex direction="column" gap="2" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
+      <Text size="2" weight="bold">Theme Settings</Text>
+      <Box>
+        <Text size="1" color="gray" mb="1">Appearance</Text>
+        <Select.Root value={appearance} onValueChange={(value) => {
+          setAppearance(value as Appearance);
+          saveTheme({ appearance: value as Appearance, accentColor, grayColor });
+        }}>
+          <Select.Trigger />
+          <Select.Content>
+            <Select.Item value="light">Light</Select.Item>
+            <Select.Item value="dark">Dark</Select.Item>
+          </Select.Content>
+        </Select.Root>
+      </Box>
+      <Box>
+        <Text size="1" color="gray" mb="1">Accent Color</Text>
+        <Select.Root value={accentColor} onValueChange={(value) => {
+          setAccentColor(value as AccentColor);
+          saveTheme({ appearance, accentColor: value as AccentColor, grayColor });
+        }}>
+          <Select.Trigger />
+          <Select.Content>
+            <Select.Item value="blue">Blue</Select.Item>
+            <Select.Item value="green">Green</Select.Item>
+            <Select.Item value="red">Red</Select.Item>
+            <Select.Item value="purple">Purple</Select.Item>
+            <Select.Item value="cyan">Cyan</Select.Item>
+            <Select.Item value="teal">Teal</Select.Item>
+            <Select.Item value="jade">Jade</Select.Item>
+            <Select.Item value="violet">Violet</Select.Item>
+          </Select.Content>
+        </Select.Root>
+      </Box>
+      <Box>
+        <Text size="1" color="gray" mb="1">Gray Scale</Text>
+        <Select.Root value={grayColor} onValueChange={(value) => {
+          setGrayColor(value as GrayColor);
+          saveTheme({ appearance, accentColor, grayColor: value as GrayColor });
+        }}>
+          <Select.Trigger />
+          <Select.Content>
+            <Select.Item value="gray">Gray</Select.Item>
+            <Select.Item value="mauve">Mauve</Select.Item>
+            <Select.Item value="slate">Slate</Select.Item>
+            <Select.Item value="sage">Sage</Select.Item>
+            <Select.Item value="olive">Olive</Select.Item>
+            <Select.Item value="sand">Sand</Select.Item>
+          </Select.Content>
+        </Select.Root>
+      </Box>
+    </Flex>
   );
 }
 

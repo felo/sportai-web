@@ -1,6 +1,8 @@
 "use client";
 
 import * as Toast from "@radix-ui/react-toast";
+import { Box, Flex, Text, IconButton } from "@radix-ui/themes";
+import { Cross2Icon } from "@radix-ui/react-icons";
 import { useEffect, useState } from "react";
 
 interface ToastProps {
@@ -29,37 +31,55 @@ export function ErrorToast({ error, onOpenChange }: ToastProps) {
   return (
     <Toast.Provider swipeDirection="right" duration={5000}>
       <Toast.Root
-        className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 shadow-lg data-[state=open]:animate-slideIn data-[state=closed]:animate-hide"
         open={open}
         onOpenChange={handleOpenChange}
+        style={{
+          backgroundColor: "var(--red-3)",
+          border: "1px solid var(--red-6)",
+          borderRadius: "var(--radius-3)",
+          padding: "var(--space-4)",
+          boxShadow: "var(--shadow-4)",
+        }}
       >
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <Toast.Title className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
-              Error
+        <Flex align="start" gap="3">
+          <Box style={{ flex: 1 }}>
+            <Toast.Title asChild>
+              <Text size="2" weight="medium" color="red" mb="1">
+                Error
+              </Text>
             </Toast.Title>
-            <Toast.Description className="text-sm text-red-700 dark:text-red-300">
-              {error}
+            <Toast.Description asChild>
+              <Text size="2" color="red">
+                {error}
+              </Text>
             </Toast.Description>
-          </div>
-          <Toast.Close className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 flex-shrink-0">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          </Box>
+          <Toast.Close asChild>
+            <IconButton
+              size="1"
+              color="red"
+              variant="ghost"
+              style={{ flexShrink: 0 }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+              <Cross2Icon width="16" height="16" />
+            </IconButton>
           </Toast.Close>
-        </div>
+        </Flex>
       </Toast.Root>
-      <Toast.Viewport className="fixed bottom-0 right-0 z-50 flex flex-col gap-2 w-full max-w-sm p-4" />
+      <Toast.Viewport
+        style={{
+          position: "fixed",
+          bottom: 0,
+          right: 0,
+          zIndex: 50,
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-2)",
+          width: "100%",
+          maxWidth: "384px",
+          padding: "var(--space-4)",
+        }}
+      />
     </Toast.Provider>
   );
 }
