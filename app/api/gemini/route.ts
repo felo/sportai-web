@@ -116,8 +116,8 @@ export async function POST(request: NextRequest) {
       logger.debug(`[${requestId}] ${fileType} buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     }
 
-    // Check if streaming is requested (only for text-only queries)
-    const shouldStream = !videoData && request.headers.get("x-stream") === "true";
+    // Check if streaming is requested (for both text-only and video queries)
+    const shouldStream = request.headers.get("x-stream") === "true";
     
     if (shouldStream) {
       logger.info(`[${requestId}] Streaming response...`);
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of streamGemini(prompt, conversationHistory)) {
+            for await (const chunk of streamGemini(prompt, conversationHistory, videoData)) {
               controller.enqueue(new TextEncoder().encode(chunk));
             }
             controller.close();

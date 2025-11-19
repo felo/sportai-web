@@ -124,16 +124,47 @@ export function GeminiQueryForm() {
     // This ensures we send the correct history to the API
     const conversationHistory = messages;
 
-    // Add user message
-    const userMessageId = `user-${Date.now()}`;
-    const userMessage: Message = {
-      id: userMessageId,
-      role: "user",
-      content: currentPrompt,
-      videoFile: currentVideoFile,
-      videoPreview: currentVideoPreview,
-    };
-    addMessage(userMessage);
+    const timestamp = Date.now();
+    let videoMessageId: string | null = null;
+    
+    // If both video and text are present, create two separate messages
+    if (currentVideoFile && currentPrompt.trim()) {
+      // First message: video only
+      videoMessageId = `user-video-${timestamp}`;
+      const videoMessage: Message = {
+        id: videoMessageId,
+        role: "user",
+        content: "",
+        videoFile: currentVideoFile,
+        videoPreview: currentVideoPreview,
+      };
+      addMessage(videoMessage);
+      
+      // Second message: text only
+      const textMessageId = `user-text-${timestamp}`;
+      const textMessage: Message = {
+        id: textMessageId,
+        role: "user",
+        content: currentPrompt,
+        videoFile: null,
+        videoPreview: null,
+      };
+      addMessage(textMessage);
+    } else {
+      // Single message: either video or text
+      const userMessageId = `user-${timestamp}`;
+      if (currentVideoFile) {
+        videoMessageId = userMessageId;
+      }
+      const userMessage: Message = {
+        id: userMessageId,
+        role: "user",
+        content: currentPrompt,
+        videoFile: currentVideoFile,
+        videoPreview: currentVideoPreview,
+      };
+      addMessage(userMessage);
+    }
 
     // Clear input
     setPrompt("");
@@ -181,8 +212,10 @@ export function GeminiQueryForm() {
           setProgressStage,
           conversationHistory,
           (s3Url) => {
-            // Update user message with S3 URL for video playback
-            updateMessage(userMessageId, { videoUrl: s3Url });
+            // Update video message with S3 URL for video playback
+            if (videoMessageId) {
+              updateMessage(videoMessageId, { videoUrl: s3Url });
+            }
           }
         );
       }

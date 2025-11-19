@@ -1,11 +1,25 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Avatar, Box, Flex, Spinner, Text } from "@radix-ui/themes";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
+
+const THINKING_MESSAGES = [
+  "Initializing environment model…",
+  "Detecting participants…",
+  "Estimating motion paths…",
+  "Understanding interaction dynamics…",
+  "Reconstructing event timeline…",
+  "Identifying key actions…",
+  "Measuring performance indicators…",
+  "Extracting behavioral patterns…",
+  "Evaluating technique signatures…",
+  "Computing tactical insights…",
+  "Generating summary…",
+];
 
 interface MessageBubbleProps {
   message: Message;
@@ -13,12 +27,27 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
 
   // Use S3 URL if available, otherwise fall back to preview (blob URL)
   const videoSrc = message.videoUrl || message.videoPreview;
+  
+  // Only process video if this message has a video file
+  const hasVideo = videoSrc && message.videoFile;
+  
+  // Rotate thinking messages every 3 seconds
+  useEffect(() => {
+    if (!message.content && message.role === "assistant") {
+      const interval = setInterval(() => {
+        setThinkingMessageIndex((prev) => (prev + 1) % THINKING_MESSAGES.length);
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [message.content, message.role]);
 
   useEffect(() => {
-    if (videoRef.current && videoSrc && message.videoFile && !message.videoFile.type.startsWith("image/")) {
+    if (videoRef.current && hasVideo && !message.videoFile?.type.startsWith("image/")) {
       const video = videoRef.current;
       
       // Set muted explicitly for autoplay
@@ -57,7 +86,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         video.removeEventListener("loadeddata", handleLoadedData);
       };
     }
-  }, [videoSrc, message.videoFile]);
+  }, [hasVideo, message.videoFile]);
 
   return (
     <Flex
@@ -97,10 +126,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       >
         {message.role === "user" && (
           <Box>
-            <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
-            {videoSrc && message.videoFile && (
-              <Box mt="2">
-                {message.videoFile.type.startsWith("image/") ? (
+            {/* Show video if present */}
+            {hasVideo && (
+              <Box mb={message.content.trim() ? "2" : "0"}>
+                {message.videoFile?.type.startsWith("image/") ? (
                   <img
                     src={videoSrc}
                     alt="Uploaded image"
@@ -142,11 +171,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 )}
               </Box>
             )}
+            {/* Show text if present */}
+            {message.content.trim() && (
+              <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
+            )}
           </Box>
         )}
 
         {message.role === "assistant" && (
-          <Box className="prose prose-sm dark:prose-invert" style={{ maxWidth: "none" }}>
+          <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
             {message.content ? (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -157,7 +190,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ) : (
               <Flex gap="2" align="center">
                 <Spinner size="1" />
-                <Text size="2" color="gray">Thinking...</Text>
+                <Text color="gray">{THINKING_MESSAGES[thinkingMessageIndex]}</Text>
               </Flex>
             )}
           </Box>

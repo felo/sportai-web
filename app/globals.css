@@ -24,9 +24,6 @@ body {
   --mint-11: #2E5842;
   --mint-12: #002B1A; /* darkGreen - darkest */
   
-  /* Icon accent color - mint green for icons (using lighter mint for visibility) */
-  --icon-accent: #B0DCC3; /* mint-3 - lighter mint that's visible on dark backgrounds */
-  
   /* Gray scale - Dark mode colors */
   --gray-1: #1C1C1C; /* dark background */
   --gray-2: #252525;

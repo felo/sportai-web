@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flex, Text, Tooltip, IconButton } from "@radix-ui/themes";
+import { Box, Flex, Text, Tooltip } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 
 interface VideoPreviewProps {
@@ -22,8 +22,9 @@ export function VideoPreview({
       gap="2"
       p="2"
       style={{
-        backgroundColor: "var(--gray-3)",
+        border: "1px solid var(--gray-6)",
         borderRadius: "var(--radius-2)",
+        marginTop: "var(--space-2)",
       }}
       role="region"
       aria-label="Video preview"
@@ -50,7 +51,6 @@ export function VideoPreview({
         />
       )}
       <Text
-        size="2"
         color="gray"
         style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
         aria-label={`File: ${videoFile.name}`}
@@ -58,16 +58,31 @@ export function VideoPreview({
         {videoFile.name}
       </Text>
       <Tooltip content="Remove file">
-        <IconButton
+        <button
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${videoFile.name}`}
-          color="red"
-          variant="ghost"
-          size="1"
+          style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            backgroundColor: "var(--gray-3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "background-color 0.2s",
+            border: "none",
+          }}
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = "var(--gray-4)";
+          }}
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = "var(--gray-3)";
+          }}
         >
-          <Cross2Icon width="12" height="12" />
-        </IconButton>
+          <Cross2Icon width="16" height="16" color="var(--gray-11)" />
+        </button>
       </Tooltip>
     </Flex>
   );

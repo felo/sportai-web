@@ -213,12 +213,13 @@ export async function queryGemini(
 }
 
 /**
- * Stream Gemini response (for text-only queries)
+ * Stream Gemini response (for text-only and video queries)
  * Returns an async generator that yields text chunks
  */
 export async function* streamGemini(
   prompt: string,
-  conversationHistory?: ConversationHistory[]
+  conversationHistory?: ConversationHistory[],
+  videoData?: { data: Buffer; mimeType: string } | null
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
@@ -231,10 +232,32 @@ export async function* streamGemini(
   logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
+  if (videoData) {
+    const isImage = videoData.mimeType.startsWith("image/");
+    const mediaType = isImage ? "image" : "video";
+    const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
+    logger.info(`[${requestId}] ${mediaType} attached: ${videoData.mimeType}, ${mediaSizeMB} MB`);
+  }
+  
   try {
     const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
     
-    const parts = [{ text: fullPrompt }];
+    // Build current message parts (using full prompt with system prompt)
+    const parts: any[] = [{ text: fullPrompt }];
+    
+    // Add media (video or image) if provided
+    if (videoData) {
+      const base64Length = videoData.data.toString("base64").length;
+      const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
+      logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
+      
+      parts.push({
+        inlineData: {
+          data: videoData.data.toString("base64"),
+          mimeType: videoData.mimeType,
+        },
+      });
+    }
     
     // For conversation history, use startChat() if history exists, otherwise use generateContentStream()
     let result: any;

@@ -182,35 +182,35 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
 
         const res = await fetch("/api/gemini", {
           method: "POST",
+          headers: {
+            "x-stream": "true",
+          },
           body: formData,
         });
 
         setProgress(90);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        setStage("analyzing");
 
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to get response");
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to get response");
         }
 
-        setStage("analyzing");
-        const estimatedSeconds = Math.max(
-          5,
-          Math.min(30, (videoFile.size / (1024 * 1024)) * 1.5)
-        );
-        const analysisStartTime = Date.now();
-        const progressInterval = setInterval(() => {
-          const elapsed = (Date.now() - analysisStartTime) / 1000;
-          if (elapsed < estimatedSeconds) {
-            const fakeProgress = Math.min(95, 50 + (elapsed / estimatedSeconds) * 45);
-            setProgress(fakeProgress);
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            updateMessage(assistantMessageId, accumulatedText);
           }
-        }, 200);
+        }
 
-        const data = await res.json();
-        clearInterval(progressInterval);
-
-        updateMessage(assistantMessageId, data.response);
         return;
       } catch (error) {
         // If S3 upload fails, log the error and check if we should fall back
@@ -232,7 +232,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         
         console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
 
-        // Fall back to direct upload
+        // Fall back to direct upload with streaming
         const formData = new FormData();
         formData.append("prompt", prompt);
         formData.append("video", videoFile);
@@ -249,79 +249,38 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
           }
         }
 
-        const res = await new Promise<Response>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-
-          xhr.upload.addEventListener("progress", (event) => {
-            if (event.lengthComputable) {
-              const percentComplete = (event.loaded / event.total) * 100;
-              setProgress(percentComplete * 0.8); // Scale to 0-80%
-            }
-          });
-
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              const response = {
-                ok: true,
-                status: xhr.status,
-                statusText: xhr.statusText,
-                json: async () => JSON.parse(xhr.responseText),
-                text: async () => xhr.responseText,
-              } as Response;
-              resolve(response);
-            } else {
-              try {
-                const errorData = JSON.parse(xhr.responseText);
-                reject(
-                  new Error(
-                    errorData.error || `HTTP ${xhr.status}: ${xhr.statusText}`
-                  )
-                );
-              } catch {
-                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-              }
-            }
-          });
-
-          xhr.addEventListener("error", () => {
-            reject(new Error("Network error"));
-          });
-
-          xhr.addEventListener("abort", () => {
-            reject(new Error("Request aborted"));
-          });
-
-          xhr.open("POST", "/api/gemini");
-          xhr.send(formData);
+        setStage("processing");
+        const res = await fetch("/api/gemini", {
+          method: "POST",
+          headers: {
+            "x-stream": "true",
+          },
+          body: formData,
         });
 
-        setStage("processing");
-        setProgress(100);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        setProgress(90);
+        setStage("analyzing");
 
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to get response");
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to get response");
         }
 
-        setStage("analyzing");
-        const estimatedSeconds = Math.max(
-          5,
-          Math.min(30, (videoFile.size / (1024 * 1024)) * 1.5)
-        );
-        const analysisStartTime = Date.now();
-        const progressInterval = setInterval(() => {
-          const elapsed = (Date.now() - analysisStartTime) / 1000;
-          if (elapsed < estimatedSeconds) {
-            const fakeProgress = Math.min(95, 50 + (elapsed / estimatedSeconds) * 45);
-            setProgress(fakeProgress);
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            updateMessage(assistantMessageId, accumulatedText);
           }
-        }, 200);
+        }
 
-        const data = await res.json();
-        clearInterval(progressInterval);
-
-        updateMessage(assistantMessageId, data.response);
         return;
       }
 

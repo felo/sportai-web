@@ -137,7 +137,6 @@ export function ChatInput({
     <Box
       className="sticky bottom-0 z-20"
       style={{
-        borderTop: "1px solid var(--gray-6)",
         backgroundColor: "var(--color-background)",
         paddingBottom: "var(--space-8)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
@@ -169,6 +168,7 @@ export function ChatInput({
               placeholder="Ask anything sports related"
               aria-label="Chat input"
               resize="none"
+              size="3"
               style={{
                 maxHeight: "300px",
                 padding: "var(--space-3)",

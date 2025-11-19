@@ -21,19 +21,19 @@ export const markdownComponents = {
   ),
   p: ({ node, ...props }: any) => (
     <p
-      className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed"
+      className="mb-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed"
       {...props}
     />
   ),
   ul: ({ node, ...props }: any) => (
     <ul
-      className="list-disc list-inside mb-4 space-y-2 text-gray-700 dark:text-gray-300"
+      className="list-disc list-inside mb-4 space-y-2 text-base text-gray-700 dark:text-gray-300"
       {...props}
     />
   ),
   ol: ({ node, ...props }: any) => (
     <ol
-      className="list-decimal list-inside mb-4 space-y-2 text-gray-700 dark:text-gray-300"
+      className="list-decimal list-inside mb-4 space-y-2 text-base text-gray-700 dark:text-gray-300"
       {...props}
     />
   ),
@@ -41,12 +41,12 @@ export const markdownComponents = {
   code: ({ node, inline, ...props }: any) =>
     inline ? (
       <code
-        className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm font-mono"
+        className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-base font-mono"
         {...props}
       />
     ) : (
       <code
-        className="block p-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-mono overflow-x-auto mb-4"
+        className="block p-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-base font-mono overflow-x-auto mb-4"
         {...props}
       />
     ),
