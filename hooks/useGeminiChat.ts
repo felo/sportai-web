@@ -7,27 +7,35 @@ import {
 } from "@/utils/storage";
 
 export function useGeminiChat() {
-  // Load messages from localStorage on mount
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (typeof window !== "undefined") {
-      return loadMessagesFromStorage();
-    }
-    return [];
-  });
+  // Start with empty array to avoid hydration mismatch
+  // Load from localStorage only on client after hydration
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progressStage, setProgressStage] = useState<ProgressStage>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Save messages to localStorage whenever they change
+  // Load messages from localStorage after hydration (client-side only)
   useEffect(() => {
-    if (messages.length > 0) {
-      saveMessagesToStorage(messages);
-    } else {
-      // Clear storage if messages array is empty
-      clearMessagesFromStorage();
+    if (!isHydrated) {
+      const storedMessages = loadMessagesFromStorage();
+      setMessages(storedMessages);
+      setIsHydrated(true);
     }
-  }, [messages]);
+  }, [isHydrated]);
+
+  // Save messages to localStorage whenever they change (but only after hydration)
+  useEffect(() => {
+    if (isHydrated) {
+      if (messages.length > 0) {
+        saveMessagesToStorage(messages);
+      } else {
+        // Clear storage if messages array is empty
+        clearMessagesFromStorage();
+      }
+    }
+  }, [messages, isHydrated]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,6 +66,7 @@ export function useGeminiChat() {
     progressStage,
     uploadProgress,
     messagesEndRef,
+    isHydrated,
     setLoading,
     setProgressStage,
     setUploadProgress,

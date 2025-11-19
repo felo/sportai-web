@@ -7,26 +7,52 @@ import {
   formatCost,
 } from "./token-utils";
 
-if (!process.env.GEMINI_API_KEY) {
-  logger.error("GEMINI_API_KEY environment variable is not set");
-  throw new Error("GEMINI_API_KEY environment variable is not set");
+const MODEL_NAME = "gemini-3-pro-preview";
+
+// Lazy initialization - only check API key when actually used (at runtime)
+let genAI: GoogleGenerativeAI | null = null;
+
+function getGenAI(): GoogleGenerativeAI {
+  if (!genAI) {
+    if (!process.env.GEMINI_API_KEY) {
+      logger.error("GEMINI_API_KEY environment variable is not set");
+      throw new Error("GEMINI_API_KEY environment variable is not set");
+    }
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
+  return genAI;
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-3-pro-preview";
+export interface ConversationHistory {
+  role: "user" | "model";
+  parts: Array<{ text: string }>;
+}
 
 export async function queryGemini(
   prompt: string,
-  videoData?: { data: Buffer; mimeType: string } | null
+  videoData?: { data: Buffer; mimeType: string } | null,
+  conversationHistory?: ConversationHistory[]
 ): Promise<string> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   logger.info(`[${requestId}] Starting Gemini query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] Prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
   // Estimate input tokens
   let estimatedInputTokens = estimateTextTokens(prompt);
+  
+  // Add tokens from conversation history
+  if (conversationHistory && conversationHistory.length > 0) {
+    const historyTokens = conversationHistory.reduce(
+      (sum, msg) => sum + estimateTextTokens(msg.parts.map(p => p.text).join("")),
+      0
+    );
+    estimatedInputTokens += historyTokens;
+    logger.debug(`[${requestId}] History tokens: ${historyTokens.toLocaleString()}`);
+  }
+  
   if (videoData) {
     const videoSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
     const videoTokens = estimateVideoTokens(videoData.data.length, videoData.mimeType);
@@ -42,9 +68,9 @@ export async function queryGemini(
   
   try {
     // Using Gemini 3 Pro - uses dynamic thinking (high) by default
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
     
-    // Build content parts
+    // Build current message parts
     const parts: any[] = [{ text: prompt }];
     
     // Add video if provided
@@ -60,11 +86,23 @@ export async function queryGemini(
       });
     }
     
-    logger.debug(`[${requestId}] Content parts: ${parts.length}`);
-    logger.debug(`[${requestId}] Sending request to Gemini API...`);
+    // For conversation history, use startChat() if history exists, otherwise use generateContent()
+    let result: any;
     
-    // Use type assertion to work with SDK types
-    const result = await model.generateContent(parts as any);
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Use startChat() for multi-turn conversations
+      logger.debug(`[${requestId}] Using chat mode with ${conversationHistory.length} history messages`);
+      const chat = model.startChat({
+        history: conversationHistory,
+      });
+      result = await chat.sendMessage(parts);
+    } else {
+      // Use generateContent() for single-turn queries
+      logger.debug(`[${requestId}] Using single-turn mode`);
+      result = await model.generateContent(parts);
+    }
+    
+    logger.debug(`[${requestId}] Sending request to Gemini API...`);
     const response = await result.response;
     const responseText = response.text();
     
@@ -159,21 +197,38 @@ export async function queryGemini(
  * Returns an async generator that yields text chunks
  */
 export async function* streamGemini(
-  prompt: string
+  prompt: string,
+  conversationHistory?: ConversationHistory[]
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   logger.info(`[${requestId}] Starting Gemini stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] Prompt length: ${prompt.length} characters`);
+  logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
+    
     const parts = [{ text: prompt }];
     
-    logger.debug(`[${requestId}] Streaming request to Gemini API...`);
+    // For conversation history, use startChat() if history exists, otherwise use generateContentStream()
+    let result: any;
     
-    const result = await model.generateContentStream(parts as any);
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Use startChat() for multi-turn conversations
+      logger.debug(`[${requestId}] Using chat mode with ${conversationHistory.length} history messages`);
+      const chat = model.startChat({
+        history: conversationHistory,
+      });
+      result = await chat.sendMessageStream(parts);
+    } else {
+      // Use generateContentStream() for single-turn queries
+      logger.debug(`[${requestId}] Using single-turn streaming mode`);
+      result = await model.generateContentStream(parts);
+    }
+    
+    logger.debug(`[${requestId}] Streaming request to Gemini API...`);
     
     let fullText = "";
     for await (const chunk of result.stream) {

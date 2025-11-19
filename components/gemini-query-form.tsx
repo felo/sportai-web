@@ -7,12 +7,14 @@ import { useGeminiChat } from "@/hooks/useGeminiChat";
 import { useGeminiApi } from "@/hooks/useGeminiApi";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { ChatHeader } from "@/components/chat/ChatHeader";
 import { DragOverlay } from "@/components/chat/DragOverlay";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
 import type { Message } from "@/types/chat";
 
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -38,6 +40,8 @@ export function GeminiQueryForm() {
     addMessage,
     updateMessage,
     removeMessage,
+    clearMessages,
+    isHydrated,
   } = useGeminiChat();
 
   const {
@@ -62,13 +66,40 @@ export function GeminiQueryForm() {
   });
 
   const error = videoError || apiError;
+  const hasScrolledToBottomRef = useRef(false);
 
+  // Scroll to bottom on initial load when messages are loaded from localStorage
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (isHydrated && messages.length > 0 && !hasScrolledToBottomRef.current) {
+      // Small delay to ensure DOM is ready and messages are rendered
+      const timeoutId = setTimeout(() => {
+        scrollToBottom();
+        hasScrolledToBottomRef.current = true;
+      }, 150);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isHydrated, messages.length, scrollToBottom]);
+
+  // Only auto-scroll if shouldAutoScroll is true (disabled during response generation)
+  useEffect(() => {
+    if (shouldAutoScroll) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom, shouldAutoScroll]);
 
   const handlePickleballCoachPrompt = () => {
     setPrompt(PICKLEBALL_COACH_PROMPT);
+  };
+
+  const handleClearConversation = () => {
+    if (confirm("Are you sure you want to clear the conversation? This cannot be undone.")) {
+      clearMessages();
+      setPrompt("");
+      clearVideo();
+      setVideoError(null);
+      setApiError(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,6 +109,10 @@ export function GeminiQueryForm() {
     const currentPrompt = prompt;
     const currentVideoFile = videoFile;
     const currentVideoPreview = videoPreview;
+
+    // Get conversation history BEFORE adding new messages
+    // This ensures we send the correct history to the API
+    const conversationHistory = messages;
 
     // Add user message
     const userMessage: Message = {
@@ -107,13 +142,22 @@ export function GeminiQueryForm() {
     };
     addMessage(assistantMessage);
 
+    // Scroll to bottom immediately after adding messages, then disable auto-scroll
+    // Use requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      setShouldAutoScroll(false); // Disable auto-scroll during response generation
+    });
+
     try {
+
       if (!currentVideoFile) {
         // Streaming for text-only
         await sendTextOnlyQuery(
           currentPrompt,
           assistantMessageId,
-          (id, content) => updateMessage(id, { content })
+          (id, content) => updateMessage(id, { content }),
+          conversationHistory
         );
       } else {
         // Video upload with progress
@@ -123,7 +167,8 @@ export function GeminiQueryForm() {
           assistantMessageId,
           (id, content) => updateMessage(id, { content }),
           setUploadProgress,
-          setProgressStage
+          setProgressStage,
+          conversationHistory
         );
       }
     } catch (err) {
@@ -135,21 +180,30 @@ export function GeminiQueryForm() {
       setLoading(false);
       setProgressStage("idle");
       setUploadProgress(0);
+      // Re-enable auto-scroll after response completes (user can manually scroll if needed)
+      // setShouldAutoScroll(true); // Commented out - keep auto-scroll disabled
     }
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`flex flex-col flex-1 max-w-4xl mx-auto w-full transition-colors ${
-        isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""
-      }`}
-      {...dragHandlers}
-    >
-      {/* Drag overlay */}
-      {isDragging && <DragOverlay />}
+    <div className="h-screen flex flex-col">
+      {/* Header with clear button */}
+      <ChatHeader
+        onClear={handleClearConversation}
+        messageCount={messages.length}
+      />
 
-      {/* Messages area */}
+      <div
+        ref={containerRef}
+        className={`flex flex-col flex-1 max-w-4xl mx-auto w-full transition-colors ${
+          isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""
+        }`}
+        {...dragHandlers}
+      >
+        {/* Drag overlay */}
+        {isDragging && <DragOverlay />}
+
+        {/* Messages area */}
       <MessageList
         messages={messages}
         loading={loading}
@@ -159,19 +213,20 @@ export function GeminiQueryForm() {
         messagesEndRef={messagesEndRef}
       />
 
-      {/* Input area */}
-      <ChatInput
-        prompt={prompt}
-        videoFile={videoFile}
-        videoPreview={videoPreview}
-        error={error}
-        loading={loading}
-        onPromptChange={setPrompt}
-        onVideoRemove={clearVideo}
-        onVideoChange={handleVideoChange}
-        onSubmit={handleSubmit}
-        onPickleballCoachClick={handlePickleballCoachPrompt}
-      />
+        {/* Input area */}
+        <ChatInput
+          prompt={prompt}
+          videoFile={videoFile}
+          videoPreview={videoPreview}
+          error={error}
+          loading={loading}
+          onPromptChange={setPrompt}
+          onVideoRemove={clearVideo}
+          onVideoChange={handleVideoChange}
+          onSubmit={handleSubmit}
+          onPickleballCoachClick={handlePickleballCoachPrompt}
+        />
+      </div>
     </div>
   );
 }

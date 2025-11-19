@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryGemini, streamGemini } from "@/lib/gemini";
+import { queryGemini, streamGemini, type ConversationHistory } from "@/lib/gemini";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
@@ -8,14 +8,32 @@ export async function POST(request: NextRequest) {
   
   logger.info(`[${requestId}] Received POST request to /api/gemini`);
   
+  // Check content length to catch 413 errors early
+  // Note: Vercel has a hard limit of 4.5MB, but we allow up to 20MB for other deployments
+  const MAX_PAYLOAD_SIZE_MB = 20;
+  const contentLength = request.headers.get("content-length");
+  if (contentLength) {
+    const sizeMB = parseInt(contentLength) / (1024 * 1024);
+    logger.debug(`[${requestId}] Request size: ${sizeMB.toFixed(2)} MB`);
+    if (sizeMB > MAX_PAYLOAD_SIZE_MB) {
+      logger.error(`[${requestId}] Request too large: ${sizeMB.toFixed(2)} MB (limit: ${MAX_PAYLOAD_SIZE_MB} MB)`);
+      return NextResponse.json(
+        { error: `Request payload too large (${sizeMB.toFixed(2)} MB). Maximum size is ${MAX_PAYLOAD_SIZE_MB} MB.` },
+        { status: 413 }
+      );
+    }
+  }
+  
   try {
     logger.debug(`[${requestId}] Parsing form data...`);
     const formData = await request.formData();
     const prompt = formData.get("prompt") as string;
     const videoFile = formData.get("video") as File | null;
+    const historyJson = formData.get("history") as string | null;
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
     logger.debug(`[${requestId}] Video file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
+    logger.debug(`[${requestId}] History JSON: ${historyJson ? `${historyJson.length} characters` : "none"}`);
 
     if (!prompt || typeof prompt !== "string") {
       logger.error(`[${requestId}] Validation failed: Prompt is required`);
@@ -23,6 +41,18 @@ export async function POST(request: NextRequest) {
         { error: "Prompt is required" },
         { status: 400 }
       );
+    }
+
+    // Parse conversation history if provided
+    let conversationHistory: ConversationHistory[] | undefined;
+    if (historyJson) {
+      try {
+        conversationHistory = JSON.parse(historyJson) as ConversationHistory[];
+        logger.debug(`[${requestId}] Conversation history: ${conversationHistory.length} messages`);
+      } catch (error) {
+        logger.error(`[${requestId}] Failed to parse conversation history, continuing without it:`, error);
+        conversationHistory = undefined;
+      }
     }
 
     let videoData: { data: Buffer; mimeType: string } | null = null;
@@ -53,7 +83,7 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of streamGemini(prompt)) {
+            for await (const chunk of streamGemini(prompt, conversationHistory)) {
               controller.enqueue(new TextEncoder().encode(chunk));
             }
             controller.close();
@@ -76,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
     
     logger.info(`[${requestId}] Calling queryGemini...`);
-    const response = await queryGemini(prompt, videoData);
+    const response = await queryGemini(prompt, videoData, conversationHistory);
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);

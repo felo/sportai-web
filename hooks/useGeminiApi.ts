@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import type { ProgressStage } from "@/types/chat";
+import type { ProgressStage, Message } from "@/types/chat";
+import { getConversationContext, trimMessagesByTokens, formatMessagesForGemini } from "@/utils/context-utils";
 
 interface UseGeminiApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
@@ -14,12 +15,41 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
     async (
       prompt: string,
       assistantMessageId: string,
-      updateMessage: (id: string, content: string) => void
+      updateMessage: (id: string, content: string) => void,
+      conversationHistory?: Message[]
     ) => {
       optionsRef.current.onProgressUpdate?.("generating", 0);
 
       const formData = new FormData();
       formData.append("prompt", prompt);
+
+      // Add conversation history if provided and not empty
+      // Skip if empty array to avoid sending unnecessary data
+      // For first message, conversationHistory should be empty, so we skip this
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        const context = getConversationContext(conversationHistory);
+        if (context.length > 0) {
+          const historyJson = JSON.stringify(context);
+          // Check size - allow up to 20MB total payload
+          // Leave room for prompt and other data (reserve 2MB for prompt/video/overhead)
+          const MAX_HISTORY_SIZE = 18 * 1024 * 1024; // 18MB to leave room for prompt and other data
+          if (historyJson.length > MAX_HISTORY_SIZE) {
+            console.warn(`Conversation history too large (${historyJson.length} bytes), trimming more aggressively`);
+            // Trim more aggressively by reducing token limit
+            const trimmedMessages = trimMessagesByTokens(conversationHistory, 2000); // Reduce to 2000 tokens
+            const trimmedContext = formatMessagesForGemini(trimmedMessages);
+            const trimmedJson = JSON.stringify(trimmedContext);
+            if (trimmedJson.length <= MAX_HISTORY_SIZE) {
+              formData.append("history", trimmedJson);
+            } else {
+              // If still too large, don't send history
+              console.warn("Conversation history still too large after trimming, skipping");
+            }
+          } else {
+            formData.append("history", historyJson);
+          }
+        }
+      }
 
       const response = await fetch("/api/gemini", {
         method: "POST",
@@ -59,11 +89,30 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       assistantMessageId: string,
       updateMessage: (id: string, content: string) => void,
       setProgress: (progress: number) => void,
-      setStage: (stage: ProgressStage) => void
+      setStage: (stage: ProgressStage) => void,
+      conversationHistory?: Message[]
     ) => {
       const formData = new FormData();
       formData.append("prompt", prompt);
       formData.append("video", videoFile);
+
+      // Add conversation history if provided and not empty
+      // Note: With video uploads, we need to be more conservative with history size
+      // For first message, conversationHistory should be empty, so we skip this
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        const context = getConversationContext(conversationHistory);
+        if (context.length > 0) {
+          const historyJson = JSON.stringify(context);
+          // With video, be more conservative - limit to 15MB for history (leaves 5MB for video)
+          const MAX_HISTORY_SIZE_WITH_VIDEO = 15 * 1024 * 1024; // 15MB
+          if (historyJson.length <= MAX_HISTORY_SIZE_WITH_VIDEO) {
+            formData.append("history", historyJson);
+          } else {
+            console.warn(`Conversation history too large for video upload (${historyJson.length} bytes), skipping`);
+            // Don't send history if too large with video
+          }
+        }
+      }
 
       setStage("uploading");
 
