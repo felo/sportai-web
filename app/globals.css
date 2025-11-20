@@ -3,9 +3,26 @@
 @tailwind utilities;
 
 /* Set base background colors - dark theme */
-html,
+html {
+  background-color: #000000 !important;
+  height: 100%;
+  min-height: 100%;
+  /* Prevent white background on mobile overscroll */
+  overscroll-behavior: none;
+}
+
 body {
   background-color: var(--gray-1, #1C1C1C) !important;
+  min-height: 100%;
+  /* Prevent white background on mobile overscroll */
+  overscroll-behavior: none;
+}
+
+/* Ensure root element covers full viewport on mobile */
+#__next,
+#root {
+  background-color: #000000 !important;
+  min-height: 100vh;
 }
 
 /* Custom brand color palette - overrides Radix colors with brand colors */
