@@ -23,6 +23,12 @@ export const logger = {
     }
   },
   
+  warn: (...args: any[]) => {
+    if (isDevelopment) {
+      console.warn("[Gemini Warning]", ...args);
+    }
+  },
+  
   time: (label: string) => {
     if (isDevelopment) {
       console.time(`[Gemini] ${label}`);

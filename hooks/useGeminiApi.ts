@@ -2,6 +2,9 @@ import { useState, useCallback, useRef } from "react";
 import type { ProgressStage, Message } from "@/types/chat";
 import { getConversationContext, trimMessagesByTokens, formatMessagesForGemini } from "@/utils/context-utils";
 import { uploadToS3 } from "@/lib/s3";
+import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
+import { SYSTEM_PROMPT } from "@/utils/prompts";
+import type { ThinkingMode, MediaResolution } from "@/utils/storage";
 
 interface UseGeminiApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
@@ -16,13 +19,31 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
     async (
       prompt: string,
       assistantMessageId: string,
-      updateMessage: (id: string, content: string) => void,
-      conversationHistory?: Message[]
-    ) => {
+      updateMessage: (id: string, updates: Partial<Message>) => void,
+      conversationHistory?: Message[],
+      abortController?: AbortController,
+      thinkingMode: ThinkingMode = "fast",
+      mediaResolution: MediaResolution = "medium"
+    ): Promise<void> => {
       optionsRef.current.onProgressUpdate?.("generating", 0);
+
+      // Calculate input tokens for this request
+      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+      let inputTokens = estimateTextTokens(fullPrompt);
+      
+      // Add tokens from conversation history
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        const historyTokens = conversationHistory.reduce(
+          (sum, msg) => sum + estimateTextTokens(msg.content || ""),
+          0
+        );
+        inputTokens += historyTokens;
+      }
 
       const formData = new FormData();
       formData.append("prompt", prompt);
+      formData.append("thinkingMode", thinkingMode);
+      formData.append("mediaResolution", mediaResolution);
 
       // Add conversation history if provided and not empty
       // Skip if empty array to avoid sending unnecessary data
@@ -58,6 +79,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
           "x-stream": "true",
         },
         body: formData,
+        signal: abortController?.signal,
       });
 
       if (!response.ok) {
@@ -70,13 +92,28 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       let accumulatedText = "";
 
       if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          accumulatedText += chunk;
-          updateMessage(assistantMessageId, accumulatedText);
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            // Estimate output tokens as we accumulate text
+            const outputTokens = estimateTextTokens(accumulatedText);
+            updateMessage(assistantMessageId, { 
+              content: accumulatedText,
+              inputTokens: inputTokens,
+              outputTokens: outputTokens,
+            });
+          }
+        } catch (error) {
+          // Handle abort errors gracefully
+          if (error instanceof Error && error.name === "AbortError") {
+            reader.cancel();
+            throw error;
+          }
+          throw error;
         }
       }
     },
@@ -88,12 +125,39 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       prompt: string,
       videoFile: File,
       assistantMessageId: string,
-      updateMessage: (id: string, content: string) => void,
+      updateMessage: (id: string, updates: Partial<Message>) => void,
       setProgress: (progress: number) => void,
       setStage: (stage: ProgressStage) => void,
       conversationHistory?: Message[],
-      onVideoUploaded?: (s3Url: string, s3Key: string) => void
-    ) => {
+      onVideoUploaded?: (s3Url: string, s3Key: string) => void,
+      abortController?: AbortController,
+      thinkingMode: ThinkingMode = "fast",
+      mediaResolution: MediaResolution = "medium"
+    ): Promise<void> => {
+      // Calculate input tokens for this request
+      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+      let inputTokens = estimateTextTokens(fullPrompt);
+      
+      // Add video tokens
+      const isImage = videoFile.type.startsWith("image/");
+      let videoTokens: number;
+      if (isImage) {
+        // Images: base 257 tokens + ~85 tokens per 100KB
+        const imageSizeKB = videoFile.size / 1024;
+        videoTokens = 257 + Math.ceil((imageSizeKB / 100) * 85);
+      } else {
+        videoTokens = estimateVideoTokens(videoFile.size, videoFile.type);
+      }
+      inputTokens += videoTokens;
+      
+      // Add tokens from conversation history
+      if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+        const historyTokens = conversationHistory.reduce(
+          (sum, msg) => sum + estimateTextTokens(msg.content || ""),
+          0
+        );
+        inputTokens += historyTokens;
+      }
       setStage("uploading");
       setProgress(0);
 
@@ -141,7 +205,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         await uploadToS3(presignedUrl, videoFile, (progress) => {
           // Scale upload progress to 0-80% (leaving 20% for processing)
           setProgress(progress * 0.8);
-        });
+        }, abortController?.signal);
 
         console.log("[S3] ✅ File uploaded successfully to S3!", {
           s3Url: s3Url,
@@ -166,6 +230,8 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         const formData = new FormData();
         formData.append("prompt", prompt);
         formData.append("videoUrl", s3Url);
+        formData.append("thinkingMode", thinkingMode);
+        formData.append("mediaResolution", mediaResolution);
 
         // Add conversation history if provided
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -188,6 +254,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
             "x-stream": "true",
           },
           body: formData,
+          signal: abortController?.signal,
         });
 
         setProgress(90);
@@ -203,17 +270,30 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         let accumulatedText = "";
 
         if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            accumulatedText += chunk;
-            updateMessage(assistantMessageId, accumulatedText);
+              const chunk = decoder.decode(value, { stream: true });
+              accumulatedText += chunk;
+              // Estimate output tokens as we accumulate text
+              const outputTokens = estimateTextTokens(accumulatedText);
+              updateMessage(assistantMessageId, { 
+                content: accumulatedText,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+              });
+            }
+          } catch (error) {
+            // Handle abort errors gracefully
+            if (error instanceof Error && error.name === "AbortError") {
+              reader.cancel();
+              throw error;
+            }
+            throw error;
           }
         }
-
-        return;
       } catch (error) {
         // If S3 upload fails, log the error and check if we should fall back
         console.error("[S3] ❌ S3 upload failed:", error);
@@ -238,6 +318,8 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         const formData = new FormData();
         formData.append("prompt", prompt);
         formData.append("video", videoFile);
+        formData.append("thinkingMode", thinkingMode);
+        formData.append("mediaResolution", mediaResolution);
 
         // Add conversation history
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -258,6 +340,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
             "x-stream": "true",
           },
           body: formData,
+          signal: abortController?.signal,
         });
 
         setProgress(90);
@@ -273,17 +356,30 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         let accumulatedText = "";
 
         if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            accumulatedText += chunk;
-            updateMessage(assistantMessageId, accumulatedText);
+              const chunk = decoder.decode(value, { stream: true });
+              accumulatedText += chunk;
+              // Estimate output tokens as we accumulate text
+              const outputTokens = estimateTextTokens(accumulatedText);
+              updateMessage(assistantMessageId, { 
+                content: accumulatedText,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+              });
+            }
+          } catch (error) {
+            // Handle abort errors gracefully
+            if (error instanceof Error && error.name === "AbortError") {
+              reader.cancel();
+              throw error;
+            }
+            throw error;
           }
         }
-
-        return;
       }
 
     },

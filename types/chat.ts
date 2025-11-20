@@ -14,6 +14,8 @@ export type Message = {
   videoPreview?: string | null;
   videoUrl?: string | null; // S3 URL for video playback
   videoS3Key?: string | null; // S3 key for regenerating presigned URLs
+  inputTokens?: number; // Input tokens used for this message
+  outputTokens?: number; // Output tokens used for this message (assistant messages only)
 };
 
 export type Chat = {

@@ -111,4 +111,25 @@ main {
   }
 }
 
+/* Remove borders and background from Select dropdowns */
+.select-no-border,
+.select-no-border button,
+.select-no-border [data-radix-select-trigger],
+button[data-radix-select-trigger].select-no-border {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+/* Target Radix Select trigger directly */
+[data-radix-select-trigger].select-no-border {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
 

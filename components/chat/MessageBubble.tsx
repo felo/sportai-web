@@ -6,6 +6,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
+import { getDeveloperMode } from "@/utils/storage";
+import { calculatePricing, formatCost } from "@/lib/token-utils";
 
 const THINKING_MESSAGES = [
   "Initializing environment model…",
@@ -30,6 +32,54 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
+  const [developerMode, setDeveloperMode] = useState(false);
+
+  // Load developer mode on mount
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    // Listen for developer mode changes
+    const handleStorageChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    // Also listen for custom event from Sidebar
+    window.addEventListener("developer-mode-change", handleStorageChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("developer-mode-change", handleStorageChange);
+    };
+  }, []);
+
+  // Calculate cumulative tokens up to this message
+  // Only count assistant messages for cumulative (they represent actual API calls)
+  // User message tokens are already included in assistant message input tokens
+  const cumulativeTokens = allMessages.slice(0, messageIndex + 1).reduce(
+    (acc, msg) => {
+      if (msg.role === "assistant") {
+        if (msg.inputTokens) acc.input += msg.inputTokens;
+        if (msg.outputTokens) acc.output += msg.outputTokens;
+      }
+      return acc;
+    },
+    { input: 0, output: 0 }
+  );
+
+  // Calculate tokens for this specific message
+  const messageTokens = {
+    input: message.inputTokens || 0,
+    output: message.outputTokens || 0,
+  };
+
+  // Calculate pricing for this message and cumulative
+  const messagePricing = messageTokens.input > 0 || messageTokens.output > 0
+    ? calculatePricing(messageTokens.input, messageTokens.output)
+    : null;
+  const cumulativePricing = cumulativeTokens.input > 0 || cumulativeTokens.output > 0
+    ? calculatePricing(cumulativeTokens.input, cumulativeTokens.output)
+    : null;
 
   // Use S3 URL if available, otherwise fall back to preview (blob URL)
   const videoSrc = message.videoUrl || message.videoPreview;
@@ -242,19 +292,57 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
         )}
 
         {message.role === "assistant" && (
-          <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
-            {message.content ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
+          <Box style={{ maxWidth: "none" }}>
+            <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
+              {message.content ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              ) : (
+                <Flex gap="2" align="center">
+                  <Spinner size="1" />
+                  <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
+                </Flex>
+              )}
+            </Box>
+            
+            {/* Developer mode token information */}
+            {developerMode && message.content && (messageTokens.input > 0 || messageTokens.output > 0) && (
+              <Box
+                mt="3"
+                pt="3"
+                style={{
+                  borderTop: "1px solid var(--gray-6)",
+                  fontSize: "var(--font-size-1)",
+                  color: "var(--gray-11)",
+                }}
               >
-                {message.content}
-              </ReactMarkdown>
-            ) : (
-              <Flex gap="2" align="center">
-                <Spinner size="1" />
-                <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
-              </Flex>
+                <Flex direction="column" gap="2">
+                  <Text size="1" weight="medium" color="gray">
+                    Token Usage (Developer Mode)
+                  </Text>
+                  <Flex direction="column" gap="1" pl="2">
+                    <Text size="1">
+                      <strong>This message:</strong>{" "}
+                      {messageTokens.input > 0 && `${messageTokens.input.toLocaleString()} input`}
+                      {messageTokens.input > 0 && messageTokens.output > 0 && " + "}
+                      {messageTokens.output > 0 && `${messageTokens.output.toLocaleString()} output`}
+                      {messageTokens.input === 0 && messageTokens.output === 0 && "N/A"}
+                      {messagePricing && ` (${formatCost(messagePricing.totalCost)})`}
+                    </Text>
+                    <Text size="1">
+                      <strong>Total in chat:</strong>{" "}
+                      {cumulativeTokens.input > 0 && `${cumulativeTokens.input.toLocaleString()} input`}
+                      {cumulativeTokens.input > 0 && cumulativeTokens.output > 0 && " + "}
+                      {cumulativeTokens.output > 0 && `${cumulativeTokens.output.toLocaleString()} output`}
+                      {cumulativePricing && ` (${formatCost(cumulativePricing.totalCost)})`}
+                    </Text>
+                  </Flex>
+                </Flex>
+              </Box>
             )}
           </Box>
         )}

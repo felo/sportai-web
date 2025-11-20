@@ -286,6 +286,94 @@ export function setDeveloperMode(enabled: boolean): void {
 }
 
 /**
+ * Thinking mode type
+ */
+export type ThinkingMode = "fast" | "deep";
+
+/**
+ * Media resolution type
+ */
+export type MediaResolution = "low" | "medium" | "high";
+
+/**
+ * Thinking mode storage key
+ */
+const THINKING_MODE_KEY = "thinking-mode";
+
+/**
+ * Media resolution storage key
+ */
+const MEDIA_RESOLUTION_KEY = "media-resolution";
+
+/**
+ * Get thinking mode setting from localStorage
+ * @returns "fast" or "deep", defaults to "fast"
+ */
+export function getThinkingMode(): ThinkingMode {
+  if (typeof window === "undefined") {
+    return "fast";
+  }
+
+  try {
+    const stored = localStorage.getItem(THINKING_MODE_KEY);
+    return (stored === "deep" || stored === "fast") ? stored : "fast";
+  } catch (error) {
+    console.error("Failed to load thinking mode from storage:", error);
+    return "fast";
+  }
+}
+
+/**
+ * Save thinking mode setting to localStorage
+ * @param mode - "fast" or "deep"
+ */
+export function setThinkingMode(mode: ThinkingMode): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(THINKING_MODE_KEY, mode);
+  } catch (error) {
+    console.error("Failed to save thinking mode to storage:", error);
+  }
+}
+
+/**
+ * Get media resolution setting from localStorage
+ * @returns "low", "medium", or "high", defaults to "medium"
+ */
+export function getMediaResolution(): MediaResolution {
+  if (typeof window === "undefined") {
+    return "medium";
+  }
+
+  try {
+    const stored = localStorage.getItem(MEDIA_RESOLUTION_KEY);
+    return (stored === "low" || stored === "medium" || stored === "high") ? stored : "medium";
+  } catch (error) {
+    console.error("Failed to load media resolution from storage:", error);
+    return "medium";
+  }
+}
+
+/**
+ * Save media resolution setting to localStorage
+ * @param resolution - "low", "medium", or "high"
+ */
+export function setMediaResolution(resolution: MediaResolution): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(MEDIA_RESOLUTION_KEY, resolution);
+  } catch (error) {
+    console.error("Failed to save media resolution to storage:", error);
+  }
+}
+
+/**
  * Serializable version of Chat (without File objects and blob URLs)
  */
 type SerializableChat = Omit<Chat, "messages"> & {

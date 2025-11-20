@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { TextArea, Button, Tooltip, Box, Flex, Callout, Text } from "@radix-ui/themes";
-import { ArrowUpIcon, PlusIcon } from "@radix-ui/react-icons";
+import { TextArea, Button, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
+import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "./VideoPreview";
+import type { ProgressStage } from "@/types/chat";
+import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, type ThinkingMode, type MediaResolution } from "@/utils/storage";
 
 interface ChatInputProps {
   prompt: string;
@@ -11,11 +13,16 @@ interface ChatInputProps {
   videoPreview: string | null;
   error: string | null;
   loading: boolean;
+  progressStage?: ProgressStage;
   onPromptChange: (value: string) => void;
   onVideoRemove: () => void;
   onVideoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onStop?: () => void;
   onPickleballCoachClick: () => void;
+  onThinkingModeChange?: (mode: ThinkingMode) => void;
+  onMediaResolutionChange?: (resolution: MediaResolution) => void;
+  disableTooltips?: boolean;
 }
 
 export function ChatInput({
@@ -24,17 +31,38 @@ export function ChatInput({
   videoPreview,
   error,
   loading,
+  progressStage = "idle",
   onPromptChange,
   onVideoRemove,
   onVideoChange,
   onSubmit,
+  onStop,
   onPickleballCoachClick,
+  onThinkingModeChange,
+  onMediaResolutionChange,
+  disableTooltips = false,
 }: ChatInputProps) {
+  // Debug logging
+  useEffect(() => {
+    if (loading) {
+      console.log("[ChatInput] Loading state:", { loading, hasOnStop: !!onStop, progressStage });
+    }
+  }, [loading, onStop, progressStage]);
   // Base height for textarea (in pixels) - adjust this to test different heights
   const BASE_TEXTAREA_HEIGHT = 0;
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>("fast");
+  const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>("medium");
+  const [thinkingModeOpen, setThinkingModeOpen] = useState(false);
+  const [mediaResolutionOpen, setMediaResolutionOpen] = useState(false);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    setThinkingModeState(getThinkingMode());
+    setMediaResolutionState(getMediaResolution());
+  }, []);
 
   useEffect(() => {
     // Set initial height to base height
@@ -159,6 +187,7 @@ export function ChatInput({
               videoFile={videoFile}
               videoPreview={videoPreview}
               onRemove={onVideoRemove}
+              disableTooltips={disableTooltips}
             />
           )}
 
@@ -205,13 +234,13 @@ export function ChatInput({
             {/* Buttons row */}
             <Flex
               align="center"
-              justify="between"
+              gap="2"
               style={{
                 padding: "var(--space-2) var(--space-3)",
               }}
             >
               {/* Plus button */}
-              <Tooltip content="Upload video or image">
+              <Tooltip content="Upload video or image" open={disableTooltips ? false : undefined}>
                 <label
                   htmlFor="video"
                   style={{
@@ -225,6 +254,8 @@ export function ChatInput({
                     cursor: "pointer",
                     transition: "background-color 0.2s",
                     border: "none",
+                    flexShrink: 0,
+                    marginRight: "var(--space-3)",
                   }}
                   onMouseEnter={(e: React.MouseEvent<HTMLLabelElement>) => {
                     e.currentTarget.style.backgroundColor = "var(--gray-4)";
@@ -244,36 +275,170 @@ export function ChatInput({
                 </label>
               </Tooltip>
 
-              {/* Submit button */}
-              <Tooltip content="Send message">
-                <button
-                  type="submit"
-                  disabled={loading || !prompt.trim()}
-                  style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    backgroundColor: loading || !prompt.trim() ? "var(--gray-3)" : "var(--gray-3)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: loading || !prompt.trim() ? "not-allowed" : "pointer",
-                    transition: "background-color 0.2s",
-                    border: "none",
-                    opacity: loading || !prompt.trim() ? 0.5 : 1,
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    if (!loading && prompt.trim()) {
-                      e.currentTarget.style.backgroundColor = "var(--gray-4)";
-                    }
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.currentTarget.style.backgroundColor = "var(--gray-3)";
-                  }}
-                >
-                  <ArrowUpIcon width="16" height="16" color={loading || !prompt.trim() ? "var(--gray-9)" : "var(--gray-11)"} />
-                </button>
+              {/* Thinking mode selector */}
+              <Tooltip 
+                content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
+                open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
+              >
+                <Box style={{ marginRight: "var(--space-3)" }}>
+                  <Select.Root
+                    value={thinkingMode}
+                    open={thinkingModeOpen}
+                    onOpenChange={setThinkingModeOpen}
+                    onValueChange={(value) => {
+                      const mode = value as ThinkingMode;
+                      setThinkingModeState(mode);
+                      setThinkingMode(mode);
+                      onThinkingModeChange?.(mode);
+                    }}
+                  >
+                    <Select.Trigger
+                      className="select-no-border"
+                      style={{
+                        height: "28px",
+                        fontSize: "11px",
+                        padding: "0 var(--space-2)",
+                        minWidth: "70px",
+                        border: "none",
+                        borderWidth: 0,
+                        outline: "none",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                      }}
+                    />
+                    <Select.Content>
+                      <Select.Item value="fast">Fast</Select.Item>
+                      <Select.Item value="deep">Deep</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
               </Tooltip>
+
+              {/* Media resolution selector */}
+              <Tooltip 
+                content="Media resolution: Controls the quality and token usage for video/image analysis"
+                open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
+              >
+                <Box>
+                  <Select.Root
+                    value={mediaResolution}
+                    open={mediaResolutionOpen}
+                    onOpenChange={setMediaResolutionOpen}
+                    onValueChange={(value) => {
+                      const resolution = value as MediaResolution;
+                      setMediaResolutionState(resolution);
+                      setMediaResolution(resolution);
+                      onMediaResolutionChange?.(resolution);
+                    }}
+                  >
+                    <Select.Trigger
+                      className="select-no-border"
+                      style={{
+                        height: "28px",
+                        fontSize: "11px",
+                        padding: "0 var(--space-2)",
+                        minWidth: "70px",
+                        border: "none",
+                        borderWidth: 0,
+                        outline: "none",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                      }}
+                    />
+                    <Select.Content>
+                      <Select.Item value="low">Low</Select.Item>
+                      <Select.Item value="medium">Medium</Select.Item>
+                      <Select.Item value="high">High</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
+              </Tooltip>
+
+              {/* Spacer to push submit button to the right */}
+              <Box style={{ flex: 1 }} />
+
+              {/* Submit/Stop button */}
+              {loading ? (
+                onStop ? (
+                  <Tooltip content="Stop generating" open={disableTooltips ? false : undefined}>
+                    <button
+                      type="button"
+                      onClick={onStop}
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        backgroundColor: "var(--red-3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                        border: "none",
+                      }}
+                      onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.currentTarget.style.backgroundColor = "var(--red-4)";
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.currentTarget.style.backgroundColor = "var(--red-3)";
+                      }}
+                    >
+                      <StopIcon width="16" height="16" color="var(--red-11)" />
+                    </button>
+                  </Tooltip>
+                ) : (
+                  <Tooltip content="Sending..." open={disableTooltips ? false : undefined}>
+                    <button
+                      type="button"
+                      disabled
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        backgroundColor: "var(--gray-3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "not-allowed",
+                        border: "none",
+                        opacity: 0.5,
+                      }}
+                    >
+                      <ArrowUpIcon width="16" height="16" color="var(--gray-9)" />
+                    </button>
+                  </Tooltip>
+                )
+              ) : (
+                <Tooltip content="Send message" open={disableTooltips ? false : undefined}>
+                  <button
+                    type="submit"
+                    disabled={!prompt.trim()}
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      backgroundColor: "var(--gray-3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: !prompt.trim() ? "not-allowed" : "pointer",
+                      transition: "background-color 0.2s",
+                      border: "none",
+                      opacity: !prompt.trim() ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      if (prompt.trim()) {
+                        e.currentTarget.style.backgroundColor = "var(--gray-4)";
+                      }
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                    }}
+                  >
+                    <ArrowUpIcon width="16" height="16" color={!prompt.trim() ? "var(--gray-9)" : "var(--gray-11)"} />
+                  </button>
+                </Tooltip>
+              )}
             </Flex>
           </Box>
 

@@ -7,6 +7,7 @@ import {
   formatCost,
 } from "./token-utils";
 import { SYSTEM_PROMPT } from "@/utils/prompts";
+import type { ThinkingMode, MediaResolution } from "@/utils/storage";
 
 const MODEL_NAME = "gemini-3-pro-preview";
 
@@ -32,7 +33,9 @@ export interface ConversationHistory {
 export async function queryGemini(
   prompt: string,
   videoData?: { data: Buffer; mimeType: string } | null,
-  conversationHistory?: ConversationHistory[]
+  conversationHistory?: ConversationHistory[],
+  thinkingMode: ThinkingMode = "fast",
+  mediaResolution: MediaResolution = "medium"
 ): Promise<string> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
@@ -86,8 +89,40 @@ export async function queryGemini(
   logger.time(`[${requestId}] API call duration`);
   
   try {
-    // Using Gemini 3 Pro - uses dynamic thinking (high) by default
-    const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
+    // Build generation config with thinking config and media resolution
+    // Gemini 3 API parameters: thinkingConfig (with thinkingBudget) and media_resolution
+    const generationConfig: any = {};
+    
+    // Map thinking mode to thinkingConfig with thinkingBudget
+    // Note: gemini-3-pro-preview requires thinking mode (budget > 0)
+    // "fast" = lower thinking budget, "deep" = higher thinking budget
+    // thinkingBudget is in tokens - minimum is 1, higher values allow more reasoning
+    if (thinkingMode === "deep") {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: 8192, // Higher budget for deep thinking
+      };
+    } else {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: 1024, // Lower budget for fast mode (model requires > 0)
+      };
+    }
+    
+    // Map media resolution to API parameter (uppercase enum values)
+    // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
+    const mediaResolutionMap: Record<MediaResolution, string> = {
+      low: "MEDIA_RESOLUTION_LOW",
+      medium: "MEDIA_RESOLUTION_MEDIUM",
+      high: "MEDIA_RESOLUTION_HIGH",
+    };
+    generationConfig.mediaResolution = mediaResolutionMap[mediaResolution];
+    
+    logger.debug(`[${requestId}] Generation config:`, generationConfig);
+    
+    // Using Gemini 3 Pro with generation config
+    const model = getGenAI().getGenerativeModel({ 
+      model: MODEL_NAME,
+      generationConfig,
+    });
     
     // Build current message parts (using full prompt with system prompt)
     const parts: any[] = [{ text: fullPrompt }];
@@ -174,6 +209,58 @@ export async function queryGemini(
     return responseText;
   } catch (error: any) {
     logger.timeEnd(`[${requestId}] API call duration`);
+    
+    // If generationConfig fails, try without it (for backwards compatibility)
+    // Also catch "Budget 0 is invalid" errors which indicate thinking mode is required
+    if (error?.message?.includes("generationConfig") || 
+        error?.message?.includes("thinkingConfig") || 
+        error?.message?.includes("thinkingBudget") || 
+        error?.message?.includes("mediaResolution") || 
+        error?.message?.includes("thinkingMode") ||
+        error?.message?.includes("Budget 0 is invalid") ||
+        error?.message?.includes("only works in thinking mode")) {
+      logger.debug(`[${requestId}] Generation config parameters not supported, falling back to default settings`);
+      try {
+        // Retry with minimal thinking config (model requires thinking mode)
+        const fallbackModel = getGenAI().getGenerativeModel({ 
+          model: MODEL_NAME,
+          generationConfig: {
+            thinkingConfig: {
+              thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
+            },
+          },
+        });
+        
+        // Rebuild parts
+        const parts: any[] = [{ text: fullPrompt }];
+        if (videoData) {
+          parts.push({
+            inlineData: {
+              data: videoData.data.toString("base64"),
+              mimeType: videoData.mimeType,
+            },
+          });
+        }
+        
+        let result: any;
+        if (conversationHistory && conversationHistory.length > 0) {
+          const chat = fallbackModel.startChat({ history: conversationHistory });
+          result = await chat.sendMessage(parts);
+        } else {
+          result = await fallbackModel.generateContent(parts);
+        }
+        
+        const response = result.response;
+        const responseText = response.text();
+        
+        logger.info(`[${requestId}] Response received (fallback): ${responseText.length} characters`);
+        return responseText;
+      } catch (fallbackError: any) {
+        logger.error(`[${requestId}] Fallback also failed:`, fallbackError);
+        throw fallbackError;
+      }
+    }
+    
     logger.error(`[${requestId}] Error querying Gemini:`, {
       message: error?.message,
       status: error?.status,
@@ -219,7 +306,9 @@ export async function queryGemini(
 export async function* streamGemini(
   prompt: string,
   conversationHistory?: ConversationHistory[],
-  videoData?: { data: Buffer; mimeType: string } | null
+  videoData?: { data: Buffer; mimeType: string } | null,
+  thinkingMode: ThinkingMode = "fast",
+  mediaResolution: MediaResolution = "medium"
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
@@ -231,6 +320,8 @@ export async function* streamGemini(
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
+  logger.debug(`[${requestId}] Thinking mode: ${thinkingMode}`);
+  logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
   
   if (videoData) {
     const isImage = videoData.mimeType.startsWith("image/");
@@ -240,7 +331,39 @@ export async function* streamGemini(
   }
   
   try {
-    const model = getGenAI().getGenerativeModel({ model: MODEL_NAME });
+    // Build generation config with thinking config and media resolution
+    // Gemini 3 API parameters: thinkingConfig (with thinkingBudget) and media_resolution
+    const generationConfig: any = {};
+    
+    // Map thinking mode to thinkingConfig with thinkingBudget
+    // Note: gemini-3-pro-preview requires thinking mode (budget > 0)
+    // "fast" = lower thinking budget, "deep" = higher thinking budget
+    // thinkingBudget is in tokens - minimum is 1, higher values allow more reasoning
+    if (thinkingMode === "deep") {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: 8192, // Higher budget for deep thinking
+      };
+    } else {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: 1024, // Lower budget for fast mode (model requires > 0)
+      };
+    }
+    
+    // Map media resolution to API parameter (uppercase enum values)
+    // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
+    const mediaResolutionMap: Record<MediaResolution, string> = {
+      low: "MEDIA_RESOLUTION_LOW",
+      medium: "MEDIA_RESOLUTION_MEDIUM",
+      high: "MEDIA_RESOLUTION_HIGH",
+    };
+    generationConfig.mediaResolution = mediaResolutionMap[mediaResolution];
+    
+    logger.debug(`[${requestId}] Generation config:`, generationConfig);
+    
+    const model = getGenAI().getGenerativeModel({ 
+      model: MODEL_NAME,
+      generationConfig,
+    });
     
     // Build current message parts (using full prompt with system prompt)
     const parts: any[] = [{ text: fullPrompt }];
@@ -288,6 +411,60 @@ export async function* streamGemini(
     
     logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
   } catch (error: any) {
+    // If generationConfig fails, try without it (for backwards compatibility)
+    // Also catch "Budget 0 is invalid" errors which indicate thinking mode is required
+    if (error?.message?.includes("generationConfig") || 
+        error?.message?.includes("thinkingConfig") || 
+        error?.message?.includes("thinkingBudget") || 
+        error?.message?.includes("mediaResolution") || 
+        error?.message?.includes("thinkingMode") ||
+        error?.message?.includes("thinking_level") ||
+        error?.message?.includes("media_resolution") ||
+        error?.message?.includes("Budget 0 is invalid") ||
+        error?.message?.includes("only works in thinking mode")) {
+      logger.debug(`[${requestId}] Generation config parameters not supported, falling back to default settings`);
+      // Retry with minimal thinking config (model requires thinking mode)
+      const fallbackModel = getGenAI().getGenerativeModel({ 
+        model: MODEL_NAME,
+        generationConfig: {
+          thinkingConfig: {
+            thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
+          },
+        },
+      });
+      
+      // Rebuild parts
+      const parts: any[] = [{ text: fullPrompt }];
+      if (videoData) {
+        parts.push({
+          inlineData: {
+            data: videoData.data.toString("base64"),
+            mimeType: videoData.mimeType,
+          },
+        });
+      }
+      
+      let result: any;
+      if (conversationHistory && conversationHistory.length > 0) {
+        const chat = fallbackModel.startChat({ history: conversationHistory });
+        result = await chat.sendMessageStream(parts);
+      } else {
+        result = await fallbackModel.generateContentStream(parts);
+      }
+      
+      let fullText = "";
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullText += chunkText;
+          yield chunkText;
+        }
+      }
+      
+      logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
+      return;
+    }
+    
     logger.error(`[${requestId}] Error streaming Gemini:`, {
       message: error?.message,
       status: error?.status,

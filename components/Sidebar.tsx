@@ -14,9 +14,10 @@ interface SidebarProps {
   children?: React.ReactNode;
   onClearChat?: () => void;
   messageCount?: number;
+  onChatSwitchAttempt?: () => boolean;
 }
 
-export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProps) {
+export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchAttempt }: SidebarProps) {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const [alertOpen, setAlertOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -111,6 +112,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
   const handleDeveloperModeToggle = (checked: boolean) => {
     setDeveloperMode(checked);
     saveDeveloperMode(checked);
+    // Dispatch custom event for components listening to developer mode changes
+    window.dispatchEvent(new CustomEvent("developer-mode-change"));
   };
 
   // Don't render sidebar on mobile
@@ -181,6 +184,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                 variant="ghost"
                 size="2"
                 onClick={() => {
+                  // Check if chat is thinking before creating new chat
+                  if (onChatSwitchAttempt && !onChatSwitchAttempt()) {
+                    return; // User cancelled
+                  }
                   const newChat = createChat();
                   saveCurrentChatId(newChat.id);
                   // State will be updated via event handler
@@ -236,6 +243,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                             variant={currentChatId === chat.id ? "soft" : "ghost"}
                             size="2"
                             onClick={() => {
+                              // Don't warn if clicking on the same chat
+                              if (currentChatId !== chat.id) {
+                                // Check if chat is thinking before switching
+                                if (onChatSwitchAttempt && !onChatSwitchAttempt()) {
+                                  return; // User cancelled
+                                }
+                              }
                               saveCurrentChatId(chat.id);
                               // State will be updated via event handler
                             }}
@@ -284,6 +298,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                                 color="red"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // If deleting the current chat while it's thinking, warn the user
+                                  if (currentChatId === chat.id && onChatSwitchAttempt && !onChatSwitchAttempt()) {
+                                    return; // User cancelled
+                                  }
                                   deleteChat(chat.id);
                                   const updatedChats = loadChatsFromStorage();
                                   setChats(updatedChats);

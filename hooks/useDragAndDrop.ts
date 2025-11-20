@@ -10,6 +10,7 @@ export function useDragAndDrop({
   onError,
 }: UseDragAndDropOptions) {
   const [isDragging, setIsDragging] = useState(false);
+  const [hasJustDropped, setHasJustDropped] = useState(false);
   const dragCounterRef = useRef(0);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -47,6 +48,7 @@ export function useDragAndDrop({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragging(false);
+    setHasJustDropped(true);
 
     const files = Array.from(e.dataTransfer.files);
     // Accept both videos and images
@@ -60,10 +62,16 @@ export function useDragAndDrop({
     } else if (files.length > 0) {
       onError?.("Please drop a valid video or image file");
     }
+
+    // Reset the flag after a short delay to re-enable tooltips
+    setTimeout(() => {
+      setHasJustDropped(false);
+    }, 500);
   };
 
   return {
     isDragging,
+    hasJustDropped,
     handlers: {
       onDragEnter: handleDragEnter,
       onDragOver: handleDragOver,

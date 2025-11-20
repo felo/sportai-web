@@ -6,6 +6,7 @@ import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useGeminiChat } from "@/hooks/useGeminiChat";
 import { useGeminiApi } from "@/hooks/useGeminiApi";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useNavigationWarning } from "@/hooks/useNavigationWarning";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -14,13 +15,17 @@ import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
-import { getCurrentChatId, setCurrentChatId, createChat, updateChat } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution } from "@/utils/storage";
 import type { Message } from "@/types/chat";
+import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(() => getThinkingMode());
+  const [mediaResolution, setMediaResolution] = useState<MediaResolution>(() => getMediaResolution());
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
   const isMobile = useIsMobile();
 
@@ -63,7 +68,12 @@ export function GeminiQueryForm() {
     },
   });
 
-  const { isDragging, handlers: dragHandlers } = useDragAndDrop({
+  const { confirmNavigation } = useNavigationWarning({
+    isLoading: loading,
+    progressStage,
+  });
+
+  const { isDragging, hasJustDropped, handlers: dragHandlers } = useDragAndDrop({
     onFileDrop: (file) => {
       processVideoFile(file);
     },
@@ -75,7 +85,7 @@ export function GeminiQueryForm() {
   // Auto-populate prompt when video is added and prompt is empty
   useEffect(() => {
     if (videoFile && !prompt.trim()) {
-      setPrompt("Please analyse this video for me");
+      setPrompt("Please analyse this video for me.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoFile]); // Only depend on videoFile to avoid loops
@@ -115,6 +125,16 @@ export function GeminiQueryForm() {
     setApiError(null);
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    setProgressStage("idle");
+    setUploadProgress(0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
@@ -148,27 +168,46 @@ export function GeminiQueryForm() {
     const timestamp = Date.now();
     let videoMessageId: string | null = null;
     
+    // Calculate input tokens for user messages
+    const calculateUserMessageTokens = (content: string, videoFile: File | null): number => {
+      let tokens = estimateTextTokens(content);
+      if (videoFile) {
+        const isImage = videoFile.type.startsWith("image/");
+        if (isImage) {
+          const imageSizeKB = videoFile.size / 1024;
+          tokens += 257 + Math.ceil((imageSizeKB / 100) * 85);
+        } else {
+          tokens += estimateVideoTokens(videoFile.size, videoFile.type);
+        }
+      }
+      return tokens;
+    };
+    
     // If both video and text are present, create two separate messages
     if (currentVideoFile && currentPrompt.trim()) {
       // First message: video only
       videoMessageId = `user-video-${timestamp}`;
+      const videoTokens = calculateUserMessageTokens("", currentVideoFile);
       const videoMessage: Message = {
         id: videoMessageId,
         role: "user",
         content: "",
         videoFile: currentVideoFile,
         videoPreview: currentVideoPreview,
+        inputTokens: videoTokens,
       };
       addMessage(videoMessage);
       
       // Second message: text only
       const textMessageId = `user-text-${timestamp}`;
+      const textTokens = calculateUserMessageTokens(currentPrompt, null);
       const textMessage: Message = {
         id: textMessageId,
         role: "user",
         content: currentPrompt,
         videoFile: null,
         videoPreview: null,
+        inputTokens: textTokens,
       };
       addMessage(textMessage);
     } else {
@@ -177,12 +216,14 @@ export function GeminiQueryForm() {
       if (currentVideoFile) {
         videoMessageId = userMessageId;
       }
+      const userTokens = calculateUserMessageTokens(currentPrompt, currentVideoFile);
       const userMessage: Message = {
         id: userMessageId,
         role: "user",
         content: currentPrompt,
         videoFile: currentVideoFile,
         videoPreview: currentVideoPreview,
+        inputTokens: userTokens,
       };
       addMessage(userMessage);
     }
@@ -195,6 +236,10 @@ export function GeminiQueryForm() {
     setLoading(true);
     setUploadProgress(0);
     setProgressStage(currentVideoFile ? "uploading" : "processing");
+
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Add placeholder assistant message
     const assistantMessageId = `assistant-${Date.now()}`;
@@ -226,16 +271,19 @@ export function GeminiQueryForm() {
         await sendTextOnlyQuery(
           currentPrompt,
           assistantMessageId,
-          (id, content) => {
+          (id, updates) => {
             // Check if chat changed during streaming
             const chatId = getCurrentChatId();
             if (chatId === requestChatId) {
-              updateMessage(id, { content });
+              updateMessage(id, updates);
             } else {
               console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
             }
           },
-          conversationHistory
+          conversationHistory,
+          abortController,
+          thinkingMode,
+          mediaResolution
         );
       } else {
         // Video upload with progress
@@ -243,11 +291,11 @@ export function GeminiQueryForm() {
           currentPrompt,
           currentVideoFile,
           assistantMessageId,
-          (id, content) => {
+          (id, updates) => {
             // Check if chat changed during streaming
             const chatId = getCurrentChatId();
             if (chatId === requestChatId) {
-              updateMessage(id, { content });
+              updateMessage(id, updates);
             } else {
               console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
             }
@@ -261,17 +309,32 @@ export function GeminiQueryForm() {
             if (chatId === requestChatId && videoMessageId) {
               updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key });
             }
-          }
+          },
+          abortController,
+          thinkingMode,
+          mediaResolution
         );
       }
     } catch (err) {
       // Only handle error if we're still on the same chat
       const currentChatId = getCurrentChatId();
       if (currentChatId === requestChatId) {
-        const errorMessage =
-          err instanceof Error ? err.message : "An error occurred";
-        setApiError(errorMessage);
-        removeMessage(assistantMessageId);
+        // Don't show error if request was aborted (user clicked stop)
+        if (err instanceof Error && err.name === "AbortError") {
+          console.log("[GeminiQueryForm] Request was cancelled by user");
+          // Optionally update the message to indicate it was stopped
+          const currentContent = messages.find(m => m.id === assistantMessageId)?.content || "";
+          if (currentContent.trim()) {
+            updateMessage(assistantMessageId, { content: currentContent + "\n\n[Stopped by user]" });
+          } else {
+            removeMessage(assistantMessageId);
+          }
+        } else {
+          const errorMessage =
+            err instanceof Error ? err.message : "An error occurred";
+          setApiError(errorMessage);
+          removeMessage(assistantMessageId);
+        }
       }
     } finally {
       // Only reset loading state if we're still on the same chat
@@ -281,6 +344,8 @@ export function GeminiQueryForm() {
         setProgressStage("idle");
         setUploadProgress(0);
       }
+      // Clean up abort controller
+      abortControllerRef.current = null;
       // Re-enable auto-scroll after response completes (user can manually scroll if needed)
       // setShouldAutoScroll(true); // Commented out - keep auto-scroll disabled
     }
@@ -295,6 +360,7 @@ export function GeminiQueryForm() {
       <Sidebar 
         onClearChat={handleClearConversation}
         messageCount={messages.length}
+        onChatSwitchAttempt={confirmNavigation}
       />
 
       {/* Content wrapper - accounts for sidebar width and centers content */}
@@ -361,11 +427,16 @@ export function GeminiQueryForm() {
             videoPreview={videoPreview}
             error={null}
             loading={loading}
+            progressStage={progressStage}
             onPromptChange={setPrompt}
             onVideoRemove={clearVideo}
             onVideoChange={handleVideoChange}
             onSubmit={handleSubmit}
+            onStop={handleStop}
             onPickleballCoachClick={handlePickleballCoachPrompt}
+            onThinkingModeChange={setThinkingMode}
+            onMediaResolutionChange={setMediaResolution}
+            disableTooltips={hasJustDropped}
           />
         </div>
       </div>

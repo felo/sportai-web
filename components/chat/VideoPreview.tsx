@@ -7,12 +7,14 @@ interface VideoPreviewProps {
   videoFile: File;
   videoPreview: string | null;
   onRemove: () => void;
+  disableTooltips?: boolean;
 }
 
 export function VideoPreview({
   videoFile,
   videoPreview,
   onRemove,
+  disableTooltips = false,
 }: VideoPreviewProps) {
   const isImage = videoFile.type.startsWith("image/");
   
@@ -57,7 +59,7 @@ export function VideoPreview({
       >
         {videoFile.name}
       </Text>
-      <Tooltip content="Remove file">
+      <Tooltip content="Remove file" open={disableTooltips ? false : undefined}>
         <button
           type="button"
           onClick={onRemove}

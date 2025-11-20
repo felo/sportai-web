@@ -219,7 +219,8 @@ export async function generatePresignedUploadUrl(
 export async function uploadToS3(
   presignedUrl: string,
   file: File,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   console.log("[S3 Upload] Starting upload to S3...", {
     fileName: file.name,
@@ -231,6 +232,14 @@ export async function uploadToS3(
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+
+    // Handle abort signal
+    if (abortSignal) {
+      abortSignal.addEventListener("abort", () => {
+        xhr.abort();
+        reject(new Error("Upload cancelled"));
+      });
+    }
 
     // Track upload progress
     if (onProgress) {
