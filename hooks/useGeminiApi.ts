@@ -349,24 +349,42 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
           throw error;
         }
       } catch (error) {
-        // If S3 upload fails, log the error and check if we should fall back
-        console.error("[S3] ❌ S3 upload failed:", error);
-        console.error("[S3] Error details:", {
-          error: error instanceof Error ? error.message : String(error),
-          fileName: videoFile.name,
-          fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
-        });
+        // Check if this is an error from the S3 upload phase or from the API call phase
+        // If we got past S3 upload, this is likely an API error, not an S3 error
+        const isS3UploadError = error instanceof Error && 
+          (error.message.includes("S3") || error.message.includes("upload") || error.message.includes("presigned"));
         
-        // Check file size - if too large, fail with error (don't fall back)
-        const fileSizeMB = videoFile.size / (1024 * 1024);
-        if (fileSizeMB > 4.5) {
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          throw new Error(
-            `S3 upload failed: ${errorMessage}. File is too large (${fileSizeMB.toFixed(2)} MB) for direct upload. Please check your S3 configuration or compress your video.`
-          );
+        if (isS3UploadError) {
+          // If S3 upload fails, log the error and check if we should fall back
+          console.error("[S3] ❌ S3 upload failed:", error);
+          console.error("[S3] Error details:", {
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+            errorStack: error instanceof Error ? error.stack : undefined,
+            fileName: videoFile.name,
+            fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
+          });
+          
+          // Check file size - if too large, fail with error (don't fall back)
+          const fileSizeMB = videoFile.size / (1024 * 1024);
+          if (fileSizeMB > 4.5) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            throw new Error(
+              `S3 upload failed: ${errorMessage}. File is too large (${fileSizeMB.toFixed(2)} MB) for direct upload. Please check your S3 configuration or compress your video.`
+            );
+          }
+          
+          console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
+        } else {
+          // This is an API error, not an S3 error - rethrow it
+          console.error("[Gemini API] ❌ API call failed:", error);
+          console.error("[Gemini API] Error details:", {
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : undefined,
+            errorStack: error instanceof Error ? error.stack : undefined,
+          });
+          throw error;
         }
-        
-        console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
 
         // Fall back to direct upload with streaming
         const formData = new FormData();

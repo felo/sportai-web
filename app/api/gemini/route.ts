@@ -132,16 +132,45 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             for await (const chunk of streamGemini(prompt, conversationHistory, videoData, thinkingMode, mediaResolution)) {
-              controller.enqueue(new TextEncoder().encode(chunk));
+              // Check if controller is still open before enqueueing
+              // This can happen if the client aborts the request
+              try {
+                controller.enqueue(new TextEncoder().encode(chunk));
+              } catch (enqueueError) {
+                // Controller might be closed (e.g., client aborted)
+                // Check for both "closed" and "Invalid state" errors
+                const errorMessage = enqueueError instanceof Error ? enqueueError.message : String(enqueueError);
+                if (enqueueError instanceof TypeError && 
+                    (errorMessage.includes("closed") || errorMessage.includes("Invalid state"))) {
+                  logger.warn(`[${requestId}] Stream controller closed or invalid state, stopping stream:`, errorMessage);
+                  break;
+                }
+                throw enqueueError;
+              }
             }
-            controller.close();
+            // Only close if controller is still open
+            try {
+              controller.close();
+            } catch (closeError) {
+              // Controller already closed, that's okay
+              logger.debug(`[${requestId}] Controller already closed`);
+            }
             
             const duration = Date.now() - startTime;
             logger.info(`[${requestId}] Stream completed successfully in ${duration}ms`);
           } catch (error) {
             logger.error(`[${requestId}] Stream error:`, error);
-            controller.error(error);
+            // Only call error if controller is still open
+            try {
+              controller.error(error);
+            } catch (errorError) {
+              // Controller already closed, log but don't throw
+              logger.warn(`[${requestId}] Could not send error to closed controller:`, errorError);
+            }
           }
+        },
+        cancel() {
+          logger.info(`[${requestId}] Stream cancelled by client`);
         },
       });
       

@@ -161,21 +161,15 @@ export function GeminiQueryForm() {
     setUploadProgress(0);
     setProgressStage(currentVideoFile ? "uploading" : "processing");
 
-    // If submitting first video and no current chat exists, create a new chat with video filename as title
-    if (currentVideoFile && messages.length === 0) {
-      const currentChatId = getCurrentChatId();
-      if (!currentChatId) {
-        // Create a new chat with the video filename as title
-        const videoFileName = currentVideoFile.name;
-        // Remove file extension for cleaner title
-        const title = videoFileName.replace(/\.[^/.]+$/, "");
-        console.log("[Chat] Creating new chat with title:", title);
-        const newChat = createChat([], title);
-        setCurrentChatId(newChat.id);
-        // Update requestChatId to the newly created chat ID
-        requestChatId = newChat.id;
-        console.log("[Chat] Created chat:", newChat.id, "Title:", newChat.title);
-      }
+    // If no current chat exists, create a new chat
+    if (!requestChatId) {
+      console.log("[Chat] Creating new chat");
+      const newChat = createChat([], undefined); // Let it generate a default title
+      setCurrentChatId(newChat.id);
+      requestChatId = newChat.id;
+      console.log("[Chat] Created chat:", newChat.id);
+      // Update activeChatIdRef immediately to prevent chat change handler from interfering
+      // This is a workaround - we need to update the ref in useGeminiChat
     }
 
     const timestamp = Date.now();
@@ -196,8 +190,14 @@ export function GeminiQueryForm() {
       return tokens;
     };
     
+    console.log("[GeminiQueryForm] Creating user messages...", {
+      hasVideo: !!currentVideoFile,
+      hasPrompt: !!currentPrompt.trim(),
+    });
+    
     // If both video and text are present, create two separate messages
     if (currentVideoFile && currentPrompt.trim()) {
+      console.log("[GeminiQueryForm] Creating two messages: video + text");
       // First message: video only
       videoMessageId = `user-video-${timestamp}`;
       const videoTokens = calculateUserMessageTokens("", currentVideoFile);
@@ -209,6 +209,7 @@ export function GeminiQueryForm() {
         videoPreview: currentVideoPreview,
         inputTokens: videoTokens,
       };
+      console.log("[GeminiQueryForm] Adding video message:", videoMessageId);
       addMessage(videoMessage);
       
       // Second message: text only
@@ -222,9 +223,11 @@ export function GeminiQueryForm() {
         videoPreview: null,
         inputTokens: textTokens,
       };
+      console.log("[GeminiQueryForm] Adding text message:", textMessageId);
       addMessage(textMessage);
     } else {
       // Single message: either video or text
+      console.log("[GeminiQueryForm] Creating single message");
       const userMessageId = `user-${timestamp}`;
       if (currentVideoFile) {
         videoMessageId = userMessageId;
@@ -238,13 +241,15 @@ export function GeminiQueryForm() {
         videoPreview: currentVideoPreview,
         inputTokens: userTokens,
       };
+      console.log("[GeminiQueryForm] Adding user message:", userMessageId, {
+        hasVideo: !!userMessage.videoFile,
+        hasPreview: !!userMessage.videoPreview,
+        contentLength: userMessage.content.length,
+      });
       addMessage(userMessage);
     }
 
-    console.log("[GeminiQueryForm] Messages added:", {
-      userMessageId: videoMessageId || (currentVideoFile ? `user-${timestamp}` : null),
-      totalMessages: messages.length + (currentVideoFile && currentPrompt.trim() ? 2 : 1),
-    });
+    console.log("[GeminiQueryForm] User messages added, current messages state length:", messages.length);
 
     // Clear input
     setPrompt("");
@@ -266,27 +271,27 @@ export function GeminiQueryForm() {
       role: "assistant",
       content: "",
     };
+    console.log("[GeminiQueryForm] Adding assistant placeholder message:", assistantMessageId);
     addMessage(assistantMessage);
-    console.log("[GeminiQueryForm] Assistant placeholder message added:", assistantMessageId);
+    console.log("[GeminiQueryForm] All messages added, waiting for state update...");
 
-    // Immediately save messages to chat to prevent chat change handler from clearing them
-    // Get all messages including the ones we just added
-    const allMessages = [
-      ...messages,
-      ...(currentVideoFile && currentPrompt.trim() 
-        ? [{ id: videoMessageId!, role: "user" as const, content: "", videoFile: currentVideoFile, videoPreview: currentVideoPreview, inputTokens: calculateUserMessageTokens("", currentVideoFile) },
-           { id: `user-text-${timestamp}`, role: "user" as const, content: currentPrompt, inputTokens: calculateUserMessageTokens(currentPrompt, null) }]
-        : [{ id: currentVideoFile ? videoMessageId! : `user-${timestamp}`, role: "user" as const, content: currentPrompt, videoFile: currentVideoFile, videoPreview: currentVideoPreview, inputTokens: calculateUserMessageTokens(currentPrompt, currentVideoFile) }]),
-      assistantMessage
-    ];
-    
-    if (requestChatId) {
-      console.log("[GeminiQueryForm] Saving messages to chat immediately:", {
-        chatId: requestChatId,
-        messageCount: allMessages.length,
+    // Wait a tick for React to update state, then save messages to chat
+    setTimeout(() => {
+      // Get current messages from state (they should be updated by now)
+      const currentChatId = getCurrentChatId();
+      console.log("[GeminiQueryForm] Saving messages to chat:", {
+        requestChatId,
+        currentChatId,
+        match: currentChatId === requestChatId,
       });
-      updateChat(requestChatId, { messages: allMessages }, true);
-    }
+      
+      if (requestChatId && currentChatId === requestChatId) {
+        // Messages will be saved by useGeminiChat useEffect, but we can also save here explicitly
+        console.log("[GeminiQueryForm] Chat IDs match, messages should be saved by useEffect");
+      } else {
+        console.warn("[GeminiQueryForm] Chat ID mismatch:", { requestChatId, currentChatId });
+      }
+    }, 0);
 
     // Scroll to bottom immediately after adding messages, then disable auto-scroll
     // Use requestAnimationFrame to ensure DOM is updated

@@ -97,11 +97,22 @@ export function useGeminiChat() {
       const currentChatId = getCurrentChatId();
       
       // If chat is empty but we have messages, don't clear them (might be in the middle of submission)
+      // Also check if this is the same chat we're already on (might be a refresh event)
       if (currentChatId) {
         const chat = getChatById(currentChatId);
-        if (chat && chat.messages.length === 0 && messages.length > 0) {
-          console.log("[useGeminiChat] Chat is empty but we have messages, keeping current messages");
-          return;
+        if (chat) {
+          // If chat is empty but we have messages, keep current messages
+          if (chat.messages.length === 0 && messages.length > 0) {
+            console.log("[useGeminiChat] Chat is empty but we have messages, keeping current messages");
+            // Update activeChatIdRef to match current chat
+            activeChatIdRef.current = currentChatId;
+            return;
+          }
+          // If this is the same chat we're already on and messages match, don't reload
+          if (activeChatIdRef.current === currentChatId && chat.messages.length === messages.length) {
+            console.log("[useGeminiChat] Same chat, same message count, skipping reload");
+            return;
+          }
         }
       }
       
@@ -162,6 +173,14 @@ export function useGeminiChat() {
 
   // Save messages to localStorage and update chat whenever they change (but only after hydration)
   useEffect(() => {
+    console.log("[useGeminiChat] ===== MESSAGES CHANGED EFFECT =====", {
+      isHydrated,
+      isSwitchingChat: isSwitchingChatRef.current,
+      messagesCount: messages.length,
+      activeChatId: activeChatIdRef.current,
+      currentChatId: getCurrentChatId(),
+    });
+    
     if (isHydrated && !isSwitchingChatRef.current) {
       const currentChatId = getCurrentChatId();
       
@@ -172,16 +191,31 @@ export function useGeminiChat() {
       }
       
       if (messages.length > 0) {
+        console.log("[useGeminiChat] Saving messages:", {
+          count: messages.length,
+          chatId: currentChatId,
+          messageIds: messages.map(m => m.id),
+        });
         saveMessagesToStorage(messages);
         
         // Update current chat with messages
         if (currentChatId) {
-          updateChat(currentChatId, { messages });
+          console.log("[useGeminiChat] Updating chat with messages:", currentChatId);
+          updateChat(currentChatId, { messages }, true);
+          console.log("[useGeminiChat] Chat updated successfully");
+        } else {
+          console.warn("[useGeminiChat] No current chat ID, cannot update chat");
         }
       } else {
         // Clear storage if messages array is empty
+        console.log("[useGeminiChat] Messages array is empty, clearing storage");
         clearMessagesFromStorage();
       }
+    } else {
+      console.log("[useGeminiChat] Skipping save:", {
+        isHydrated,
+        isSwitchingChat: isSwitchingChatRef.current,
+      });
     }
   }, [messages, isHydrated]);
 
@@ -190,18 +224,23 @@ export function useGeminiChat() {
   }, []);
 
   const addMessage = useCallback((message: Message) => {
-    console.log("[useGeminiChat] Adding message:", {
+    console.log("[useGeminiChat] ===== ADD MESSAGE =====", {
       id: message.id,
       role: message.role,
       hasContent: !!message.content,
       hasVideo: !!(message.videoFile || message.videoPreview || message.videoUrl),
+      currentMessagesCount: messages.length,
     });
     setMessages((prev) => {
       const newMessages = [...prev, message];
-      console.log("[useGeminiChat] Messages after add:", newMessages.length);
+      console.log("[useGeminiChat] State updated:", {
+        previousCount: prev.length,
+        newCount: newMessages.length,
+        messageIds: newMessages.map(m => m.id),
+      });
       return newMessages;
     });
-  }, []);
+  }, [messages.length]);
 
   const updateMessage = useCallback((id: string, updates: Partial<Message>) => {
     // Check if chat has changed - if so, don't update messages

@@ -24,6 +24,12 @@ export function MessageList({
   uploadProgress,
   messagesEndRef,
 }: MessageListProps) {
+  console.log("[MessageList] Render:", {
+    messagesCount: messages.length,
+    loading,
+    messageIds: messages.map(m => m.id),
+  });
+  
   return (
     <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-6" role="log" aria-label="Chat messages">
       {messages.length === 0 && (
