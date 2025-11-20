@@ -1,7 +1,7 @@
 "use client";
 
 import { Theme } from "@radix-ui/themes";
-import { useEffect, useState, useLayoutEffect } from "react";
+import { useEffect, useState } from "react";
 
 type Appearance = "light" | "dark";
 type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
@@ -11,17 +11,6 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
   const [appearance, setAppearance] = useState<Appearance>("dark");
   const [accentColor, setAccentColor] = useState<AccentColor>("mint");
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
-
-  // Use useLayoutEffect to run synchronously before paint
-  useLayoutEffect(() => {
-    // Force dark mode immediately - runs before browser paint
-    setAppearance("dark");
-    
-    // Ensure HTML element has dark mode attributes
-    document.documentElement.setAttribute("data-theme", "dark");
-    document.documentElement.setAttribute("data-radix-theme-appearance", "dark");
-    document.documentElement.style.colorScheme = "dark";
-  }, []);
 
   useEffect(() => {
     // Force dark theme - always use dark mode
