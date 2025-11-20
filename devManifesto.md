@@ -72,6 +72,24 @@ This makes Tailwind's `dark:` classes check the `data-theme` attribute instead o
 
 ## Component Styling Rules
 
+### UI Component Development
+
+**ALWAYS use Radix UI components for building UI:**
+
+- ✅ Use `@radix-ui/themes` components: `Card`, `Button`, `Flex`, `Text`, `Heading`, `Dialog`, etc.
+- ✅ Leverage Radix UI's built-in theming system with color props
+- ✅ Take advantage of Radix UI's accessibility features
+- ✅ Use Radix UI's responsive props and layout primitives
+- ❌ Don't create custom buttons, cards, or layout components from scratch
+- ❌ Don't use generic HTML elements when a Radix component exists
+
+**Why?** Radix UI provides:
+- Consistent design system integration
+- Built-in dark/light theme support
+- Automatic accessibility (ARIA attributes, keyboard navigation)
+- Responsive utilities and layout primitives
+- Lower maintenance burden
+
 ### Markdown Components
 
 - Located in: `components/markdown/markdown-components.tsx`
@@ -169,10 +187,12 @@ html[data-theme="light"] body {
 2. ❌ **Don't** listen to `prefers-color-scheme` media query changes
 3. ❌ **Don't** use system appearance detection
 4. ❌ **Don't** hardcode text colors in inline styles (use CSS variables)
-5. ✅ **Do** use `data-theme` attributes for theme detection
-6. ✅ **Do** use Radix UI color variables (`var(--gray-12)`, etc.)
-7. ✅ **Do** use Tailwind `dark:` classes (they check `data-theme`)
-8. ✅ **Do** let Radix UI handle text colors automatically
+5. ❌ **Don't** create custom UI components when Radix UI components exist
+6. ✅ **Do** use `data-theme` attributes for theme detection
+7. ✅ **Do** use Radix UI color variables (`var(--gray-12)`, etc.)
+8. ✅ **Do** use Tailwind `dark:` classes (they check `data-theme`)
+9. ✅ **Do** let Radix UI handle text colors automatically
+10. ✅ **Do** use Radix UI components from `@radix-ui/themes` for all UI elements
 
 ## Testing Theme Changes
 
@@ -185,11 +205,14 @@ html[data-theme="light"] body {
 
 ## When Adding New Components
 
-- Use Radix UI components when possible
+- **ALWAYS** use Radix UI components (`@radix-ui/themes`) as the foundation
 - Use Radix UI color props (e.g., `color="gray"`) for consistency
 - Use CSS variables for custom colors (e.g., `var(--mint-6)`)
 - Add `dark:` Tailwind classes for theme-aware styling
 - Don't hardcode colors — use theme variables
+- Leverage Radix UI's layout primitives: `Flex`, `Grid`, `Container`, `Section`, `Box`
+- Use Radix UI's typography components: `Text`, `Heading`, `Code`, `Em`, `Strong`
+- For interactive elements, use: `Button`, `IconButton`, `Link`, `Card` (with `asChild` when needed)
 
 ## When Debugging Theme Issues
 

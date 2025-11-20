@@ -15,11 +15,12 @@ import { DragOverlay } from "@/components/chat/DragOverlay";
 import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
+import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
 import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
-import { getMediaType } from "@/utils/video-utils";
+import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
 
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
@@ -172,6 +173,23 @@ export function GeminiQueryForm() {
 
   const handlePickleballCoachPrompt = () => {
     setPrompt(PICKLEBALL_COACH_PROMPT);
+  };
+
+  const handleStarterPromptSelect = async (prompt: string, videoUrl: string) => {
+    try {
+      setVideoError(null);
+      // Load the video first
+      const videoFile = await downloadVideoFromUrl(videoUrl);
+      processVideoFile(videoFile);
+      // Then set the prompt
+      setPrompt(prompt);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load demo video";
+      setVideoError(errorMessage);
+      // Still set the prompt even if video loading fails
+      setPrompt(prompt);
+      throw error;
+    }
   };
 
   const handleClearConversation = () => {
@@ -502,29 +520,37 @@ export function GeminiQueryForm() {
           {/* Messages area - this is the scrolling container with fade overlay */}
           <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
             <div style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
-              <MessageList
-                messages={messages}
-                loading={loading}
-                videoFile={videoFile}
-                progressStage={progressStage}
-                uploadProgress={uploadProgress}
-                messagesEndRef={messagesEndRef}
-              />
+              {messages.length === 0 && !loading ? (
+                <StarterPrompts 
+                  onPromptSelect={handleStarterPromptSelect}
+                />
+              ) : (
+                <MessageList
+                  messages={messages}
+                  loading={loading}
+                  videoFile={videoFile}
+                  progressStage={progressStage}
+                  uploadProgress={uploadProgress}
+                  messagesEndRef={messagesEndRef}
+                />
+              )}
             </div>
             
-            {/* Bottom fade overlay - fades content at bottom */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: "60px",
-                background: `linear-gradient(to top, var(--gray-1, #1C1C1C) 0%, transparent 100%)`,
-                pointerEvents: "none",
-                zIndex: 1000,
-              }}
-            />
+            {/* Bottom fade overlay - fades content at bottom - only show when there are messages */}
+            {messages.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: "60px",
+                  background: `linear-gradient(to top, var(--gray-1, #1C1C1C) 0%, transparent 100%)`,
+                  pointerEvents: "none",
+                  zIndex: 1000,
+                }}
+              />
+            )}
           </div>
 
           {/* Input area - docked at bottom */}

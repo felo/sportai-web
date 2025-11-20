@@ -54,3 +54,29 @@ export function getMediaType(file: File): 'video' | 'image' {
   return isImageFile(file) ? 'image' : 'video';
 }
 
+/**
+ * Downloads a video from a URL and converts it to a File object
+ */
+export async function downloadVideoFromUrl(url: string): Promise<File> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download video: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    
+    // Extract filename from URL or use a default
+    const urlParts = url.split('/');
+    const filename = urlParts[urlParts.length - 1] || 'demo-video.mp4';
+    
+    // Create a File object from the blob
+    const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+    
+    return file;
+  } catch (error) {
+    console.error('Error downloading video:', error);
+    throw new Error('Failed to load demo video. Please try uploading your own video.');
+  }
+}
+
