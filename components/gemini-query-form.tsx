@@ -17,7 +17,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
-import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution, generateAIChatTitle, getChatById } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
@@ -27,6 +27,7 @@ export function GeminiQueryForm() {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(() => getThinkingMode());
   const [mediaResolution, setMediaResolution] = useState<MediaResolution>(() => getMediaResolution());
+  const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>(() => getDomainExpertise());
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -175,9 +176,31 @@ export function GeminiQueryForm() {
     setPrompt(PICKLEBALL_COACH_PROMPT);
   };
 
-  const handleStarterPromptSelect = async (prompt: string, videoUrl: string) => {
+  const handleStarterPromptSelect = async (
+    prompt: string, 
+    videoUrl: string,
+    settings?: {
+      thinkingMode?: ThinkingMode;
+      mediaResolution?: MediaResolution;
+      domainExpertise?: DomainExpertise;
+    }
+  ) => {
     try {
       setVideoError(null);
+      
+      // Apply settings if provided
+      if (settings) {
+        if (settings.thinkingMode) {
+          setThinkingMode(settings.thinkingMode);
+        }
+        if (settings.mediaResolution) {
+          setMediaResolution(settings.mediaResolution);
+        }
+        if (settings.domainExpertise) {
+          setDomainExpertise(settings.domainExpertise);
+        }
+      }
+      
       // Load the video first
       const videoFile = await downloadVideoFromUrl(videoUrl);
       processVideoFile(videoFile);
@@ -398,7 +421,8 @@ export function GeminiQueryForm() {
           conversationHistory,
           abortController,
           thinkingMode,
-          mediaResolution
+          mediaResolution,
+          domainExpertise
         );
       } else {
         // Video upload with progress
@@ -428,7 +452,8 @@ export function GeminiQueryForm() {
           },
           abortController,
           thinkingMode,
-          mediaResolution
+          mediaResolution,
+          domainExpertise
         );
       }
     } catch (err) {
@@ -561,6 +586,9 @@ export function GeminiQueryForm() {
             error={null}
             loading={loading}
             progressStage={progressStage}
+            thinkingMode={thinkingMode}
+            mediaResolution={mediaResolution}
+            domainExpertise={domainExpertise}
             onPromptChange={setPrompt}
             onVideoRemove={clearVideo}
             onVideoChange={handleVideoChange}
@@ -569,6 +597,7 @@ export function GeminiQueryForm() {
             onPickleballCoachClick={handlePickleballCoachPrompt}
             onThinkingModeChange={setThinkingMode}
             onMediaResolutionChange={setMediaResolution}
+            onDomainExpertiseChange={setDomainExpertise}
             disableTooltips={hasJustDropped}
           />
         </div>

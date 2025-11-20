@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryGemini, streamGemini, type ConversationHistory } from "@/lib/gemini";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
-import type { ThinkingMode, MediaResolution } from "@/utils/storage";
+import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 // Ensure this route uses Node.js runtime (required for file uploads and Buffer)
 export const runtime = "nodejs";
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     const historyJson = formData.get("history") as string | null;
     const thinkingMode = (formData.get("thinkingMode") as ThinkingMode) || "fast";
     const mediaResolution = (formData.get("mediaResolution") as MediaResolution) || "medium";
+    const domainExpertise = (formData.get("domainExpertise") as DomainExpertise) || "all-sports";
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
     logger.debug(`[${requestId}] Media file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     logger.debug(`[${requestId}] History JSON: ${historyJson ? `${historyJson.length} characters` : "none"}`);
     logger.debug(`[${requestId}] Thinking mode: ${thinkingMode}`);
     logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
+    logger.debug(`[${requestId}] Domain expertise: ${domainExpertise}`);
 
     if (!prompt || typeof prompt !== "string") {
       logger.error(`[${requestId}] Validation failed: Prompt is required`);
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of streamGemini(prompt, conversationHistory, videoData, thinkingMode, mediaResolution)) {
+            for await (const chunk of streamGemini(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise)) {
               // Check if controller is still open before enqueueing
               // This can happen if the client aborts the request
               try {
@@ -183,7 +185,7 @@ export async function POST(request: NextRequest) {
     }
     
     logger.info(`[${requestId}] Calling queryGemini...`);
-    const response = await queryGemini(prompt, videoData, conversationHistory, thinkingMode, mediaResolution);
+    const response = await queryGemini(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise);
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);

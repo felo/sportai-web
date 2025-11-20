@@ -5,7 +5,7 @@ import { TextArea, Button, Tooltip, Box, Flex, Callout, Text, Select } from "@ra
 import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "./VideoPreview";
 import type { ProgressStage } from "@/types/chat";
-import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, type ThinkingMode, type MediaResolution } from "@/utils/storage";
+import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, getDomainExpertise, setDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 
 interface ChatInputProps {
   prompt: string;
@@ -14,6 +14,9 @@ interface ChatInputProps {
   error: string | null;
   loading: boolean;
   progressStage?: ProgressStage;
+  thinkingMode?: ThinkingMode;
+  mediaResolution?: MediaResolution;
+  domainExpertise?: DomainExpertise;
   onPromptChange: (value: string) => void;
   onVideoRemove: () => void;
   onVideoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -22,6 +25,7 @@ interface ChatInputProps {
   onPickleballCoachClick: () => void;
   onThinkingModeChange?: (mode: ThinkingMode) => void;
   onMediaResolutionChange?: (resolution: MediaResolution) => void;
+  onDomainExpertiseChange?: (expertise: DomainExpertise) => void;
   disableTooltips?: boolean;
 }
 
@@ -32,6 +36,9 @@ export function ChatInput({
   error,
   loading,
   progressStage = "idle",
+  thinkingMode: thinkingModeProp,
+  mediaResolution: mediaResolutionProp,
+  domainExpertise: domainExpertiseProp,
   onPromptChange,
   onVideoRemove,
   onVideoChange,
@@ -40,6 +47,7 @@ export function ChatInput({
   onPickleballCoachClick,
   onThinkingModeChange,
   onMediaResolutionChange,
+  onDomainExpertiseChange,
   disableTooltips = false,
 }: ChatInputProps) {
   // Debug logging
@@ -54,16 +62,31 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>("fast");
-  const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>("medium");
+  const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>(() => thinkingModeProp || getThinkingMode());
+  const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>(() => mediaResolutionProp || getMediaResolution());
+  const [domainExpertise, setDomainExpertiseState] = useState<DomainExpertise>(() => domainExpertiseProp || getDomainExpertise());
   const [thinkingModeOpen, setThinkingModeOpen] = useState(false);
   const [mediaResolutionOpen, setMediaResolutionOpen] = useState(false);
+  const [domainExpertiseOpen, setDomainExpertiseOpen] = useState(false);
 
-  // Load settings from localStorage on mount
+  // Update local state when props change (e.g., from starter prompts)
   useEffect(() => {
-    setThinkingModeState(getThinkingMode());
-    setMediaResolutionState(getMediaResolution());
-  }, []);
+    if (thinkingModeProp) {
+      setThinkingModeState(thinkingModeProp);
+    }
+  }, [thinkingModeProp]);
+
+  useEffect(() => {
+    if (mediaResolutionProp) {
+      setMediaResolutionState(mediaResolutionProp);
+    }
+  }, [mediaResolutionProp]);
+
+  useEffect(() => {
+    if (domainExpertiseProp) {
+      setDomainExpertiseState(domainExpertiseProp);
+    }
+  }, [domainExpertiseProp]);
 
   // Reset file input when video is cleared (e.g., after error or removal)
   useEffect(() => {
@@ -328,7 +351,7 @@ export function ChatInput({
                 content="Media resolution: Controls the quality and token usage for video/image analysis"
                 open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
               >
-                <Box>
+                <Box style={{ marginRight: "var(--space-3)" }}>
                   <Select.Root
                     value={mediaResolution}
                     open={mediaResolutionOpen}
@@ -358,6 +381,47 @@ export function ChatInput({
                       <Select.Item value="low">Low</Select.Item>
                       <Select.Item value="medium">Medium</Select.Item>
                       <Select.Item value="high">High</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
+              </Tooltip>
+
+              {/* Domain expertise selector */}
+              <Tooltip 
+                content="Domain expertise: Choose the sport for specialized analysis"
+                open={disableTooltips ? false : (!domainExpertiseOpen ? undefined : false)}
+              >
+                <Box>
+                  <Select.Root
+                    value={domainExpertise}
+                    open={domainExpertiseOpen}
+                    onOpenChange={setDomainExpertiseOpen}
+                    onValueChange={(value) => {
+                      const expertise = value as DomainExpertise;
+                      setDomainExpertiseState(expertise);
+                      setDomainExpertise(expertise);
+                      onDomainExpertiseChange?.(expertise);
+                    }}
+                  >
+                    <Select.Trigger
+                      className="select-no-border"
+                      style={{
+                        height: "28px",
+                        fontSize: "11px",
+                        padding: "0 var(--space-2)",
+                        minWidth: "90px",
+                        border: "none",
+                        borderWidth: 0,
+                        outline: "none",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                      }}
+                    />
+                    <Select.Content>
+                      <Select.Item value="all-sports">All Sports</Select.Item>
+                      <Select.Item value="tennis">Tennis</Select.Item>
+                      <Select.Item value="pickleball">Pickleball</Select.Item>
+                      <Select.Item value="padel">Padel</Select.Item>
                     </Select.Content>
                   </Select.Root>
                 </Box>

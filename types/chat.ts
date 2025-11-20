@@ -20,6 +20,7 @@ export type Message = {
   modelSettings?: {
     thinkingMode: string;
     mediaResolution: string;
+    domainExpertise?: string;
   };
 };
 

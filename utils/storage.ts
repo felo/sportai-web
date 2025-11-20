@@ -296,6 +296,11 @@ export type ThinkingMode = "fast" | "deep";
 export type MediaResolution = "low" | "medium" | "high";
 
 /**
+ * Domain expertise type
+ */
+export type DomainExpertise = "all-sports" | "tennis" | "pickleball" | "padel";
+
+/**
  * Thinking mode storage key
  */
 const THINKING_MODE_KEY = "thinking-mode";
@@ -304,6 +309,11 @@ const THINKING_MODE_KEY = "thinking-mode";
  * Media resolution storage key
  */
 const MEDIA_RESOLUTION_KEY = "media-resolution";
+
+/**
+ * Domain expertise storage key
+ */
+const DOMAIN_EXPERTISE_KEY = "domain-expertise";
 
 /**
  * Get thinking mode setting from localStorage
@@ -370,6 +380,42 @@ export function setMediaResolution(resolution: MediaResolution): void {
     localStorage.setItem(MEDIA_RESOLUTION_KEY, resolution);
   } catch (error) {
     console.error("Failed to save media resolution to storage:", error);
+  }
+}
+
+/**
+ * Get domain expertise setting from localStorage
+ * @returns "all-sports", "tennis", "pickleball", or "padel", defaults to "all-sports"
+ */
+export function getDomainExpertise(): DomainExpertise {
+  if (typeof window === "undefined") {
+    return "all-sports";
+  }
+
+  try {
+    const stored = localStorage.getItem(DOMAIN_EXPERTISE_KEY);
+    return (stored === "all-sports" || stored === "tennis" || stored === "pickleball" || stored === "padel") 
+      ? stored 
+      : "all-sports";
+  } catch (error) {
+    console.error("Failed to load domain expertise from storage:", error);
+    return "all-sports";
+  }
+}
+
+/**
+ * Save domain expertise setting to localStorage
+ * @param expertise - "all-sports", "tennis", "pickleball", or "padel"
+ */
+export function setDomainExpertise(expertise: DomainExpertise): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(DOMAIN_EXPERTISE_KEY, expertise);
+  } catch (error) {
+    console.error("Failed to save domain expertise to storage:", error);
   }
 }
 

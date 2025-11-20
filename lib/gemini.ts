@@ -6,8 +6,8 @@ import {
   calculatePricing,
   formatCost,
 } from "./token-utils";
-import { SYSTEM_PROMPT } from "@/utils/prompts";
-import type { ThinkingMode, MediaResolution } from "@/utils/storage";
+import { getSystemPromptWithDomain } from "./prompts";
+import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 const MODEL_NAME = "gemini-3-pro-preview";
 
@@ -35,12 +35,14 @@ export async function queryGemini(
   videoData?: { data: Buffer; mimeType: string } | null,
   conversationHistory?: ConversationHistory[],
   thinkingMode: ThinkingMode = "fast",
-  mediaResolution: MediaResolution = "medium"
+  mediaResolution: MediaResolution = "medium",
+  domainExpertise: DomainExpertise = "all-sports"
 ): Promise<string> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Prepend system prompt to user prompt
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+  // Get system prompt with domain-specific enhancement
+  const systemPrompt = getSystemPromptWithDomain(domainExpertise);
+  const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
   logger.info(`[${requestId}] Starting Gemini query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
@@ -308,12 +310,14 @@ export async function* streamGemini(
   conversationHistory?: ConversationHistory[],
   videoData?: { data: Buffer; mimeType: string } | null,
   thinkingMode: ThinkingMode = "fast",
-  mediaResolution: MediaResolution = "medium"
+  mediaResolution: MediaResolution = "medium",
+  domainExpertise: DomainExpertise = "all-sports"
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Prepend system prompt to user prompt
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
+  // Get system prompt with domain-specific enhancement
+  const systemPrompt = getSystemPromptWithDomain(domainExpertise);
+  const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
   logger.info(`[${requestId}] Starting Gemini stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);

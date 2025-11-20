@@ -3,8 +3,11 @@ import type { ProgressStage, Message } from "@/types/chat";
 import { getConversationContext, trimMessagesByTokens, formatMessagesForGemini } from "@/utils/context-utils";
 import { uploadToS3 } from "@/lib/s3";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
-import { SYSTEM_PROMPT } from "@/utils/prompts";
-import type { ThinkingMode, MediaResolution } from "@/utils/storage";
+import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+
+// Rough estimate for system prompt token count (server-side prompt is not exposed to client)
+// This includes base system prompt + potential domain expertise enhancement
+const ESTIMATED_SYSTEM_PROMPT_TOKENS = 500;
 
 interface UseGeminiApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
@@ -23,15 +26,16 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       conversationHistory?: Message[],
       abortController?: AbortController,
       thinkingMode: ThinkingMode = "fast",
-      mediaResolution: MediaResolution = "medium"
+      mediaResolution: MediaResolution = "medium",
+      domainExpertise: DomainExpertise = "all-sports"
     ): Promise<void> => {
       optionsRef.current.onProgressUpdate?.("generating", 0);
 
       const requestStartTime = Date.now();
 
       // Calculate input tokens for this request
-      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
-      let inputTokens = estimateTextTokens(fullPrompt);
+      // Note: System prompt is constructed server-side and not exposed to client
+      let inputTokens = ESTIMATED_SYSTEM_PROMPT_TOKENS + estimateTextTokens(prompt);
       
       // Add tokens from conversation history
       if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -46,6 +50,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       formData.append("prompt", prompt);
       formData.append("thinkingMode", thinkingMode);
       formData.append("mediaResolution", mediaResolution);
+      formData.append("domainExpertise", domainExpertise);
 
       // Add conversation history if provided and not empty
       // Skip if empty array to avoid sending unnecessary data
@@ -117,6 +122,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
             modelSettings: {
               thinkingMode,
               mediaResolution,
+              domainExpertise,
             },
           });
         } catch (error) {
@@ -144,11 +150,12 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       onVideoUploaded?: (s3Url: string, s3Key: string) => void,
       abortController?: AbortController,
       thinkingMode: ThinkingMode = "fast",
-      mediaResolution: MediaResolution = "medium"
+      mediaResolution: MediaResolution = "medium",
+      domainExpertise: DomainExpertise = "all-sports"
     ): Promise<void> => {
       // Calculate input tokens for this request
-      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
-      let inputTokens = estimateTextTokens(fullPrompt);
+      // Note: System prompt is constructed server-side and not exposed to client
+      let inputTokens = ESTIMATED_SYSTEM_PROMPT_TOKENS + estimateTextTokens(prompt);
       
       // Add video tokens
       const isImage = videoFile.type.startsWith("image/");
@@ -246,6 +253,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         formData.append("videoUrl", s3Url);
         formData.append("thinkingMode", thinkingMode);
         formData.append("mediaResolution", mediaResolution);
+        formData.append("domainExpertise", domainExpertise);
 
         // Add conversation history if provided
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -338,6 +346,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
             modelSettings: {
               thinkingMode,
               mediaResolution,
+              domainExpertise,
             },
           });
         } catch (error) {
@@ -392,6 +401,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         formData.append("video", videoFile);
         formData.append("thinkingMode", thinkingMode);
         formData.append("mediaResolution", mediaResolution);
+        formData.append("domainExpertise", domainExpertise);
 
         // Add conversation history
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -451,6 +461,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
               modelSettings: {
                 thinkingMode,
                 mediaResolution,
+                domainExpertise,
               },
             });
           } catch (error) {

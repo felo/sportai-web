@@ -4,19 +4,36 @@ import React from "react";
 import Image from "next/image";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { URLs } from "@/lib/config";
-import { STARTER_PROMPTS } from "@/utils/prompts";
+import { STARTER_PROMPTS, type StarterPromptConfig } from "@/utils/prompts";
+import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 interface StarterPromptsProps {
-  onPromptSelect: (prompt: string, videoUrl: string) => void;
+  onPromptSelect: (
+    prompt: string, 
+    videoUrl: string,
+    settings?: {
+      thinkingMode?: ThinkingMode;
+      mediaResolution?: MediaResolution;
+      domainExpertise?: DomainExpertise;
+    }
+  ) => void;
 }
 
 export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
   const [loadingVideoForCard, setLoadingVideoForCard] = React.useState<string | null>(null);
 
-  const handleCardClick = async (promptId: string, prompt: string, videoUrl: string) => {
+  const handleCardClick = async (config: StarterPromptConfig) => {
     try {
-      setLoadingVideoForCard(promptId);
-      await onPromptSelect(prompt, videoUrl);
+      setLoadingVideoForCard(config.id);
+      
+      // Extract settings from config
+      const settings = {
+        thinkingMode: config.thinkingMode,
+        mediaResolution: config.mediaResolution,
+        domainExpertise: config.domainExpertise,
+      };
+      
+      await onPromptSelect(config.prompt, config.videoUrl, settings);
     } catch (error) {
       console.error('Error loading demo video:', error);
     } finally {
@@ -105,7 +122,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
               <Button
                 size="2"
                 variant="soft"
-                onClick={() => handleCardClick(starterPrompt.id, starterPrompt.prompt, starterPrompt.videoUrl)}
+                onClick={() => handleCardClick(starterPrompt)}
                 loading={loadingVideoForCard === starterPrompt.id}
                 disabled={loadingVideoForCard !== null}
                 style={{ width: "100%", cursor: "pointer" }}
