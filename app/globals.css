@@ -10,7 +10,27 @@ html {
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
   /* Force dark color scheme on iOS */
-  color-scheme: dark;
+  color-scheme: dark !important;
+}
+
+/* Force dark mode regardless of system preference */
+html,
+html[data-theme="dark"],
+html[data-radix-theme-appearance="dark"],
+html.dark {
+  color-scheme: dark !important;
+  background-color: #000000 !important;
+}
+
+/* Override any light mode styles */
+@media (prefers-color-scheme: light) {
+  html,
+  html[data-theme="dark"],
+  html[data-radix-theme-appearance="dark"],
+  html.dark {
+    color-scheme: dark !important;
+    background-color: #000000 !important;
+  }
 }
 
 body {
@@ -25,6 +45,14 @@ body {
 #root {
   background-color: #000000 !important;
   min-height: 100vh;
+}
+
+/* Force Radix UI to dark mode - override any system preference */
+[data-radix-theme],
+[data-radix-theme-appearance="dark"],
+html[data-radix-theme-appearance="dark"] [data-radix-theme] {
+  /* Force dark appearance */
+  color-scheme: dark !important;
 }
 
 /* Custom brand color palette - overrides Radix colors with brand colors */
@@ -61,6 +89,15 @@ body {
   --color-background: var(--gray-1);
   
   /* Ensure the theme wrapper itself has dark background */
+  background-color: var(--gray-1) !important;
+  color-scheme: dark !important;
+}
+
+/* Override Radix UI light mode styles even if they're applied */
+[data-radix-theme][data-radix-theme-appearance="light"],
+html[data-radix-theme-appearance="light"] [data-radix-theme] {
+  /* Force dark mode even if light is set */
+  color-scheme: dark !important;
   background-color: var(--gray-1) !important;
 }
 
