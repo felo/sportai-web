@@ -453,7 +453,23 @@ export function ChatInput({
 
           {/* Disclaimer text */}
           <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
-            This is a demo of the SportAI API, and may contain errors. For enterprise-level precision, performance, and dedicated support, please contact us.
+            This is a demo of the{" "}
+            <a 
+              href="https://sportai.com/platform" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: "inherit", textDecoration: "underline" }}
+            >
+              SportAI API
+            </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
+            <a 
+              href="https://sportai.com/contact" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: "inherit", textDecoration: "underline" }}
+            >
+              contact us
+            </a>.
           </Text>
         </Flex>
       </form>
