@@ -302,13 +302,30 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                                   if (currentChatId === chat.id && onChatSwitchAttempt && !onChatSwitchAttempt()) {
                                     return; // User cancelled
                                   }
-                                  deleteChat(chat.id);
-                                  const updatedChats = loadChatsFromStorage();
-                                  setChats(updatedChats);
-                                  if (currentChatId === chat.id) {
-                                    const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
-                                    setCurrentChatId(newCurrentChatId);
-                                    saveCurrentChatId(newCurrentChatId);
+                                  
+                                  // Check if this is the last chat - if so, clear it instead of deleting
+                                  const allChats = loadChatsFromStorage();
+                                  if (allChats.length === 1) {
+                                    // Last chat - clear messages instead of deleting
+                                    console.log("[Sidebar] Last chat - clearing messages instead of deleting");
+                                    updateChat(chat.id, { messages: [] }, false);
+                                    // Refresh chat list
+                                    const updatedChats = loadChatsFromStorage();
+                                    setChats(updatedChats);
+                                    // Also clear the chat in the UI state
+                                    if (currentChatId === chat.id && onClearChat) {
+                                      onClearChat();
+                                    }
+                                  } else {
+                                    // Not the last chat - delete normally
+                                    deleteChat(chat.id);
+                                    const updatedChats = loadChatsFromStorage();
+                                    setChats(updatedChats);
+                                    if (currentChatId === chat.id) {
+                                      const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
+                                      setCurrentChatId(newCurrentChatId);
+                                      saveCurrentChatId(newCurrentChatId);
+                                    }
                                   }
                                   setHoveredChatId(null);
                                 }}

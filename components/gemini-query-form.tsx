@@ -82,6 +82,21 @@ export function GeminiQueryForm() {
     },
   });
 
+  // Ensure there's always a chat - create one on mount if none exists
+  useEffect(() => {
+    if (isHydrated) {
+      const currentChatId = getCurrentChatId();
+      if (!currentChatId) {
+        console.log("[GeminiQueryForm] No chat exists, creating default chat");
+        const newChat = createChat([], undefined);
+        setCurrentChatId(newChat.id);
+        console.log("[GeminiQueryForm] Created default chat:", newChat.id);
+      } else {
+        console.log("[GeminiQueryForm] Using existing chat:", currentChatId);
+      }
+    }
+  }, [isHydrated]);
+
   // Auto-populate prompt when video is added and prompt is empty
   useEffect(() => {
     if (videoFile && !prompt.trim()) {
@@ -153,24 +168,20 @@ export function GeminiQueryForm() {
     // This ensures we send the correct history to the API
     const conversationHistory = messages;
     
-    // Store the initial chat ID (might be null for new chats)
-    let requestChatId = getCurrentChatId();
+    // Get the current chat ID - there should always be one (created on mount)
+    const requestChatId = getCurrentChatId();
+    console.log("[GeminiQueryForm] Using chat:", requestChatId);
+    
+    if (!requestChatId) {
+      console.error("[GeminiQueryForm] No chat ID available! This should not happen - chat should be created on mount.");
+      return;
+    }
 
-    // Set loading state BEFORE creating chat to prevent chat change handler from interfering
+    // Set loading state
+    console.log("[GeminiQueryForm] Setting loading state to true");
     setLoading(true);
     setUploadProgress(0);
     setProgressStage(currentVideoFile ? "uploading" : "processing");
-
-    // If no current chat exists, create a new chat
-    if (!requestChatId) {
-      console.log("[Chat] Creating new chat");
-      const newChat = createChat([], undefined); // Let it generate a default title
-      setCurrentChatId(newChat.id);
-      requestChatId = newChat.id;
-      console.log("[Chat] Created chat:", newChat.id);
-      // Update activeChatIdRef immediately to prevent chat change handler from interfering
-      // This is a workaround - we need to update the ref in useGeminiChat
-    }
 
     const timestamp = Date.now();
     let videoMessageId: string | null = null;

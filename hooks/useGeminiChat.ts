@@ -82,38 +82,52 @@ export function useGeminiChat() {
     if (!isHydrated) return;
 
     const handleChatChange = async () => {
+      const currentChatId = getCurrentChatId();
+      
+      console.log("[useGeminiChat] ===== CHAT CHANGE HANDLER =====", {
+        currentChatId,
+        activeChatId: activeChatIdRef.current,
+        currentMessages: messages.length,
+        loading,
+      });
+      
+      // CRITICAL FIX: Check if chat is empty but we have messages FIRST
+      // This prevents clearing messages when creating a new chat during submission
+      if (currentChatId) {
+        const chat = getChatById(currentChatId);
+        if (chat && chat.messages.length === 0 && messages.length > 0) {
+          console.log("[useGeminiChat] ⚠️ Chat is empty but we have messages - KEEPING STATE MESSAGES", {
+            chatId: currentChatId,
+            chatMessages: chat.messages.length,
+            stateMessages: messages.length,
+            loading,
+          });
+          // Update activeChatIdRef to match current chat
+          activeChatIdRef.current = currentChatId;
+          return; // Don't reload - keep current messages
+        }
+      }
+      
       // Don't interfere if we're already loading (might be creating a new chat during submission)
       if (loading) {
-        console.log("[useGeminiChat] Ignoring chat change during active loading");
+        console.log("[useGeminiChat] Ignoring chat change during active loading", {
+          currentChatId,
+          activeChatId: activeChatIdRef.current,
+        });
+        // Update activeChatIdRef even during loading
+        if (currentChatId) {
+          activeChatIdRef.current = currentChatId;
+        }
         return;
       }
       
-      console.log("[useGeminiChat] Chat change handler triggered", {
-        currentChatId: getCurrentChatId(),
-        activeChatId: activeChatIdRef.current,
-        currentMessages: messages.length,
-      });
-      
-      const currentChatId = getCurrentChatId();
-      
-      // If chat is empty but we have messages, don't clear them (might be in the middle of submission)
-      // Also check if this is the same chat we're already on (might be a refresh event)
-      if (currentChatId) {
-        const chat = getChatById(currentChatId);
-        if (chat) {
-          // If chat is empty but we have messages, keep current messages
-          if (chat.messages.length === 0 && messages.length > 0) {
-            console.log("[useGeminiChat] Chat is empty but we have messages, keeping current messages");
-            // Update activeChatIdRef to match current chat
-            activeChatIdRef.current = currentChatId;
-            return;
-          }
-          // If this is the same chat we're already on and messages match, don't reload
-          if (activeChatIdRef.current === currentChatId && chat.messages.length === messages.length) {
-            console.log("[useGeminiChat] Same chat, same message count, skipping reload");
-            return;
-          }
-        }
+      // If this is the same chat we're already on, don't reload
+      if (activeChatIdRef.current === currentChatId && currentChatId) {
+        console.log("[useGeminiChat] Same chat, skipping reload", {
+          chatId: currentChatId,
+          messageCount: messages.length,
+        });
+        return;
       }
       
       isSwitchingChatRef.current = true;
@@ -243,6 +257,13 @@ export function useGeminiChat() {
   }, [messages.length]);
 
   const updateMessage = useCallback((id: string, updates: Partial<Message>) => {
+    console.log("[useGeminiChat] ===== UPDATE MESSAGE =====", {
+      id,
+      updates,
+      activeChatId: activeChatIdRef.current,
+      currentChatId: getCurrentChatId(),
+    });
+    
     // Check if chat has changed - if so, don't update messages
     const currentChatId = getCurrentChatId();
     if (activeChatIdRef.current !== currentChatId) {
@@ -250,9 +271,22 @@ export function useGeminiChat() {
       return;
     }
     
-    setMessages((prev) =>
-      prev.map((msg) => (msg.id === id ? { ...msg, ...updates } : msg))
-    );
+    setMessages((prev) => {
+      const messageExists = prev.find(m => m.id === id);
+      console.log("[useGeminiChat] Updating message in state:", {
+        messageExists: !!messageExists,
+        previousCount: prev.length,
+        updatingId: id,
+      });
+      
+      const updated = prev.map((msg) => (msg.id === id ? { ...msg, ...updates } : msg));
+      console.log("[useGeminiChat] Updated messages:", {
+        newCount: updated.length,
+        updatedMessage: updated.find(m => m.id === id),
+      });
+      
+      return updated;
+    });
   }, []);
 
   const removeMessage = useCallback((id: string) => {
