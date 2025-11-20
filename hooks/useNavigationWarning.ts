@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { ProgressStage } from "@/types/chat";
 
 interface UseNavigationWarningOptions {
@@ -12,6 +12,8 @@ interface UseNavigationWarningOptions {
  */
 export function useNavigationWarning({ isLoading, progressStage }: UseNavigationWarningOptions) {
   const isThinkingRef = useRef(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
   // Update ref when thinking state changes
   useEffect(() => {
@@ -45,18 +47,48 @@ export function useNavigationWarning({ isLoading, progressStage }: UseNavigation
 
   /**
    * Show a confirmation dialog if chat is thinking
-   * Returns true if user confirmed, false if cancelled
+   * Returns a Promise that resolves to true if user confirmed, false if cancelled
    */
-  const confirmNavigation = (message: string = "A response is being generated. Are you sure you want to leave?"): boolean => {
+  const confirmNavigation = useCallback(async (message: string = "A response is being generated. Are you sure you want to leave?"): Promise<boolean> => {
     if (!isThinkingRef.current) {
       return true; // Not thinking, allow navigation
     }
-    return window.confirm(message);
-  };
+    
+    // Return a promise that resolves when the user interacts with the dialog
+    return new Promise<boolean>((resolve) => {
+      resolveRef.current = resolve;
+      setDialogOpen(true);
+    });
+  }, []);
+
+  /**
+   * Handle dialog confirmation
+   */
+  const handleConfirm = useCallback(() => {
+    if (resolveRef.current) {
+      resolveRef.current(true);
+      resolveRef.current = null;
+    }
+    setDialogOpen(false);
+  }, []);
+
+  /**
+   * Handle dialog cancellation
+   */
+  const handleCancel = useCallback(() => {
+    if (resolveRef.current) {
+      resolveRef.current(false);
+      resolveRef.current = null;
+    }
+    setDialogOpen(false);
+  }, []);
 
   return {
     isThinking,
     confirmNavigation,
+    dialogOpen,
+    handleConfirm,
+    handleCancel,
   };
 }
 

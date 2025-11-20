@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { AlertDialog, Button, Flex } from "@radix-ui/themes";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useGeminiChat } from "@/hooks/useGeminiChat";
@@ -15,7 +16,7 @@ import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
-import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 
@@ -68,7 +69,7 @@ export function GeminiQueryForm() {
     },
   });
 
-  const { confirmNavigation } = useNavigationWarning({
+  const { confirmNavigation, dialogOpen, handleConfirm, handleCancel } = useNavigationWarning({
     isLoading: loading,
     progressStage,
   });
@@ -127,6 +128,45 @@ export function GeminiQueryForm() {
       scrollToBottom();
     }
   }, [messages, scrollToBottom, shouldAutoScroll]);
+
+  // Generate AI title after first exchange completes
+  useEffect(() => {
+    if (!isHydrated) return;
+    
+    // Only generate title for first exchange (user + assistant)
+    // Note: might be multiple user messages if video + text were sent separately
+    const userMessages = messages.filter(m => m.role === "user");
+    const assistantMessages = messages.filter(m => m.role === "assistant");
+    
+    // Check if we have at least one user message and exactly one assistant message
+    // And the assistant message is complete (we're not loading anymore)
+    if (userMessages.length >= 1 && 
+        assistantMessages.length === 1 && 
+        assistantMessages[0].content.trim().length > 0 &&
+        !loading) { 
+      
+      const currentChatId = getCurrentChatId();
+      if (currentChatId) {
+        // Check if title is still the default/generated one (not manually edited)
+        const chat = getChatById(currentChatId);
+        const firstUserContent = userMessages[0].content.trim().slice(0, 50);
+        
+        // Only regenerate if title looks auto-generated (matches "New Chat", "Video Analysis", or starts with user content)
+        if (chat && (chat.title === "New Chat" || chat.title === "Video Analysis" || (firstUserContent && chat.title.startsWith(firstUserContent)))) {
+          // Generate title asynchronously (don't block UI)
+          generateAIChatTitle(messages).then(title => {
+            // Double-check chat hasn't changed
+            const stillCurrentChatId = getCurrentChatId();
+            if (stillCurrentChatId === currentChatId) {
+              updateChat(currentChatId, { title }, false);
+            }
+          }).catch(error => {
+            console.error("Failed to generate AI title:", error);
+          });
+        }
+      }
+    }
+  }, [messages, isHydrated, loading]);
 
   const handlePickleballCoachPrompt = () => {
     setPrompt(PICKLEBALL_COACH_PROMPT);
@@ -507,6 +547,32 @@ export function GeminiQueryForm() {
 
       {/* Toast for error notifications */}
       <ErrorToast error={error} />
+
+      {/* Alert Dialog for navigation warning */}
+      <AlertDialog.Root open={dialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCancel();
+        }
+      }}>
+        <AlertDialog.Content maxWidth="450px">
+          <AlertDialog.Title>Leave this page?</AlertDialog.Title>
+          <AlertDialog.Description size="2">
+            A response is being generated. Are you sure you want to leave?
+          </AlertDialog.Description>
+          <Flex gap="3" mt="4" justify="end">
+            <AlertDialog.Cancel>
+              <Button variant="soft" color="gray" onClick={handleCancel}>
+                Cancel
+              </Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action>
+              <Button variant="solid" color="red" onClick={handleConfirm}>
+                Leave
+              </Button>
+            </AlertDialog.Action>
+          </Flex>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
     </div>
   );
 }

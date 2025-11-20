@@ -83,46 +83,18 @@ export function useGeminiChat() {
 
     const handleChatChange = async () => {
       const currentChatId = getCurrentChatId();
+      const isSwitchingToDifferentChat = activeChatIdRef.current !== currentChatId;
       
       console.log("[useGeminiChat] ===== CHAT CHANGE HANDLER =====", {
         currentChatId,
         activeChatId: activeChatIdRef.current,
+        isSwitchingToDifferentChat,
         currentMessages: messages.length,
         loading,
       });
       
-      // CRITICAL FIX: Check if chat is empty but we have messages FIRST
-      // This prevents clearing messages when creating a new chat during submission
-      if (currentChatId) {
-        const chat = getChatById(currentChatId);
-        if (chat && chat.messages.length === 0 && messages.length > 0) {
-          console.log("[useGeminiChat] ⚠️ Chat is empty but we have messages - KEEPING STATE MESSAGES", {
-            chatId: currentChatId,
-            chatMessages: chat.messages.length,
-            stateMessages: messages.length,
-            loading,
-          });
-          // Update activeChatIdRef to match current chat
-          activeChatIdRef.current = currentChatId;
-          return; // Don't reload - keep current messages
-        }
-      }
-      
-      // Don't interfere if we're already loading (might be creating a new chat during submission)
-      if (loading) {
-        console.log("[useGeminiChat] Ignoring chat change during active loading", {
-          currentChatId,
-          activeChatId: activeChatIdRef.current,
-        });
-        // Update activeChatIdRef even during loading
-        if (currentChatId) {
-          activeChatIdRef.current = currentChatId;
-        }
-        return;
-      }
-      
       // If this is the same chat we're already on, don't reload
-      if (activeChatIdRef.current === currentChatId && currentChatId) {
+      if (!isSwitchingToDifferentChat && currentChatId) {
         console.log("[useGeminiChat] Same chat, skipping reload", {
           chatId: currentChatId,
           messageCount: messages.length,
@@ -130,9 +102,38 @@ export function useGeminiChat() {
         return;
       }
       
+      // If we're switching to a different chat and currently loading, 
+      // only keep messages if we're switching to an empty chat during submission
+      // Otherwise, we should switch chats normally
+      if (loading && isSwitchingToDifferentChat) {
+        const chat = currentChatId ? getChatById(currentChatId) : null;
+        // Only keep messages if the new chat is empty AND we're actively submitting
+        // This prevents losing messages mid-submission
+        if (chat && chat.messages.length === 0 && messages.length > 0) {
+          console.log("[useGeminiChat] ⚠️ Switching to empty chat during submission - KEEPING STATE MESSAGES", {
+            chatId: currentChatId,
+            chatMessages: chat.messages.length,
+            stateMessages: messages.length,
+          });
+          // Update activeChatIdRef but don't clear messages yet
+          activeChatIdRef.current = currentChatId;
+          return;
+        }
+        // If switching to a chat with messages, proceed normally
+      }
+      
+      // Don't interfere if we're already loading AND not switching chats
+      if (loading && !isSwitchingToDifferentChat) {
+        console.log("[useGeminiChat] Ignoring chat change during active loading (same chat)", {
+          currentChatId,
+          activeChatId: activeChatIdRef.current,
+        });
+        return;
+      }
+      
       isSwitchingChatRef.current = true;
       
-      // Update the active chat ID reference
+      // Update the active chat ID reference immediately
       activeChatIdRef.current = currentChatId;
       
       // Reset loading state when switching chats
@@ -148,12 +149,20 @@ export function useGeminiChat() {
             messageCount: chat.messages.length,
             currentMessages: messages.length,
           });
-          // Load messages from the selected chat
-          const refreshed = await refreshVideoUrls(chat.messages);
-          setMessages(refreshed);
-          console.log("[useGeminiChat] Messages loaded:", refreshed.length);
-          // Update chat with refreshed URLs (silent to prevent event loop)
-          updateChat(currentChatId, { messages: refreshed }, true);
+          
+          // If chat is empty, clear messages immediately (before async operations)
+          if (chat.messages.length === 0) {
+            console.log("[useGeminiChat] Chat is empty, clearing messages immediately");
+            setMessages([]);
+            clearMessagesFromStorage();
+          } else {
+            // Load messages from the selected chat
+            const refreshed = await refreshVideoUrls(chat.messages);
+            setMessages(refreshed);
+            console.log("[useGeminiChat] Messages loaded:", refreshed.length);
+            // Update chat with refreshed URLs (silent to prevent event loop)
+            updateChat(currentChatId, { messages: refreshed }, true);
+          }
         } else {
           // Chat not found, clear messages
           console.log("[useGeminiChat] Chat not found, clearing messages");
@@ -224,6 +233,12 @@ export function useGeminiChat() {
         // Clear storage if messages array is empty
         console.log("[useGeminiChat] Messages array is empty, clearing storage");
         clearMessagesFromStorage();
+        
+        // Also update current chat to have empty messages (if we're on a chat)
+        if (currentChatId) {
+          console.log("[useGeminiChat] Updating chat to have empty messages:", currentChatId);
+          updateChat(currentChatId, { messages: [] }, true);
+        }
       }
     } else {
       console.log("[useGeminiChat] Skipping save:", {

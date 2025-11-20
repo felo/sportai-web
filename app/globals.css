@@ -9,6 +9,8 @@ html {
   min-height: 100%;
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
+  /* Force dark color scheme on iOS */
+  color-scheme: dark;
 }
 
 body {

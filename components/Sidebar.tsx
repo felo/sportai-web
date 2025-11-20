@@ -14,7 +14,7 @@ interface SidebarProps {
   children?: React.ReactNode;
   onClearChat?: () => void;
   messageCount?: number;
-  onChatSwitchAttempt?: () => boolean;
+  onChatSwitchAttempt?: () => Promise<boolean> | boolean;
 }
 
 export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchAttempt }: SidebarProps) {
@@ -76,10 +76,14 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     
     // Listen for chat storage changes (from same tab - custom event)
     const handleChatStorageChange = () => {
-      const updatedChats = loadChatsFromStorage();
-      const updatedCurrentChatId = getCurrentChatId();
-      setChats(updatedChats);
-      setCurrentChatId(updatedCurrentChatId);
+      // Use requestAnimationFrame to ensure React processes the state update
+      // This ensures the UI updates even if the event fires synchronously
+      requestAnimationFrame(() => {
+        const updatedChats = loadChatsFromStorage();
+        const updatedCurrentChatId = getCurrentChatId();
+        setChats(updatedChats);
+        setCurrentChatId(updatedCurrentChatId);
+      });
     };
     
     window.addEventListener("storage", handleStorageChange);
@@ -183,10 +187,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               <Button
                 variant="ghost"
                 size="2"
-                onClick={() => {
+                onClick={async () => {
                   // Check if chat is thinking before creating new chat
-                  if (onChatSwitchAttempt && !onChatSwitchAttempt()) {
-                    return; // User cancelled
+                  if (onChatSwitchAttempt) {
+                    const result = await Promise.resolve(onChatSwitchAttempt());
+                    if (!result) {
+                      return; // User cancelled
+                    }
                   }
                   const newChat = createChat();
                   saveCurrentChatId(newChat.id);
@@ -242,12 +249,15 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           <Button
                             variant={currentChatId === chat.id ? "soft" : "ghost"}
                             size="2"
-                            onClick={() => {
+                            onClick={async () => {
                               // Don't warn if clicking on the same chat
                               if (currentChatId !== chat.id) {
                                 // Check if chat is thinking before switching
-                                if (onChatSwitchAttempt && !onChatSwitchAttempt()) {
-                                  return; // User cancelled
+                                if (onChatSwitchAttempt) {
+                                  const result = await Promise.resolve(onChatSwitchAttempt());
+                                  if (!result) {
+                                    return; // User cancelled
+                                  }
                                 }
                               }
                               saveCurrentChatId(chat.id);
@@ -257,9 +267,24 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               justifyContent: "flex-start",
                               padding: "var(--space-2) var(--space-3)",
                               width: "100%",
+                              height: "auto",
+                              minHeight: "32px",
+                              whiteSpace: "normal",
+                              wordWrap: "break-word",
                             }}
                           >
-                            <Text size="2" color={currentChatId === chat.id ? undefined : "gray"} style={{ flex: 1, textAlign: "left" }}>
+                            <Text 
+                              size="2" 
+                              color={currentChatId === chat.id ? undefined : "gray"} 
+                              style={{ 
+                                flex: 1, 
+                                textAlign: "left",
+                                wordBreak: "break-word",
+                                overflowWrap: "break-word",
+                                whiteSpace: "normal",
+                                lineHeight: "1.4",
+                              }}
+                            >
                               {chat.title}
                             </Text>
                           </Button>
@@ -269,8 +294,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               style={{
                                 position: "absolute",
                                 right: "var(--space-2)",
-                                top: "50%",
-                                transform: "translateY(-45%)",
+                                top: "var(--space-2)",
+                                alignItems: "center",
                               }}
                             >
                               <Button
@@ -296,11 +321,14 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                                 variant="ghost"
                                 size="1"
                                 color="red"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
                                   // If deleting the current chat while it's thinking, warn the user
-                                  if (currentChatId === chat.id && onChatSwitchAttempt && !onChatSwitchAttempt()) {
-                                    return; // User cancelled
+                                  if (currentChatId === chat.id && onChatSwitchAttempt) {
+                                    const result = await Promise.resolve(onChatSwitchAttempt());
+                                    if (!result) {
+                                      return; // User cancelled
+                                    }
                                   }
                                   
                                   // Check if this is the last chat - if so, clear it instead of deleting
