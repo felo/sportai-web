@@ -6,6 +6,7 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: ['class', '[data-theme="dark"]'], // Use data-attribute instead of prefers-color-scheme
   theme: {
     extend: {
       keyframes: {

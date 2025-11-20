@@ -486,12 +486,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 <Text ml="2">Themes</Text>
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent>
-                <DropdownMenu.Item 
-                  disabled
-                  onSelect={(e) => e.preventDefault()}
-                >
+                <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
                   <Text>Light</Text>
-                  <Text ml="auto" size="1" color="gray">Coming soon</Text>
+                  {appearance === "light" && (
+                    <Text ml="auto" size="1" color="gray">✓</Text>
+                  )}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
                   <Text>Dark</Text>

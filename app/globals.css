@@ -2,29 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Set base background colors - dark theme */
+/* Set base styles */
 html {
-  background-color: #000000 !important;
   height: 100%;
   min-height: 100%;
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
-  /* Force dark color scheme on iOS */
-  color-scheme: dark;
+  /* Disable system color scheme detection */
+  color-scheme: only light;
 }
 
 body {
-  background-color: var(--gray-1, #1C1C1C) !important;
   min-height: 100%;
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
-}
-
-/* Ensure root element covers full viewport on mobile */
-#__next,
-#root {
-  background-color: #000000 !important;
-  min-height: 100vh;
 }
 
 /* Custom brand color palette - overrides Radix colors with brand colors */
@@ -42,9 +33,12 @@ body {
   --mint-10: #3C6C54;
   --mint-11: #2E5842;
   --mint-12: #002B1A; /* darkGreen - darkest */
-  
-  /* Gray scale - Dark mode colors */
-  --gray-1: #1C1C1C; /* dark background */
+}
+
+/* Dark mode specific color overrides */
+[data-radix-theme][data-radix-theme-appearance="dark"] {
+  /* Custom gray scale for dark mode */
+  --gray-1: #1C1C1C;
   --gray-2: #252525;
   --gray-3: #2E2E2E;
   --gray-4: #383838;
@@ -55,29 +49,15 @@ body {
   --gray-9: #686868;
   --gray-10: #727272;
   --gray-11: #7C7C7C;
-  --gray-12: #002B1A; /* darkGreen - darkest */
+  --gray-12: #002B1A;
   
-  /* Override the main background color variable */
   --color-background: var(--gray-1);
-  
-  /* Ensure the theme wrapper itself has dark background */
-  background-color: var(--gray-1) !important;
-}
-
-/* Target Radix Theme component directly for dark mode */
-[data-radix-theme] > * {
-  background-color: var(--gray-1) !important;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
-  background-color: var(--gray-1, #1C1C1C) !important;
-}
-
-main {
-  background-color: var(--gray-1, #1C1C1C) !important;
 }
 
 /* Hide scrollbars while maintaining scroll functionality */

@@ -13,30 +13,24 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
   useEffect(() => {
-    // Force dark theme - always use dark mode
-    // Clear any light theme preference from localStorage
+    // Load theme from localStorage, defaulting to dark if not set
     const stored = localStorage.getItem("radix-theme");
     if (stored) {
       try {
         const theme = JSON.parse(stored);
-        // Update stored theme to ensure appearance is always dark
-        const updatedTheme = {
-          ...theme,
-          appearance: "dark",
-          accentColor: theme.accentColor || "mint",
-          grayColor: theme.grayColor || "gray",
-        };
-        localStorage.setItem("radix-theme", JSON.stringify(updatedTheme));
-        setAppearance("dark");
-        setAccentColor(updatedTheme.accentColor);
-        setGrayColor(updatedTheme.grayColor);
+        setAppearance(theme.appearance || "dark");
+        setAccentColor(theme.accentColor || "mint");
+        setGrayColor(theme.grayColor || "gray");
+        // Set HTML attribute for CSS selectors
+        document.documentElement.setAttribute("data-theme", theme.appearance || "dark");
       } catch (e) {
-        // Invalid stored theme, use defaults and save
+        // Invalid stored theme, use defaults
         const defaultTheme = { appearance: "dark", accentColor: "mint", grayColor: "gray" };
         localStorage.setItem("radix-theme", JSON.stringify(defaultTheme));
         setAppearance("dark");
         setAccentColor("mint");
         setGrayColor("gray");
+        document.documentElement.setAttribute("data-theme", "dark");
       }
     } else {
       // No stored theme, save dark theme as default
@@ -45,25 +39,20 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
       setAppearance("dark");
       setAccentColor("mint");
       setGrayColor("gray");
+      document.documentElement.setAttribute("data-theme", "dark");
     }
 
-    // Listen for theme changes (but still force dark appearance)
+    // Listen for theme changes
     const handleThemeChange = () => {
       const stored = localStorage.getItem("radix-theme");
       if (stored) {
         try {
           const theme = JSON.parse(stored);
-          // Always force dark appearance, but allow accent/gray color changes
-          const updatedTheme = {
-            ...theme,
-            appearance: "dark",
-            accentColor: theme.accentColor || "mint",
-            grayColor: theme.grayColor || "gray",
-          };
-          localStorage.setItem("radix-theme", JSON.stringify(updatedTheme));
-          setAppearance("dark");
-          setAccentColor(updatedTheme.accentColor);
-          setGrayColor(updatedTheme.grayColor);
+          setAppearance(theme.appearance || "dark");
+          setAccentColor(theme.accentColor || "mint");
+          setGrayColor(theme.grayColor || "gray");
+          // Update HTML attribute
+          document.documentElement.setAttribute("data-theme", theme.appearance || "dark");
         } catch (e) {
           // Invalid stored theme, use defaults
           const defaultTheme = { appearance: "dark", accentColor: "mint", grayColor: "gray" };
@@ -71,13 +60,8 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
           setAppearance("dark");
           setAccentColor("mint");
           setGrayColor("gray");
+          document.documentElement.setAttribute("data-theme", "dark");
         }
-      } else {
-        const defaultTheme = { appearance: "dark", accentColor: "mint", grayColor: "gray" };
-        localStorage.setItem("radix-theme", JSON.stringify(defaultTheme));
-        setAppearance("dark");
-        setAccentColor("mint");
-        setGrayColor("gray");
       }
     };
 

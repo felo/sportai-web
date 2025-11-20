@@ -201,7 +201,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
               : "transparent",
           color:
             message.role === "user"
-              ? "white"
+              ? "var(--gray-12)" // Use Radix UI text color - works in both light and dark
               : "var(--gray-12)",
           border: message.role === "user" ? "1px solid var(--mint-6)" : "none",
         }}
@@ -302,7 +302,14 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
             ) : null}
             {/* Show text if present */}
             {message.content.trim() && (
-              <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
+              <Text 
+                style={{ 
+                  whiteSpace: "pre-wrap",
+                  color: "inherit", // Inherit from parent Box which uses var(--gray-12)
+                }}
+              >
+                {message.content}
+              </Text>
             )}
           </Box>
         )}
