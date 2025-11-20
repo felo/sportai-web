@@ -23,28 +23,53 @@ const THINKING_MESSAGES = [
 
 interface MessageBubbleProps {
   message: Message;
+  allMessages?: Message[];
+  messageIndex?: number;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
 
   // Use S3 URL if available, otherwise fall back to preview (blob URL)
   const videoSrc = message.videoUrl || message.videoPreview;
   
-  // Show video if we have a video URL (persisted S3 URL) or a video file with preview
-  const hasVideo = videoSrc && (message.videoUrl || message.videoFile);
+  // Show video if we have a video URL, preview, file, or S3 key (for persisted videos)
+  const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   
-  // Rotate thinking messages every 3 seconds (only when uploading video)
+  // Check if any previous user messages (until we hit an assistant message) have a video
+  // This checks all user messages in the current conversation thread
+  const userSentVideo = (() => {
+    if (message.role !== "assistant" || messageIndex === 0) return false;
+    // Look backwards from current message until we hit an assistant message
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      const prevMessage = allMessages[i];
+      if (prevMessage.role === "assistant") {
+        // Stop when we hit an assistant message - we've checked all user messages in this thread
+        return false;
+      }
+      if (prevMessage.role === "user") {
+        // Check if this user message has a video
+        const hasVideo = !!(prevMessage.videoUrl || prevMessage.videoPreview || prevMessage.videoFile || prevMessage.videoS3Key);
+        if (hasVideo) {
+          return true;
+        }
+        // Continue checking previous user messages
+      }
+    }
+    return false;
+  })();
+  
+  // Rotate thinking messages every 3 seconds (only when user sent a video)
   useEffect(() => {
-    if (!message.content && message.role === "assistant" && hasVideo) {
+    if (!message.content && message.role === "assistant" && userSentVideo) {
       const interval = setInterval(() => {
         setThinkingMessageIndex((prev) => (prev + 1) % THINKING_MESSAGES.length);
       }, 3000);
       
       return () => clearInterval(interval);
     }
-  }, [message.content, message.role, hasVideo]);
+  }, [message.content, message.role, userSentVideo]);
 
   useEffect(() => {
     // Check if this is a video (not an image)
@@ -133,59 +158,82 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       >
         {message.role === "user" && (
           <Box>
-            {/* Show video if present */}
-            {hasVideo && (
+            {/* Show video if present - always show if user provided a video */}
+            {hasVideo ? (
               <Box 
                 mb={message.content.trim() ? "2" : "0"}
                 style={{
                   overflow: "hidden",
-                  borderRadius: message.role === "user" && hasVideo 
-                    ? "var(--radius-3)" 
-                    : "0",
+                  borderRadius: "var(--radius-3)",
                 }}
               >
                 {message.videoFile?.type.startsWith("image/") || (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ? (
                   <img
-                    src={videoSrc}
+                    src={videoSrc || undefined}
                     alt="Uploaded image"
                     style={{
                       maxWidth: "100%",
                       display: "block",
                     }}
                   />
-                ) : (
-                  <video
-                    ref={videoRef}
-                    src={videoSrc || undefined}
-                    controls
-                    autoPlay
-                    muted
-                    playsInline
-                    preload="auto"
-                    onError={(e) => {
-                      console.error("Video playback error:", e);
-                      const video = e.currentTarget;
-                      console.error("Video error details:", {
-                        error: video.error,
-                        networkState: video.networkState,
-                        readyState: video.readyState,
-                        src: video.src,
-                      });
-                    }}
-                    onLoadStart={() => {
-                      console.log("Video load started:", videoSrc);
-                    }}
-                    onLoadedMetadata={() => {
-                      console.log("Video metadata loaded");
-                    }}
+                ) : videoSrc ? (
+                  <Box
                     style={{
-                      maxWidth: "100%",
-                      display: "block",
+                      position: "relative",
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      backgroundColor: "var(--gray-3)",
                     }}
-                  />
+                  >
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      controls
+                      autoPlay
+                      muted
+                      playsInline
+                      preload="metadata"
+                      onError={(e) => {
+                        console.error("Video playback error:", e);
+                        const video = e.currentTarget;
+                        console.error("Video error details:", {
+                          error: video.error,
+                          networkState: video.networkState,
+                          readyState: video.readyState,
+                          src: video.src,
+                        });
+                      }}
+                      onLoadStart={() => {
+                        console.log("Video load started:", videoSrc);
+                      }}
+                      onLoadedMetadata={() => {
+                        console.log("Video metadata loaded");
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        display: "block",
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      backgroundColor: "var(--gray-3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text size="2" color="gray">Loading video...</Text>
+                  </Box>
                 )}
               </Box>
-            )}
+            ) : null}
             {/* Show text if present */}
             {message.content.trim() && (
               <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
@@ -205,7 +253,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ) : (
               <Flex gap="2" align="center">
                 <Spinner size="1" />
-                <Text color="gray">{hasVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
+                <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
               </Flex>
             )}
           </Box>

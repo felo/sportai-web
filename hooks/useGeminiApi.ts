@@ -92,7 +92,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       setProgress: (progress: number) => void,
       setStage: (stage: ProgressStage) => void,
       conversationHistory?: Message[],
-      onVideoUploaded?: (s3Url: string) => void
+      onVideoUploaded?: (s3Url: string, s3Key: string) => void
     ) => {
       setStage("uploading");
       setProgress(0);
@@ -126,9 +126,10 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         const { url: presignedUrl, publicUrl, downloadUrl, key } = await urlResponse.json();
         // Use presigned download URL if available (for secure access), otherwise fall back to public URL
         s3Url = downloadUrl || publicUrl;
+        const s3Key = key;
 
         console.log("[S3] ✅ Presigned URL received", {
-          key,
+          key: s3Key,
           publicUrl: publicUrl,
           downloadUrl: downloadUrl ? `${downloadUrl.substring(0, 50)}...` : "none",
           usingUrl: downloadUrl ? "presigned download URL" : "public URL",
@@ -144,12 +145,13 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
 
         console.log("[S3] ✅ File uploaded successfully to S3!", {
           s3Url: s3Url,
+          s3Key: s3Key,
           fileName: videoFile.name,
         });
 
-        // Notify that video has been uploaded with S3 URL
+        // Notify that video has been uploaded with S3 URL and key
         if (onVideoUploaded) {
-          onVideoUploaded(s3Url);
+          onVideoUploaded(s3Url, s3Key);
         }
 
         setProgress(80);

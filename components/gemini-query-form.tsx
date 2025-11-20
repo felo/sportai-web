@@ -14,6 +14,7 @@ import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
+import { getCurrentChatId, setCurrentChatId, createChat, updateChat } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 
 export function GeminiQueryForm() {
@@ -125,6 +126,24 @@ export function GeminiQueryForm() {
     // Get conversation history BEFORE adding new messages
     // This ensures we send the correct history to the API
     const conversationHistory = messages;
+    
+    // Store the chat ID at the start of the request to prevent updates if chat changes
+    const requestChatId = getCurrentChatId();
+
+    // If submitting first video and no current chat exists, create a new chat with video filename as title
+    if (currentVideoFile && messages.length === 0) {
+      const currentChatId = getCurrentChatId();
+      if (!currentChatId) {
+        // Create a new chat with the video filename as title
+        const videoFileName = currentVideoFile.name;
+        // Remove file extension for cleaner title
+        const title = videoFileName.replace(/\.[^/.]+$/, "");
+        console.log("[Chat] Creating new chat with title:", title);
+        const newChat = createChat([], title);
+        setCurrentChatId(newChat.id);
+        console.log("[Chat] Created chat:", newChat.id, "Title:", newChat.title);
+      }
+    }
 
     const timestamp = Date.now();
     let videoMessageId: string | null = null;
@@ -194,13 +213,28 @@ export function GeminiQueryForm() {
     });
 
     try {
+      // Check if chat changed before starting request
+      const currentChatId = getCurrentChatId();
+      if (currentChatId !== requestChatId) {
+        console.warn("[GeminiQueryForm] Chat changed before request started, aborting");
+        removeMessage(assistantMessageId);
+        return;
+      }
 
       if (!currentVideoFile) {
         // Streaming for text-only
         await sendTextOnlyQuery(
           currentPrompt,
           assistantMessageId,
-          (id, content) => updateMessage(id, { content }),
+          (id, content) => {
+            // Check if chat changed during streaming
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) {
+              updateMessage(id, { content });
+            } else {
+              console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
+            }
+          },
           conversationHistory
         );
       } else {
@@ -209,27 +243,44 @@ export function GeminiQueryForm() {
           currentPrompt,
           currentVideoFile,
           assistantMessageId,
-          (id, content) => updateMessage(id, { content }),
+          (id, content) => {
+            // Check if chat changed during streaming
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) {
+              updateMessage(id, { content });
+            } else {
+              console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
+            }
+          },
           setUploadProgress,
           setProgressStage,
           conversationHistory,
-          (s3Url) => {
-            // Update video message with S3 URL for video playback
-            if (videoMessageId) {
-              updateMessage(videoMessageId, { videoUrl: s3Url });
+          (s3Url, s3Key) => {
+            // Check if chat changed before updating video message
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId && videoMessageId) {
+              updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key });
             }
           }
         );
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "An error occurred";
-      setApiError(errorMessage);
-      removeMessage(assistantMessageId);
+      // Only handle error if we're still on the same chat
+      const currentChatId = getCurrentChatId();
+      if (currentChatId === requestChatId) {
+        const errorMessage =
+          err instanceof Error ? err.message : "An error occurred";
+        setApiError(errorMessage);
+        removeMessage(assistantMessageId);
+      }
     } finally {
-      setLoading(false);
-      setProgressStage("idle");
-      setUploadProgress(0);
+      // Only reset loading state if we're still on the same chat
+      const currentChatId = getCurrentChatId();
+      if (currentChatId === requestChatId) {
+        setLoading(false);
+        setProgressStage("idle");
+        setUploadProgress(0);
+      }
       // Re-enable auto-scroll after response completes (user can manually scroll if needed)
       // setShouldAutoScroll(true); // Commented out - keep auto-scroll disabled
     }

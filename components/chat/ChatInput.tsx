@@ -30,14 +30,17 @@ export function ChatInput({
   onSubmit,
   onPickleballCoachClick,
 }: ChatInputProps) {
+  // Base height for textarea (in pixels) - adjust this to test different heights
+  const BASE_TEXTAREA_HEIGHT = 0;
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
-    // Set initial height to two lines (80px total including padding)
+    // Set initial height to base height
     if (textareaRef.current) {
-      // Ensure it starts at exactly 80px
-      textareaRef.current.style.height = "80px";
+      // Ensure it starts at exactly base height
+      textareaRef.current.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
     }
   }, []);
 
@@ -45,7 +48,7 @@ export function ChatInput({
     // Skip resize on initial mount if empty
     if (!prompt.trim()) {
       if (textareaRef.current) {
-        textareaRef.current.style.height = "80px";
+        textareaRef.current.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
       }
       return;
     }
@@ -60,13 +63,13 @@ export function ChatInput({
           textarea.style.height = "auto";
           const scrollHeight = textarea.scrollHeight;
           
-          // Base height is 80px (includes padding)
+          // Base height includes padding
           // Only resize if content actually exceeds this base height
-          if (scrollHeight > 80) {
+          if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
             textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
           } else {
-            // Keep at two lines
-            textarea.style.height = "80px";
+            // Keep at base height
+            textarea.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
           }
         }
       });
@@ -82,9 +85,9 @@ export function ChatInput({
       if (textareaRef.current) {
         const textarea = textareaRef.current;
         
-        // If empty, keep at two lines
+        // If empty, keep at base height
         if (!newValue.trim()) {
-          textarea.style.height = "80px";
+          textarea.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
           return;
         }
         
@@ -92,13 +95,13 @@ export function ChatInput({
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
         
-        // Base height is 80px (includes padding)
+        // Base height includes padding
         // Only resize if content actually exceeds this base height
-        if (scrollHeight > 80) {
+        if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
           textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
         } else {
-          // Keep at two lines
-          textarea.style.height = "80px";
+          // Keep at base height
+          textarea.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
         }
       }
     });
@@ -115,13 +118,13 @@ export function ChatInput({
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
         
-        // Base height is 80px (includes padding)
+        // Base height includes padding
         // Only resize if content actually exceeds this base height
-        if (scrollHeight > 80) {
+        if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
           textarea.style.height = `${Math.min(scrollHeight, 300)}px`;
         } else {
-          // Keep at two lines
-          textarea.style.height = "80px";
+          // Keep at base height
+          textarea.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
         }
       }
     }, 0);

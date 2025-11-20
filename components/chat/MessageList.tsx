@@ -70,8 +70,8 @@ export function MessageList({
         </div>
       )}
 
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+      {messages.map((message, index) => (
+        <MessageBubble key={message.id} message={message} allMessages={messages} messageIndex={index} />
       ))}
 
       {loading && videoFile && (

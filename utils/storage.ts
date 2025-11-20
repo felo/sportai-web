@@ -1,4 +1,4 @@
-import type { Message } from "@/types/chat";
+import type { Message, Chat } from "@/types/chat";
 
 const STORAGE_KEY = "sportai-chat-messages";
 
@@ -30,10 +30,60 @@ const MAX_STORAGE_SIZE_BYTES = 2 * 1024 * 1024;
 type SerializableMessage = Omit<Message, "videoFile" | "videoPreview">;
 
 /**
+ * Refresh video URLs from S3 keys for messages that have expired URLs
+ * This is called asynchronously after loading messages
+ */
+export async function refreshVideoUrls(messages: Message[]): Promise<Message[]> {
+  const messagesWithKeys = messages.filter((msg) => msg.videoS3Key && !msg.videoUrl);
+  
+  if (messagesWithKeys.length === 0) {
+    return messages;
+  }
+
+  console.log(`[Storage] Refreshing ${messagesWithKeys.length} video URL(s) from S3 keys...`);
+
+  const refreshedMessages = await Promise.all(
+    messages.map(async (msg) => {
+      // Refresh if we have an S3 key (presigned URLs expire, so always refresh)
+      if (msg.videoS3Key) {
+        try {
+          const response = await fetch("/api/s3/download-url", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              key: msg.videoS3Key,
+              expiresIn: 7 * 24 * 3600, // 7 days
+            }),
+          });
+
+          if (response.ok) {
+            const { downloadUrl } = await response.json();
+            console.log(`[Storage] ✅ Refreshed video URL for key: ${msg.videoS3Key}`);
+            return { ...msg, videoUrl: downloadUrl };
+          } else {
+            console.warn(`[Storage] ⚠️ Failed to refresh video URL for key: ${msg.videoS3Key}`);
+            return msg;
+          }
+        } catch (error) {
+          console.error(`[Storage] ❌ Error refreshing video URL for key: ${msg.videoS3Key}`, error);
+          return msg;
+        }
+      }
+      return msg;
+    })
+  );
+
+  return refreshedMessages;
+}
+
+/**
  * Load messages from localStorage
  * Automatically trims old messages if they exceed the limit
+ * Refreshes video URLs from S3 keys if needed
  */
-export function loadMessagesFromStorage(): Message[] {
+export async function loadMessagesFromStorage(): Promise<Message[]> {
   if (typeof window === "undefined") {
     return [];
   }
@@ -60,11 +110,13 @@ export function loadMessagesFromStorage(): Message[] {
     }
     
     // Convert back to Message[] format (without videoFile/videoPreview)
-    return trimmed.map((msg) => ({
+    const messages: Message[] = trimmed.map((msg) => ({
       ...msg,
       videoFile: null,
       videoPreview: null,
     }));
+
+    return messages;
   } catch (error) {
     console.error("Failed to load messages from storage:", error);
     return [];
@@ -181,6 +233,341 @@ export function clearMessagesFromStorage(): void {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
     console.error("Failed to clear messages from storage:", error);
+  }
+}
+
+/**
+ * Developer mode storage key
+ */
+const DEVELOPER_MODE_KEY = "developer-mode";
+
+/**
+ * Chats storage key
+ */
+const CHATS_STORAGE_KEY = "sportai-chats";
+
+/**
+ * Current chat ID storage key
+ */
+const CURRENT_CHAT_ID_KEY = "sportai-current-chat-id";
+
+/**
+ * Get developer mode setting from localStorage
+ * @returns true if developer mode is enabled, false otherwise
+ */
+export function getDeveloperMode(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const stored = localStorage.getItem(DEVELOPER_MODE_KEY);
+    return stored === "true";
+  } catch (error) {
+    console.error("Failed to load developer mode from storage:", error);
+    return false;
+  }
+}
+
+/**
+ * Save developer mode setting to localStorage
+ * @param enabled - Whether developer mode should be enabled
+ */
+export function setDeveloperMode(enabled: boolean): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(DEVELOPER_MODE_KEY, enabled ? "true" : "false");
+  } catch (error) {
+    console.error("Failed to save developer mode to storage:", error);
+  }
+}
+
+/**
+ * Serializable version of Chat (without File objects and blob URLs)
+ */
+type SerializableChat = Omit<Chat, "messages"> & {
+  messages: SerializableMessage[];
+};
+
+/**
+ * Generate a unique chat ID
+ */
+function generateChatId(): string {
+  return `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Generate a chat title from the first user message
+ */
+function generateChatTitle(messages: Message[]): string {
+  const firstUserMessage = messages.find((msg) => msg.role === "user");
+  if (firstUserMessage) {
+    const content = firstUserMessage.content.trim();
+    // Use first 50 characters as title, or "New Chat" if empty
+    return content.length > 0 ? content.slice(0, 50) : "New Chat";
+  }
+  return "New Chat";
+}
+
+/**
+ * Convert Chat to SerializableChat (removes File objects and blob URLs)
+ */
+function serializeChat(chat: Chat): SerializableChat {
+  return {
+    ...chat,
+    messages: chat.messages.map((msg) => {
+      const { videoFile, videoPreview, ...rest } = msg;
+      return rest;
+    }),
+  };
+}
+
+/**
+ * Convert SerializableChat back to Chat
+ */
+function deserializeChat(serialized: SerializableChat): Chat {
+  return {
+    ...serialized,
+    messages: serialized.messages.map((msg) => ({
+      ...msg,
+      videoFile: null,
+      videoPreview: null,
+    })),
+  };
+}
+
+/**
+ * Load all chats from localStorage
+ * @returns Array of chats, sorted by updatedAt (most recent first)
+ */
+export function loadChatsFromStorage(): Chat[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const stored = localStorage.getItem(CHATS_STORAGE_KEY);
+    if (!stored) {
+      return [];
+    }
+
+    const parsed = JSON.parse(stored) as SerializableChat[];
+    return parsed.map(deserializeChat).sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch (error) {
+    console.error("Failed to load chats from storage:", error);
+    return [];
+  }
+}
+
+/**
+ * Save chats to localStorage
+ * @param chats - Array of chats to save
+ */
+export function saveChatsToStorage(chats: Chat[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const serializable = chats.map(serializeChat);
+    localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(serializable));
+  } catch (error) {
+    console.error("Failed to save chats to storage:", error);
+    // Handle quota exceeded error gracefully
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      console.warn("LocalStorage quota exceeded. Attempting to trim chats...");
+      try {
+        // Keep only the most recent chats (limit to 50)
+        const trimmed = chats
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 50)
+          .map(serializeChat);
+        localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(trimmed));
+        console.info(`Successfully saved ${trimmed.length} chats after trimming due to quota`);
+      } catch (retryError) {
+        console.error("Failed to save even after trimming:", retryError);
+      }
+    }
+  }
+}
+
+/**
+ * Create a new chat and save it to storage
+ * @param messages - Initial messages for the chat
+ * @param title - Optional custom title for the chat (defaults to generated title from messages)
+ * @returns The created chat
+ */
+export function createChat(messages: Message[] = [], title?: string): Chat {
+  const now = Date.now();
+  const chat: Chat = {
+    id: generateChatId(),
+    title: title || generateChatTitle(messages),
+    createdAt: now,
+    updatedAt: now,
+    messages,
+  };
+
+  const chats = loadChatsFromStorage();
+  chats.unshift(chat); // Add to beginning
+  saveChatsToStorage(chats);
+
+  // Dispatch custom event to notify components of chat creation
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("chat-storage-change"));
+  }
+
+  return chat;
+}
+
+/**
+ * Update an existing chat
+ * @param chatId - ID of the chat to update
+ * @param updates - Partial chat data to update
+ * @param silent - If true, don't dispatch the chat-storage-change event (prevents loops)
+ */
+export function updateChat(chatId: string, updates: Partial<Chat>, silent: boolean = false): void {
+  const chats = loadChatsFromStorage();
+  const index = chats.findIndex((chat) => chat.id === chatId);
+
+  if (index === -1) {
+    console.warn(`Chat with id ${chatId} not found`);
+    return;
+  }
+
+  // Only update updatedAt if content actually changed (not just refreshing URLs)
+  // Compare message IDs and content, ignoring File objects and URLs
+  const hasContentChange = updates.messages && 
+    (updates.messages.length !== chats[index].messages.length ||
+     updates.messages.some((msg, i) => 
+       msg.id !== chats[index].messages[i]?.id || 
+       msg.content !== chats[index].messages[i]?.content ||
+       msg.role !== chats[index].messages[i]?.role
+     ));
+
+  // Determine the title:
+  // 1. Use provided title if explicitly set
+  // 2. Regenerate from messages ONLY if message content actually changed (not just URL refreshes)
+  // 3. Otherwise keep existing title
+  const newTitle = updates.title !== undefined
+    ? updates.title
+    : (hasContentChange && updates.messages
+        ? generateChatTitle(updates.messages)
+        : chats[index].title);
+
+  // Create updated chat object - spread updates first, then override with computed values
+  // This ensures title and updatedAt are set correctly
+  const { title: _, messages: __, ...otherUpdates } = updates;
+  const updatedChat = {
+    ...chats[index],
+    ...otherUpdates,
+    updatedAt: hasContentChange ? Date.now() : chats[index].updatedAt,
+    title: newTitle,
+    // Include messages if provided
+    ...(updates.messages && { messages: updates.messages }),
+  };
+  
+  console.log(`[Storage] Updating chat ${chatId}:`, {
+    oldTitle: chats[index].title,
+    newTitle: newTitle,
+    updatesTitle: updates.title,
+    finalTitle: updatedChat.title,
+  });
+
+  chats[index] = updatedChat;
+  saveChatsToStorage(chats);
+  
+  // Verify it was saved correctly
+  const verifyChats = loadChatsFromStorage();
+  const verifyChat = verifyChats.find(c => c.id === chatId);
+  console.log(`[Storage] Verification - saved title: "${verifyChat?.title}"`);
+
+  // Dispatch custom event to notify components of chat update (unless silent)
+  if (!silent && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("chat-storage-change"));
+  }
+}
+
+/**
+ * Delete a chat from storage
+ * @param chatId - ID of the chat to delete
+ */
+export function deleteChat(chatId: string): void {
+  const chats = loadChatsFromStorage();
+  const filtered = chats.filter((chat) => chat.id !== chatId);
+  saveChatsToStorage(filtered);
+
+  // Dispatch custom event to notify components of chat deletion
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("chat-storage-change"));
+  }
+}
+
+/**
+ * Get a specific chat by ID
+ * @param chatId - ID of the chat to retrieve
+ * @returns The chat if found, undefined otherwise
+ */
+export function getChatById(chatId: string): Chat | undefined {
+  const chats = loadChatsFromStorage();
+  return chats.find((chat) => chat.id === chatId);
+}
+
+/**
+ * Get the current active chat ID from storage
+ * @returns The current chat ID, or undefined if not set
+ */
+export function getCurrentChatId(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  try {
+    const stored = localStorage.getItem(CURRENT_CHAT_ID_KEY);
+    return stored || undefined;
+  } catch (error) {
+    console.error("Failed to load current chat ID from storage:", error);
+    return undefined;
+  }
+}
+
+/**
+ * Set the current active chat ID
+ * @param chatId - ID of the chat to set as current
+ */
+export function setCurrentChatId(chatId: string | undefined): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (chatId) {
+      localStorage.setItem(CURRENT_CHAT_ID_KEY, chatId);
+    } else {
+      localStorage.removeItem(CURRENT_CHAT_ID_KEY);
+    }
+    // Dispatch custom event to notify components of current chat change
+    window.dispatchEvent(new Event("chat-storage-change"));
+  } catch (error) {
+    console.error("Failed to save current chat ID to storage:", error);
+  }
+}
+
+/**
+ * Clear all chats from storage
+ */
+export function clearChatsFromStorage(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(CHATS_STORAGE_KEY);
+    localStorage.removeItem(CURRENT_CHAT_ID_KEY);
+  } catch (error) {
+    console.error("Failed to clear chats from storage:", error);
   }
 }
 

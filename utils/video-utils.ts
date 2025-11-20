@@ -1,4 +1,4 @@
-export const MAX_VIDEO_SIZE_MB = 20;
+export const MAX_VIDEO_SIZE_MB = 100;
 export const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 
 export interface VideoValidationResult {
@@ -22,14 +22,14 @@ export function validateVideoFile(file: File): VideoValidationResult {
   if (!isVideo && !isImage) {
     return {
       valid: false,
-      error: "Please select a valid video or image file (JPEG, PNG, GIF, WebP)",
+      error: " Please select a valid video or image file (JPEG, PNG, GIF, WebP)",
     };
   }
 
   if (file.size > MAX_VIDEO_SIZE_BYTES) {
     return {
       valid: false,
-      error: `File size must be less than ${MAX_VIDEO_SIZE_MB}MB`,
+      error: ` File size must be less than ${MAX_VIDEO_SIZE_MB}MB`,
     };
   }
 

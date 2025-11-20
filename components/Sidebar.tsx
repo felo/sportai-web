@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog } from "@radix-ui/themes";
-import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog, Dialog, TextField } from "@radix-ui/themes";
+import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat } from "@/utils/storage";
+import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
 
@@ -20,6 +22,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>("dark");
   const [chatsExpanded, setChatsExpanded] = useState(true);
+  const [developerMode, setDeveloperMode] = useState(false);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined);
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingChat, setEditingChat] = useState<Chat | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -33,6 +42,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
         // Invalid stored theme
       }
     }
+
+    // Load developer mode from localStorage
+    setDeveloperMode(getDeveloperMode());
+
+    // Load chats from localStorage
+    setChats(loadChatsFromStorage());
+    setCurrentChatId(getCurrentChatId());
 
     // Listen for theme changes
     const handleThemeChange = () => {
@@ -48,7 +64,31 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
     };
 
     window.addEventListener("theme-change", handleThemeChange);
-    return () => window.removeEventListener("theme-change", handleThemeChange);
+    
+    // Listen for chat storage changes (from other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sportai-chats" || e.key === "sportai-current-chat-id" || !e.key) {
+        setChats(loadChatsFromStorage());
+        setCurrentChatId(getCurrentChatId());
+      }
+    };
+    
+    // Listen for chat storage changes (from same tab - custom event)
+    const handleChatStorageChange = () => {
+      const updatedChats = loadChatsFromStorage();
+      const updatedCurrentChatId = getCurrentChatId();
+      setChats(updatedChats);
+      setCurrentChatId(updatedCurrentChatId);
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("chat-storage-change", handleChatStorageChange);
+    
+    return () => {
+      window.removeEventListener("theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("chat-storage-change", handleChatStorageChange);
+    };
   }, []);
 
   const handleThemeSelect = (newAppearance: Appearance) => {
@@ -66,6 +106,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
     localStorage.setItem("radix-theme", JSON.stringify(theme));
     setAppearance(newAppearance);
     window.dispatchEvent(new Event("theme-change"));
+  };
+
+  const handleDeveloperModeToggle = (checked: boolean) => {
+    setDeveloperMode(checked);
+    saveDeveloperMode(checked);
   };
 
   // Don't render sidebar on mobile
@@ -120,9 +165,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
           }}
         >
           {isCollapsed ? (
-            <HamburgerMenuIcon width="16" height="16" />
+            <HamburgerMenuIcon width="20" height="20" />
           ) : (
-            <Cross2Icon width="16" height="16" />
+            <Cross2Icon width="20" height="20" />
           )}
         </Button>
       </Box>
@@ -135,6 +180,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
               <Button
                 variant="ghost"
                 size="2"
+                onClick={() => {
+                  const newChat = createChat();
+                  saveCurrentChatId(newChat.id);
+                  // State will be updated via event handler
+                }}
                 style={{
                   justifyContent: "flex-start",
                   padding: "var(--space-2) var(--space-3)",
@@ -168,42 +218,96 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                 </Button>
                 {chatsExpanded && (
                   <Flex direction="column" gap="1" style={{ paddingLeft: "calc(16px + var(--space-1) + var(--space-2))", paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
-                    <Button
-                      variant="ghost"
-                      size="2"
-                      style={{
-                        justifyContent: "flex-start",
-                        padding: "var(--space-2) var(--space-3)",
-                      }}
-                    >
-                      <Text size="2" color="gray">
-                        Chat 1
+                    {chats.length === 0 ? (
+                      <Text size="2" color="gray" style={{ padding: "var(--space-2) var(--space-3)" }}>
+                        No chats yet
                       </Text>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="2"
-                      style={{
-                        justifyContent: "flex-start",
-                        padding: "var(--space-2) var(--space-3)",
-                      }}
-                    >
-                      <Text size="2" color="gray">
-                        Chat 2
-                      </Text>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="2"
-                      style={{
-                        justifyContent: "flex-start",
-                        padding: "var(--space-2) var(--space-3)",
-                      }}
-                    >
-                      <Text size="2" color="gray">
-                        Chat 3
-                      </Text>
-                    </Button>
+                    ) : (
+                      chats.map((chat) => (
+                        <Box
+                          key={chat.id}
+                          onMouseEnter={() => setHoveredChatId(chat.id)}
+                          onMouseLeave={() => setHoveredChatId(null)}
+                          style={{
+                            position: "relative",
+                          }}
+                        >
+                          <Button
+                            variant={currentChatId === chat.id ? "soft" : "ghost"}
+                            size="2"
+                            onClick={() => {
+                              saveCurrentChatId(chat.id);
+                              // State will be updated via event handler
+                            }}
+                            style={{
+                              justifyContent: "flex-start",
+                              padding: "var(--space-2) var(--space-3)",
+                              width: "100%",
+                            }}
+                          >
+                            <Text size="2" color={currentChatId === chat.id ? undefined : "gray"} style={{ flex: 1, textAlign: "left" }}>
+                              {chat.title}
+                            </Text>
+                          </Button>
+                          {hoveredChatId === chat.id && (
+                            <Flex
+                              gap="4"
+                              style={{
+                                position: "absolute",
+                                right: "var(--space-2)",
+                                top: "50%",
+                                transform: "translateY(-45%)",
+                              }}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingChat(chat);
+                                  setEditTitle(chat.title);
+                                  setEditDialogOpen(true);
+                                  setHoveredChatId(null);
+                                }}
+                                style={{
+                                  padding: "var(--space-1)",
+                                  minWidth: "auto",
+                                  width: "24px",
+                                  height: "24px",
+                                }}
+                              >
+                                <Pencil1Icon width="14" height="14"/>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="1"
+                                color="red"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteChat(chat.id);
+                                  const updatedChats = loadChatsFromStorage();
+                                  setChats(updatedChats);
+                                  if (currentChatId === chat.id) {
+                                    const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
+                                    setCurrentChatId(newCurrentChatId);
+                                    saveCurrentChatId(newCurrentChatId);
+                                  }
+                                  setHoveredChatId(null);
+                                }}
+                                style={{
+                                  padding: "var(--space-1)",
+                                  minWidth: "auto",
+                                  width: "24px",
+                                  height: "24px",
+                                }}
+                              >
+                                <TrashIcon width="14" height="14"/>
+                              </Button>
+                            </Flex>
+                          )}
+                        </Box>
+                      ))
+                    )}
                   </Flex>
                 )}
               </Flex>
@@ -304,7 +408,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                 padding: isCollapsed ? "var(--space-2)" : "var(--space-2) var(--space-3)",
               }}
             >
-              <GearIcon width="16" height="16" />
+              <GearIcon width="20" height="20" />
               {!isCollapsed && (
                 <Text size="2" ml="2">
                   Settings
@@ -329,6 +433,28 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
                 <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
                   <Text>Dark</Text>
                   {appearance === "dark" && (
+                    <Text ml="auto" size="1" color="gray">✓</Text>
+                  )}
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+
+            <DropdownMenu.Separator />
+
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger>
+                <Text>Developer mode</Text>
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent>
+                <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
+                  <Text>On</Text>
+                  {developerMode && (
+                    <Text ml="auto" size="1" color="gray">✓</Text>
+                  )}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
+                  <Text>Off</Text>
+                  {!developerMode && (
                     <Text ml="auto" size="1" color="gray">✓</Text>
                   )}
                 </DropdownMenu.Item>
@@ -385,6 +511,63 @@ export function Sidebar({ children, onClearChat, messageCount = 0 }: SidebarProp
           </AlertDialog.Root>
         )}
       </Box>
+
+      {/* Edit Chat Dialog */}
+      <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <Dialog.Content maxWidth="450px">
+          <Dialog.Title>Edit chat name</Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            Change the name of this chat.
+          </Dialog.Description>
+          
+          <Flex direction="column" gap="3" mt="4">
+            <TextField.Root
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Chat name"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && editTitle.trim() && editingChat) {
+                  e.preventDefault();
+                  updateChat(editingChat.id, { title: editTitle.trim() }, false);
+                  setChats(loadChatsFromStorage());
+                  setEditDialogOpen(false);
+                  setEditingChat(null);
+                  setEditTitle("");
+                }
+              }}
+            />
+            
+            <Flex gap="3" justify="end" mt="2">
+              <Dialog.Close>
+                <Button variant="soft" color="gray">
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button
+                onClick={() => {
+                  if (editTitle.trim() && editingChat) {
+                    console.log("[Sidebar] Updating chat title:", editingChat.id, "from:", editingChat.title, "to:", editTitle.trim());
+                    updateChat(editingChat.id, { title: editTitle.trim() }, false);
+                    // Small delay to ensure storage write completes before reloading
+                    setTimeout(() => {
+                      const updatedChats = loadChatsFromStorage();
+                      const updatedChat = updatedChats.find(c => c.id === editingChat.id);
+                      console.log("[Sidebar] After update - chat title:", updatedChat?.title);
+                      setChats(updatedChats);
+                    }, 10);
+                    setEditDialogOpen(false);
+                    setEditingChat(null);
+                    setEditTitle("");
+                  }
+                }}
+                disabled={!editTitle.trim()}
+              >
+                Save
+              </Button>
+            </Flex>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
     </Box>
   );
 }
