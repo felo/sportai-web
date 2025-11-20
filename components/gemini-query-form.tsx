@@ -19,6 +19,7 @@ import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
 import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, type ThinkingMode, type MediaResolution, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
+import { getMediaType } from "@/utils/video-utils";
 
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
@@ -101,7 +102,8 @@ export function GeminiQueryForm() {
   // Auto-populate prompt when video is added and prompt is empty
   useEffect(() => {
     if (videoFile && !prompt.trim()) {
-      setPrompt("Please analyse this video for me.");
+      const mediaType = getMediaType(videoFile);
+      setPrompt(`Please analyse this ${mediaType} for me.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoFile]); // Only depend on videoFile to avoid loops
@@ -198,7 +200,8 @@ export function GeminiQueryForm() {
     // Update prompt state if we're using the default so UI reflects what will be sent
     let currentPrompt = prompt.trim();
     if (!currentPrompt && videoFile) {
-      currentPrompt = "Please analyse this video for me.";
+      const mediaType = getMediaType(videoFile);
+      currentPrompt = `Please analyse this ${mediaType} for me.`;
       setPrompt(currentPrompt); // Update state so UI shows the prompt
     }
     const currentVideoFile = videoFile;

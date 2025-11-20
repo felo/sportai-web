@@ -46,3 +46,11 @@ export function revokeVideoPreview(previewUrl: string | null): void {
   }
 }
 
+export function isImageFile(file: File): boolean {
+  return SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+}
+
+export function getMediaType(file: File): 'video' | 'image' {
+  return isImageFile(file) ? 'image' : 'video';
+}
+
