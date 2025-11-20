@@ -137,9 +137,15 @@ export function GeminiQueryForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || loading) return;
+    if ((!prompt.trim() && !videoFile) || loading) return;
 
-    const currentPrompt = prompt;
+    // Use prompt if provided, otherwise use default prompt for video-only submissions
+    // Update prompt state if we're using the default so UI reflects what will be sent
+    let currentPrompt = prompt.trim();
+    if (!currentPrompt && videoFile) {
+      currentPrompt = "Please analyse this video for me.";
+      setPrompt(currentPrompt); // Update state so UI shows the prompt
+    }
     const currentVideoFile = videoFile;
     const currentVideoPreview = videoPreview;
 
@@ -147,8 +153,13 @@ export function GeminiQueryForm() {
     // This ensures we send the correct history to the API
     const conversationHistory = messages;
     
-    // Store the chat ID at the start of the request to prevent updates if chat changes
-    const requestChatId = getCurrentChatId();
+    // Store the initial chat ID (might be null for new chats)
+    let requestChatId = getCurrentChatId();
+
+    // Set loading state BEFORE creating chat to prevent chat change handler from interfering
+    setLoading(true);
+    setUploadProgress(0);
+    setProgressStage(currentVideoFile ? "uploading" : "processing");
 
     // If submitting first video and no current chat exists, create a new chat with video filename as title
     if (currentVideoFile && messages.length === 0) {
@@ -161,6 +172,8 @@ export function GeminiQueryForm() {
         console.log("[Chat] Creating new chat with title:", title);
         const newChat = createChat([], title);
         setCurrentChatId(newChat.id);
+        // Update requestChatId to the newly created chat ID
+        requestChatId = newChat.id;
         console.log("[Chat] Created chat:", newChat.id, "Title:", newChat.title);
       }
     }
@@ -228,14 +241,19 @@ export function GeminiQueryForm() {
       addMessage(userMessage);
     }
 
+    console.log("[GeminiQueryForm] Messages added:", {
+      userMessageId: videoMessageId || (currentVideoFile ? `user-${timestamp}` : null),
+      totalMessages: messages.length + (currentVideoFile && currentPrompt.trim() ? 2 : 1),
+    });
+
     // Clear input
     setPrompt("");
-    clearVideo();
+    // Don't revoke blob URL yet - it's still referenced in the message
+    // It will be revoked when S3 URL is available or when message is removed
+    clearVideo(true); // Keep blob URL since it's in the message
     setVideoError(null);
     setApiError(null);
-    setLoading(true);
-    setUploadProgress(0);
-    setProgressStage(currentVideoFile ? "uploading" : "processing");
+    // Loading state already set above before chat creation
 
     // Create abort controller for this request
     const abortController = new AbortController();
@@ -249,6 +267,26 @@ export function GeminiQueryForm() {
       content: "",
     };
     addMessage(assistantMessage);
+    console.log("[GeminiQueryForm] Assistant placeholder message added:", assistantMessageId);
+
+    // Immediately save messages to chat to prevent chat change handler from clearing them
+    // Get all messages including the ones we just added
+    const allMessages = [
+      ...messages,
+      ...(currentVideoFile && currentPrompt.trim() 
+        ? [{ id: videoMessageId!, role: "user" as const, content: "", videoFile: currentVideoFile, videoPreview: currentVideoPreview, inputTokens: calculateUserMessageTokens("", currentVideoFile) },
+           { id: `user-text-${timestamp}`, role: "user" as const, content: currentPrompt, inputTokens: calculateUserMessageTokens(currentPrompt, null) }]
+        : [{ id: currentVideoFile ? videoMessageId! : `user-${timestamp}`, role: "user" as const, content: currentPrompt, videoFile: currentVideoFile, videoPreview: currentVideoPreview, inputTokens: calculateUserMessageTokens(currentPrompt, currentVideoFile) }]),
+      assistantMessage
+    ];
+    
+    if (requestChatId) {
+      console.log("[GeminiQueryForm] Saving messages to chat immediately:", {
+        chatId: requestChatId,
+        messageCount: allMessages.length,
+      });
+      updateChat(requestChatId, { messages: allMessages }, true);
+    }
 
     // Scroll to bottom immediately after adding messages, then disable auto-scroll
     // Use requestAnimationFrame to ensure DOM is updated
@@ -307,7 +345,8 @@ export function GeminiQueryForm() {
             // Check if chat changed before updating video message
             const chatId = getCurrentChatId();
             if (chatId === requestChatId && videoMessageId) {
-              updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key });
+              // Clear blob URL when S3 URL is available to prevent revoked blob URL errors
+              updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key, videoPreview: null });
             }
           },
           abortController,
@@ -333,7 +372,16 @@ export function GeminiQueryForm() {
           const errorMessage =
             err instanceof Error ? err.message : "An error occurred";
           setApiError(errorMessage);
+          // Remove assistant message
           removeMessage(assistantMessageId);
+          // Also remove user video message if it exists (upload failed)
+          // Revoke blob URL from the captured preview before removing
+          if (videoMessageId && currentVideoPreview) {
+            URL.revokeObjectURL(currentVideoPreview);
+            removeMessage(videoMessageId);
+          }
+          // Clear video on error so user can try again with a new file
+          clearVideo();
         }
       }
     } finally {

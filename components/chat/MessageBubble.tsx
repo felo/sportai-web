@@ -82,7 +82,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
     : null;
 
   // Use S3 URL if available, otherwise fall back to preview (blob URL)
-  const videoSrc = message.videoUrl || message.videoPreview;
+  // Prioritize S3 URL to avoid revoked blob URL errors
+  const videoSrc = message.videoUrl || (message.videoPreview && !message.videoUrl ? message.videoPreview : null);
   
   // Show video if we have a video URL, preview, file, or S3 key (for persisted videos)
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
@@ -221,6 +222,13 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                   <img
                     src={videoSrc || undefined}
                     alt="Uploaded image"
+                    onError={(e) => {
+                      // Handle revoked blob URL errors gracefully
+                      if (videoSrc?.startsWith("blob:")) {
+                        console.warn("Image blob URL revoked or invalid:", videoSrc);
+                        e.currentTarget.style.display = "none";
+                      }
+                    }}
                     style={{
                       maxWidth: "100%",
                       display: "block",
@@ -244,14 +252,22 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                       playsInline
                       preload="metadata"
                       onError={(e) => {
-                        console.error("Video playback error:", e);
                         const video = e.currentTarget;
-                        console.error("Video error details:", {
-                          error: video.error,
-                          networkState: video.networkState,
-                          readyState: video.readyState,
-                          src: video.src,
-                        });
+                        // Check if this is a blob URL error (revoked blob)
+                        // Revoked blob URLs typically result in network errors or src not supported errors
+                        if (video.src.startsWith("blob:")) {
+                          console.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
+                          // Don't log as error for revoked blob URLs - this is expected behavior
+                          // The video element will just fail to load, which is fine
+                        } else {
+                          console.error("Video playback error:", e);
+                          console.error("Video error details:", {
+                            error: video.error,
+                            networkState: video.networkState,
+                            readyState: video.readyState,
+                            src: video.src,
+                          });
+                        }
                       }}
                       onLoadStart={() => {
                         console.log("Video load started:", videoSrc);
@@ -310,7 +326,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
             </Box>
             
             {/* Developer mode token information */}
-            {developerMode && message.content && (messageTokens.input > 0 || messageTokens.output > 0) && (
+            {developerMode && message.content && (
               <Box
                 mt="3"
                 pt="3"
@@ -322,24 +338,38 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
               >
                 <Flex direction="column" gap="2">
                   <Text size="1" weight="medium" color="gray">
-                    Token Usage (Developer Mode)
+                    Developer Mode
                   </Text>
                   <Flex direction="column" gap="1" pl="2">
-                    <Text size="1">
-                      <strong>This message:</strong>{" "}
-                      {messageTokens.input > 0 && `${messageTokens.input.toLocaleString()} input`}
-                      {messageTokens.input > 0 && messageTokens.output > 0 && " + "}
-                      {messageTokens.output > 0 && `${messageTokens.output.toLocaleString()} output`}
-                      {messageTokens.input === 0 && messageTokens.output === 0 && "N/A"}
-                      {messagePricing && ` (${formatCost(messagePricing.totalCost)})`}
-                    </Text>
-                    <Text size="1">
-                      <strong>Total in chat:</strong>{" "}
-                      {cumulativeTokens.input > 0 && `${cumulativeTokens.input.toLocaleString()} input`}
-                      {cumulativeTokens.input > 0 && cumulativeTokens.output > 0 && " + "}
-                      {cumulativeTokens.output > 0 && `${cumulativeTokens.output.toLocaleString()} output`}
-                      {cumulativePricing && ` (${formatCost(cumulativePricing.totalCost)})`}
-                    </Text>
+                    {(messageTokens.input > 0 || messageTokens.output > 0) && (
+                      <>
+                        <Text size="1">
+                          <strong>Token usage (this message):</strong>{" "}
+                          {messageTokens.input > 0 && `${messageTokens.input.toLocaleString()} input`}
+                          {messageTokens.input > 0 && messageTokens.output > 0 && " + "}
+                          {messageTokens.output > 0 && `${messageTokens.output.toLocaleString()} output`}
+                          {messageTokens.input === 0 && messageTokens.output === 0 && "N/A"}
+                          {messagePricing && ` (${formatCost(messagePricing.totalCost)})`}
+                        </Text>
+                        <Text size="1">
+                          <strong>Token usage (total in chat):</strong>{" "}
+                          {cumulativeTokens.input > 0 && `${cumulativeTokens.input.toLocaleString()} input`}
+                          {cumulativeTokens.input > 0 && cumulativeTokens.output > 0 && " + "}
+                          {cumulativeTokens.output > 0 && `${cumulativeTokens.output.toLocaleString()} output`}
+                          {cumulativePricing && ` (${formatCost(cumulativePricing.totalCost)})`}
+                        </Text>
+                      </>
+                    )}
+                    {message.responseDuration !== undefined && (
+                      <Text size="1">
+                        <strong>Response time:</strong> {message.responseDuration.toLocaleString()}ms ({(message.responseDuration / 1000).toFixed(2)}s)
+                      </Text>
+                    )}
+                    {message.modelSettings && (
+                      <Text size="1">
+                        <strong>Settings:</strong> Thinking={message.modelSettings.thinkingMode}, Resolution={message.modelSettings.mediaResolution}
+                      </Text>
+                    )}
                   </Flex>
                 </Flex>
               </Box>

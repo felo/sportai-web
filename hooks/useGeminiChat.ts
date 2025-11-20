@@ -82,8 +82,30 @@ export function useGeminiChat() {
     if (!isHydrated) return;
 
     const handleChatChange = async () => {
-      isSwitchingChatRef.current = true;
+      // Don't interfere if we're already loading (might be creating a new chat during submission)
+      if (loading) {
+        console.log("[useGeminiChat] Ignoring chat change during active loading");
+        return;
+      }
+      
+      console.log("[useGeminiChat] Chat change handler triggered", {
+        currentChatId: getCurrentChatId(),
+        activeChatId: activeChatIdRef.current,
+        currentMessages: messages.length,
+      });
+      
       const currentChatId = getCurrentChatId();
+      
+      // If chat is empty but we have messages, don't clear them (might be in the middle of submission)
+      if (currentChatId) {
+        const chat = getChatById(currentChatId);
+        if (chat && chat.messages.length === 0 && messages.length > 0) {
+          console.log("[useGeminiChat] Chat is empty but we have messages, keeping current messages");
+          return;
+        }
+      }
+      
+      isSwitchingChatRef.current = true;
       
       // Update the active chat ID reference
       activeChatIdRef.current = currentChatId;
@@ -96,18 +118,26 @@ export function useGeminiChat() {
       if (currentChatId) {
         const chat = getChatById(currentChatId);
         if (chat) {
+          console.log("[useGeminiChat] Loading messages from chat:", {
+            chatId: currentChatId,
+            messageCount: chat.messages.length,
+            currentMessages: messages.length,
+          });
           // Load messages from the selected chat
           const refreshed = await refreshVideoUrls(chat.messages);
           setMessages(refreshed);
+          console.log("[useGeminiChat] Messages loaded:", refreshed.length);
           // Update chat with refreshed URLs (silent to prevent event loop)
           updateChat(currentChatId, { messages: refreshed }, true);
         } else {
           // Chat not found, clear messages
+          console.log("[useGeminiChat] Chat not found, clearing messages");
           setMessages([]);
           clearMessagesFromStorage();
         }
       } else {
         // No current chat, try old storage for backward compatibility
+        console.log("[useGeminiChat] No current chat, loading from old storage");
         const storedMessages = await loadMessagesFromStorage();
         if (storedMessages.length > 0) {
           const refreshed = await refreshVideoUrls(storedMessages);
@@ -160,7 +190,17 @@ export function useGeminiChat() {
   }, []);
 
   const addMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message]);
+    console.log("[useGeminiChat] Adding message:", {
+      id: message.id,
+      role: message.role,
+      hasContent: !!message.content,
+      hasVideo: !!(message.videoFile || message.videoPreview || message.videoUrl),
+    });
+    setMessages((prev) => {
+      const newMessages = [...prev, message];
+      console.log("[useGeminiChat] Messages after add:", newMessages.length);
+      return newMessages;
+    });
   }, []);
 
   const updateMessage = useCallback((id: string, updates: Partial<Message>) => {

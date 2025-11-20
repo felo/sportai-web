@@ -28,8 +28,10 @@ export function useVideoUpload() {
     setVideoPreview(previewUrl);
   }, [videoPreview]);
 
-  const clearVideo = useCallback(() => {
-    if (videoPreview) {
+  const clearVideo = useCallback((keepBlobUrl = false) => {
+    // If keepBlobUrl is true, don't revoke the blob URL (it's still referenced in a message)
+    // The blob URL will be garbage collected when there are no more references
+    if (videoPreview && !keepBlobUrl) {
       revokeVideoPreview(videoPreview);
     }
     setVideoFile(null);

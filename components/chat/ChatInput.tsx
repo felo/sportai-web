@@ -52,6 +52,7 @@ export function ChatInput({
   const BASE_TEXTAREA_HEIGHT = 0;
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>("fast");
   const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>("medium");
@@ -63,6 +64,13 @@ export function ChatInput({
     setThinkingModeState(getThinkingMode());
     setMediaResolutionState(getMediaResolution());
   }, []);
+
+  // Reset file input when video is cleared (e.g., after error or removal)
+  useEffect(() => {
+    if (!videoFile && fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [videoFile]);
 
   useEffect(() => {
     // Set initial height to base height
@@ -265,6 +273,7 @@ export function ChatInput({
                   }}
                 >
                   <input
+                    ref={fileInputRef}
                     id="video"
                     type="file"
                     accept="video/*,image/jpeg,image/jpg,image/png,image/gif,image/webp"
@@ -412,7 +421,7 @@ export function ChatInput({
                 <Tooltip content="Send message" open={disableTooltips ? false : undefined}>
                   <button
                     type="submit"
-                    disabled={!prompt.trim()}
+                    disabled={!prompt.trim() && !videoFile}
                     style={{
                       width: "32px",
                       height: "32px",
@@ -421,13 +430,13 @@ export function ChatInput({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      cursor: !prompt.trim() ? "not-allowed" : "pointer",
+                      cursor: (!prompt.trim() && !videoFile) ? "not-allowed" : "pointer",
                       transition: "background-color 0.2s",
                       border: "none",
-                      opacity: !prompt.trim() ? 0.5 : 1,
+                      opacity: (!prompt.trim() && !videoFile) ? 0.5 : 1,
                     }}
                     onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      if (prompt.trim()) {
+                      if (prompt.trim() || videoFile) {
                         e.currentTarget.style.backgroundColor = "var(--gray-4)";
                       }
                     }}
@@ -435,7 +444,7 @@ export function ChatInput({
                       e.currentTarget.style.backgroundColor = "var(--gray-3)";
                     }}
                   >
-                    <ArrowUpIcon width="16" height="16" color={!prompt.trim() ? "var(--gray-9)" : "var(--gray-11)"} />
+                    <ArrowUpIcon width="16" height="16" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "var(--gray-11)"} />
                   </button>
                 </Tooltip>
               )}

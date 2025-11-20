@@ -89,8 +89,8 @@ export async function queryGemini(
   logger.time(`[${requestId}] API call duration`);
   
   try {
-    // Build generation config with thinking config and media resolution
-    // Gemini 3 API parameters: thinkingConfig (with thinkingBudget) and media_resolution
+    // Build generation config with thinking level and media resolution
+    // Gemini 3 API parameters: thinking_level and media_resolution
     const generationConfig: any = {};
     
     // Map thinking mode to thinkingConfig with thinkingBudget
@@ -107,14 +107,14 @@ export async function queryGemini(
       };
     }
     
-    // Map media resolution to API parameter (uppercase enum values)
+    // Map media resolution to API parameter (snake_case for API)
     // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
     const mediaResolutionMap: Record<MediaResolution, string> = {
       low: "MEDIA_RESOLUTION_LOW",
       medium: "MEDIA_RESOLUTION_MEDIUM",
       high: "MEDIA_RESOLUTION_HIGH",
     };
-    generationConfig.mediaResolution = mediaResolutionMap[mediaResolution];
+    generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
@@ -228,7 +228,7 @@ export async function queryGemini(
             thinkingConfig: {
               thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
             },
-          },
+          } as any,
         });
         
         // Rebuild parts
@@ -331,8 +331,8 @@ export async function* streamGemini(
   }
   
   try {
-    // Build generation config with thinking config and media resolution
-    // Gemini 3 API parameters: thinkingConfig (with thinkingBudget) and media_resolution
+    // Build generation config with thinking level and media resolution
+    // Gemini 3 API parameters: thinking_level and media_resolution
     const generationConfig: any = {};
     
     // Map thinking mode to thinkingConfig with thinkingBudget
@@ -349,14 +349,14 @@ export async function* streamGemini(
       };
     }
     
-    // Map media resolution to API parameter (uppercase enum values)
+    // Map media resolution to API parameter (snake_case for API)
     // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
     const mediaResolutionMap: Record<MediaResolution, string> = {
       low: "MEDIA_RESOLUTION_LOW",
       medium: "MEDIA_RESOLUTION_MEDIUM",
       high: "MEDIA_RESOLUTION_HIGH",
     };
-    generationConfig.mediaResolution = mediaResolutionMap[mediaResolution];
+    generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
@@ -430,7 +430,7 @@ export async function* streamGemini(
           thinkingConfig: {
             thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
           },
-        },
+        } as any,
       });
       
       // Rebuild parts

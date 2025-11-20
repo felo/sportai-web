@@ -16,6 +16,11 @@ export type Message = {
   videoS3Key?: string | null; // S3 key for regenerating presigned URLs
   inputTokens?: number; // Input tokens used for this message
   outputTokens?: number; // Output tokens used for this message (assistant messages only)
+  responseDuration?: number; // API response duration in milliseconds
+  modelSettings?: {
+    thinkingMode: string;
+    mediaResolution: string;
+  };
 };
 
 export type Chat = {

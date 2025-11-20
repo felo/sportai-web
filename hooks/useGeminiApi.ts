@@ -27,6 +27,8 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
     ): Promise<void> => {
       optionsRef.current.onProgressUpdate?.("generating", 0);
 
+      const requestStartTime = Date.now();
+
       // Calculate input tokens for this request
       const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nUser Query: ${prompt}`;
       let inputTokens = estimateTextTokens(fullPrompt);
@@ -107,6 +109,16 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
               outputTokens: outputTokens,
             });
           }
+          
+          // Calculate duration and add settings after streaming completes
+          const duration = Date.now() - requestStartTime;
+          updateMessage(assistantMessageId, {
+            responseDuration: duration,
+            modelSettings: {
+              thinkingMode,
+              mediaResolution,
+            },
+          });
         } catch (error) {
           // Handle abort errors gracefully
           if (error instanceof Error && error.name === "AbortError") {
@@ -158,6 +170,8 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         );
         inputTokens += historyTokens;
       }
+      
+      const requestStartTime = Date.now();
       setStage("uploading");
       setProgress(0);
 
@@ -248,20 +262,38 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
           }
         }
 
-        const res = await fetch("/api/gemini", {
-          method: "POST",
-          headers: {
-            "x-stream": "true",
-          },
-          body: formData,
-          signal: abortController?.signal,
-        });
+        console.log("[Gemini API] Sending request to /api/gemini with S3 URL...");
+        let res: Response;
+        try {
+          res = await fetch("/api/gemini", {
+            method: "POST",
+            headers: {
+              "x-stream": "true",
+            },
+            body: formData,
+            signal: abortController?.signal,
+          });
+          console.log("[Gemini API] Response received:", {
+            ok: res.ok,
+            status: res.status,
+            statusText: res.statusText,
+            hasBody: !!res.body,
+          });
+        } catch (fetchError) {
+          console.error("[Gemini API] ❌ Fetch error:", fetchError);
+          throw fetchError;
+        }
 
         setProgress(90);
         setStage("analyzing");
 
         if (!res.ok) {
           const errorText = await res.text();
+          console.error("[Gemini API] ❌ Request failed:", {
+            status: res.status,
+            statusText: res.statusText,
+            errorText,
+          });
           throw new Error(errorText || "Failed to get response");
         }
 
@@ -269,30 +301,52 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         const decoder = new TextDecoder();
         let accumulatedText = "";
 
-        if (reader) {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+        if (!reader) {
+          console.error("[Gemini API] ❌ Response body is null or undefined");
+          throw new Error("Response body is null");
+        }
 
-              const chunk = decoder.decode(value, { stream: true });
-              accumulatedText += chunk;
-              // Estimate output tokens as we accumulate text
-              const outputTokens = estimateTextTokens(accumulatedText);
-              updateMessage(assistantMessageId, { 
-                content: accumulatedText,
-                inputTokens: inputTokens,
-                outputTokens: outputTokens,
-              });
+        console.log("[Gemini API] Starting to read stream...");
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              console.log("[Gemini API] Stream completed. Total length:", accumulatedText.length);
+              break;
             }
-          } catch (error) {
-            // Handle abort errors gracefully
-            if (error instanceof Error && error.name === "AbortError") {
-              reader.cancel();
-              throw error;
-            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            console.log("[Gemini API] Received chunk:", {
+              chunkLength: chunk.length,
+              totalLength: accumulatedText.length,
+              preview: chunk.substring(0, 50),
+            });
+            // Estimate output tokens as we accumulate text
+            const outputTokens = estimateTextTokens(accumulatedText);
+            updateMessage(assistantMessageId, { 
+              content: accumulatedText,
+              inputTokens: inputTokens,
+              outputTokens: outputTokens,
+            });
+          }
+            
+          // Calculate duration and add settings after streaming completes
+          const duration = Date.now() - requestStartTime;
+          updateMessage(assistantMessageId, {
+            responseDuration: duration,
+            modelSettings: {
+              thinkingMode,
+              mediaResolution,
+            },
+          });
+        } catch (error) {
+          // Handle abort errors gracefully
+          if (error instanceof Error && error.name === "AbortError") {
+            reader.cancel();
             throw error;
           }
+          throw error;
         }
       } catch (error) {
         // If S3 upload fails, log the error and check if we should fall back
@@ -371,6 +425,16 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
                 outputTokens: outputTokens,
               });
             }
+            
+            // Calculate duration and add settings after streaming completes (fallback path)
+            const duration = Date.now() - requestStartTime;
+            updateMessage(assistantMessageId, {
+              responseDuration: duration,
+              modelSettings: {
+                thinkingMode,
+                mediaResolution,
+              },
+            });
           } catch (error) {
             // Handle abort errors gracefully
             if (error instanceof Error && error.name === "AbortError") {
