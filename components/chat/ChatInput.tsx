@@ -204,7 +204,7 @@ export function ChatInput({
       className="sticky bottom-0 z-20"
       style={{
         backgroundColor: "var(--color-background)",
-        paddingBottom: "var(--space-4)",
+        paddingBottom: isMobile ? "calc(var(--space-4) + env(safe-area-inset-bottom))" : "var(--space-4)", // Safe area support
         paddingLeft: isMobile ? "0" : "var(--space-4)",
         paddingRight: isMobile ? "0" : "var(--space-4)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",

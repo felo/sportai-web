@@ -568,11 +568,15 @@ export function GeminiQueryForm() {
           marginRight: isMobile ? "0" : "0",
           transition: "margin-left 0.2s ease-in-out",
           width: isMobile ? "100%" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
-          height: isMobile ? "100vh" : "calc(100vh - 57px)", // Full height on mobile
+          height: isMobile ? "100dvh" : "calc(100vh - 57px)", // Use dynamic viewport height on mobile
           marginTop: isMobile ? "0" : "57px", // Start at top on mobile
           display: "flex",
           justifyContent: "center",
           overflow: "hidden",
+          position: isMobile ? "fixed" : "relative", // Fix position on mobile to prevent scroll
+          top: isMobile ? "0" : "auto",
+          left: isMobile ? "0" : "auto",
+          right: isMobile ? "0" : "auto",
         }}
       >
         {/* Scrollable content area - centered and responsive */}

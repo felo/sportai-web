@@ -25,7 +25,10 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
           borderBottom: "1px solid var(--gray-6)",
           backgroundColor: "var(--color-background)",
           backdropFilter: "blur(8px)",
-          padding: "var(--space-3) var(--space-4)",
+          paddingTop: "calc(var(--space-3) + env(safe-area-inset-top))", // Safe area support
+          paddingBottom: "var(--space-3)",
+          paddingLeft: "var(--space-4)",
+          paddingRight: "var(--space-4)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",

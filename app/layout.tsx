@@ -9,6 +9,13 @@ import "@radix-ui/themes/utilities.css";
 export const metadata: Metadata = {
   title: "SportAI",
   description: "SportAI analysis tool",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: "cover", // Ensures safe area insets work on iPhone
+  },
 };
 
 export default function RootLayout({
