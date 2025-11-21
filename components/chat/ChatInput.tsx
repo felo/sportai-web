@@ -268,6 +268,7 @@ export function ChatInput({
                 borderRadius: 0,
                 outline: "none",
                 boxShadow: "none",
+                fontSize: isMobile ? "16px" : undefined, // Prevents auto-zoom on iOS
               }}
             />
             

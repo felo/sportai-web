@@ -12,8 +12,6 @@ export const metadata: Metadata = {
   viewport: {
     width: "device-width",
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
     viewportFit: "cover", // Ensures safe area insets work on iPhone
   },
 };
