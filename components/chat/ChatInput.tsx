@@ -60,7 +60,7 @@ export function ChatInput({
     }
   }, [loading, onStop, progressStage]);
   // Base height for textarea (in pixels) - adjust this to test different heights
-  const BASE_TEXTAREA_HEIGHT = 0;
+  const BASE_TEXTAREA_HEIGHT = isMobile ? 40 : 0;
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,10 +253,12 @@ export function ChatInput({
               placeholder="Ask anything sports related…"
               aria-label="Chat input"
               resize="none"
-              size="3"
+              size={isMobile ? "2" : "3"}
               style={{
                 maxHeight: "300px",
-                padding: "var(--space-3)",
+                minHeight: isMobile ? "40px" : undefined,
+                height: isMobile ? "40px" : undefined,
+                padding: isMobile ? "var(--space-2)" : "var(--space-3)",
                 paddingBottom: "var(--space-2)",
                 overflowY: "auto",
                 backgroundColor: "transparent",
