@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog, Dialog, TextField } from "@radix-ui/themes";
-import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon } from "@radix-ui/react-icons";
+import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon, GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat } from "@/utils/storage";
@@ -391,7 +391,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Text size="2">SportAI Platform</Text>
+                    <GlobeIcon width="16" height="16" />
+                    <Text size="2" ml="2">SportAI Platform</Text>
                   </a>
                 </Button>
                 <Button
@@ -408,7 +409,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Text size="2">API Documentation</Text>
+                    <FileTextIcon width="16" height="16" />
+                    <Text size="2" ml="2">API Documentation</Text>
                   </a>
                 </Button>
                 <Button
@@ -425,7 +427,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Text size="2">Contact Us</Text>
+                    <EnvelopeClosedIcon width="16" height="16" />
+                    <Text size="2" ml="2">Contact Us</Text>
                   </a>
                 </Button>
                 <Button
@@ -442,7 +445,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Text size="2">About Us</Text>
+                    <InfoCircledIcon width="16" height="16" />
+                    <Text size="2" ml="2">About Us</Text>
                   </a>
                 </Button>
               </Flex>

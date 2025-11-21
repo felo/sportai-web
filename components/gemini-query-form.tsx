@@ -96,10 +96,40 @@ export function GeminiQueryForm() {
         const newChat = createChat([], undefined);
         setCurrentChatId(newChat.id);
         console.log("[GeminiQueryForm] Created default chat:", newChat.id);
+        // Reset settings to defaults for new chat
+        setThinkingMode("fast");
+        setMediaResolution("medium");
+        setDomainExpertise("all-sports");
       } else {
         console.log("[GeminiQueryForm] Using existing chat:", currentChatId);
       }
     }
+  }, [isHydrated]);
+
+  // Reset settings to defaults when a new empty chat is created
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const handleChatChange = () => {
+      const currentChatId = getCurrentChatId();
+      if (currentChatId) {
+        // Check if the current chat has no messages (it's a brand new chat)
+        const chatData = getChatById(currentChatId);
+        if (chatData && chatData.messages.length === 0) {
+          console.log("[GeminiQueryForm] New empty chat detected, resetting settings to defaults");
+          setThinkingMode("fast");
+          setMediaResolution("medium");
+          setDomainExpertise("all-sports");
+        }
+      }
+    };
+
+    // Listen for chat changes (triggered when new chat is created or chat is switched)
+    window.addEventListener("chat-storage-change", handleChatChange);
+    
+    return () => {
+      window.removeEventListener("chat-storage-change", handleChatChange);
+    };
   }, [isHydrated]);
 
   // Auto-populate prompt when video is added and prompt is empty
