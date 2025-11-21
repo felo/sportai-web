@@ -123,6 +123,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
               <Button
                 size="2"
                 variant="soft"
+                className="action-button"
                 onClick={() => handleCardClick(starterPrompt)}
                 loading={loadingVideoForCard === starterPrompt.id}
                 disabled={loadingVideoForCard !== null}

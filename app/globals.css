@@ -203,3 +203,92 @@ button[data-radix-select-trigger].select-no-border {
   box-shadow: none !important;
   background-color: transparent !important;
 }
+
+/* Action Button Styling - Green Pill Shape (only for primary action buttons) */
+/* This class can be added to buttons that should have the prominent green pill style */
+button.action-button {
+  border-radius: 9999px !important; /* Full rounded pill shape */
+  font-weight: 600 !important;
+  transition: all 0.3s ease-out !important;
+  border: 2px solid white !important;
+  text-transform: uppercase !important;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 0 10px rgba(122, 219, 143, 0.2) !important;
+  background-color: #7ADB8F !important; /* Light green */
+  color: #1C1C1C !important; /* Dark text */
+}
+
+button.action-button:hover:not([disabled]) {
+  background-color: #95E5A6 !important; /* Lighter green on hover */
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 20px rgba(122, 219, 143, 0.6),
+    0 0 40px rgba(122, 219, 143, 0.4),
+    0 4px 16px rgba(122, 219, 143, 0.5) !important;
+}
+
+button.action-button[disabled] {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  background-color: var(--gray-4) !important;
+  color: var(--gray-9) !important;
+}
+
+/* Red variant for destructive actions */
+button.action-button[data-accent-color="red"] {
+  background-color: #E54D2E !important;
+  color: white !important;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 0 10px rgba(229, 77, 46, 0.2) !important;
+}
+
+button.action-button[data-accent-color="red"]:hover:not([disabled]) {
+  background-color: #DD4425 !important;
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 20px rgba(229, 77, 46, 0.6),
+    0 0 40px rgba(229, 77, 46, 0.4),
+    0 4px 16px rgba(229, 77, 46, 0.5) !important;
+}
+
+/* Light mode text adjustment */
+.radix-themes button.action-button {
+  color: #1C1C1C !important;
+}
+
+/* Dark mode text adjustment */
+html[data-theme="dark"] button.action-button,
+[data-radix-theme][data-radix-theme-appearance="dark"] button.action-button {
+  color: #1C1C1C !important; /* Keep dark text on light green background */
+}
+
+/* API Version Tooltip Styling */
+.api-version-tooltip {
+  padding: 2px 0;
+  line-height: 1.4;
+}
+
+/* Ensure tooltip content inherits proper theme colors */
+[data-radix-tooltip-content] .api-version-tooltip {
+  background-color: var(--gray-2);
+  border: 1px solid var(--gray-6);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 0 0 1px var(--gray-5);
+}
+
+/* Dark mode tooltip adjustments */
+html[data-theme="dark"] [data-radix-tooltip-content] .api-version-tooltip,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-tooltip-content] .api-version-tooltip {
+  background-color: var(--gray-2);
+  border-color: var(--gray-6);
+}
+
+/* Light mode tooltip adjustments */
+html[data-theme="light"] [data-radix-tooltip-content] .api-version-tooltip,
+[data-radix-theme][data-radix-theme-appearance="light"] [data-radix-tooltip-content] .api-version-tooltip {
+  background-color: var(--gray-1);
+  border-color: var(--gray-5);
+}

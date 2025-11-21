@@ -1,6 +1,6 @@
 "use client";
 
-import { Flex, Box } from "@radix-ui/themes";
+import { Flex, Box, Text, Badge, Tooltip } from "@radix-ui/themes";
 import Image from "next/image";
 import { useSidebar } from "@/components/SidebarContext";
 
@@ -35,6 +35,33 @@ export function ChatHeader({ messageCount }: ChatHeaderProps) {
         height={38}
         style={{ objectFit: "contain", height: "auto" }}
       />
+      <Tooltip 
+        content={
+          <Box className="api-version-tooltip">
+            <div style={{ fontSize: "12px"}}>
+            Stable v0.5.58 - Last updated 2025-10-01
+            </div>
+          </Box>
+        }
+        side="bottom"
+      >
+        <Badge
+          variant="soft"
+          color="gray"
+          radius="full"
+          size="2"
+          style={{
+            fontFamily: "var(--font-mono, 'Courier New', monospace)",
+            fontSize: "12px",
+            fontWeight: "500",
+            letterSpacing: "0.02em",
+            padding: "4px 12px",
+            cursor: "help",
+          }}
+        >
+          API version 0.5.58
+        </Badge>
+      </Tooltip>
     </Box>
   );
 }

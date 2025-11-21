@@ -277,22 +277,29 @@ export function ChatInput({
                   style={{
                     width: "32px",
                     height: "32px",
-                    borderRadius: "50%",
-                    backgroundColor: "var(--gray-3)",
+                    borderRadius: "9999px",
+                    backgroundColor: "#7ADB8F",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    transition: "background-color 0.2s",
-                    border: "none",
+                    transition: "all 0.3s ease-out",
+                    border: "2px solid white",
                     flexShrink: 0,
                     marginRight: "var(--space-3)",
+                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
                   }}
                   onMouseEnter={(e: React.MouseEvent<HTMLLabelElement>) => {
-                    e.currentTarget.style.backgroundColor = "var(--gray-4)";
+                    e.currentTarget.style.backgroundColor = "#95E5A6";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
                   }}
                   onMouseLeave={(e: React.MouseEvent<HTMLLabelElement>) => {
-                    e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                    e.currentTarget.style.backgroundColor = "#7ADB8F";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
                   }}
                 >
                   <input
@@ -303,7 +310,7 @@ export function ChatInput({
                     onChange={onVideoChange}
                     style={{ display: "none" }}
                   />
-                  <PlusIcon width="16" height="16" color="var(--gray-11)" />
+                  <PlusIcon width="16" height="16" color="#1C1C1C" />
                 </label>
               </Tooltip>
 
@@ -489,26 +496,35 @@ export function ChatInput({
                     style={{
                       width: "32px",
                       height: "32px",
-                      borderRadius: "50%",
-                      backgroundColor: "var(--gray-3)",
+                      borderRadius: "9999px",
+                      backgroundColor: (!prompt.trim() && !videoFile) ? "var(--gray-4)" : "#7ADB8F",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: (!prompt.trim() && !videoFile) ? "not-allowed" : "pointer",
-                      transition: "background-color 0.2s",
-                      border: "none",
+                      transition: "all 0.3s ease-out",
+                      border: (!prompt.trim() && !videoFile) ? "none" : "2px solid white",
                       opacity: (!prompt.trim() && !videoFile) ? 0.5 : 1,
+                      boxShadow: (!prompt.trim() && !videoFile) ? "none" : "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+                      textTransform: "uppercase",
+                      fontWeight: 600,
                     }}
                     onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                       if (prompt.trim() || videoFile) {
-                        e.currentTarget.style.backgroundColor = "var(--gray-4)";
+                        e.currentTarget.style.backgroundColor = "#95E5A6";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
                       }
                     }}
                     onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                      if (prompt.trim() || videoFile) {
+                        e.currentTarget.style.backgroundColor = "#7ADB8F";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
+                      }
                     }}
                   >
-                    <ArrowUpIcon width="16" height="16" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "var(--gray-11)"} />
+                    <ArrowUpIcon width="16" height="16" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "#1C1C1C"} />
                   </button>
                 </Tooltip>
               )}

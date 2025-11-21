@@ -558,7 +558,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 <AlertDialog.Action>
                   <Button 
                     variant="solid" 
-                    color="red" 
+                    color="red"
                     onClick={() => {
                       onClearChat();
                       setAlertOpen(false);
@@ -606,6 +606,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 </Button>
               </Dialog.Close>
               <Button
+                className="action-button"
                 onClick={() => {
                   if (editTitle.trim() && editingChat) {
                     console.log("[Sidebar] Updating chat title:", editingChat.id, "from:", editingChat.title, "to:", editTitle.trim());
