@@ -38,6 +38,7 @@ export function VideoPoseViewer({
   const [videoFPS, setVideoFPS] = useState(30); // Default FPS, will be detected
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showTrajectories, setShowTrajectories] = useState(false);
+  const [smoothTrajectories, setSmoothTrajectories] = useState(true);
   const [showFaceLandmarks, setShowFaceLandmarks] = useState(false);
   const [selectedJoints, setSelectedJoints] = useState<number[]>([9, 10]); // Default: wrists
   const [jointTrajectories, setJointTrajectories] = useState<Map<number, Array<{x: number, y: number, frame: number}>>>(new Map());
@@ -461,22 +462,51 @@ export function VideoPoseViewer({
         
         const color = jointColors[jointIndex % jointColors.length];
         
-        // Draw trajectory line
+        // Apply smoothing if enabled
+        const pointsToDraw = smoothTrajectories 
+          ? smoothTrajectory(trajectory) // Adaptive smoothing for realistic human movement
+          : trajectory.map(p => ({ x: p.x, y: p.y }));
+        
+        // Draw trajectory line with smooth curves
         ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         
-        ctx.beginPath();
-        ctx.moveTo(trajectory[0].x, trajectory[0].y);
-        
-        for (let i = 1; i < trajectory.length; i++) {
-          ctx.lineTo(trajectory[i].x, trajectory[i].y);
+        if (smoothTrajectories && pointsToDraw.length > 2) {
+          // Use quadratic curves for even smoother, more natural paths
+          ctx.beginPath();
+          ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+          
+          // Draw smooth curves through points
+          for (let i = 1; i < pointsToDraw.length - 1; i++) {
+            const current = pointsToDraw[i];
+            const next = pointsToDraw[i + 1];
+            const midX = (current.x + next.x) / 2;
+            const midY = (current.y + next.y) / 2;
+            
+            if (i === 1) {
+              ctx.lineTo(current.x, current.y);
+            } else {
+              ctx.quadraticCurveTo(current.x, current.y, midX, midY);
+            }
+          }
+          
+          // Connect to last point
+          const lastPoint = pointsToDraw[pointsToDraw.length - 1];
+          ctx.lineTo(lastPoint.x, lastPoint.y);
+        } else {
+          // Simple line drawing for non-smoothed paths
+          ctx.beginPath();
+          ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+          for (let i = 1; i < pointsToDraw.length; i++) {
+            ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+          }
         }
         
         ctx.stroke();
         
-        // Draw dots along trajectory
+        // Draw dots along original trajectory (not smoothed) to show actual data points
         trajectory.forEach((point, index) => {
           if (index % 5 === 0) { // Draw every 5th point to reduce clutter
             ctx.fillStyle = color;
@@ -565,7 +595,120 @@ export function VideoPoseViewer({
         });
       }
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles]);
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories]);
+
+  // Catmull-Rom spline interpolation for smooth trajectories
+  // Creates smooth curves through points, simulating higher FPS
+  const catmullRomSpline = (
+    p0: { x: number; y: number },
+    p1: { x: number; y: number },
+    p2: { x: number; y: number },
+    p3: { x: number; y: number },
+    t: number
+  ): { x: number; y: number } => {
+    // Catmull-Rom spline formula
+    const t2 = t * t;
+    const t3 = t2 * t;
+    
+    return {
+      x: 0.5 * (
+        (2 * p1.x) +
+        (-p0.x + p2.x) * t +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+      ),
+      y: 0.5 * (
+        (2 * p1.y) +
+        (-p0.y + p2.y) * t +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+      )
+    };
+  };
+
+  // Calculate velocity between two points
+  const calculateVelocity = (
+    p1: { x: number; y: number; frame: number },
+    p2: { x: number; y: number; frame: number }
+  ): number => {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dt = p2.frame - p1.frame || 1; // Avoid division by zero
+    return Math.sqrt(dx * dx + dy * dy) / dt;
+  };
+
+  // Generate smoothed trajectory points using adaptive Catmull-Rom splines
+  // Adapts smoothing based on movement velocity for more realistic human motion
+  const smoothTrajectory = (points: Array<{x: number, y: number, frame: number}>): Array<{x: number, y: number}> => {
+    if (points.length < 2) return points.map(p => ({ x: p.x, y: p.y }));
+    if (points.length === 2) {
+      // Use cubic Bezier for 2 points with estimated control points
+      const segments = 10;
+      const smoothed: Array<{x: number, y: number}> = [];
+      const p0 = points[0];
+      const p1 = points[1];
+      
+      // Estimate control points based on direction
+      const dx = p1.x - p0.x;
+      const dy = p1.y - p0.y;
+      const cp1x = p0.x + dx * 0.3;
+      const cp1y = p0.y + dy * 0.3;
+      const cp2x = p1.x - dx * 0.3;
+      const cp2y = p1.y - dy * 0.3;
+      
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const mt3 = mt2 * mt;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        
+        smoothed.push({
+          x: mt3 * p0.x + 3 * mt2 * t * cp1x + 3 * mt * t2 * cp2x + t3 * p1.x,
+          y: mt3 * p0.y + 3 * mt2 * t * cp1y + 3 * mt * t2 * cp2y + t3 * p1.y
+        });
+      }
+      return smoothed;
+    }
+
+    const smoothed: Array<{x: number, y: number}> = [];
+    
+    // Add first point
+    smoothed.push({ x: points[0].x, y: points[0].y });
+    
+    // Calculate velocities for adaptive smoothing
+    const velocities: number[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      velocities.push(calculateVelocity(points[i], points[i + 1]));
+    }
+    const avgVelocity = velocities.reduce((a, b) => a + b, 0) / velocities.length;
+    
+    // Interpolate between each pair of points with adaptive segment count
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = i > 0 ? points[i - 1] : points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1];
+      
+      // Adaptive segment count based on velocity
+      // Faster movements get more segments for smoother curves
+      // Slower movements get fewer segments to maintain natural feel
+      const velocity = velocities[i] || avgVelocity;
+      const velocityRatio = Math.min(velocity / (avgVelocity || 1), 3); // Cap at 3x
+      const baseSegments = 8; // Base number of segments
+      const segments = Math.max(5, Math.round(baseSegments * (1 + velocityRatio * 0.5)));
+      
+      // Generate interpolated points between p1 and p2
+      for (let j = 1; j <= segments; j++) {
+        const t = j / segments;
+        const interpolated = catmullRomSpline(p0, p1, p2, p3, t);
+        smoothed.push(interpolated);
+      }
+    }
+    
+    return smoothed;
+  };
 
   // Get joint name from index
   const getJointName = (index: number): string => {
@@ -1160,6 +1303,51 @@ export function VideoPoseViewer({
                 {enableSmoothing 
                   ? "Smooth tracking, reduces jitter. Better for viewing."
                   : "Raw keypoints, no filtering. Shows exact frame data."}
+              </Text>
+            </Flex>
+          </Flex>
+
+          {/* Joint Trajectory Tracking Toggle */}
+          <Flex gap="2" align="center">
+            <Switch
+              checked={showTrajectories}
+              onCheckedChange={(checked) => {
+                setShowTrajectories(checked);
+                if (!checked) {
+                  setJointTrajectories(new Map()); // Clear trajectories when disabled
+                }
+              }}
+              disabled={isLoading}
+            />
+            <Flex direction="column" gap="0">
+              <Text size="2" color="gray">
+                Draw joint trajectories
+              </Text>
+              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                {showTrajectories 
+                  ? "Tracing selected joints over time. Select joints below to track their paths."
+                  : "Trace joint movement paths over time"}
+              </Text>
+            </Flex>
+          </Flex>
+
+          {/* Trajectory Smoothing Toggle */}
+          <Flex gap="2" align="center">
+            <Switch
+              checked={smoothTrajectories}
+              onCheckedChange={setSmoothTrajectories}
+              disabled={isLoading || !showTrajectories}
+            />
+            <Flex direction="column" gap="0">
+              <Text size="2" color="gray">
+                Smooth trajectories
+              </Text>
+              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                {showTrajectories 
+                  ? (smoothTrajectories 
+                      ? "Interpolating paths with spline curves for smoother motion (simulates higher FPS)"
+                      : "Raw trajectory paths, shows exact recorded points")
+                  : "Enable trajectory tracking above to use smoothing"}
               </Text>
             </Flex>
           </Flex>
