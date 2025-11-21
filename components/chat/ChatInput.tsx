@@ -253,11 +253,9 @@ export function ChatInput({
               placeholder="Ask anything sports related…"
               aria-label="Chat input"
               resize="none"
-              size={isMobile ? "2" : "3"}
+              size="3"
               style={{
                 maxHeight: "300px",
-                minHeight: isMobile ? "40px" : undefined,
-                height: isMobile ? "40px" : undefined,
                 paddingTop: isMobile ? "var(--space-2)" : "var(--space-3)",
                 paddingLeft: isMobile ? "var(--space-2)" : "var(--space-3)",
                 paddingRight: isMobile ? "var(--space-2)" : "var(--space-3)",
@@ -268,7 +266,6 @@ export function ChatInput({
                 borderRadius: 0,
                 outline: "none",
                 boxShadow: "none",
-                fontSize: isMobile ? "16px" : undefined, // Prevents auto-zoom on iOS
               }}
             />
             
