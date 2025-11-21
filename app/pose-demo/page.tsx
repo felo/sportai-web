@@ -56,16 +56,6 @@ export default function PoseDemoPage() {
     >
       <Container size="3" py="6">
         <Flex direction="column" gap="6">
-        {/* Header */}
-        <Box>
-          <Heading size="8" mb="2" style={{ color: "var(--mint-9)" }}>
-            Pose Detection Demo
-          </Heading>
-          <Text size="3" color="gray">
-            Upload a video to see real-time skeleton detection overlay. This runs entirely in your browser using TensorFlow.js.
-          </Text>
-        </Box>
-
         {/* Upload Section */}
         {!videoUrl && (
           <Card size="3">

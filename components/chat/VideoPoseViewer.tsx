@@ -5,7 +5,7 @@ import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { usePoseDetection } from "@/hooks/usePoseDetection";
-import { drawPose } from "@/types/pose";
+import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS } from "@/types/pose";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 
 interface VideoPoseViewerProps {
@@ -38,6 +38,7 @@ export function VideoPoseViewer({
   const [videoFPS, setVideoFPS] = useState(30); // Default FPS, will be detected
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showTrajectories, setShowTrajectories] = useState(false);
+  const [showFaceLandmarks, setShowFaceLandmarks] = useState(false);
   const [selectedJoints, setSelectedJoints] = useState<number[]>([9, 10]); // Default: wrists
   const [jointTrajectories, setJointTrajectories] = useState<Map<number, Array<{x: number, y: number, frame: number}>>>(new Map());
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
@@ -46,6 +47,12 @@ export function VideoPoseViewer({
   const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
   const [usePreprocessing, setUsePreprocessing] = useState(false);
   const [maxPoses, setMaxPoses] = useState(1);
+  
+  // Angle Measurement State
+  const [showAngles, setShowAngles] = useState(false);
+  const [enableAngleClicking, setEnableAngleClicking] = useState(false);
+  const [selectedAngleJoints, setSelectedAngleJoints] = useState<number[]>([]);
+  const [measuredAngles, setMeasuredAngles] = useState<Array<[number, number, number]>>([]);
 
   // Track average confidence stats: Map<personIndex, { sum: number, count: number }>
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
@@ -321,6 +328,113 @@ export function VideoPoseViewer({
     });
   }, [currentPoses, showTrajectories, selectedJoints, currentFrame, dimensions.width, dimensions.height]);
 
+  // Handle canvas clicks for angle measurement
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!enableAngleClicking || currentPoses.length === 0) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Video to Canvas scaling
+    const video = videoRef.current;
+    if (!video) return;
+    const vidScaleX = canvas.width / video.videoWidth;
+    const vidScaleY = canvas.height / video.videoHeight;
+
+    // Scale click to canvas coordinates (if canvas CSS size differs from internal size)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const clickX = x * scaleX;
+    const clickY = y * scaleY;
+
+    const pose = currentPoses[0]; // Use first person
+    if (!pose) return;
+
+    // First, check if clicking directly on a joint (highest priority)
+    let minDist = Infinity;
+    let nearestJoint = -1;
+
+    pose.keypoints.forEach((kp, index) => {
+      if ((kp.score ?? 0) < 0.3) return;
+      
+      const kx = kp.x * vidScaleX;
+      const ky = kp.y * vidScaleY;
+      
+      const dist = Math.sqrt(Math.pow(kx - clickX, 2) + Math.pow(ky - clickY, 2));
+      if (dist < 30) { // 30px hit radius for joints
+        if (dist < minDist) {
+          minDist = dist;
+          nearestJoint = index;
+        }
+      }
+    });
+
+    // If clicking on a joint, prioritize joint selection
+    if (nearestJoint !== -1) {
+      // Add to selection
+      const newSelection = [...selectedAngleJoints, nearestJoint];
+      
+      if (newSelection.length === 3) {
+        // We have a complete angle (A-B-C)
+        setMeasuredAngles([...measuredAngles, [newSelection[0], newSelection[1], newSelection[2]]]);
+        setSelectedAngleJoints([]);
+      } else {
+        setSelectedAngleJoints(newSelection);
+      }
+      return; // Don't check for angle toggling
+    }
+
+    // If not clicking on a joint, check if clicking on an existing angle arc to toggle its order
+    if (measuredAngles.length > 0) {
+      for (let i = 0; i < measuredAngles.length; i++) {
+        const [idxA, idxB, idxC] = measuredAngles[i];
+        const pointA = pose.keypoints[idxA];
+        const pointB = pose.keypoints[idxB];
+        const pointC = pose.keypoints[idxC];
+
+        if (!pointA || !pointB || !pointC) continue;
+
+        // Scale keypoints to canvas coordinates
+        const scaledB = {
+          x: pointB.x * vidScaleX,
+          y: pointB.y * vidScaleY,
+        };
+
+        // Calculate arc radius (same as in drawAngle)
+        const distAB = Math.sqrt(
+          Math.pow((pointA.x - pointB.x) * vidScaleX, 2) + 
+          Math.pow((pointA.y - pointB.y) * vidScaleY, 2)
+        );
+        const distBC = Math.sqrt(
+          Math.pow((pointC.x - pointB.x) * vidScaleX, 2) + 
+          Math.pow((pointC.y - pointB.y) * vidScaleY, 2)
+        );
+        const radius = Math.min(distAB, distBC) * 0.5;
+
+        // Check if click is within the arc area (near the vertex and within radius)
+        const distToVertex = Math.sqrt(
+          Math.pow(clickX - scaledB.x, 2) + 
+          Math.pow(clickY - scaledB.y, 2)
+        );
+
+        // Click is within the arc area if it's within the radius from the vertex
+        // Make it smaller to avoid conflicts with joint selection
+        if (distToVertex < radius * 0.8) {
+          // Toggle the angle order: [A, B, C] -> [C, B, A]
+          const newAngles = [...measuredAngles];
+          newAngles[i] = [idxC, idxB, idxA];
+          setMeasuredAngles(newAngles);
+          return;
+        }
+      }
+    }
+  };
+
   // Draw skeleton on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -395,10 +509,124 @@ export function VideoPoseViewer({
           connectionColor: "#7ADB8F",
           connectionWidth: 3,
           minConfidence: 0.3,
+          showFace: showFaceLandmarks,
         });
       }
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height]);
+
+    // Draw angles
+    if (showAngles && currentPoses.length > 0) {
+      const pose = currentPoses[0]; // Use first person for angle measurement
+      if (pose) {
+        const scaleX = canvas.width / video.videoWidth;
+        const scaleY = canvas.height / video.videoHeight;
+        
+        // Scale keypoints
+        const scaledKeypoints = pose.keypoints.map(kp => ({
+          ...kp,
+          x: kp.x * scaleX,
+          y: kp.y * scaleY,
+        }));
+
+        // Draw selected joints (in progress)
+        if (selectedAngleJoints.length >= 2) {
+          // Draw lines connecting selected joints
+          ctx.strokeStyle = "#A855F7"; // Purple
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          
+          for (let i = 0; i < selectedAngleJoints.length - 1; i++) {
+            const idx1 = selectedAngleJoints[i];
+            const idx2 = selectedAngleJoints[i + 1];
+            const kp1 = scaledKeypoints[idx1];
+            const kp2 = scaledKeypoints[idx2];
+            
+            if (kp1 && kp2 && (kp1.score ?? 0) > 0.3 && (kp2.score ?? 0) > 0.3) {
+              ctx.beginPath();
+              ctx.moveTo(kp1.x, kp1.y);
+              ctx.lineTo(kp2.x, kp2.y);
+              ctx.stroke();
+            }
+          }
+          
+          ctx.setLineDash([]);
+        }
+
+        // Draw completed angles
+        measuredAngles.forEach(([idxA, idxB, idxC]) => {
+          drawAngle(ctx, scaledKeypoints, [idxA, idxB, idxC], {
+            lineColor: "#A855F7", // Purple
+            arcColor: "rgba(168, 85, 247, 0.3)", // Semi-transparent purple
+            textColor: "#FFFFFF", // White
+            lineWidth: 2,
+            fontSize: 14,
+            minConfidence: 0.3,
+          });
+        });
+      }
+    }
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles]);
+
+  // Get joint name from index
+  const getJointName = (index: number): string => {
+    const jointNames: { [key: number]: string } = {
+      0: "Nose",
+      1: "L Eye",
+      2: "R Eye",
+      3: "L Ear",
+      4: "R Ear",
+      5: "L Shoulder",
+      6: "R Shoulder",
+      7: "L Elbow",
+      8: "R Elbow",
+      9: "L Wrist",
+      10: "R Wrist",
+      11: "L Hip",
+      12: "R Hip",
+      13: "L Knee",
+      14: "R Knee",
+      15: "L Ankle",
+      16: "R Ankle",
+    };
+    return jointNames[index] || `Joint ${index}`;
+  };
+
+  // Calculate current angle value from current poses
+  const getCurrentAngleValue = (angle: [number, number, number]): number | null => {
+    if (currentPoses.length === 0) return null;
+    const pose = currentPoses[0];
+    const [idxA, idxB, idxC] = angle;
+    
+    const pointA = pose.keypoints[idxA];
+    const pointB = pose.keypoints[idxB];
+    const pointC = pose.keypoints[idxC];
+    
+    if (!pointA || !pointB || !pointC) return null;
+    if ((pointA.score ?? 0) < 0.3 || (pointB.score ?? 0) < 0.3 || (pointC.score ?? 0) < 0.3) return null;
+    
+    return calculateAngle(pointA, pointB, pointC);
+  };
+
+  // Toggle angle preset: add if not exists, remove if exists (check both orders)
+  const toggleAnglePreset = (angle: [number, number, number]) => {
+    const [idxA, idxB, idxC] = angle;
+    const reverseAngle: [number, number, number] = [idxC, idxB, idxA];
+    
+    // Check if angle exists in either order
+    const existingIndex = measuredAngles.findIndex(
+      ([a, b, c]) =>
+        (a === idxA && b === idxB && c === idxC) ||
+        (a === idxC && b === idxB && c === idxA)
+    );
+    
+    if (existingIndex !== -1) {
+      // Remove existing angle
+      setMeasuredAngles(measuredAngles.filter((_, i) => i !== existingIndex));
+    } else {
+      // Add new angle
+      setMeasuredAngles([...measuredAngles, angle]);
+    }
+  };
 
   const handlePlayPause = () => {
     const video = videoRef.current;
@@ -542,7 +770,6 @@ export function VideoPoseViewer({
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: `${width}px`,
           backgroundColor: "var(--gray-2)",
           borderRadius: "var(--radius-3)",
           overflow: "hidden",
@@ -570,14 +797,16 @@ export function VideoPoseViewer({
           ref={canvasRef}
           width={dimensions.width}
           height={dimensions.height}
+          onClick={handleCanvasClick}
           style={{
             position: "absolute",
             top: 0,
             left: 0,
             width: "100%",
             height: "100%",
-            pointerEvents: "none",
+            pointerEvents: enableAngleClicking ? "auto" : "none", // Enable clicks when angle clicking is active
             zIndex: 10,
+            cursor: enableAngleClicking ? "crosshair" : "default",
           }}
         />
 
@@ -611,6 +840,46 @@ export function VideoPoseViewer({
                   <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
                     Person {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
                     {" • Avg: "}{(avgConfidence * 100).toFixed(0)}%
+                  </Text>
+                );
+              })}
+            </Flex>
+          </Box>
+        )}
+
+        {/* Angles Overlay */}
+        {showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
+          <Box
+            style={{
+              position: "absolute",
+              top: "12px",
+              right: "12px",
+              backgroundColor: "rgba(0, 0, 0, 0.6)",
+              backdropFilter: "blur(4px)",
+              padding: "8px 12px",
+              borderRadius: "var(--radius-3)",
+              zIndex: 15,
+              pointerEvents: "none",
+              maxWidth: "250px",
+            }}
+          >
+            <Flex direction="column" gap="1" align="end">
+              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                Angles
+              </Text>
+              {measuredAngles.map((angle, idx) => {
+                const [idxA, idxB, idxC] = angle;
+                const angleValue = getCurrentAngleValue(angle);
+                const jointA = getJointName(idxA);
+                const jointB = getJointName(idxB);
+                const jointC = getJointName(idxC);
+                
+                return (
+                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                    {jointA}-{jointB}-{jointC}:{" "}
+                    <span style={{ color: "#A855F7", fontWeight: "bold" }}>
+                      {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
+                    </span>
                   </Text>
                 );
               })}
@@ -654,49 +923,164 @@ export function VideoPoseViewer({
       {showControls && (
         <Flex direction="column" gap="2">
           {/* Playback Controls */}
-          <Flex gap="2" align="center" wrap="wrap">
-            <Button
-              onClick={handlePlayPause}
-              disabled={isLoading || isPreprocessing}
-              variant="soft"
-              size="2"
-            >
-              {isPlaying ? <PauseIcon /> : <PlayIcon />}
-              {isPlaying ? "Pause" : "Play"}
-            </Button>
-            <Button
-              onClick={handleReset}
-              disabled={isLoading || isPreprocessing}
-              variant="soft"
-              size="2"
-            >
-              <ResetIcon />
-              Reset
-            </Button>
-            {!isPreprocessing && !usePreprocessing && (
+          <Flex direction="column" gap="2">
+            <Flex gap="2" align="center" wrap="wrap">
               <Button
-                onClick={handlePreprocess}
-                disabled={isLoading}
+                onClick={handlePlayPause}
+                disabled={isLoading || isPreprocessing}
                 variant="soft"
                 size="2"
-                color="mint"
               >
-                Pre-process All Frames
+                {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                {isPlaying ? "Pause" : "Play"}
               </Button>
+              <Button
+                onClick={handleReset}
+                disabled={isLoading || isPreprocessing}
+                variant="soft"
+                size="2"
+              >
+                <ResetIcon />
+                Reset
+              </Button>
+            {!isPreprocessing && !usePreprocessing && (
+              <>
+                <Button
+                  onClick={handlePreprocess}
+                  disabled={isLoading}
+                  variant="soft"
+                  size="2"
+                  color="mint"
+                >
+                  Pre-process All Frames
+                </Button>
+                {/* Frame-by-Frame Navigation */}
+                <Button
+                  onClick={() => handleFrameStep('backward')}
+                  disabled={isLoading || isPreprocessing}
+                  variant="soft"
+                  size="2"
+                >
+                  <ChevronLeftIcon width="16" height="16" />
+                  Previous Frame
+                </Button>
+                <Button
+                  onClick={() => handleFrameStep('forward')}
+                  disabled={isLoading || isPreprocessing}
+                  variant="soft"
+                  size="2"
+                >
+                  Next Frame
+                  <ChevronRightIcon width="16" height="16" />
+                </Button>
+              </>
             )}
             {usePreprocessing && (
-              <Button
-                onClick={() => {
-                  setUsePreprocessing(false);
-                  setPreprocessedPoses(new Map());
-                }}
-                variant="soft"
-                size="2"
-                color="amber"
-              >
-                Using Pre-processed • Click to Disable
-              </Button>
+              <>
+                <Button
+                  onClick={() => {
+                    setUsePreprocessing(false);
+                    setPreprocessedPoses(new Map());
+                  }}
+                  variant="soft"
+                  size="2"
+                  color="amber"
+                >
+                  Using Pre-processed • Click to Disable
+                </Button>
+                {/* Frame-by-Frame Navigation */}
+                <Button
+                  onClick={() => handleFrameStep('backward')}
+                  disabled={isLoading || isPreprocessing}
+                  variant="soft"
+                  size="2"
+                >
+                  <ChevronLeftIcon width="16" height="16" />
+                  Previous Frame
+                </Button>
+                <Button
+                  onClick={() => handleFrameStep('forward')}
+                  disabled={isLoading || isPreprocessing}
+                  variant="soft"
+                  size="2"
+                >
+                  Next Frame
+                  <ChevronRightIcon width="16" height="16" />
+                </Button>
+              </>
             )}
+            </Flex>
+
+            {/* Playback Speed Selector */}
+            <Flex direction="column" gap="1">
+              <Text size="2" color="gray" weight="medium">
+                Playback speed
+              </Text>
+              <Select.Root
+                value={playbackSpeed.toString()}
+                onValueChange={(value) => setPlaybackSpeed(parseFloat(value))}
+                disabled={isLoading || showTrajectories}
+              >
+                <Select.Trigger 
+                  style={{ width: "100%", height: "70px", padding: "12px" }}
+                  placeholder="Select speed..."
+                >
+                  <Flex direction="column" gap="1" align="start">
+                    <Text weight="medium" size="2">
+                      {playbackSpeed === 0.25 && "0.25× (Slowest)"}
+                      {playbackSpeed === 0.5 && "0.5× (Slow)"}
+                      {playbackSpeed === 1.0 && "1.0× (Normal)"}
+                      {playbackSpeed === 2.0 && "2.0× (Fast)"}
+                    </Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5", textAlign: "left" }}>
+                      {playbackSpeed === 0.25 && "Frame-perfect tracking, no skipped frames"}
+                      {playbackSpeed === 0.5 && "Good balance for most analysis"}
+                      {playbackSpeed === 1.0 && "Standard playback speed"}
+                      {playbackSpeed === 2.0 && "Quick review (may skip some frames)"}
+                    </Text>
+                  </Flex>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="0.25" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">0.25× (Slowest)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        Frame-perfect tracking, no skipped frames
+                      </Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="0.5" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">0.5× (Slow)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        Good balance for most analysis
+                      </Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="1.0" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">1.0× (Normal)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        Standard playback speed
+                      </Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="2.0" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">2.0× (Fast)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        Quick review (may skip some frames)
+                      </Text>
+                    </Flex>
+                  </Select.Item>
+                </Select.Content>
+              </Select.Root>
+              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                {showTrajectories 
+                  ? "Auto-set to 0.25× for accurate trajectory tracking"
+                  : `Current speed: ${playbackSpeed}×`}
+              </Text>
+            </Flex>
           </Flex>
 
           {/* Pre-processing Progress */}
@@ -725,30 +1109,6 @@ export function VideoPoseViewer({
             </Flex>
           )}
 
-          {/* Frame-by-Frame Navigation */}
-          <Flex gap="2" align="center">
-            <Button
-              onClick={() => handleFrameStep('backward')}
-              disabled={isLoading}
-              variant="soft"
-              size="2"
-              style={{ flex: 1 }}
-            >
-              <ChevronLeftIcon width="16" height="16" />
-              Previous Frame
-            </Button>
-            <Button
-              onClick={() => handleFrameStep('forward')}
-              disabled={isLoading}
-              variant="soft"
-              size="2"
-              style={{ flex: 1 }}
-            >
-              Next Frame
-              <ChevronRightIcon width="16" height="16" />
-            </Button>
-          </Flex>
-
           {/* Skeleton Toggle */}
           <Flex gap="2" align="center">
             <Switch
@@ -766,75 +1126,23 @@ export function VideoPoseViewer({
             </Text>
           </Flex>
 
-          {/* Playback Speed Selector */}
-          <Flex direction="column" gap="1">
-            <Text size="2" color="gray" weight="medium">
-              Playback speed
-            </Text>
-            <Select.Root
-              value={playbackSpeed.toString()}
-              onValueChange={(value) => setPlaybackSpeed(parseFloat(value))}
-              disabled={isLoading || showTrajectories}
-            >
-              <Select.Trigger 
-                style={{ width: "100%", height: "70px", padding: "12px" }}
-                placeholder="Select speed..."
-              >
-                <Flex direction="column" gap="1" align="start">
-                  <Text weight="medium" size="2">
-                    {playbackSpeed === 0.25 && "0.25× (Slowest)"}
-                    {playbackSpeed === 0.5 && "0.5× (Slow)"}
-                    {playbackSpeed === 1.0 && "1.0× (Normal)"}
-                    {playbackSpeed === 2.0 && "2.0× (Fast)"}
-                  </Text>
-                  <Text size="2" color="gray" style={{ lineHeight: "1.5", textAlign: "left" }}>
-                    {playbackSpeed === 0.25 && "Frame-perfect tracking, no skipped frames"}
-                    {playbackSpeed === 0.5 && "Good balance for most analysis"}
-                    {playbackSpeed === 1.0 && "Standard playback speed"}
-                    {playbackSpeed === 2.0 && "Quick review (may skip some frames)"}
-                  </Text>
-                </Flex>
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Item value="0.25" style={{ minHeight: "70px", padding: "12px" }}>
-                  <Flex direction="column" gap="1">
-                    <Text weight="medium" size="2">0.25× (Slowest)</Text>
-                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                      Frame-perfect tracking, no skipped frames
-                    </Text>
-                  </Flex>
-                </Select.Item>
-                <Select.Item value="0.5" style={{ minHeight: "70px", padding: "12px" }}>
-                  <Flex direction="column" gap="1">
-                    <Text weight="medium" size="2">0.5× (Slow)</Text>
-                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                      Good balance for most analysis
-                    </Text>
-                  </Flex>
-                </Select.Item>
-                <Select.Item value="1.0" style={{ minHeight: "70px", padding: "12px" }}>
-                  <Flex direction="column" gap="1">
-                    <Text weight="medium" size="2">1.0× (Normal)</Text>
-                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                      Standard playback speed
-                    </Text>
-                  </Flex>
-                </Select.Item>
-                <Select.Item value="2.0" style={{ minHeight: "70px", padding: "12px" }}>
-                  <Flex direction="column" gap="1">
-                    <Text weight="medium" size="2">2.0× (Fast)</Text>
-                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                      Quick review (may skip some frames)
-                    </Text>
-                  </Flex>
-                </Select.Item>
-              </Select.Content>
-            </Select.Root>
-            <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-              {showTrajectories 
-                ? "Auto-set to 0.25× for accurate trajectory tracking"
-                : `Current speed: ${playbackSpeed}×`}
-            </Text>
+          {/* Face Landmarks Toggle */}
+          <Flex gap="2" align="center">
+            <Switch
+              checked={showFaceLandmarks}
+              onCheckedChange={setShowFaceLandmarks}
+              disabled={isLoading || !showSkeleton}
+            />
+            <Flex direction="column" gap="0">
+              <Text size="2" color="gray">
+                Show face landmarks
+              </Text>
+              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                {showFaceLandmarks 
+                  ? "Showing eyes, ears, and nose."
+                  : "Hiding face points for privacy/clarity."}
+              </Text>
+            </Flex>
           </Flex>
 
           {/* Temporal Smoothing Toggle */}
@@ -856,29 +1164,195 @@ export function VideoPoseViewer({
             </Flex>
           </Flex>
 
-          {/* Trajectory Tracking Toggle */}
+          {/* Angle Display Toggle */}
           <Flex gap="2" align="center">
             <Switch
-              checked={showTrajectories}
+              checked={showAngles}
               onCheckedChange={(checked) => {
-                setShowTrajectories(checked);
+                setShowAngles(checked);
                 if (!checked) {
-                  setJointTrajectories(new Map()); // Clear when disabled
+                  setEnableAngleClicking(false); // Disable clicking when hiding angles
                 }
               }}
               disabled={isLoading}
             />
             <Flex direction="column" gap="0">
               <Text size="2" color="gray">
-                Draw joint trajectories
+                Show angles
               </Text>
               <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {showTrajectories 
-                  ? "Recording motion paths. Use Reset to clear."
-                  : "Track joint movements over time."}
+                {showAngles 
+                  ? "Display angle measurements on video" 
+                  : "Show angle measurements overlay"}
               </Text>
             </Flex>
           </Flex>
+
+          {/* Angle Clicking Toggle */}
+          {showAngles && (
+            <Flex gap="2" align="center">
+              <Switch
+                checked={enableAngleClicking}
+                onCheckedChange={(checked) => {
+                  setEnableAngleClicking(checked);
+                  if (!checked) {
+                    setSelectedAngleJoints([]); // Clear selection when disabling clicking
+                  }
+                }}
+                disabled={isLoading}
+              />
+              <Flex direction="column" gap="0">
+                <Text size="2" color="gray">
+                  Enable angle clicking
+                </Text>
+                <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                  {enableAngleClicking 
+                    ? "Click 3 joints to measure angle (A-B-C), or click existing angles to toggle order" 
+                    : "Click on joints or angles to measure/toggle"}
+                </Text>
+              </Flex>
+            </Flex>
+          )}
+
+          {/* Angle Controls (shown when angles enabled) */}
+          {showAngles && (
+            <Flex direction="column" gap="2">
+              <Flex gap="2" wrap="wrap">
+                <Button 
+                  size="1" 
+                  variant="soft" 
+                  onClick={() => {
+                    setMeasuredAngles([]);
+                    setSelectedAngleJoints([]);
+                  }}
+                >
+                  Clear All
+                </Button>
+              </Flex>
+              
+              <Flex direction="column" gap="1">
+                <Text size="1" color="gray" weight="medium">Arms</Text>
+                <Flex gap="1" wrap="wrap">
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([5, 7, 9])} // Left arm: shoulder-elbow-wrist
+                  >
+                    L Arm
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([6, 8, 10])} // Right arm: shoulder-elbow-wrist
+                  >
+                    R Arm
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([9, 7, 5])} // Left arm reverse: wrist-elbow-shoulder
+                  >
+                    L Arm (rev)
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([10, 8, 6])} // Right arm reverse: wrist-elbow-shoulder
+                  >
+                    R Arm (rev)
+                  </Button>
+                </Flex>
+              </Flex>
+
+              <Flex direction="column" gap="1">
+                <Text size="1" color="gray" weight="medium">Legs</Text>
+                <Flex gap="1" wrap="wrap">
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([11, 13, 15])} // Left leg: hip-knee-ankle
+                  >
+                    L Leg
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([12, 14, 16])} // Right leg: hip-knee-ankle
+                  >
+                    R Leg
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([15, 13, 11])} // Left leg reverse: ankle-knee-hip
+                  >
+                    L Leg (rev)
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([16, 14, 12])} // Right leg reverse: ankle-knee-hip
+                  >
+                    R Leg (rev)
+                  </Button>
+                </Flex>
+              </Flex>
+
+              <Flex direction="column" gap="1">
+                <Text size="1" color="gray" weight="medium">Shoulder & Torso</Text>
+                <Flex gap="1" wrap="wrap">
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([7, 5, 11])} // Left shoulder elevation: elbow-shoulder-hip
+                  >
+                    L Shoulder
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([8, 6, 12])} // Right shoulder elevation: elbow-shoulder-hip
+                  >
+                    R Shoulder
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([5, 11, 13])} // Left hip angle: shoulder-hip-knee
+                  >
+                    L Hip
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([6, 12, 14])} // Right hip angle: shoulder-hip-knee
+                  >
+                    R Hip
+                  </Button>
+                  <Button 
+                    size="1" 
+                    variant="soft" 
+                    color="mint"
+                    onClick={() => toggleAnglePreset([5, 11, 12])} // Torso rotation: left shoulder-left hip-right hip
+                  >
+                    Torso
+                  </Button>
+                </Flex>
+              </Flex>
+            </Flex>
+          )}
 
           {/* Joint Selection (shown when trajectories enabled) */}
           {showTrajectories && (
