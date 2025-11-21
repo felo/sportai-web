@@ -37,7 +37,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     description: "Understand game tactics, shot selection, and player positioning",
     prompt:
       "Review the strategic decisions in this pickleball rally video. Analyze shot selection, court positioning, and tactical choices. What could be improved from a strategic perspective?",
-    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/pickleball_rally_tscprv.mp4",
+    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/Pickleball%20Rally.mp4",
     thinkingMode: "fast",
     mediaResolution: "medium",
     domainExpertise: "pickleball",
@@ -49,7 +49,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     description: "Get detailed feedback on your form, stance, and swing mechanics",
     prompt:
       "Analyze the technique in this video. Focus on form, body positioning, and swing mechanics. Identify 2-3 key areas for improvement and suggest specific drills to help.",
-    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Tennis_Serve_keyh8o.mp4",
+    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Tennis%20Serve.mp4",
     thinkingMode: "deep",
     mediaResolution: "high",
     domainExpertise: "tennis",
@@ -61,7 +61,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     description: "Get 3-5 actionable tips to immediately improve your game",
     prompt:
       "Watch this video and provide 3-5 quick, actionable tips that would make the biggest immediate impact on performance. Keep it concise and practical.",
-    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/pickleball_rally_tscprv.mp4",
+    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/Pickleball%20Rally.mp4",
     thinkingMode: "fast",
     mediaResolution: "low",
     domainExpertise: "pickleball",
