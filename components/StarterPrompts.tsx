@@ -106,7 +106,13 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           maxWidth: "900px",
         }}
       >
-        {STARTER_PROMPTS.map((starterPrompt) => (
+        {STARTER_PROMPTS.filter((starterPrompt) => {
+          // Hide quick-tips card on mobile
+          if (isMobile && starterPrompt.id === "quick-tips") {
+            return false;
+          }
+          return true;
+        }).map((starterPrompt) => (
           <Card
             key={starterPrompt.id}
             style={{
