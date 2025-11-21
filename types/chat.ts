@@ -14,6 +14,7 @@ export type Message = {
   videoPreview?: string | null;
   videoUrl?: string | null; // S3 URL for video playback
   videoS3Key?: string | null; // S3 key for regenerating presigned URLs
+  videoPlaybackSpeed?: number; // Video playback speed (0.25, 0.5, 1.0, 1.5, 2.0, etc.)
   inputTokens?: number; // Input tokens used for this message
   outputTokens?: number; // Output tokens used for this message (assistant messages only)
   responseDuration?: number; // API response duration in milliseconds

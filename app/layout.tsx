@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
-import "@radix-ui/themes/styles.css";
-import "./globals.css";
+// Import Radix CSS in proper order to allow overrides
+import "@radix-ui/themes/tokens.css";
+import "@radix-ui/themes/components.css";
+import "./globals.css"; // Our custom styles go here, between components and utilities
+import "@radix-ui/themes/utilities.css";
 
 export const metadata: Metadata = {
   title: "SportAI",

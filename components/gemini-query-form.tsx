@@ -28,6 +28,7 @@ export function GeminiQueryForm() {
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(() => getThinkingMode());
   const [mediaResolution, setMediaResolution] = useState<MediaResolution>(() => getMediaResolution());
   const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>(() => getDomainExpertise());
+  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -183,6 +184,7 @@ export function GeminiQueryForm() {
       thinkingMode?: ThinkingMode;
       mediaResolution?: MediaResolution;
       domainExpertise?: DomainExpertise;
+      playbackSpeed?: number;
     }
   ) => {
     try {
@@ -198,6 +200,9 @@ export function GeminiQueryForm() {
         }
         if (settings.domainExpertise) {
           setDomainExpertise(settings.domainExpertise);
+        }
+        if (settings.playbackSpeed !== undefined) {
+          setVideoPlaybackSpeed(settings.playbackSpeed);
         }
       }
       
@@ -302,6 +307,7 @@ export function GeminiQueryForm() {
         content: "",
         videoFile: currentVideoFile,
         videoPreview: currentVideoPreview,
+        videoPlaybackSpeed: videoPlaybackSpeed,
         inputTokens: videoTokens,
       };
       console.log("[GeminiQueryForm] Adding video message:", videoMessageId);
@@ -334,6 +340,7 @@ export function GeminiQueryForm() {
         content: currentPrompt,
         videoFile: currentVideoFile,
         videoPreview: currentVideoPreview,
+        videoPlaybackSpeed: currentVideoFile ? videoPlaybackSpeed : undefined,
         inputTokens: userTokens,
       };
       console.log("[GeminiQueryForm] Adding user message:", userMessageId, {

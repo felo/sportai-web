@@ -23,6 +23,7 @@ export interface StarterPromptConfig {
   thinkingMode?: ThinkingMode;
   mediaResolution?: MediaResolution;
   domainExpertise?: DomainExpertise;
+  playbackSpeed?: number; // Video playback speed (0.25, 0.5, 1.0, 1.5, 2.0, etc.)
 }
 
 /**
@@ -40,6 +41,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     thinkingMode: "fast",
     mediaResolution: "medium",
     domainExpertise: "pickleball",
+    playbackSpeed: 1.0,
   },
   {
     id: "technique-analysis",
@@ -51,6 +53,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     thinkingMode: "deep",
     mediaResolution: "high",
     domainExpertise: "tennis",
+    playbackSpeed: 0.25, // Slow motion for detailed technique analysis
   },
   {
     id: "quick-tips",
@@ -62,5 +65,6 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     thinkingMode: "fast",
     mediaResolution: "low",
     domainExpertise: "pickleball",
+    playbackSpeed: 1.0,
   },
 ];

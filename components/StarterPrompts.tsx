@@ -3,7 +3,6 @@
 import React from "react";
 import Image from "next/image";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
-import { URLs } from "@/lib/config";
 import { STARTER_PROMPTS, type StarterPromptConfig } from "@/utils/prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
@@ -15,6 +14,7 @@ interface StarterPromptsProps {
       thinkingMode?: ThinkingMode;
       mediaResolution?: MediaResolution;
       domainExpertise?: DomainExpertise;
+      playbackSpeed?: number;
     }
   ) => void;
 }
@@ -31,6 +31,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
         thinkingMode: config.thinkingMode,
         mediaResolution: config.mediaResolution,
         domainExpertise: config.domainExpertise,
+        playbackSpeed: config.playbackSpeed,
       };
       
       await onPromptSelect(config.prompt, config.videoUrl, settings);
@@ -59,15 +60,15 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           style={{
             position: "relative",
             width: "100%",
-            maxWidth: "min(600px, 80vw)",
+            maxWidth: "256px",
             height: "auto",
           }}
         >
           <Image
-            src={URLs.logo}
+            src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680386/sai-logo-green_nuuyat.svg"
             alt="SportAI"
-            width={600}
-            height={190}
+            width={356}
+            height={280}
             style={{
               width: "100%",
               height: "auto",

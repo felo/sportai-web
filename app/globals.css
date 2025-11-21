@@ -19,39 +19,112 @@ body {
 }
 
 /* Custom brand color palette - overrides Radix colors with brand colors */
-[data-radix-theme] {
-  /* Mint color scale based on brand colors */
-  --mint-1: #D7F4DD; /* lightMint - lightest */
-  --mint-2: #C4E8D0;
-  --mint-3: #B0DCC3;
-  --mint-4: #9DD0B6;
-  --mint-5: #89C4A9;
-  --mint-6: #74BC9C; /* darkMint - primary brand color */
-  --mint-7: #66A88A;
-  --mint-8: #589478;
-  --mint-9: #4A8066;
-  --mint-10: #3C6C54;
-  --mint-11: #2E5842;
-  --mint-12: #002B1A; /* darkGreen - darkest */
+
+/* LIGHT MODE overrides (and default fallback) */
+.radix-themes {
+  /* In Light Mode, we use DARK GREEN for contrast against white */
+  --mint-1: #D7F4DD !important;
+  --mint-2: #C4E8D0 !important;
+  --mint-3: #B0DCC3 !important;
+  --mint-4: #9DD0B6 !important;
+  --mint-5: #89C4A9 !important;
+  --mint-6: #025940 !important; /* Primary borders/interactive - Dark Green for visibility */
+  --mint-7: #025940 !important;
+  --mint-8: #025940 !important;
+  --mint-9: #025940 !important; /* Solid background - Dark Green */
+  --mint-10: #024530 !important; /* Hover - Darker Green */
+  --mint-11: #025940 !important; /* Text - Dark Green */
+  --mint-12: #025940 !important; /* Text - Dark Green */
+  
+  /* Alpha variants */
+  --mint-a1: rgba(2, 89, 64, 0.05) !important;
+  --mint-a2: rgba(2, 89, 64, 0.1) !important;
+  --mint-a3: rgba(2, 89, 64, 0.15) !important;
+  --mint-a4: rgba(2, 89, 64, 0.2) !important;
+  --mint-a5: rgba(2, 89, 64, 0.3) !important;
+  --mint-a6: rgba(2, 89, 64, 0.4) !important;
+  --mint-a7: rgba(2, 89, 64, 0.5) !important;
+  --mint-a8: rgba(2, 89, 64, 0.6) !important;
+  --mint-a9: rgba(2, 89, 64, 0.8) !important;
+  --mint-a10: rgba(2, 89, 64, 0.9) !important;
+  --mint-a11: rgba(2, 89, 64, 0.95) !important;
+  --mint-a12: rgba(2, 89, 64, 1) !important;
+
+  /* Override accent colors to map to our custom mint */
+  --accent-1: var(--mint-1) !important;
+  --accent-2: var(--mint-2) !important;
+  --accent-3: var(--mint-3) !important;
+  --accent-4: var(--mint-4) !important;
+  --accent-5: var(--mint-5) !important;
+  --accent-6: var(--mint-6) !important;
+  --accent-7: var(--mint-7) !important;
+  --accent-8: var(--mint-8) !important;
+  --accent-9: var(--mint-9) !important;
+  --accent-10: var(--mint-10) !important;
+  --accent-11: var(--mint-11) !important;
+  --accent-12: var(--mint-12) !important;
+  
+  --accent-a1: var(--mint-a1) !important;
+  --accent-a2: var(--mint-a2) !important;
+  --accent-a3: var(--mint-a3) !important;
+  --accent-a4: var(--mint-a4) !important;
+  --accent-a5: var(--mint-a5) !important;
+  --accent-a6: var(--mint-a6) !important;
+  --accent-a7: var(--mint-a7) !important;
+  --accent-a8: var(--mint-a8) !important;
+  --accent-a9: var(--mint-a9) !important;
+  --accent-a10: var(--mint-a10) !important;
+  --accent-a11: var(--mint-a11) !important;
+  --accent-a12: var(--mint-a12) !important;
 }
 
-/* Dark mode specific color overrides */
+/* DARK MODE overrides */
+/* We use the selector that RadixThemeProvider applies to HTML */
+html[data-theme="dark"] .radix-themes,
 [data-radix-theme][data-radix-theme-appearance="dark"] {
+  /* In Dark Mode, we use LIGHT GREEN for contrast against dark gray */
+  --mint-1: #025940 !important; /* Darkest background */
+  --mint-2: #025940 !important;
+  --mint-3: #025940 !important;
+  --mint-4: #025940 !important;
+  --mint-5: #025940 !important;
+  --mint-6: #7ADB8F !important; /* Primary borders - Light Green */
+  --mint-7: #7ADB8F !important;
+  --mint-8: #7ADB8F !important;
+  --mint-9: #7ADB8F !important; /* Solid background - Light Green */
+  --mint-10: #95E5A6 !important; /* Hover - Lighter Green */
+  --mint-11: #7ADB8F !important; /* Text - Light Green */
+  --mint-12: #D7F4DD !important; /* High contrast text - Lightest Green */
+
+  /* Alpha variants for dark mode */
+  --mint-a1: rgba(122, 219, 143, 0.05) !important;
+  --mint-a2: rgba(122, 219, 143, 0.1) !important;
+  --mint-a3: rgba(122, 219, 143, 0.15) !important;
+  --mint-a4: rgba(122, 219, 143, 0.2) !important;
+  --mint-a5: rgba(122, 219, 143, 0.3) !important;
+  --mint-a6: rgba(122, 219, 143, 0.4) !important;
+  --mint-a7: rgba(122, 219, 143, 0.5) !important;
+  --mint-a8: rgba(122, 219, 143, 0.64) !important;
+  --mint-a9: rgba(122, 219, 143, 0.8) !important;
+  --mint-a10: rgba(122, 219, 143, 0.9) !important;
+  --mint-a11: rgba(122, 219, 143, 0.95) !important;
+  --mint-a12: rgba(122, 219, 143, 1) !important;
+
   /* Custom gray scale for dark mode */
-  --gray-1: #1C1C1C;
-  --gray-2: #252525;
-  --gray-3: #2E2E2E;
-  --gray-4: #383838;
-  --gray-5: #404040;
-  --gray-6: #4A4A4A;
-  --gray-7: #545454;
-  --gray-8: #5E5E5E;
-  --gray-9: #686868;
-  --gray-10: #727272;
-  --gray-11: #7C7C7C;
-  --gray-12: #002B1A;
+  --gray-1: #1C1C1C !important;
+  --gray-2: #252525 !important;
+  --gray-3: #2E2E2E !important;
+  --gray-4: #383838 !important;
+  --gray-5: #404040 !important;
+  --gray-6: #4A4A4A !important;
+  --gray-7: #545454 !important;
+  --gray-8: #5E5E5E !important;
+  --gray-9: #686868 !important;
+  --gray-10: #727272 !important;
+  --gray-11: #7C7C7C !important;
+  --gray-12: #EEEEEE !important; /* High contrast text - standard white/gray */
   
-  --color-background: var(--gray-1);
+  --color-background: var(--gray-1) !important;
 }
 
 body {
@@ -130,5 +203,3 @@ button[data-radix-select-trigger].select-no-border {
   box-shadow: none !important;
   background-color: transparent !important;
 }
-
-

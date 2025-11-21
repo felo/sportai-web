@@ -1,10 +1,10 @@
 export function DragOverlay() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#74BC9C]/20 dark:bg-[#4A8066]/30 pointer-events-none">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 border-4 border-dashed border-[#74BC9C]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#7ADB8F]/20 dark:bg-[#025940]/30 pointer-events-none">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 border-4 border-dashed border-[#7ADB8F]">
         <div className="text-center">
           <svg
-            className="mx-auto h-16 w-16 text-[#74BC9C] mb-4"
+            className="mx-auto h-16 w-16 text-[#7ADB8F] mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

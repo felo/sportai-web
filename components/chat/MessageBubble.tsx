@@ -133,6 +133,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       // Set muted explicitly for autoplay
       video.muted = true;
       
+      // Set playback speed if specified in the message
+      if (message.videoPlaybackSpeed !== undefined) {
+        video.playbackRate = message.videoPlaybackSpeed;
+      }
+      
       const playVideo = async () => {
         try {
           if (video.readyState >= 3) {
@@ -166,7 +171,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
         video.removeEventListener("loadeddata", handleLoadedData);
       };
     }
-  }, [hasVideo, message.videoFile, message.videoUrl]);
+  }, [hasVideo, message.videoFile, message.videoUrl, message.videoPlaybackSpeed]);
 
   return (
     <Flex
@@ -177,13 +182,13 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
     >
       {message.role === "assistant" && (
         <Avatar
-          size="2"
+          size="3"
           radius="full"
-          src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763589692/sai-icon_s0u6ni.png"
+          src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763679890/sai-logo-dark-green_ovhgj3.svg"
           fallback="AI"
           style={{
             backgroundColor: "white",
-            border: "2px solid var(--mint-6)",
+            border: "1px solid var(--mint-6)",
           }}
         />
       )}

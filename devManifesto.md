@@ -68,7 +68,7 @@ This makes Tailwind's `dark:` classes check the `data-theme` attribute instead o
 
 **Brand Colors:**
 - Mint scale: `--mint-1` through `--mint-12`
-- Primary brand color: `--mint-6` (#74BC9C)
+- Primary brand color: `--mint-6` (#7ADB8F)
 
 ## Component Styling Rules
 

@@ -22,11 +22,11 @@ export const Colors = {
   /**
    * Darker mint green
    */
-  darkMint: "#74BC9C",
+  darkMint: "#7ADB8F",
   /**
    * Very dark green (almost black)
    */
-  darkGreen: "#002B1A",
+  darkGreen: "#025940",
   /**
    * White
    */

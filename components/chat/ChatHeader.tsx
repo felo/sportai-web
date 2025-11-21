@@ -2,7 +2,6 @@
 
 import { Flex, Box } from "@radix-ui/themes";
 import Image from "next/image";
-import { URLs } from "@/lib/config";
 import { useSidebar } from "@/components/SidebarContext";
 
 interface ChatHeaderProps {
@@ -30,7 +29,7 @@ export function ChatHeader({ messageCount }: ChatHeaderProps) {
       }}
     >
       <Image
-        src={URLs.logo}
+        src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg"
         alt="SportAI"
         width={120}
         height={38}
