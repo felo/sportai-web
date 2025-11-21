@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { STARTER_PROMPTS, type StarterPromptConfig } from "@/utils/prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface StarterPromptsProps {
   onPromptSelect: (
@@ -21,6 +22,7 @@ interface StarterPromptsProps {
 
 export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
   const [loadingVideoForCard, setLoadingVideoForCard] = React.useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const handleCardClick = async (config: StarterPromptConfig) => {
     try {
@@ -46,40 +48,44 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       direction="column"
       align="center"
       justify="start"
-      gap="8"
+      gap={isMobile ? "4" : "8"}
       style={{
         height: "100%",
-        padding: "3rem 1rem 2rem",
-        maxWidth: "900px",
+        padding: isMobile ? "0.5rem 1rem 1rem" : "3rem 1rem 2rem",
+        maxWidth: isMobile ? "100%" : "900px",
         margin: "0 auto",
+        width: "100%",
       }}
     >
       {/* Logo and Subtitle */}
-      <Flex direction="column" align="center" gap="4" style={{ width: "100%" }}>
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            maxWidth: "256px",
-            height: "auto",
-          }}
-        >
-          <Image
-            src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680386/sai-logo-green_nuuyat.svg"
-            alt="SportAI"
-            width={356}
-            height={280}
+      <Flex direction="column" align="center" gap={isMobile ? "2" : "4"} style={{ width: "100%" }}>
+        {/* Hide logo on mobile */}
+        {!isMobile && (
+          <div
             style={{
+              position: "relative",
               width: "100%",
+              maxWidth: "256px",
               height: "auto",
-              objectFit: "contain",
-              objectPosition: "center top",
             }}
-            priority
-          />
-        </div>
+          >
+            <Image
+              src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680386/sai-logo-green_nuuyat.svg"
+              alt="SportAI"
+              width={356}
+              height={280}
+              style={{
+                width: "100%",
+                height: "auto",
+                objectFit: "contain",
+                objectPosition: "center top",
+              }}
+              priority
+            />
+          </div>
+        )}
         <Text
-          size="5"
+          size={isMobile ? "4" : "5"}
           align="center"
           color="gray"
           style={{
@@ -92,7 +98,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
 
       {/* Starter Prompt Cards */}
       <Flex
-        gap="4"
+        gap={isMobile ? "3" : "4"}
         wrap="wrap"
         justify="center"
         style={{
@@ -104,19 +110,24 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           <Card
             key={starterPrompt.id}
             style={{
-              flex: "1 1 260px",
-              maxWidth: "280px",
+              flex: isMobile ? "1 1 100%" : "1 1 260px",
+              maxWidth: isMobile ? "100%" : "280px",
               transition: "all 0.2s ease",
               border: "1px solid var(--gray-6)",
             }}
             className="starter-prompt-card"
           >
-            <Flex direction="column" gap="3" p="4" style={{ height: "100%", minHeight: "180px" }}>
-              <Flex direction="column" gap="2" style={{ flex: 1 }}>
-                <Heading size="5" weight="medium">
+            <Flex 
+              direction="column" 
+              gap={isMobile ? "2" : "3"} 
+              p={isMobile ? "3" : "4"} 
+              style={{ height: "100%", minHeight: isMobile ? "auto" : "180px" }}
+            >
+              <Flex direction="column" gap={isMobile ? "1" : "2"} style={{ flex: 1 }} align={isMobile ? "center" : "start"}>
+                <Heading size={isMobile ? "4" : "5"} weight="medium" align={isMobile ? "center" : "left"}>
                   {starterPrompt.title}
                 </Heading>
-                <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                <Text size="2" color="gray" style={{ lineHeight: "1.5", textAlign: isMobile ? "center" : "left" }}>
                   {starterPrompt.description}
                 </Text>
               </Flex>
@@ -127,7 +138,12 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
                 onClick={() => handleCardClick(starterPrompt)}
                 loading={loadingVideoForCard === starterPrompt.id}
                 disabled={loadingVideoForCard !== null}
-                style={{ width: "100%", cursor: "pointer" }}
+                style={{ 
+                  width: "100%", 
+                  maxWidth: isMobile ? "200px" : "none",
+                  cursor: "pointer",
+                  margin: isMobile ? "0 auto" : "0"
+                }}
               >
                 Start
               </Button>
@@ -137,7 +153,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       </Flex>
 
       {/* Instructions */}
-      <Text size="3" color="gray" style={{ textAlign: "center", maxWidth: "600px" }}>
+      <Text size={isMobile ? "2" : "3"} color="gray" style={{ textAlign: "center", maxWidth: "600px" }}>
         Drag and drop a video or click the upload button below
       </Text>
 
@@ -146,10 +162,12 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           transition: all 0.2s ease;
         }
         
-        :global(.starter-prompt-card:hover) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-          border-color: var(--accent-9) !important;
+        @media (min-width: 768px) {
+          :global(.starter-prompt-card:hover) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            border-color: var(--accent-9) !important;
+          }
         }
       `}</style>
     </Flex>

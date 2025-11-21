@@ -6,6 +6,7 @@ import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "./VideoPreview";
 import type { ProgressStage } from "@/types/chat";
 import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, getDomainExpertise, setDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface ChatInputProps {
   prompt: string;
@@ -50,6 +51,8 @@ export function ChatInput({
   onDomainExpertiseChange,
   disableTooltips = false,
 }: ChatInputProps) {
+  const isMobile = useIsMobile();
+  
   // Debug logging
   useEffect(() => {
     if (loading) {
@@ -202,6 +205,8 @@ export function ChatInput({
       style={{
         backgroundColor: "var(--color-background)",
         paddingBottom: "var(--space-4)",
+        paddingLeft: "var(--space-4)",
+        paddingRight: "var(--space-4)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -533,23 +538,39 @@ export function ChatInput({
 
           {/* Disclaimer text */}
           <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
-            This is a demo of the{" "}
-            <a 
-              href="https://sportai.com/platform" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ color: "inherit", textDecoration: "underline" }}
-            >
-              SportAI API
-            </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
-            <a 
-              href="https://sportai.com/contact" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ color: "inherit", textDecoration: "underline" }}
-            >
-              contact us
-            </a>.
+            {isMobile ? (
+              <>
+                This is a demo, for enterprise level precision, please{" "}
+                <a 
+                  href="https://sportai.com/contact" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: "inherit", textDecoration: "underline" }}
+                >
+                  contact us
+                </a>.
+              </>
+            ) : (
+              <>
+                This is a demo of the{" "}
+                <a 
+                  href="https://sportai.com/platform" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: "inherit", textDecoration: "underline" }}
+                >
+                  SportAI API
+                </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
+                <a 
+                  href="https://sportai.com/contact" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: "inherit", textDecoration: "underline" }}
+                >
+                  contact us
+                </a>.
+              </>
+            )}
           </Text>
         </Flex>
       </form>

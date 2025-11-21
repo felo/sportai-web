@@ -538,10 +538,21 @@ export function GeminiQueryForm() {
     }
   };
 
+  const handleNewChat = async () => {
+    // Check if chat is thinking before creating new chat
+    const result = await Promise.resolve(confirmNavigation());
+    if (!result) {
+      return; // User cancelled
+    }
+    const newChat = createChat();
+    setCurrentChatId(newChat.id);
+    // State will be updated via event handler
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header - hidden on mobile */}
-      {!isMobile && <ChatHeader messageCount={messages.length} />}
+      {/* Header - visible on both mobile and desktop */}
+      <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
 
       {/* Sidebar */}
       <Sidebar 
@@ -557,8 +568,8 @@ export function GeminiQueryForm() {
           marginRight: isMobile ? "16px" : "0",
           transition: "margin-left 0.2s ease-in-out",
           width: isMobile ? "calc(100% - 32px)" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
-          height: isMobile ? "100vh" : "calc(100vh - 57px)", // Full height on mobile, minus header on desktop
-          marginTop: isMobile ? "0" : "57px", // Start below header on desktop
+          height: "calc(100vh - 57px)", // Minus header on both mobile and desktop
+          marginTop: "57px", // Start below header on both mobile and desktop
           display: "flex",
           justifyContent: "center",
           overflow: "hidden",
