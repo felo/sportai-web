@@ -1,5 +1,127 @@
 import React from "react";
 
+/**
+ * Convert timestamp string to seconds
+ * Supports formats: M:SS, MM:SS, H:MM:SS
+ */
+function timestampToSeconds(timestamp: string): number {
+  const parts = timestamp.split(':').map(p => parseInt(p, 10));
+  
+  if (parts.length === 2) {
+    // M:SS or MM:SS
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 3) {
+    // H:MM:SS
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  
+  return 0;
+}
+
+/**
+ * Find the most recent video element in the chat
+ */
+function findMostRecentVideo(): HTMLVideoElement | null {
+  // Find all video elements in the chat
+  const videos = document.querySelectorAll('video');
+  
+  // Return the last one (most recent)
+  return videos.length > 0 ? videos[videos.length - 1] : null;
+}
+
+/**
+ * Jump to timestamp in the most recent video
+ */
+function jumpToTimestamp(timestamp: string) {
+  const video = findMostRecentVideo();
+  
+  if (!video) {
+    console.warn('No video found in chat');
+    return;
+  }
+  
+  const seconds = timestampToSeconds(timestamp);
+  
+  // Jump to the timestamp
+  video.currentTime = seconds;
+  
+  // Set playback speed to 0.25x (slow motion)
+  video.playbackRate = 0.25;
+  
+  // Play the video at slow motion
+  video.play().catch(error => {
+    console.warn('Could not autoplay video:', error);
+  });
+  
+  // Scroll the video into view
+  video.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/**
+ * Process text content to detect and linkify timestamps
+ */
+function processTextWithTimestamps(text: string): React.ReactNode[] {
+  // Pattern to match timestamps: M:SS, MM:SS, or H:MM:SS
+  const timestampPattern = /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g;
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = timestampPattern.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // Add the timestamp as a clickable link
+    const timestamp = match[0];
+    parts.push(
+      <a
+        key={`timestamp-${match.index}`}
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          jumpToTimestamp(timestamp);
+        }}
+        className="timestamp-link"
+        title="Click to jump to this timestamp in the video"
+      >
+        {timestamp}
+      </a>
+    );
+    
+    lastIndex = match.index + timestamp.length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Custom text component that processes timestamps
+ */
+const TextWithTimestamps: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  if (typeof children === 'string') {
+    return <>{processTextWithTimestamps(children)}</>;
+  }
+  
+  if (Array.isArray(children)) {
+    return <>{children.map((child, index) => {
+      if (typeof child === 'string') {
+        return <React.Fragment key={index}>{processTextWithTimestamps(child)}</React.Fragment>;
+      }
+      return <React.Fragment key={index}>{child}</React.Fragment>;
+    })}</>;
+  }
+  
+  return <>{children}</>;
+};
+
 export const markdownComponents = {
   h1: ({ node, ...props }: any) => (
     <h1
@@ -19,11 +141,13 @@ export const markdownComponents = {
       {...props}
     />
   ),
-  p: ({ node, ...props }: any) => (
+  p: ({ node, children, ...props }: any) => (
     <p
       className="mb-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed"
       {...props}
-    />
+    >
+      <TextWithTimestamps>{children}</TextWithTimestamps>
+    </p>
   ),
   ul: ({ node, ...props }: any) => (
     <ul
@@ -37,7 +161,11 @@ export const markdownComponents = {
       {...props}
     />
   ),
-  li: ({ node, ...props }: any) => <li className="ml-4 mb-1" {...props} />,
+  li: ({ node, children, ...props }: any) => (
+    <li className="ml-4 mb-1" {...props}>
+      <TextWithTimestamps>{children}</TextWithTimestamps>
+    </li>
+  ),
   code: ({ node, inline, ...props }: any) =>
     inline ? (
       <code
@@ -59,10 +187,16 @@ export const markdownComponents = {
       {...props}
     />
   ),
-  strong: ({ node, ...props }: any) => (
-    <strong className="font-semibold text-gray-900 dark:text-gray-100" {...props} />
+  strong: ({ node, children, ...props }: any) => (
+    <strong className="font-semibold text-gray-900 dark:text-gray-100" {...props}>
+      <TextWithTimestamps>{children}</TextWithTimestamps>
+    </strong>
   ),
-  em: ({ node, ...props }: any) => <em className="italic" {...props} />,
+  em: ({ node, children, ...props }: any) => (
+    <em className="italic" {...props}>
+      <TextWithTimestamps>{children}</TextWithTimestamps>
+    </em>
+  ),
   a: ({ node, ...props }: any) => (
     <a
       className="text-blue-600 dark:text-blue-400 hover:underline"

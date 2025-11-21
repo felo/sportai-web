@@ -264,6 +264,45 @@ html[data-theme="dark"] button.action-button,
   color: #1C1C1C !important; /* Keep dark text on light green background */
 }
 
+/* Timestamp Links in Chat - Clickable video timestamps */
+.timestamp-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: rgba(2, 89, 64, 0.1);
+  color: #025940;
+  border: 1px solid rgba(2, 89, 64, 0.3);
+}
+
+.timestamp-link:hover {
+  background-color: rgba(2, 89, 64, 0.2);
+  border-color: rgba(2, 89, 64, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(2, 89, 64, 0.2);
+}
+
+/* Dark mode timestamp links */
+html[data-theme="dark"] .timestamp-link,
+[data-radix-theme][data-radix-theme-appearance="dark"] .timestamp-link {
+  background-color: rgba(122, 219, 143, 0.15);
+  color: #7ADB8F;
+  border-color: rgba(122, 219, 143, 0.3);
+}
+
+html[data-theme="dark"] .timestamp-link:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] .timestamp-link:hover {
+  background-color: rgba(122, 219, 143, 0.25);
+  border-color: rgba(122, 219, 143, 0.5);
+  box-shadow: 0 2px 4px rgba(122, 219, 143, 0.3);
+}
+
 /* API Version Tooltip Styling */
 .api-version-tooltip {
   padding: 2px 0;
