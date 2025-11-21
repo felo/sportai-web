@@ -4,9 +4,13 @@ import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
 
 export type MoveNetModelType = "SinglePose.Lightning" | "SinglePose.Thunder" | "MultiPose.Lightning";
+export type BlazePoseModelType = "lite" | "full" | "heavy";
+export type PoseModelType = MoveNetModelType | BlazePoseModelType;
+export type SupportedModel = "MoveNet" | "BlazePose";
 
 export interface PoseDetectionConfig {
-  modelType?: MoveNetModelType;
+  model?: SupportedModel;
+  modelType?: PoseModelType;
   enableSmoothing?: boolean;
   minPoseScore?: number;
   minPartScore?: number;
@@ -17,6 +21,7 @@ export interface PoseDetectionConfig {
 export interface PoseDetectionResult {
   keypoints: poseDetection.Keypoint[];
   score?: number;
+  keypoints3D?: poseDetection.Keypoint3D[]; // For 3D models
 }
 
 export function usePoseDetection(config: PoseDetectionConfig = {}) {
@@ -28,6 +33,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
   const animationFrameRef = useRef<number | null>(null);
 
   const {
+    model = "MoveNet",
     modelType = "SinglePose.Lightning",
     enableSmoothing = true,
     minPoseScore = 0.25,
@@ -49,52 +55,75 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         await tf.setBackend("webgl");
         await tf.ready();
 
+        let detectorConfig: any;
+        let supportedModel: poseDetection.SupportedModels;
+        let modelKey: string;
+
+        if (model === "BlazePose") {
+          // BlazePose configuration
+          supportedModel = poseDetection.SupportedModels.BlazePose;
+          const blazeModelType = (modelType as BlazePoseModelType) || "full";
+          modelKey = `blazepose-${blazeModelType}`;
+          
+          // Use tfjs runtime (MediaPipe requires additional setup and may not work in Next.js)
+          // BlazePose tfjs DOES provide keypoints3D!
+          detectorConfig = {
+            runtime: "tfjs" as const,
+            modelType: blazeModelType,
+            enableSmoothing: enableSmoothing,
+            // Get the actual input dimensions used by the model
+          };
+        } else {
+          // MoveNet configuration
+          supportedModel = poseDetection.SupportedModels.MoveNet;
+          const movenetModelType = (modelType as MoveNetModelType) || "SinglePose.Lightning";
+          modelKey = `movenet-${movenetModelType.toLowerCase().replace(/\./g, '-')}`;
+          
+          detectorConfig = {
+            modelType: movenetModelType,
+            enableSmoothing: enableSmoothing,
+            minPoseScore: minPoseScore,
+            minPartScore: minPartScore,
+          };
+
+          // Add maxPoses for MultiPose model
+          if (movenetModelType === "MultiPose.Lightning") {
+            detectorConfig.maxPoses = maxPoses;
+            detectorConfig.enableTracking = true;
+          }
+
+          // Add input resolution if specified
+          if (inputResolution) {
+            detectorConfig.modelConfig = {
+              inputResolution: inputResolution,
+            };
+          }
+        }
+
         // Check if model is already cached
-        const modelKey = `movenet-${modelType.toLowerCase().replace(/\./g, '-')}`;
-        
         try {
           const cachedModels = await tf.io.listModels();
           const isCached = Object.keys(cachedModels).some(key => key.includes(modelKey));
           
           if (isCached) {
-            console.log(`Loading ${modelType} from cache...`);
+            console.log(`Loading ${model} ${modelType} from cache...`);
             setLoadingFromCache(true);
           } else {
-            console.log(`Downloading ${modelType} model (will be cached for next time)...`);
+            console.log(`Downloading ${model} ${modelType} model (will be cached for next time)...`);
             setLoadingFromCache(false);
           }
         } catch (e) {
           console.log('Could not check cache status:', e);
         }
 
-        const detectorConfig: any = {
-          modelType: modelType,
-          enableSmoothing: enableSmoothing,
-          minPoseScore: minPoseScore,
-          minPartScore: minPartScore,
-        };
-
-        // Add maxPoses for MultiPose model
-        if (modelType === "MultiPose.Lightning") {
-          detectorConfig.maxPoses = maxPoses;
-          detectorConfig.enableTracking = true;
-        }
-
-        // Add input resolution if specified
-        if (inputResolution) {
-          detectorConfig.modelConfig = {
-            inputResolution: inputResolution,
-          };
-        }
-
         const startTime = performance.now();
         const poseDetector = await poseDetection.createDetector(
-          poseDetection.SupportedModels.MoveNet,
+          supportedModel,
           detectorConfig
         );
         const loadTime = performance.now() - startTime;
 
-        console.log(`Model loaded in ${(loadTime / 1000).toFixed(2)}s ${loadingFromCache ? '(from cache)' : '(downloaded)'}`);
+        console.log(`${model} model loaded in ${(loadTime / 1000).toFixed(2)}s ${loadingFromCache ? '(from cache)' : '(downloaded)'}`);
 
         if (mounted) {
           setDetector(poseDetector);
@@ -130,6 +159,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
       }
     };
   }, [
+    model,
     modelType, 
     enableSmoothing, 
     minPoseScore, 
@@ -150,16 +180,35 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
 
       try {
         const poses = await detector.estimatePoses(element);
-        return poses.map((pose) => ({
-          keypoints: pose.keypoints,
-          score: pose.score,
-        }));
+        return poses.map((pose) => {
+          // BlazePose may provide keypoints3D in the pose object (only with MediaPipe runtime)
+          const poseAny = pose as any;
+          
+          // Check for keypoints3D in various possible locations
+          let keypoints3D = poseAny.keypoints3D || poseAny.keypoints3d || null;
+          
+          // Debug logging for BlazePose
+          if (model === "BlazePose") {
+            console.log("BlazePose detection:", {
+              keypoints2D: pose.keypoints.length,
+              hasKeypoints3D: !!keypoints3D,
+              keypoints3DLength: keypoints3D?.length || 0,
+              poseKeys: Object.keys(poseAny),
+            });
+          }
+          
+          return {
+            keypoints: pose.keypoints,
+            score: pose.score,
+            keypoints3D: keypoints3D,
+          };
+        });
       } catch (err) {
         console.error("Pose detection error:", err);
         return [];
       }
     },
-    [detector]
+    [detector, model]
   );
 
   // Start continuous pose detection on a video element
@@ -209,7 +258,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     try {
       const models = await tf.io.listModels();
       const modelKeys = Object.keys(models).filter(key => 
-        key.includes('movenet') || key.includes('tfjs')
+        key.includes('movenet') || key.includes('blazepose') || key.includes('tfjs')
       );
       
       for (const key of modelKeys) {

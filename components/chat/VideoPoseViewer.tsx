@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
-import { usePoseDetection } from "@/hooks/usePoseDetection";
-import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS } from "@/types/pose";
+import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
+import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
+import { Pose3DViewer } from "./Pose3DViewer";
 
 interface VideoPoseViewerProps {
   videoUrl: string;
@@ -28,6 +29,8 @@ export function VideoPoseViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(autoPlay);
+  const [selectedModel, setSelectedModel] = useState<SupportedModel>("MoveNet");
+  const [blazePoseModelType, setBlazePoseModelType] = useState<"lite" | "full" | "heavy">("full");
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [useAccurateMode, setUseAccurateMode] = useState(false);
   const [enableSmoothing, setEnableSmoothing] = useState(true);
@@ -91,19 +94,27 @@ export function VideoPoseViewer({
     return presets[resolutionMode];
   }, [resolutionMode]);
 
-  // Automatically switch to MultiPose when maxPoses > 1
-  const effectiveModelType = maxPoses > 1 
-    ? "MultiPose.Lightning" 
-    : (useAccurateMode ? "SinglePose.Thunder" : "SinglePose.Lightning");
+  // Determine model type based on selected model
+  const effectiveModelType = React.useMemo(() => {
+    if (selectedModel === "BlazePose") {
+      return blazePoseModelType;
+    } else {
+      // MoveNet: automatically switch to MultiPose when maxPoses > 1
+      return maxPoses > 1 
+        ? "MultiPose.Lightning" 
+        : (useAccurateMode ? "SinglePose.Thunder" : "SinglePose.Lightning");
+    }
+  }, [selectedModel, blazePoseModelType, maxPoses, useAccurateMode]);
 
   const { isLoading, loadingFromCache, error, isDetecting, detectPose, startDetection, stopDetection, clearModelCache } =
     usePoseDetection({
+      model: selectedModel,
       modelType: effectiveModelType,
       enableSmoothing: enableSmoothing,
       minPoseScore: currentConfidence.minPoseScore,
       minPartScore: currentConfidence.minPartScore,
-      inputResolution: currentResolution,
-      maxPoses: maxPoses,
+      inputResolution: selectedModel === "MoveNet" ? currentResolution : undefined,
+      maxPoses: selectedModel === "MoveNet" ? maxPoses : 1,
     });
 
   // Update canvas dimensions when video loads
@@ -450,6 +461,18 @@ export function VideoPoseViewer({
 
     // Draw trajectories first (behind skeleton)
     if (showTrajectories && jointTrajectories.size > 0) {
+      // Use same scaling as pose drawing
+      let scaleX, scaleY;
+      if (selectedModel === "BlazePose") {
+        const blazePoseInputWidth = 830 * 1.2;
+        const blazePoseInputHeight = 467 * 1.2;
+        scaleX = canvas.width / blazePoseInputWidth;
+        scaleY = canvas.height / blazePoseInputHeight;
+      } else {
+        scaleX = canvas.width / video.videoWidth;
+        scaleY = canvas.height / video.videoHeight;
+      }
+      
       const jointColors = [
         "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
         "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B88B", "#B8E994",
@@ -462,10 +485,17 @@ export function VideoPoseViewer({
         
         const color = jointColors[jointIndex % jointColors.length];
         
+        // Scale trajectory points to canvas coordinates
+        const scaledTrajectory = trajectory.map(point => ({
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+          frame: point.frame, // Keep frame info for smoothing
+        }));
+        
         // Apply smoothing if enabled
         const pointsToDraw = smoothTrajectories 
-          ? smoothTrajectory(trajectory) // Adaptive smoothing for realistic human movement
-          : trajectory.map(p => ({ x: p.x, y: p.y }));
+          ? smoothTrajectory(scaledTrajectory) // Adaptive smoothing for realistic human movement
+          : scaledTrajectory;
         
         // Draw trajectory line with smooth curves
         ctx.strokeStyle = color;
@@ -520,17 +550,36 @@ export function VideoPoseViewer({
 
     // Draw poses
     if (showSkeleton && currentPoses.length > 0) {
-      // Calculate scale factors from video native size to canvas size
-      const scaleX = canvas.width / video.videoWidth;
-      const scaleY = canvas.height / video.videoHeight;
-      
       for (const pose of currentPoses) {
-        // Scale keypoints from video space to canvas space
-        const scaledKeypoints = pose.keypoints.map(kp => ({
-          ...kp,
-          x: kp.x * scaleX,
-          y: kp.y * scaleY,
-        }));
+        let scaledKeypoints;
+        
+        if (selectedModel === "BlazePose") {
+          // BlazePose uses an internal input resolution
+          // Fine-tuned to match the person's size
+          const blazePoseInputWidth = 850;
+          const blazePoseInputHeight = 478;
+          
+          const scaleX = canvas.width / blazePoseInputWidth;
+          const scaleY = canvas.height / blazePoseInputHeight;
+          
+          scaledKeypoints = pose.keypoints.map(kp => ({
+            ...kp,
+            x: kp.x * scaleX,
+            y: kp.y * scaleY,
+          }));
+        } else {
+          // MoveNet returns coordinates in video pixel space
+          const scaleX = canvas.width / video.videoWidth;
+          const scaleY = canvas.height / video.videoHeight;
+          scaledKeypoints = pose.keypoints.map(kp => ({
+            ...kp,
+            x: kp.x * scaleX,
+            y: kp.y * scaleY,
+          }));
+        }
+        
+        // Use BlazePose connections if using BlazePose model, otherwise use MoveNet connections
+        const connections = selectedModel === "BlazePose" ? BLAZEPOSE_CONNECTIONS_2D : undefined;
         
         drawPose(ctx, scaledKeypoints, {
           keypointColor: "#FF9800", // Orange center
@@ -540,23 +589,31 @@ export function VideoPoseViewer({
           connectionWidth: 3,
           minConfidence: 0.3,
           showFace: showFaceLandmarks,
-        });
+        }, connections);
       }
     }
 
-    // Draw angles
-    if (showAngles && currentPoses.length > 0) {
-      const pose = currentPoses[0]; // Use first person for angle measurement
-      if (pose) {
-        const scaleX = canvas.width / video.videoWidth;
-        const scaleY = canvas.height / video.videoHeight;
-        
-        // Scale keypoints
-        const scaledKeypoints = pose.keypoints.map(kp => ({
-          ...kp,
-          x: kp.x * scaleX,
-          y: kp.y * scaleY,
-        }));
+      // Draw angles
+      if (showAngles && currentPoses.length > 0) {
+        const pose = currentPoses[0]; // Use first person for angle measurement
+        if (pose) {
+          // Use same scaling as pose drawing
+          let scaleX, scaleY;
+          if (selectedModel === "BlazePose") {
+            const blazePoseInputWidth = 800;
+            const blazePoseInputHeight = 450;
+            scaleX = canvas.width / blazePoseInputWidth;
+            scaleY = canvas.height / blazePoseInputHeight;
+          } else {
+            scaleX = canvas.width / video.videoWidth;
+            scaleY = canvas.height / video.videoHeight;
+          }
+          
+          const scaledKeypoints = pose.keypoints.map(kp => ({
+            ...kp,
+            x: kp.x * scaleX,
+            y: kp.y * scaleY,
+          }));
 
         // Draw selected joints (in progress)
         if (selectedAngleJoints.length >= 2) {
@@ -595,7 +652,7 @@ export function VideoPoseViewer({
         });
       }
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories]);
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel]);
 
   // Catmull-Rom spline interpolation for smooth trajectories
   // Creates smooth curves through points, simulating higher FPS
@@ -905,8 +962,82 @@ export function VideoPoseViewer({
     }
   };
 
+  // Get first pose with 3D keypoints for visualization
+  // Track frame number to force re-renders
+  const [pose3DKey, setPose3DKey] = React.useState(0);
+  
+  const pose3D = React.useMemo(() => {
+    if (selectedModel === "BlazePose" && currentPoses.length > 0) {
+      const pose = currentPoses[0];
+      if (pose && pose.keypoints3D && pose.keypoints3D.length > 0) {
+        // Increment key to force re-render
+        setPose3DKey(prev => prev + 1);
+        return pose;
+      }
+    }
+    return null;
+  }, [currentPoses, selectedModel]);
+
   return (
     <Flex direction="column" gap="3">
+      {/* 3D Pose Viewer (shown when BlazePose is selected and 3D data is available) */}
+      {selectedModel === "BlazePose" && (
+        <Box style={{ 
+          width: "100%", 
+          backgroundColor: "var(--gray-2)", 
+          borderRadius: "var(--radius-3)", 
+          // padding: "8px", // Removed padding for better alignment
+          overflow: "hidden", // Ensure content stays within border radius
+          position: "relative",
+        }}>
+          {/* Floating Header */}
+          <Box style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            zIndex: 5,
+            background: "rgba(0, 0, 0, 0.5)",
+            padding: "4px 8px",
+            borderRadius: "6px",
+            backdropFilter: "blur(4px)"
+          }}>
+            <Text size="1" style={{ color: "white" }} weight="medium">
+              3D Pose Visualization
+            </Text>
+          </Box>
+
+          {pose3D ? (
+            <Box style={{ 
+              width: "100%", 
+              position: "relative",
+              touchAction: "none", 
+            }}>
+              <Pose3DViewer 
+                key={pose3DKey}
+                pose={pose3D} 
+                width={dimensions.width} 
+                height={dimensions.height} 
+              />
+            </Box>
+          ) : (
+            <Box style={{ 
+              width: "100%", 
+              height: `${dimensions.height}px`, 
+              backgroundColor: "var(--gray-3)", 
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              <Text size="2" color="gray">
+                {currentPoses.length > 0 
+                  ? "Waiting for 3D keypoints..." 
+                  : "No pose detected yet"}
+              </Text>
+            </Box>
+          )}
+        </Box>
+      )}
+
       {/* Video Container with Canvas Overlay */}
       <Box
         ref={containerRef}
@@ -1223,6 +1354,96 @@ export function VideoPoseViewer({
                   ? "Auto-set to 0.25× for accurate trajectory tracking"
                   : `Current speed: ${playbackSpeed}×`}
               </Text>
+            </Flex>
+
+            {/* Model Selection */}
+            <Flex direction="column" gap="1">
+              <Text size="2" color="gray" weight="medium">
+                Pose Detection Model
+              </Text>
+              <Select.Root
+                value={selectedModel}
+                onValueChange={(value) => {
+                  setSelectedModel(value as SupportedModel);
+                  // Reset poses when switching models
+                  setCurrentPoses([]);
+                  setJointTrajectories(new Map());
+                  setMeasuredAngles([]);
+                }}
+                disabled={isLoading || isPreprocessing}
+              >
+                <Select.Trigger style={{ width: "100%", height: "70px", padding: "12px" }}>
+                  <Flex direction="column" gap="1" align="start">
+                    <Text weight="medium" size="2">
+                      {selectedModel === "MoveNet" ? "MoveNet (2D)" : "BlazePose (3D)"}
+                    </Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                      {selectedModel === "MoveNet" 
+                        ? "Fast, 17 keypoints, 2D only"
+                        : "Accurate, 33 keypoints, 3D depth"}
+                    </Text>
+                  </Flex>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="MoveNet" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">MoveNet (2D)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fast, 17 keypoints, 2D only</Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="BlazePose" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">BlazePose (3D)</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Accurate, 33 keypoints, 3D depth</Text>
+                    </Flex>
+                  </Select.Item>
+                </Select.Content>
+              </Select.Root>
+              
+              {/* BlazePose Model Type Selector */}
+              {selectedModel === "BlazePose" && (
+                <Select.Root
+                  value={blazePoseModelType}
+                  onValueChange={(value) => {
+                    setBlazePoseModelType(value as "lite" | "full" | "heavy");
+                    setCurrentPoses([]);
+                  }}
+                  disabled={isLoading || isPreprocessing}
+                >
+                  <Select.Trigger style={{ width: "100%", height: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1" align="start">
+                      <Text weight="medium" size="2">
+                        {blazePoseModelType.charAt(0).toUpperCase() + blazePoseModelType.slice(1)}
+                      </Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        {blazePoseModelType === "lite" && "Fastest, lower accuracy"}
+                        {blazePoseModelType === "full" && "Balanced speed and accuracy"}
+                        {blazePoseModelType === "heavy" && "Slowest, highest accuracy"}
+                      </Text>
+                    </Flex>
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="lite" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">Lite</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fastest, lower accuracy</Text>
+                      </Flex>
+                    </Select.Item>
+                    <Select.Item value="full" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">Full</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Balanced speed and accuracy</Text>
+                      </Flex>
+                    </Select.Item>
+                    <Select.Item value="heavy" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">Heavy</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Slowest, highest accuracy</Text>
+                      </Flex>
+                    </Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              )}
             </Flex>
           </Flex>
 

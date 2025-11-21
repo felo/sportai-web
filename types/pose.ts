@@ -57,6 +57,76 @@ export const POSE_CONNECTIONS: PoseConnection[] = [
   { start: POSE_KEYPOINTS.RIGHT_KNEE, end: POSE_KEYPOINTS.RIGHT_ANKLE },
 ];
 
+// BlazePose keypoint indices (33 keypoints)
+// Mapping to common body parts for compatibility
+export const BLAZEPOSE_KEYPOINTS = {
+  NOSE: 0,
+  LEFT_EYE_INNER: 1,
+  LEFT_EYE: 2,
+  LEFT_EYE_OUTER: 3,
+  RIGHT_EYE_INNER: 4,
+  RIGHT_EYE: 5,
+  RIGHT_EYE_OUTER: 6,
+  LEFT_EAR: 7,
+  RIGHT_EAR: 8,
+  MOUTH_LEFT: 9,
+  MOUTH_RIGHT: 10,
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
+  LEFT_PINKY: 17,
+  RIGHT_PINKY: 18,
+  LEFT_INDEX: 19,
+  RIGHT_INDEX: 20,
+  LEFT_THUMB: 21,
+  RIGHT_THUMB: 22,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
+  LEFT_HEEL: 29,
+  RIGHT_HEEL: 30,
+  LEFT_FOOT_INDEX: 31,
+  RIGHT_FOOT_INDEX: 32,
+} as const;
+
+// BlazePose connections (mapped to similar structure as MoveNet for 2D display)
+// Simplified to match main body structure - using primary keypoints only
+export const BLAZEPOSE_CONNECTIONS_2D: PoseConnection[] = [
+  // Face (simplified - just main features)
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_EAR, end: BLAZEPOSE_KEYPOINTS.LEFT_EYE },
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_EYE, end: BLAZEPOSE_KEYPOINTS.NOSE },
+  { start: BLAZEPOSE_KEYPOINTS.NOSE, end: BLAZEPOSE_KEYPOINTS.RIGHT_EYE },
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_EYE, end: BLAZEPOSE_KEYPOINTS.RIGHT_EAR },
+  
+  // Torso
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_SHOULDER, end: BLAZEPOSE_KEYPOINTS.RIGHT_SHOULDER },
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_SHOULDER, end: BLAZEPOSE_KEYPOINTS.LEFT_HIP },
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_SHOULDER, end: BLAZEPOSE_KEYPOINTS.RIGHT_HIP },
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_HIP, end: BLAZEPOSE_KEYPOINTS.RIGHT_HIP },
+  
+  // Left Arm (main chain only)
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_SHOULDER, end: BLAZEPOSE_KEYPOINTS.LEFT_ELBOW },
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_ELBOW, end: BLAZEPOSE_KEYPOINTS.LEFT_WRIST },
+  
+  // Right Arm (main chain only)
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_SHOULDER, end: BLAZEPOSE_KEYPOINTS.RIGHT_ELBOW },
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_ELBOW, end: BLAZEPOSE_KEYPOINTS.RIGHT_WRIST },
+  
+  // Left Leg (main chain only)
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_HIP, end: BLAZEPOSE_KEYPOINTS.LEFT_KNEE },
+  { start: BLAZEPOSE_KEYPOINTS.LEFT_KNEE, end: BLAZEPOSE_KEYPOINTS.LEFT_ANKLE },
+  
+  // Right Leg (main chain only)
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_HIP, end: BLAZEPOSE_KEYPOINTS.RIGHT_KNEE },
+  { start: BLAZEPOSE_KEYPOINTS.RIGHT_KNEE, end: BLAZEPOSE_KEYPOINTS.RIGHT_ANKLE },
+];
+
 export interface DrawOptions {
   keypointColor?: string;
   keypointOutlineColor?: string;
@@ -71,7 +141,8 @@ export interface DrawOptions {
 export function drawPose(
   ctx: CanvasRenderingContext2D,
   keypoints: Keypoint[],
-  options: DrawOptions = {}
+  options: DrawOptions = {},
+  connections?: PoseConnection[] // Allow custom connections for different models
 ) {
   const {
     keypointColor = "#FF9800", // Orange center
@@ -98,7 +169,10 @@ export function drawPose(
   ctx.lineWidth = connectionWidth;
   ctx.lineCap = "round";
 
-  for (const connection of POSE_CONNECTIONS) {
+  // Use provided connections or default MoveNet connections
+  const connectionsToUse = connections || POSE_CONNECTIONS;
+
+  for (const connection of connectionsToUse) {
     const startPoint = keypoints[connection.start];
     const endPoint = keypoints[connection.end];
 
