@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Avatar, Box, Flex, Spinner, Text } from "@radix-ui/themes";
+import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
-import { getDeveloperMode } from "@/utils/storage";
+import { getDeveloperMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 
 const THINKING_MESSAGES = [
@@ -23,6 +23,53 @@ const THINKING_MESSAGES = [
   "Generating summary…",
 ];
 
+const PRO_UPSELL_SHOWN_KEY = "sportai-pro-upsell-shown";
+
+/**
+ * Check if PRO upsell has been shown for a specific chat
+ */
+function hasShownProUpsell(chatId: string | undefined): boolean {
+  if (typeof window === "undefined" || !chatId) {
+    return false;
+  }
+  
+  try {
+    const stored = localStorage.getItem(PRO_UPSELL_SHOWN_KEY);
+    if (!stored) return false;
+    
+    const shownChats = JSON.parse(stored) as string[];
+    return shownChats.includes(chatId);
+  } catch (error) {
+    console.error("Failed to check PRO upsell status:", error);
+    return false;
+  }
+}
+
+/**
+ * Mark that PRO upsell has been shown for a specific chat
+ */
+function markProUpsellShown(chatId: string | undefined): void {
+  if (typeof window === "undefined" || !chatId) {
+    return;
+  }
+  
+  try {
+    const stored = localStorage.getItem(PRO_UPSELL_SHOWN_KEY);
+    let shownChats: string[] = stored ? JSON.parse(stored) : [];
+    
+    if (!shownChats.includes(chatId)) {
+      shownChats.push(chatId);
+      // Keep only the last 100 chat IDs to prevent localStorage from growing too large
+      if (shownChats.length > 100) {
+        shownChats = shownChats.slice(-100);
+      }
+      localStorage.setItem(PRO_UPSELL_SHOWN_KEY, JSON.stringify(shownChats));
+    }
+  } catch (error) {
+    console.error("Failed to mark PRO upsell as shown:", error);
+  }
+}
+
 interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
@@ -33,6 +80,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [showProUpsell, setShowProUpsell] = useState(false);
 
   // Load developer mode on mount
   useEffect(() => {
@@ -121,6 +169,32 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       return () => clearInterval(interval);
     }
   }, [message.content, message.role, userSentVideo]);
+
+  // Show PRO upsell after message is complete with a natural delay (only once per chat)
+  useEffect(() => {
+    if (message.role === "assistant" && message.content) {
+      const chatId = getCurrentChatId();
+      
+      // Check if we've already shown the upsell for this chat
+      if (hasShownProUpsell(chatId)) {
+        setShowProUpsell(false);
+        return;
+      }
+      
+      // Reset first in case message is being re-rendered
+      setShowProUpsell(false);
+      // Add a delay for natural appearance (1 second after content appears)
+      const timer = setTimeout(() => {
+        setShowProUpsell(true);
+        // Mark as shown for this chat
+        markProUpsellShown(chatId);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setShowProUpsell(false);
+    }
+  }, [message.content, message.role]);
 
   useEffect(() => {
     // Check if this is a video (not an image)
@@ -336,6 +410,54 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                 </Flex>
               )}
             </Box>
+            
+            {/* PRO Membership Upsell */}
+            {showProUpsell && (
+              <Box
+                mt="4"
+                pt="4"
+                style={{
+                  borderTop: "1px solid var(--gray-6)",
+                  opacity: 0,
+                  animation: "fadeInUpsell 0.5s ease-in forwards",
+                }}
+              >
+                <Flex direction="column" gap="3">
+                  <Flex direction="column" gap="2">
+                    <Text size="3" weight="medium">
+                      Want more accuracy and deeper insights?
+                    </Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                      Upgrade to SportAI PRO for enhanced analysis, more detailed data, and advanced features tailored to your needs.
+                    </Text>
+                  </Flex>
+                  <Button
+                    size="2"
+                    variant="soft"
+                    className="action-button"
+                    onClick={() => {
+                      window.open("https://sportai.com/contact", "_blank", "noopener,noreferrer");
+                    }}
+                    style={{ width: "fit-content", cursor: "pointer" }}
+                  >
+                    Contact us for PRO
+                  </Button>
+                </Flex>
+              </Box>
+            )}
+            
+            <style jsx>{`
+              @keyframes fadeInUpsell {
+                from {
+                  opacity: 0;
+                  transform: translateY(10px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+            `}</style>
             
             {/* Developer mode token information */}
             {developerMode && message.content && (
