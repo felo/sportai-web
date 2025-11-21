@@ -42,8 +42,20 @@ export default function PoseDemoPage() {
   };
 
   return (
-    <Container size="3" py="6">
-      <Flex direction="column" gap="6">
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: "auto",
+        overscrollBehavior: "contain",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <Container size="3" py="6">
+        <Flex direction="column" gap="6">
         {/* Header */}
         <Box>
           <Heading size="8" mb="2" style={{ color: "var(--mint-9)" }}>
@@ -156,8 +168,9 @@ export default function PoseDemoPage() {
             </Flex>
           </Flex>
         </Card>
-      </Flex>
-    </Container>
+        </Flex>
+      </Container>
+    </div>
   );
 }
 

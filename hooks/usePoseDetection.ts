@@ -10,6 +10,8 @@ export interface PoseDetectionConfig {
   enableSmoothing?: boolean;
   minPoseScore?: number;
   minPartScore?: number;
+  inputResolution?: { width: number; height: number };
+  maxPoses?: number;
 }
 
 export interface PoseDetectionResult {
@@ -22,6 +24,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [loadingFromCache, setLoadingFromCache] = useState(false);
   const animationFrameRef = useRef<number | null>(null);
 
   const {
@@ -29,6 +32,8 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     enableSmoothing = true,
     minPoseScore = 0.25,
     minPartScore = 0.3,
+    inputResolution,
+    maxPoses = 1,
   } = config;
 
   // Initialize the pose detector
@@ -44,24 +49,74 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         await tf.setBackend("webgl");
         await tf.ready();
 
+        // Check if model is already cached
+        const modelKey = `movenet-${modelType.toLowerCase().replace(/\./g, '-')}`;
+        
+        try {
+          const cachedModels = await tf.io.listModels();
+          const isCached = Object.keys(cachedModels).some(key => key.includes(modelKey));
+          
+          if (isCached) {
+            console.log(`Loading ${modelType} from cache...`);
+            setLoadingFromCache(true);
+          } else {
+            console.log(`Downloading ${modelType} model (will be cached for next time)...`);
+            setLoadingFromCache(false);
+          }
+        } catch (e) {
+          console.log('Could not check cache status:', e);
+        }
+
         const detectorConfig: any = {
           modelType: modelType,
+          enableSmoothing: enableSmoothing,
+          minPoseScore: minPoseScore,
+          minPartScore: minPartScore,
         };
 
+        // Add maxPoses for MultiPose model
+        if (modelType === "MultiPose.Lightning") {
+          detectorConfig.maxPoses = maxPoses;
+          detectorConfig.enableTracking = true;
+        }
+
+        // Add input resolution if specified
+        if (inputResolution) {
+          detectorConfig.modelConfig = {
+            inputResolution: inputResolution,
+          };
+        }
+
+        const startTime = performance.now();
         const poseDetector = await poseDetection.createDetector(
           poseDetection.SupportedModels.MoveNet,
           detectorConfig
         );
+        const loadTime = performance.now() - startTime;
+
+        console.log(`Model loaded in ${(loadTime / 1000).toFixed(2)}s ${loadingFromCache ? '(from cache)' : '(downloaded)'}`);
 
         if (mounted) {
           setDetector(poseDetector);
           setIsLoading(false);
+          setLoadingFromCache(false);
         }
       } catch (err) {
         console.error("Failed to initialize pose detector:", err);
         if (mounted) {
-          setError(err instanceof Error ? err.message : "Failed to initialize pose detector");
+          let errorMessage = "Failed to load pose detection model.";
+          
+          if (err instanceof Error) {
+            if (err.message.includes("CORS") || err.message.includes("fetch")) {
+              errorMessage = "Network error loading model. Try: 1) Refresh page, 2) Clear browser cache, 3) Check internet connection, or 4) Try incognito mode.";
+            } else {
+              errorMessage = err.message;
+            }
+          }
+          
+          setError(errorMessage);
           setIsLoading(false);
+          setLoadingFromCache(false);
         }
       }
     }
@@ -74,7 +129,15 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [modelType, enableSmoothing, minPoseScore, minPartScore]);
+  }, [
+    modelType, 
+    enableSmoothing, 
+    minPoseScore, 
+    minPartScore, 
+    inputResolution?.width, 
+    inputResolution?.height,
+    maxPoses
+  ]);
 
   // Detect poses from a single frame
   const detectPose = useCallback(
@@ -141,14 +204,36 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     setIsDetecting(false);
   }, []);
 
+  // Function to clear model cache
+  const clearModelCache = useCallback(async () => {
+    try {
+      const models = await tf.io.listModels();
+      const modelKeys = Object.keys(models).filter(key => 
+        key.includes('movenet') || key.includes('tfjs')
+      );
+      
+      for (const key of modelKeys) {
+        await tf.io.removeModel(key);
+        console.log(`Cleared cached model: ${key}`);
+      }
+      
+      return modelKeys.length;
+    } catch (err) {
+      console.error('Failed to clear model cache:', err);
+      return 0;
+    }
+  }, []);
+
   return {
     detector,
     isLoading,
+    loadingFromCache,
     error,
     isDetecting,
     detectPose,
     startDetection,
     stopDetection,
+    clearModelCache,
   };
 }
 
