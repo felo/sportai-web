@@ -9,6 +9,7 @@ import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const THINKING_MESSAGES = [
   "Initializing environment model…",
@@ -82,6 +83,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [showProUpsell, setShowProUpsell] = useState(false);
+  const isMobile = useIsMobile();
 
   // Load developer mode on mount
   useEffect(() => {
@@ -250,12 +252,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
 
   return (
     <Flex
-      gap="4"
+      gap={isMobile && message.role === "assistant" ? "0" : "4"}
       justify={message.role === "user" ? "end" : "start"}
       role="article"
       aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
     >
-      {message.role === "assistant" && (
+      {message.role === "assistant" && !isMobile && (
         <Avatar
           size="3"
           radius="full"
@@ -270,7 +272,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
 
       <Box
         style={{
-          maxWidth: "80%",
+          maxWidth: isMobile && message.role === "assistant" ? "100%" : "80%",
           borderRadius: message.role === "user" && !hasVideo
             ? "24px 8px 24px 24px" 
             : "var(--radius-3)",

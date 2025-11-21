@@ -5,6 +5,7 @@ import { Text } from "@radix-ui/themes";
 import { MessageBubble } from "./MessageBubble";
 import { ProgressIndicator } from "./ProgressIndicator";
 import { URLs } from "@/lib/config";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Message, ProgressStage } from "@/types/chat";
 
 interface MessageListProps {
@@ -24,6 +25,8 @@ export function MessageList({
   uploadProgress,
   messagesEndRef,
 }: MessageListProps) {
+  const isMobile = useIsMobile();
+  
   console.log("[MessageList] Render:", {
     messagesCount: messages.length,
     loading,
@@ -31,7 +34,16 @@ export function MessageList({
   });
   
   return (
-    <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-6" role="log" aria-label="Chat messages">
+    <div 
+      className="flex-1 pb-24 space-y-6" 
+      style={{ 
+        paddingTop: isMobile ? "calc(57px + 1rem)" : "1.5rem",
+        paddingLeft: isMobile ? "1rem" : "1rem",
+        paddingRight: isMobile ? "1rem" : "1rem"
+      }}
+      role="log" 
+      aria-label="Chat messages"
+    >
       {messages.length === 0 && (
         <div 
           className="flex flex-col items-center justify-start pt-12" 

@@ -564,12 +564,12 @@ export function GeminiQueryForm() {
       {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
         style={{
-          marginLeft: isMobile ? "16px" : (isSidebarCollapsed ? "64px" : "280px"),
-          marginRight: isMobile ? "16px" : "0",
+          marginLeft: isMobile ? "0" : (isSidebarCollapsed ? "64px" : "280px"),
+          marginRight: isMobile ? "0" : "0",
           transition: "margin-left 0.2s ease-in-out",
-          width: isMobile ? "calc(100% - 32px)" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
-          height: "calc(100vh - 57px)", // Minus header on both mobile and desktop
-          marginTop: "57px", // Start below header on both mobile and desktop
+          width: isMobile ? "100%" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
+          height: isMobile ? "100vh" : "calc(100vh - 57px)", // Full height on mobile
+          marginTop: isMobile ? "0" : "57px", // Start at top on mobile
           display: "flex",
           justifyContent: "center",
           overflow: "hidden",

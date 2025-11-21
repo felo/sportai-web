@@ -205,19 +205,19 @@ export function ChatInput({
       style={{
         backgroundColor: "var(--color-background)",
         paddingBottom: "var(--space-4)",
-        paddingLeft: "var(--space-4)",
-        paddingRight: "var(--space-4)",
+        paddingLeft: isMobile ? "0" : "var(--space-4)",
+        paddingRight: isMobile ? "0" : "var(--space-4)",
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
       }}
     >
       {error && (
-        <Callout.Root color="red" mb="3">
+        <Callout.Root color="red" mb="3" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
           <Callout.Text size="2">{error}</Callout.Text>
         </Callout.Root>
       )}
 
       <form onSubmit={onSubmit}>
-        <Flex direction="column" gap="4">
+        <Flex direction="column" gap="4" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
           {videoFile && videoPreview && (
             <VideoPreview
               videoFile={videoFile}
@@ -258,7 +258,9 @@ export function ChatInput({
                 maxHeight: "300px",
                 minHeight: isMobile ? "40px" : undefined,
                 height: isMobile ? "40px" : undefined,
-                padding: isMobile ? "var(--space-2)" : "var(--space-3)",
+                paddingTop: isMobile ? "var(--space-2)" : "var(--space-3)",
+                paddingLeft: isMobile ? "var(--space-2)" : "var(--space-3)",
+                paddingRight: isMobile ? "var(--space-2)" : "var(--space-3)",
                 paddingBottom: "var(--space-2)",
                 overflowY: "auto",
                 backgroundColor: "transparent",

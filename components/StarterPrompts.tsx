@@ -51,14 +51,14 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       gap={isMobile ? "4" : "8"}
       style={{
         height: "100%",
-        padding: isMobile ? "0.5rem 1rem 1rem" : "3rem 1rem 2rem",
+        padding: isMobile ? "calc(57px + 1rem) 1rem 1rem" : "3rem 1rem 2rem",
         maxWidth: isMobile ? "100%" : "900px",
         margin: "0 auto",
         width: "100%",
       }}
     >
       {/* Logo and Subtitle */}
-      <Flex direction="column" align="center" gap={isMobile ? "2" : "4"} style={{ width: "100%" }}>
+      <Flex direction="column" align="center" gap={isMobile ? "2" : "4"} style={{ width: "100%", marginTop: isMobile ? "0.75rem" : "0" }}>
         {/* Hide logo on mobile */}
         {!isMobile && (
           <div
