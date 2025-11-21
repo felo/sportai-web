@@ -331,3 +331,107 @@ html[data-theme="light"] [data-radix-tooltip-content] .api-version-tooltip,
   background-color: var(--gray-1);
   border-color: var(--gray-5);
 }
+
+/* Collapsible Sections (details/summary) - Light Mode */
+details.collapsible-section {
+  margin: 1rem 0;
+  border: 1px solid rgba(2, 89, 64, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(2, 89, 64, 0.03);
+  transition: all 0.2s ease;
+}
+
+/* Add padding to the content area inside details */
+details.collapsible-section > *:not(summary) {
+  padding: 0 1rem;
+}
+
+/* Add top padding to the first element after summary */
+details.collapsible-section > summary + * {
+  padding-top: 1rem;
+}
+
+/* Add bottom padding to the last element inside details */
+details.collapsible-section > *:last-child {
+  padding-bottom: 1rem;
+}
+
+details.collapsible-section:hover {
+  border-color: rgba(2, 89, 64, 0.5);
+  background-color: rgba(2, 89, 64, 0.05);
+}
+
+summary.collapsible-summary {
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  background-color: rgba(2, 89, 64, 0.08);
+  color: #025940;
+  user-select: none;
+  transition: all 0.2s ease;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+summary.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+summary.collapsible-summary::before {
+  content: '▶';
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 0.75em;
+  color: #025940;
+}
+
+details.collapsible-section[open] summary.collapsible-summary::before {
+  transform: rotate(90deg);
+}
+
+summary.collapsible-summary:hover {
+  background-color: rgba(2, 89, 64, 0.15);
+}
+
+details.collapsible-section[open] summary.collapsible-summary {
+  background-color: rgba(2, 89, 64, 0.12);
+  border-bottom: 1px solid rgba(2, 89, 64, 0.2);
+}
+
+/* Dark mode collapsible sections */
+html[data-theme="dark"] details.collapsible-section,
+[data-radix-theme][data-radix-theme-appearance="dark"] details.collapsible-section {
+  border-color: rgba(122, 219, 143, 0.3);
+  background-color: rgba(122, 219, 143, 0.03);
+}
+
+html[data-theme="dark"] details.collapsible-section:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] details.collapsible-section:hover {
+  border-color: rgba(122, 219, 143, 0.5);
+  background-color: rgba(122, 219, 143, 0.05);
+}
+
+html[data-theme="dark"] summary.collapsible-summary,
+[data-radix-theme][data-radix-theme-appearance="dark"] summary.collapsible-summary {
+  background-color: rgba(122, 219, 143, 0.08);
+  color: #7ADB8F;
+}
+
+html[data-theme="dark"] summary.collapsible-summary::before,
+[data-radix-theme][data-radix-theme-appearance="dark"] summary.collapsible-summary::before {
+  color: #7ADB8F;
+}
+
+html[data-theme="dark"] summary.collapsible-summary:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] summary.collapsible-summary:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+}
+
+html[data-theme="dark"] details.collapsible-section[open] summary.collapsible-summary,
+[data-radix-theme][data-radix-theme-appearance="dark"] details.collapsible-section[open] summary.collapsible-summary {
+  background-color: rgba(122, 219, 143, 0.12);
+  border-bottom-color: rgba(122, 219, 143, 0.2);
+}

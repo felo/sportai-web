@@ -228,5 +228,17 @@ export const markdownComponents = {
   hr: ({ node, ...props }: any) => (
     <hr className="my-6 border-gray-300 dark:border-gray-600" {...props} />
   ),
+  details: ({ node, ...props }: any) => (
+    <details
+      className="collapsible-section"
+      {...props}
+    />
+  ),
+  summary: ({ node, ...props }: any) => (
+    <summary
+      className="collapsible-summary"
+      {...props}
+    />
+  ),
 };
 

@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getCurrentChatId } from "@/utils/storage";
@@ -399,6 +400,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
               {message.content ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
                   components={markdownComponents}
                 >
                   {message.content}
