@@ -1437,7 +1437,6 @@ export function VideoPoseViewer({
       {/* Video Container with Canvas Overlay */}
       <Box
         ref={containerRef}
-        tabIndex={0}
         style={{
           position: "relative",
           width: "100%",
@@ -1449,15 +1448,6 @@ export function VideoPoseViewer({
           borderRadius: "var(--radius-3)",
           overflow: "hidden",
           margin: "0 auto",
-          outline: "2px solid transparent",
-          transition: "outline 0.2s ease",
-          cursor: "pointer",
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.outline = "2px solid var(--accent-9)";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.outline = "2px solid transparent";
         }}
       >
         <video
