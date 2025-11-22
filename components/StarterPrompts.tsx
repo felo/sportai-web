@@ -16,6 +16,7 @@ interface StarterPromptsProps {
       mediaResolution?: MediaResolution;
       domainExpertise?: DomainExpertise;
       playbackSpeed?: number;
+      poseSettings?: StarterPromptConfig["poseSettings"];
     }
   ) => void;
 }
@@ -34,6 +35,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
         mediaResolution: config.mediaResolution,
         domainExpertise: config.domainExpertise,
         playbackSpeed: config.playbackSpeed,
+        poseSettings: config.poseSettings,
       };
       
       await onPromptSelect(config.prompt, config.videoUrl, settings);

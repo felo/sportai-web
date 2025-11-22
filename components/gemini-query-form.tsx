@@ -16,7 +16,7 @@ import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
-import { PICKLEBALL_COACH_PROMPT } from "@/utils/prompts";
+import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
 import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
@@ -29,6 +29,7 @@ export function GeminiQueryForm() {
   const [mediaResolution, setMediaResolution] = useState<MediaResolution>(() => getMediaResolution());
   const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>(() => getDomainExpertise());
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
+  const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -215,6 +216,7 @@ export function GeminiQueryForm() {
       mediaResolution?: MediaResolution;
       domainExpertise?: DomainExpertise;
       playbackSpeed?: number;
+      poseSettings?: StarterPromptConfig["poseSettings"];
     }
   ) => {
     try {
@@ -233,6 +235,11 @@ export function GeminiQueryForm() {
         }
         if (settings.playbackSpeed !== undefined) {
           setVideoPlaybackSpeed(settings.playbackSpeed);
+        }
+        if (settings.poseSettings) {
+          setPoseData(settings.poseSettings);
+        } else {
+          setPoseData(undefined);
         }
       }
       
@@ -256,6 +263,7 @@ export function GeminiQueryForm() {
     clearVideo();
     setVideoError(null);
     setApiError(null);
+    setPoseData(undefined);
   };
 
   const handleStop = () => {
@@ -339,6 +347,7 @@ export function GeminiQueryForm() {
         videoPreview: currentVideoPreview,
         videoPlaybackSpeed: videoPlaybackSpeed,
         inputTokens: videoTokens,
+        poseData: poseData,
       };
       console.log("[GeminiQueryForm] Adding video message:", videoMessageId);
       addMessage(videoMessage);
@@ -372,6 +381,7 @@ export function GeminiQueryForm() {
         videoPreview: currentVideoPreview,
         videoPlaybackSpeed: currentVideoFile ? videoPlaybackSpeed : undefined,
         inputTokens: userTokens,
+        poseData: currentVideoFile ? poseData : undefined,
       };
       console.log("[GeminiQueryForm] Adding user message:", userMessageId, {
         hasVideo: !!userMessage.videoFile,
@@ -390,8 +400,9 @@ export function GeminiQueryForm() {
     clearVideo(true); // Keep blob URL since it's in the message
     setVideoError(null);
     setApiError(null);
+    setPoseData(undefined); // Reset pose data after sending
     // Loading state already set above before chat creation
-
+    
     // Create abort controller for this request
     const abortController = new AbortController();
     abortControllerRef.current = abortController;

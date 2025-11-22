@@ -15,6 +15,19 @@ interface VideoPoseViewerProps {
   height?: number;
   autoPlay?: boolean;
   showControls?: boolean;
+  initialModel?: SupportedModel;
+  initialShowSkeleton?: boolean;
+  initialShowAngles?: boolean;
+  initialMeasuredAngles?: number[][];
+  initialPlaybackSpeed?: number;
+  initialUseAccurateMode?: boolean;
+  initialConfidenceMode?: "standard" | "high" | "low";
+  initialResolutionMode?: "fast" | "balanced" | "accurate";
+  initialShowTrackingId?: boolean;
+  initialShowTrajectories?: boolean;
+  initialSelectedJoints?: number[];
+  initialShowVelocity?: boolean;
+  initialVelocityWrist?: "left" | "right";
 }
 
 export function VideoPoseViewer({
@@ -23,30 +36,43 @@ export function VideoPoseViewer({
   height = 480,
   autoPlay = false,
   showControls = true,
+  initialModel = "MoveNet",
+  initialShowSkeleton = true,
+  initialShowAngles = false,
+  initialMeasuredAngles = [],
+  initialPlaybackSpeed = 1.0,
+  initialUseAccurateMode = false,
+  initialConfidenceMode = "standard",
+  initialResolutionMode = "balanced",
+  initialShowTrackingId = false,
+  initialShowTrajectories = false,
+  initialSelectedJoints = [9, 10],
+  initialShowVelocity = false,
+  initialVelocityWrist = "right",
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [isPlaying, setIsPlaying] = useState(autoPlay);
-  const [selectedModel, setSelectedModel] = useState<SupportedModel>("MoveNet");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<SupportedModel>(initialModel);
   const [blazePoseModelType, setBlazePoseModelType] = useState<"lite" | "full" | "heavy">("full");
-  const [showSkeleton, setShowSkeleton] = useState(true);
-  const [useAccurateMode, setUseAccurateMode] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(initialShowSkeleton);
+  const [useAccurateMode, setUseAccurateMode] = useState(initialUseAccurateMode);
   const [enableSmoothing, setEnableSmoothing] = useState(true);
-  const [confidenceMode, setConfidenceMode] = useState<"standard" | "high" | "low">("standard");
-  const [resolutionMode, setResolutionMode] = useState<"fast" | "balanced" | "accurate">("balanced");
+  const [confidenceMode, setConfidenceMode] = useState<"standard" | "high" | "low">(initialConfidenceMode);
+  const [resolutionMode, setResolutionMode] = useState<"fast" | "balanced" | "accurate">(initialResolutionMode);
   const [dimensions, setDimensions] = useState({ width, height });
   const [currentPoses, setCurrentPoses] = useState<PoseDetectionResult[]>([]);
   const [videoFPS, setVideoFPS] = useState(30); // Default FPS, will be detected
   const [currentFrame, setCurrentFrame] = useState(0);
-  const [showTrajectories, setShowTrajectories] = useState(false);
-  const [showTrackingId, setShowTrackingId] = useState(false);
+  const [showTrajectories, setShowTrajectories] = useState(initialShowTrajectories);
+  const [showTrackingId, setShowTrackingId] = useState(initialShowTrackingId);
   const [smoothTrajectories, setSmoothTrajectories] = useState(true);
   const [showFaceLandmarks, setShowFaceLandmarks] = useState(false);
-  const [selectedJoints, setSelectedJoints] = useState<number[]>([9, 10]); // Default: wrists
+  const [selectedJoints, setSelectedJoints] = useState<number[]>(initialSelectedJoints); // Default: wrists
   const [jointTrajectories, setJointTrajectories] = useState<Map<number, Array<{x: number, y: number, frame: number}>>>(new Map());
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(initialPlaybackSpeed);
   const [isPreprocessing, setIsPreprocessing] = useState(false);
   const [preprocessProgress, setPreprocessProgress] = useState(0);
   const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
@@ -54,10 +80,128 @@ export function VideoPoseViewer({
   const [maxPoses, setMaxPoses] = useState(1);
   
   // Angle Measurement State
-  const [showAngles, setShowAngles] = useState(false);
+  const [showAngles, setShowAngles] = useState(initialShowAngles);
   const [enableAngleClicking, setEnableAngleClicking] = useState(false);
   const [selectedAngleJoints, setSelectedAngleJoints] = useState<number[]>([]);
-  const [measuredAngles, setMeasuredAngles] = useState<Array<[number, number, number]>>([]);
+  const [measuredAngles, setMeasuredAngles] = useState<Array<[number, number, number]>>(initialMeasuredAngles as [number, number, number][]);
+
+  // Velocity Measurement State
+  const [showVelocity, setShowVelocity] = useState(initialShowVelocity);
+  const [velocityWrist, setVelocityWrist] = useState<'left' | 'right'>(initialVelocityWrist);
+  const [velocityStats, setVelocityStats] = useState<{ current: number; peak: number }>({ current: 0, peak: 0 });
+  const lastWristPosRef = useRef<{ x: number; y: number; frame: number; time: number } | null>(null);
+  const velocityHistoryRef = useRef<number[]>([]);
+
+  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
+
+  useEffect(() => {
+    // Dynamic import to avoid SSR issues with storage utility
+    import("@/utils/storage").then(({ getDeveloperMode }) => {
+      setDeveloperMode(getDeveloperMode());
+    });
+
+    const handleStorageChange = () => {
+      import("@/utils/storage").then(({ getDeveloperMode }) => {
+        setDeveloperMode(getDeveloperMode());
+      });
+    };
+
+    window.addEventListener("developer-mode-change", handleStorageChange);
+    return () => window.removeEventListener("developer-mode-change", handleStorageChange);
+  }, []);
+
+  // Reset velocity stats when toggling feature or changing wrist
+  useEffect(() => {
+    setVelocityStats({ current: 0, peak: 0 });
+    lastWristPosRef.current = null;
+    velocityHistoryRef.current = [];
+  }, [showVelocity, velocityWrist]);
+
+  // Calculate velocity
+  useEffect(() => {
+    if (!showVelocity || currentPoses.length === 0) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    const pose = currentPoses[0];
+    if (!pose) return;
+
+    // Determine wrist index based on model and side
+    let wristIndex;
+    if (selectedModel === "BlazePose") {
+      wristIndex = velocityWrist === 'left' ? 15 : 16;
+    } else {
+      wristIndex = velocityWrist === 'left' ? 9 : 10;
+    }
+
+    const wristKp = pose.keypoints[wristIndex];
+    
+    // Calculate person height in pixels (use bounding box or keypoints range)
+    let personHeightPx = 0;
+    if (pose.box) {
+      personHeightPx = pose.box.height;
+    } else {
+       // Fallback: calculate from keypoints
+       const validKps = pose.keypoints.filter(k => (k.score ?? 0) > 0.3);
+       if (validKps.length > 0) {
+         const ys = validKps.map(k => k.y);
+         personHeightPx = Math.max(...ys) - Math.min(...ys);
+       }
+    }
+
+    if (personHeightPx <= 0 || !wristKp || (wristKp.score ?? 0) < 0.3) {
+        return;
+    }
+
+    // Calculate scale: person is assumed to be 1.80m (180cm)
+    const pixelsPerMeter = personHeightPx / 1.8; 
+
+    // Current Wrist Position
+    const currentX = wristKp.x;
+    const currentY = wristKp.y;
+    const currentTime = video.currentTime;
+
+    if (lastWristPosRef.current) {
+        const { x: lastX, y: lastY, time: lastTime } = lastWristPosRef.current;
+        const dt = currentTime - lastTime;
+        
+        // Calculate velocity if time advanced (and not too much, e.g. seek)
+        // Use a minimum threshold of 0.01s (10ms) to avoid noise spikes from tiny time steps
+        if (dt > 0.01 && dt < 0.5) { 
+            const dx = currentX - lastX;
+            const dy = currentY - lastY;
+            const distPx = Math.sqrt(dx*dx + dy*dy);
+            
+            const distM = distPx / pixelsPerMeter;
+            const velocityMs = distM / dt;
+            const velocityKmh = velocityMs * 3.6;
+
+            // Filter outliers (e.g. > 300 km/h is likely tracking glitch)
+            if (velocityKmh < 300) {
+                // Add to history for smoothing
+                const history = velocityHistoryRef.current;
+                history.push(velocityKmh);
+                if (history.length > 5) history.shift(); // Keep last 5 frames
+
+                // Calculate smoothed velocity
+                const smoothedVelocity = history.reduce((a, b) => a + b, 0) / history.length;
+
+                setVelocityStats(prev => ({
+                    current: smoothedVelocity,
+                    peak: Math.max(prev.peak, smoothedVelocity)
+                }));
+            }
+        }
+    } else {
+        // Reset history on new segment/seek
+        velocityHistoryRef.current = [];
+    }
+
+    lastWristPosRef.current = { x: currentX, y: currentY, time: currentTime, frame: currentFrame };
+  }, [currentPoses, showVelocity, velocityWrist, selectedModel]);
 
   // Track average confidence stats: Map<personIndex, { sum: number, count: number }>
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
@@ -138,6 +282,9 @@ export function VideoPoseViewer({
 
       setDimensions({ width: newWidth, height: newHeight });
       
+      // Ensure playback speed is set when metadata loads
+      video.playbackRate = playbackSpeed;
+      
       // Detect video FPS
       detectVideoFPS(video);
     };
@@ -210,6 +357,25 @@ export function VideoPoseViewer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, showSkeleton, isLoading, usePreprocessing]);
+
+  // Auto-play video when model finishes loading
+  useEffect(() => {
+    if (!isLoading && autoPlay && videoRef.current) {
+      // Set playback speed explicitly before playing
+      videoRef.current.playbackRate = playbackSpeed;
+      
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => {
+          // Re-apply playback speed after play promise resolves (some browsers reset it)
+          if (videoRef.current) {
+            videoRef.current.playbackRate = playbackSpeed;
+          }
+          setIsPlaying(true);
+          setHasStartedPlaying(true);
+        }).catch(console.error);
+      }
+    }
+  }, [isLoading, autoPlay, playbackSpeed]);
 
   // Handle pose detection when scrubbing (seeked event) while paused
   useEffect(() => {
@@ -946,6 +1112,7 @@ export function VideoPoseViewer({
     } else {
       video.play();
       setIsPlaying(true);
+      setHasStartedPlaying(true);
     }
   };
 
@@ -957,6 +1124,9 @@ export function VideoPoseViewer({
     setCurrentPoses([]);
     setJointTrajectories(new Map()); // Clear trajectories
     confidenceStats.current.clear(); // Clear confidence stats
+    setVelocityStats({ current: 0, peak: 0 });
+    lastWristPosRef.current = null;
+    velocityHistoryRef.current = [];
   };
 
   const handlePreprocess = async () => {
@@ -1157,7 +1327,8 @@ export function VideoPoseViewer({
           src={videoUrl}
           width={dimensions.width}
           height={dimensions.height}
-          autoPlay={autoPlay}
+          autoPlay={autoPlay && !isLoading}
+          crossOrigin="anonymous"
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onEnded={handleVideoEnded}
@@ -1224,48 +1395,74 @@ export function VideoPoseViewer({
           </Box>
         )}
 
-        {/* Angles Overlay */}
-        {showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
-          <Box
-            style={{
-              position: "absolute",
-              top: "12px",
-              right: "12px",
-              backgroundColor: "rgba(0, 0, 0, 0.6)",
-              backdropFilter: "blur(4px)",
-              padding: "8px 12px",
-              borderRadius: "var(--radius-3)",
-              zIndex: 15,
-              pointerEvents: "none",
-              maxWidth: "250px",
+        {/* Top-Right Overlays Container */}
+        <Flex 
+            direction="column" 
+            gap="2" 
+            style={{ 
+                position: "absolute", 
+                top: "12px", 
+                right: "12px", 
+                zIndex: 15,
+                pointerEvents: "none",
+                alignItems: "flex-end"
             }}
-          >
-            <Flex direction="column" gap="1" align="end">
-              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
-                Angles
-              </Text>
-              {measuredAngles.map((angle, idx) => {
-                const [idxA, idxB, idxC] = angle;
-                const angleValue = getCurrentAngleValue(angle);
-                const jointA = getJointName(idxA);
-                const jointB = getJointName(idxB);
-                const jointC = getJointName(idxC);
-                
-                return (
-                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
-                    {jointA}-{jointB}-{jointC}:{" "}
-                    <span style={{ color: "#A855F7", fontWeight: "bold" }}>
-                      {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
-                    </span>
+        >
+            {/* Angles Overlay */}
+            {showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
+              <Box
+                style={{
+                  backgroundColor: "rgba(0, 0, 0, 0.6)",
+                  backdropFilter: "blur(4px)",
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-3)",
+                  minWidth: "140px"
+                }}
+              >
+                <Flex direction="column" gap="1" align="end">
+                  <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                    Angles
                   </Text>
-                );
-              })}
-            </Flex>
-          </Box>
-        )}
+                  {measuredAngles.map((angle, idx) => {
+                    const [idxA, idxB, idxC] = angle;
+                    const angleValue = getCurrentAngleValue(angle);
+                    const jointA = getJointName(idxA);
+                    const jointB = getJointName(idxB);
+                    const jointC = getJointName(idxC);
+                    
+                    return (
+                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                        {jointA} - {jointB} - {jointC}:{" "}
+                        <span style={{ color: "#A855F7", fontWeight: "bold" }}>
+                          {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
+                        </span>
+                      </Text>
+                    );
+                  })}
+                </Flex>
+              </Box>
+            )}
+
+            {/* Velocity Overlay */}
+            {showVelocity && currentPoses.length > 0 && (
+               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: "8px 12px", borderRadius: "var(--radius-3)", minWidth: "140px" }}>
+                  <Flex direction="column" gap="1" align="end">
+                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                        Wrist Velocity ({velocityWrist === 'left' ? "L" : "R"})
+                    </Text>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                        Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStats.current.toFixed(1)} km/h</span>
+                    </Text>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                        Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStats.peak.toFixed(1)} km/h</span>
+                    </Text>
+                  </Flex>
+               </Box>
+            )}
+        </Flex>
         
-        {/* Loading Overlay */}
-        {isLoading && (
+              {/* Loading Overlay */}
+        {(isLoading || (autoPlay && !isPlaying && !hasStartedPlaying)) && (
           <Flex
             align="center"
             justify="center"
@@ -1277,16 +1474,19 @@ export function VideoPoseViewer({
               bottom: 0,
               backgroundColor: "rgba(0, 0, 0, 0.5)",
               zIndex: 20,
+              transition: "opacity 0.3s ease",
             }}
           >
             <Flex align="center" gap="2" direction="column" style={{ color: "white" }}>
               <Flex align="center" gap="2">
                 <Spinner size="3" />
                 <Text size="4">
-                  {loadingFromCache ? "Loading model from cache..." : "Downloading model..."}
+                  {isLoading 
+                    ? (loadingFromCache ? "Loading model from cache..." : "Analyzing...")
+                    : "Starting playback..."}
                 </Text>
               </Flex>
-              {!loadingFromCache && (
+              {isLoading && !loadingFromCache && (
                 <Text size="1" style={{ opacity: 0.8 }}>
                   First load: ~6-13MB. Will be cached for next time.
                 </Text>
@@ -1297,9 +1497,9 @@ export function VideoPoseViewer({
       </Box>
 
       {/* Controls */}
-      {showControls && (
+      {showControls && developerMode && (
         <Flex direction="column" gap="2">
-          {/* Playback Controls */}
+          {/* Playback Controls - Always visible */}
           <Flex direction="column" gap="2">
             <Flex gap="2" align="center" wrap="wrap">
               <Button
@@ -1320,6 +1520,17 @@ export function VideoPoseViewer({
                 <ResetIcon />
                 Reset
               </Button>
+              {developerMode && (
+                <Button
+                  variant="soft"
+                  color="gray"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="action-button-square"
+                  size="2"
+                >
+                  {isExpanded ? "Hide Config" : "Config"}
+                </Button>
+              )}
             {!isPreprocessing && !usePreprocessing && (
               <>
                 <Button
@@ -1387,7 +1598,10 @@ export function VideoPoseViewer({
             )}
             </Flex>
 
-            {/* Playback Speed Selector */}
+            {/* Developer Settings Area - Collapsible */}
+            {developerMode && isExpanded && (
+              <Flex direction="column" gap="3" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
+                {/* Playback Speed Selector */}
             <Flex direction="column" gap="1">
               <Text size="2" color="gray" weight="medium">
                 Playback speed
@@ -1548,7 +1762,6 @@ export function VideoPoseViewer({
                 </Select.Root>
               )}
             </Flex>
-          </Flex>
 
           {/* Pre-processing Progress */}
           {isPreprocessing && (
@@ -1664,6 +1877,45 @@ export function VideoPoseViewer({
                     <Text size="1" color="gray">
                       Enable clicking
                     </Text>
+                  </Flex>
+                )}
+              </Flex>
+
+              {/* Velocity Toggle */}
+              <Flex direction="column" gap="2">
+                <Flex gap="2" align="center">
+                  <Switch
+                    checked={showVelocity}
+                    onCheckedChange={setShowVelocity}
+                    disabled={isLoading}
+                  />
+                  <Text size="2" color="gray">
+                    Wrist Velocity
+                  </Text>
+                </Flex>
+                {/* Wrist Selection (nested) */}
+                {showVelocity && (
+                  <Flex gap="2" align="center" pl="4">
+                     <Flex gap="1" style={{ backgroundColor: "var(--gray-4)", padding: "2px", borderRadius: "var(--radius-2)" }}>
+                        <Button 
+                            size="1" 
+                            variant={velocityWrist === 'left' ? "solid" : "ghost"} 
+                            color={velocityWrist === 'left' ? "mint" : "gray"}
+                            onClick={() => setVelocityWrist('left')}
+                            style={{ height: "20px", padding: "0 6px" }}
+                        >
+                            Left
+                        </Button>
+                        <Button 
+                            size="1" 
+                            variant={velocityWrist === 'right' ? "solid" : "ghost"}
+                            color={velocityWrist === 'right' ? "mint" : "gray"}
+                            onClick={() => setVelocityWrist('right')}
+                            style={{ height: "20px", padding: "0 6px" }}
+                        >
+                            Right
+                        </Button>
+                     </Flex>
                   </Flex>
                 )}
               </Flex>
@@ -1913,8 +2165,8 @@ export function VideoPoseViewer({
                   size="1"
                   variant="soft"
                   onClick={() => {
-                    setSelectedJoints([]);
                     setJointTrajectories(new Map());
+                    setSelectedJoints([]);
                   }}
                   color="gray"
                 >
@@ -2155,9 +2407,6 @@ export function VideoPoseViewer({
             </Text>
           </Flex>
 
-          {/* Pose Info - MOVED TO OVERLAY */}
-
-
           {/* Error Display */}
           {error && (
             <Flex direction="column" gap="2">
@@ -2179,9 +2428,12 @@ export function VideoPoseViewer({
               </Button>
             </Flex>
           )}
+          
+          </Flex>
+        )}
+        </Flex>
         </Flex>
       )}
     </Flex>
   );
 }
-

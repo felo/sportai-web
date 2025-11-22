@@ -10,6 +10,7 @@ import type { Message } from "@/types/chat";
 import { getDeveloperMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { VideoPoseViewer } from "./VideoPoseViewer";
 
 const THINKING_MESSAGES = [
   "Initializing environment model…",
@@ -325,45 +326,65 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                       backgroundColor: "var(--gray-3)",
                     }}
                   >
-                    <video
-                      ref={videoRef}
-                      src={videoSrc}
-                      controls
-                      autoPlay
-                      muted
-                      playsInline
-                      preload="metadata"
-                      onError={(e) => {
-                        const video = e.currentTarget;
-                        // Check if this is a blob URL error (revoked blob)
-                        // Revoked blob URLs typically result in network errors or src not supported errors
-                        if (video.src.startsWith("blob:")) {
-                          console.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
-                          // Don't log as error for revoked blob URLs - this is expected behavior
-                          // The video element will just fail to load, which is fine
-                        } else {
-                          console.error("Video playback error:", e);
-                          console.error("Video error details:", {
-                            error: video.error,
-                            networkState: video.networkState,
-                            readyState: video.readyState,
-                            src: video.src,
-                          });
-                        }
-                      }}
-                      onLoadStart={() => {
-                        console.log("Video load started:", videoSrc);
-                      }}
-                      onLoadedMetadata={() => {
-                        console.log("Video metadata loaded");
-                      }}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        display: "block",
-                      }}
-                    />
+                    {message.poseData?.enabled ? (
+                      <VideoPoseViewer
+                        videoUrl={videoSrc}
+                        autoPlay
+                        initialModel={message.poseData.model}
+                        initialShowSkeleton={message.poseData.showSkeleton}
+                        initialShowAngles={message.poseData.showAngles}
+                        initialMeasuredAngles={message.poseData.defaultAngles}
+                        initialPlaybackSpeed={message.videoPlaybackSpeed}
+                        initialUseAccurateMode={message.poseData.useAccurateMode}
+                        initialConfidenceMode={message.poseData.confidenceMode}
+                        initialResolutionMode={message.poseData.resolutionMode}
+                        initialShowTrackingId={message.poseData.showTrackingId}
+                        initialShowTrajectories={message.poseData.showTrajectories}
+                        initialSelectedJoints={message.poseData.selectedJoints}
+                        initialShowVelocity={message.poseData.showVelocity}
+                        initialVelocityWrist={message.poseData.velocityWrist}
+                      />
+                    ) : (
+                      <video
+                        ref={videoRef}
+                        src={videoSrc}
+                        controls
+                        autoPlay
+                        muted
+                        playsInline
+                        preload="metadata"
+                        onError={(e) => {
+                          const video = e.currentTarget;
+                          // Check if this is a blob URL error (revoked blob)
+                          // Revoked blob URLs typically result in network errors or src not supported errors
+                          if (video.src.startsWith("blob:")) {
+                            console.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
+                            // Don't log as error for revoked blob URLs - this is expected behavior
+                            // The video element will just fail to load, which is fine
+                          } else {
+                            console.error("Video playback error:", e);
+                            console.error("Video error details:", {
+                              error: video.error,
+                              networkState: video.networkState,
+                              readyState: video.readyState,
+                              src: video.src,
+                            });
+                          }
+                        }}
+                        onLoadStart={() => {
+                          console.log("Video load started:", videoSrc);
+                        }}
+                        onLoadedMetadata={() => {
+                          console.log("Video metadata loaded");
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                      />
+                    )}
                   </Box>
                 ) : (
                   <Box

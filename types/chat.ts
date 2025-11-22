@@ -23,6 +23,21 @@ export type Message = {
     mediaResolution: string;
     domainExpertise?: string;
   };
+  poseData?: {
+    enabled: boolean;
+    model: "MoveNet" | "BlazePose";
+    showSkeleton: boolean;
+    showAngles: boolean;
+    defaultAngles?: number[][];
+    useAccurateMode?: boolean;
+    confidenceMode?: "standard" | "high" | "low";
+    resolutionMode?: "fast" | "balanced" | "accurate";
+    showTrackingId?: boolean;
+    showTrajectories?: boolean;
+    selectedJoints?: number[];
+    showVelocity?: boolean;
+    velocityWrist?: "left" | "right";
+  };
 };
 
 export type Chat = {

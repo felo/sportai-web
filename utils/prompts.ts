@@ -24,6 +24,21 @@ export interface StarterPromptConfig {
   mediaResolution?: MediaResolution;
   domainExpertise?: DomainExpertise;
   playbackSpeed?: number; // Video playback speed (0.25, 0.5, 1.0, 1.5, 2.0, etc.)
+  poseSettings?: {
+    enabled: boolean;
+    model: "MoveNet" | "BlazePose";
+    showSkeleton: boolean;
+    showAngles: boolean;
+    defaultAngles?: number[][];
+    useAccurateMode?: boolean;
+    confidenceMode?: "standard" | "high" | "low";
+    resolutionMode?: "fast" | "balanced" | "accurate";
+    showTrackingId?: boolean;
+    showTrajectories?: boolean;
+    selectedJoints?: number[];
+    showVelocity?: boolean;
+    velocityWrist?: "left" | "right";
+  };
 }
 
 /**
@@ -54,6 +69,25 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     mediaResolution: "high",
     domainExpertise: "tennis",
     playbackSpeed: 0.25, // Slow motion for detailed technique analysis
+    poseSettings: {
+      enabled: true,
+      model: "MoveNet",
+      showSkeleton: true,
+      showAngles: true,
+      defaultAngles: [
+        [6, 8, 10],   // Right Arm (Shoulder-Elbow-Wrist)
+        [11, 13, 15], // Left Leg (Hip-Knee-Ankle)
+        [12, 14, 16]  // Right Leg (Hip-Knee-Ankle)
+      ],
+      useAccurateMode: true, // Thunder
+      confidenceMode: "low", // Challenging conditions
+      resolutionMode: "accurate", // 384x384
+      showTrackingId: true,
+      showTrajectories: false,
+      selectedJoints: [10], // Right Wrist
+      showVelocity: true,
+      velocityWrist: "right"
+    }
   },
   {
     id: "quick-tips",

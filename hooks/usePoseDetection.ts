@@ -34,6 +34,10 @@ export interface PoseDetectionResult {
   box?: { xMin: number; yMin: number; width: number; height: number; score?: number }; // Bounding box
 }
 
+// Global cache for loaded detectors to prevent re-downloading/re-initializing
+// Using a Map where key is the model configuration string and value is the detector promise
+const detectorCache = new Map<string, Promise<poseDetection.PoseDetector>>();
+
 export function usePoseDetection(config: PoseDetectionConfig = {}) {
   const [detector, setDetector] = useState<poseDetection.PoseDetector | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +72,17 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         let detectorConfig: any;
         let supportedModel: poseDetection.SupportedModels;
         let modelKey: string;
+
+        // Generate a unique key for this configuration
+        const configKey = JSON.stringify({
+          model,
+          modelType: model === "BlazePose" ? (modelType || "full") : (modelType || "SinglePose.Lightning"),
+          minPoseScore,
+          minPartScore,
+          inputResolution,
+          maxPoses,
+          enableSmoothing // Include smoothing in key as it's part of detector creation for BlazePose
+        });
 
         if (model === "BlazePose") {
           // BlazePose configuration
@@ -110,36 +125,67 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
           }
         }
 
-        // Check if model is already cached
+        // Check if we already have a promise for this detector configuration
+        if (detectorCache.has(configKey)) {
+          console.log(`Using cached detector instance for ${model} ${modelType}`);
+          try {
+            const cachedDetector = await detectorCache.get(configKey);
+            if (mounted && cachedDetector) {
+              setDetector(cachedDetector);
+              setIsLoading(false);
+              setLoadingFromCache(true);
+              return;
+            }
+          } catch (err) {
+            console.error("Error retrieving cached detector:", err);
+            detectorCache.delete(configKey); // Clear failed cache entry
+          }
+        }
+
+        // If not cached, create new detector
+        console.log(`Creating new detector for ${model} ${modelType}...`);
+        
+        // Check if model is already cached (browser cache check)
+        // This part is mostly for UI feedback, actual loading happens in createDetector
         try {
           const cachedModels = await tf.io.listModels();
           const isCached = Object.keys(cachedModels).some(key => key.includes(modelKey));
           
           if (isCached) {
-            console.log(`Loading ${model} ${modelType} from cache...`);
             setLoadingFromCache(true);
           } else {
-            console.log(`Downloading ${model} ${modelType} model (will be cached for next time)...`);
             setLoadingFromCache(false);
           }
         } catch (e) {
-          console.log('Could not check cache status:', e);
+          // Ignore cache check errors
         }
 
         const startTime = performance.now();
-        const poseDetector = await poseDetection.createDetector(
+        
+        // Create the detector promise
+        const detectorPromise = poseDetection.createDetector(
           supportedModel,
           detectorConfig
         );
-        const loadTime = performance.now() - startTime;
+        
+        // Cache the promise immediately
+        detectorCache.set(configKey, detectorPromise);
 
-        console.log(`${model} model loaded in ${(loadTime / 1000).toFixed(2)}s ${loadingFromCache ? '(from cache)' : '(downloaded)'}`);
+        try {
+          const poseDetector = await detectorPromise;
+          const loadTime = performance.now() - startTime;
+          console.log(`${model} model loaded in ${(loadTime / 1000).toFixed(2)}s`);
 
-        if (mounted) {
-          setDetector(poseDetector);
-          setIsLoading(false);
-          setLoadingFromCache(false);
+          if (mounted) {
+            setDetector(poseDetector);
+            setIsLoading(false);
+          }
+        } catch (err) {
+          // If loading failed, remove from cache so we can try again
+          detectorCache.delete(configKey);
+          throw err;
         }
+
       } catch (err) {
         console.error("Failed to initialize pose detector:", err);
         if (mounted) {
