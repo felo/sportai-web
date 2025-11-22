@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { markdownComponents } from "@/components/markdown/markdown-components";
 import type { Message } from "@/types/chat";
-import { getDeveloperMode, getCurrentChatId } from "@/utils/storage";
+import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { VideoPoseViewer } from "./VideoPoseViewer";
@@ -83,25 +83,33 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [theatreMode, setTheatreMode] = useState(true);
   const [showProUpsell, setShowProUpsell] = useState(false);
   const isMobile = useIsMobile();
 
-  // Load developer mode on mount
+  // Load developer mode and theatre mode on mount
   useEffect(() => {
     setDeveloperMode(getDeveloperMode());
+    setTheatreMode(getTheatreMode());
     
     // Listen for developer mode changes
-    const handleStorageChange = () => {
+    const handleDeveloperModeChange = () => {
       setDeveloperMode(getDeveloperMode());
     };
     
-    window.addEventListener("storage", handleStorageChange);
-    // Also listen for custom event from Sidebar
-    window.addEventListener("developer-mode-change", handleStorageChange);
+    // Listen for theatre mode changes
+    const handleTheatreModeChange = () => {
+      setTheatreMode(getTheatreMode());
+    };
+    
+    window.addEventListener("storage", handleDeveloperModeChange);
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    window.addEventListener("theatre-mode-change", handleTheatreModeChange);
     
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("developer-mode-change", handleStorageChange);
+      window.removeEventListener("storage", handleDeveloperModeChange);
+      window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+      window.removeEventListener("theatre-mode-change", handleTheatreModeChange);
     };
   }, []);
 
@@ -280,7 +288,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
 
       <Box
         style={{
-          maxWidth: isMobile && message.role === "assistant" ? "100%" : "80%",
+          maxWidth: isMobile && message.role === "assistant" 
+            ? "100%" 
+            : theatreMode && hasVideo
+            ? "100%"
+            : "80%",
           borderRadius: message.role === "user" && !hasVideo
             ? "24px 8px 24px 24px" 
             : "var(--radius-3)",

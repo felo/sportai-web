@@ -5,7 +5,7 @@ import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog, Dialog, 
 import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon, GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat } from "@/utils/storage";
+import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat } from "@/utils/storage";
 import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
@@ -24,6 +24,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
   const [appearance, setAppearance] = useState<Appearance>("dark");
   const [chatsExpanded, setChatsExpanded] = useState(true);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [theatreMode, setTheatreMode] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
@@ -46,6 +47,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
 
     // Load developer mode from localStorage
     setDeveloperMode(getDeveloperMode());
+    
+    // Load theatre mode from localStorage
+    setTheatreMode(getTheatreMode());
 
     // Load chats from localStorage
     setChats(loadChatsFromStorage());
@@ -118,6 +122,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     saveDeveloperMode(checked);
     // Dispatch custom event for components listening to developer mode changes
     window.dispatchEvent(new CustomEvent("developer-mode-change"));
+  };
+
+  const handleTheatreModeToggle = (checked: boolean) => {
+    setTheatreMode(checked);
+    saveTheatreMode(checked);
+    // Dispatch custom event for components listening to theatre mode changes
+    window.dispatchEvent(new CustomEvent("theatre-mode-change"));
   };
 
   // Don't render sidebar on mobile
@@ -499,6 +510,28 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
                   <Text>Dark</Text>
                   {appearance === "dark" && (
+                    <Text ml="auto" size="1" color="gray">✓</Text>
+                  )}
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+
+            <DropdownMenu.Separator />
+
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger>
+                <Text>Theatre mode</Text>
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent>
+                <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
+                  <Text>On</Text>
+                  {theatreMode && (
+                    <Text ml="auto" size="1" color="gray">✓</Text>
+                  )}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
+                  <Text>Off</Text>
+                  {!theatreMode && (
                     <Text ml="auto" size="1" color="gray">✓</Text>
                   )}
                 </DropdownMenu.Item>

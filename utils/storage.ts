@@ -242,6 +242,11 @@ export function clearMessagesFromStorage(): void {
 const DEVELOPER_MODE_KEY = "developer-mode";
 
 /**
+ * Theatre mode storage key
+ */
+const THEATRE_MODE_KEY = "theatre-mode";
+
+/**
  * Chats storage key
  */
 const CHATS_STORAGE_KEY = "sportai-chats";
@@ -282,6 +287,44 @@ export function setDeveloperMode(enabled: boolean): void {
     localStorage.setItem(DEVELOPER_MODE_KEY, enabled ? "true" : "false");
   } catch (error) {
     console.error("Failed to save developer mode to storage:", error);
+  }
+}
+
+/**
+ * Get theatre mode setting from localStorage
+ * @returns true if theatre mode is enabled, false otherwise (defaults to true)
+ */
+export function getTheatreMode(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  try {
+    const stored = localStorage.getItem(THEATRE_MODE_KEY);
+    // Default to true if not set
+    if (stored === null) {
+      return true;
+    }
+    return stored === "true";
+  } catch (error) {
+    console.error("Failed to load theatre mode from storage:", error);
+    return true;
+  }
+}
+
+/**
+ * Save theatre mode setting to localStorage
+ * @param enabled - Whether theatre mode should be enabled
+ */
+export function setTheatreMode(enabled: boolean): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(THEATRE_MODE_KEY, enabled ? "true" : "false");
+  } catch (error) {
+    console.error("Failed to save theatre mode to storage:", error);
   }
 }
 

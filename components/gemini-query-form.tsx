@@ -25,9 +25,9 @@ import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>(() => getThinkingMode());
-  const [mediaResolution, setMediaResolution] = useState<MediaResolution>(() => getMediaResolution());
-  const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>(() => getDomainExpertise());
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>("fast");
+  const [mediaResolution, setMediaResolution] = useState<MediaResolution>("medium");
+  const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>("all-sports");
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +87,15 @@ export function GeminiQueryForm() {
       setVideoError(error);
     },
   });
+
+  // Load settings from localStorage after hydration
+  useEffect(() => {
+    if (isHydrated) {
+      setThinkingMode(getThinkingMode());
+      setMediaResolution(getMediaResolution());
+      setDomainExpertise(getDomainExpertise());
+    }
+  }, [isHydrated]);
 
   // Ensure there's always a chat - create one on mount if none exists
   useEffect(() => {
