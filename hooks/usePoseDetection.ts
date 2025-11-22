@@ -18,10 +18,18 @@ export interface PoseDetectionConfig {
   maxPoses?: number;
 }
 
+export interface Keypoint3D {
+  x: number;
+  y: number;
+  z: number;
+  score?: number;
+  name?: string;
+}
+
 export interface PoseDetectionResult {
   keypoints: poseDetection.Keypoint[];
   score?: number;
-  keypoints3D?: poseDetection.Keypoint3D[]; // For 3D models
+  keypoints3D?: Keypoint3D[]; // For 3D models
 }
 
 export function usePoseDetection(config: PoseDetectionConfig = {}) {
@@ -285,4 +293,3 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     clearModelCache,
   };
 }
-
