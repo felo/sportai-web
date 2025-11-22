@@ -281,7 +281,7 @@ export function drawAngle(
     arcColor = "rgba(168, 85, 247, 0.3)", // Semi-transparent purple
     textColor = "#FFFFFF", // White
     lineWidth = 2,
-    fontSize = 14,
+    fontSize = 20, // Increased default for better readability
     minConfidence = 0.3,
   } = options;
 
@@ -380,7 +380,7 @@ export function drawAngle(
   
   // Draw text outline/stroke for extra visibility
   ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = Math.max(2, fontSize * 0.15); // Thinner stroke for crispness
   ctx.lineJoin = "round";
   ctx.strokeText(angleText, textX, textY);
   

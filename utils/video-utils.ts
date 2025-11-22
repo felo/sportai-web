@@ -1,3 +1,5 @@
+// Maximum video size aligned with Gemini API limit
+// Files larger than this will receive a natural dialogue response from the LLM
 export const MAX_VIDEO_SIZE_MB = 100;
 export const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 
@@ -26,10 +28,16 @@ export function validateVideoFile(file: File): VideoValidationResult {
     };
   }
 
-  if (file.size > MAX_VIDEO_SIZE_BYTES) {
+  // Client-side validation allows files through - even if > 100MB
+  // This ensures the server can respond with a natural dialogue message
+  // Only block extremely large files (> 500MB) that would cause upload issues
+  const EXTREME_SIZE_MB = 500;
+  const EXTREME_SIZE_BYTES = EXTREME_SIZE_MB * 1024 * 1024;
+  
+  if (file.size > EXTREME_SIZE_BYTES) {
     return {
       valid: false,
-      error: ` File size must be less than ${MAX_VIDEO_SIZE_MB}MB`,
+      error: ` File is extremely large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please use a file under ${EXTREME_SIZE_MB}MB.`,
     };
   }
 

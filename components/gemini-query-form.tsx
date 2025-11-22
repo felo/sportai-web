@@ -30,6 +30,7 @@ export function GeminiQueryForm() {
   const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>("all-sports");
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
+  const [showingVideoSizeError, setShowingVideoSizeError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -168,11 +169,21 @@ export function GeminiQueryForm() {
   }, [isHydrated, messages.length, scrollToBottom]);
 
   // Only auto-scroll if shouldAutoScroll is true (disabled during response generation)
+  // Also don't auto-scroll if the last message is a video size limit error
   useEffect(() => {
-    if (shouldAutoScroll) {
+    const lastMessage = messages[messages.length - 1];
+    const isVideoSizeLimitError = lastMessage?.isVideoSizeLimitError;
+    
+    if (shouldAutoScroll && !isVideoSizeLimitError) {
       scrollToBottom();
     }
-  }, [messages, scrollToBottom, shouldAutoScroll]);
+    
+    // Update showingVideoSizeError based on whether last message is a size error
+    // This keeps the state in sync with the actual messages
+    if (isVideoSizeLimitError !== showingVideoSizeError) {
+      setShowingVideoSizeError(!!isVideoSizeLimitError);
+    }
+  }, [messages, scrollToBottom, shouldAutoScroll, showingVideoSizeError]);
 
   // Generate AI title after first exchange completes
   useEffect(() => {
@@ -273,6 +284,7 @@ export function GeminiQueryForm() {
     setVideoError(null);
     setApiError(null);
     setPoseData(undefined);
+    setShowingVideoSizeError(false);
   };
 
   const handleStop = () => {
@@ -283,6 +295,7 @@ export function GeminiQueryForm() {
     setLoading(false);
     setProgressStage("idle");
     setUploadProgress(0);
+    setShowingVideoSizeError(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -447,8 +460,18 @@ export function GeminiQueryForm() {
 
     // Scroll to bottom immediately after adding messages, then disable auto-scroll
     // Use requestAnimationFrame to ensure DOM is updated
+    // Skip initial scroll if we're about to show a video size limit error
+    const willShowSizeLimitError = !!(currentVideoFile && 
+                                      currentVideoFile.type.startsWith("video/") && 
+                                      (currentVideoFile.size / (1024 * 1024)) > 100);
+    
+    // Update state to hide disclaimer if showing size error
+    setShowingVideoSizeError(willShowSizeLimitError);
+    
     requestAnimationFrame(() => {
-      scrollToBottom();
+      if (!willShowSizeLimitError) {
+        scrollToBottom();
+      }
       setShouldAutoScroll(false); // Disable auto-scroll during response generation
     });
 
@@ -550,6 +573,8 @@ export function GeminiQueryForm() {
         setLoading(false);
         setProgressStage("idle");
         setUploadProgress(0);
+        // Clear video size error state after completion (unless it was actually a size error)
+        // The flag will stay true if it was a size error, ensuring banner stays hidden
       }
       // Clean up abort controller
       abortControllerRef.current = null;
@@ -566,6 +591,7 @@ export function GeminiQueryForm() {
     }
     const newChat = createChat();
     setCurrentChatId(newChat.id);
+    setShowingVideoSizeError(false);
     // State will be updated via event handler
   };
 
@@ -671,6 +697,7 @@ export function GeminiQueryForm() {
             onMediaResolutionChange={setMediaResolution}
             onDomainExpertiseChange={setDomainExpertise}
             disableTooltips={hasJustDropped}
+            hideDisclaimer={showingVideoSizeError}
           />
         </div>
       </div>

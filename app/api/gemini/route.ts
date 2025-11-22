@@ -132,9 +132,61 @@ export async function POST(request: NextRequest) {
       
       if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
         logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds recommended limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
+        // Return a natural LLM-style response instead of an error
+        const naturalResponse = `## 📹 Video Size Issue
+
+I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
+
+<details>
+<summary>📊 Why This Matters</summary>
+
+This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
+
+Video analysis requires significant processing power, and keeping files under 100 MB ensures:
+- Faster processing times
+- More reliable analysis
+- Better quality insights
+- Consistent performance across different video types
+
+</details>
+
+<details>
+<summary>💡 How to Fix This</summary>
+
+Here are a few ways you can help me analyze your video:
+
+**1. Trim the video**
+- Focus on the most important moments or rallies you'd like me to review
+- Even a 30-60 second clip can provide valuable insights!
+- Most video editing apps allow you to easily cut specific sections
+
+**2. Compress the video**
+- Use a video compression tool to reduce the file size while maintaining good quality
+- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
+- Target a lower bitrate while keeping the resolution
+
+**3. Adjust media resolution**
+- You can change the media resolution setting to **Low** in the chat input below
+- This helps me process larger videos more efficiently
+- Low resolution is often sufficient for technique analysis
+
+**4. Split into clips**
+- Break your video into shorter segments and submit them separately
+- I can analyze multiple clips and provide focused feedback on each
+- This approach often leads to more detailed, actionable insights
+
+</details>
+
+---
+
+I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+
+        logger.debug(`[${requestId}] Returning natural LLM response for oversized video`);
+        
+        // Mark this as a special "too_large" response type so client can handle it appropriately
         return NextResponse.json(
-          { error: `Video file is too large (${sizeMB.toFixed(1)} MB). Gemini API works best with videos under ${LARGE_VIDEO_LIMIT_MB} MB. Please use a shorter clip, compress the video, or use 'Low' media resolution.` },
-          { status: 413 }
+          { response: naturalResponse, videoTooLarge: true },
+          { status: 200 } // Return 200 so it's treated as a successful response
         );
       } else if (sizeMB > LARGE_VIDEO_WARNING_MB) {
         logger.warn(`[${requestId}] Large video detected (${sizeMB.toFixed(2)} MB) - may cause API timeout or errors`);
@@ -152,6 +204,92 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
+            // Check if video is too large before streaming
+            if (videoData && videoData.mimeType.startsWith("video/")) {
+              const sizeMB = videoData.data.length / (1024 * 1024);
+              const LARGE_VIDEO_LIMIT_MB = 100;
+              
+              if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
+                logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds limit in streaming mode`);
+                // Stream the natural error response instead
+                const naturalResponse = `## 📹 Video Size Issue
+
+I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
+
+<details>
+<summary>📊 Why This Matters</summary>
+
+This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
+
+Video analysis requires significant processing power, and keeping files under 100 MB ensures:
+- Faster processing times
+- More reliable analysis
+- Better quality insights
+- Consistent performance across different video types
+
+</details>
+
+<details>
+<summary>💡 How to Fix This</summary>
+
+Here are a few ways you can help me analyze your video:
+
+**1. Trim the video**
+- Focus on the most important moments or rallies you'd like me to review
+- Even a 30-60 second clip can provide valuable insights!
+- Most video editing apps allow you to easily cut specific sections
+
+**2. Compress the video**
+- Use a video compression tool to reduce the file size while maintaining good quality
+- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
+- Target a lower bitrate while keeping the resolution
+
+**3. Adjust media resolution**
+- You can change the media resolution setting to **Low** in the chat input below
+- This helps me process larger videos more efficiently
+- Low resolution is often sufficient for technique analysis
+
+**4. Split into clips**
+- Break your video into shorter segments and submit them separately
+- I can analyze multiple clips and provide focused feedback on each
+- This approach often leads to more detailed, actionable insights
+
+</details>
+
+---
+
+I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+                
+                // Stream the response character by character for a natural typing effect
+                const encoder = new TextEncoder();
+                for (let i = 0; i < naturalResponse.length; i++) {
+                  try {
+                    controller.enqueue(encoder.encode(naturalResponse[i]));
+                    // Small delay to simulate typing (optional)
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                  } catch (enqueueError) {
+                    const errorMessage = enqueueError instanceof Error ? enqueueError.message : String(enqueueError);
+                    if (enqueueError instanceof TypeError && 
+                        (errorMessage.includes("closed") || errorMessage.includes("Invalid state"))) {
+                      logger.warn(`[${requestId}] Stream controller closed during natural response`);
+                      break;
+                    }
+                    throw enqueueError;
+                  }
+                }
+                
+                try {
+                  controller.close();
+                } catch (closeError) {
+                  logger.debug(`[${requestId}] Controller already closed`);
+                }
+                
+                const duration = Date.now() - startTime;
+                logger.info(`[${requestId}] Natural error response streamed in ${duration}ms`);
+                return;
+              }
+            }
+            
             for await (const chunk of streamGemini(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise)) {
               // Check if controller is still open before enqueueing
               // This can happen if the client aborts the request

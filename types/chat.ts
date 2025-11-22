@@ -18,6 +18,7 @@ export type Message = {
   inputTokens?: number; // Input tokens used for this message
   outputTokens?: number; // Output tokens used for this message (assistant messages only)
   responseDuration?: number; // API response duration in milliseconds
+  isVideoSizeLimitError?: boolean; // Flag to indicate this is a video size limitation message
   modelSettings?: {
     thinkingMode: string;
     mediaResolution: string;

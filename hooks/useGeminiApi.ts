@@ -153,6 +153,108 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
       mediaResolution: MediaResolution = "medium",
       domainExpertise: DomainExpertise = "all-sports"
     ): Promise<void> => {
+      const requestStartTime = Date.now();
+      
+      // Check video size IMMEDIATELY before any upload - aligned with Gemini's 100MB limit
+      const isVideo = videoFile.type.startsWith("video/");
+      if (isVideo) {
+        const sizeMB = videoFile.size / (1024 * 1024);
+        const LARGE_VIDEO_LIMIT_MB = 100;
+        
+        if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
+          console.log(`[Client] Video size (${sizeMB.toFixed(2)} MB) exceeds limit, showing natural response immediately`);
+          
+          // Generate the natural response immediately without uploading
+          const naturalResponse = `## 📹 Video Size Issue
+
+I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
+
+<details>
+<summary>📊 Why This Matters</summary>
+
+This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
+
+Video analysis requires significant processing power, and keeping files under 100 MB ensures:
+- Faster processing times
+- More reliable analysis
+- Better quality insights
+- Consistent performance across different video types
+
+</details>
+
+<details>
+<summary>💡 How to Fix This</summary>
+
+Here are a few ways you can help me analyze your video:
+
+**1. Trim the video**
+- Focus on the most important moments or rallies you'd like me to review
+- Even a 30-60 second clip can provide valuable insights!
+- Most video editing apps allow you to easily cut specific sections
+
+**2. Compress the video**
+- Use a video compression tool to reduce the file size while maintaining good quality
+- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
+- Target a lower bitrate while keeping the resolution
+
+**3. Adjust media resolution**
+- You can change the media resolution setting to **Low** in the chat input below
+- This helps me process larger videos more efficiently
+- Low resolution is often sufficient for technique analysis
+
+**4. Split into clips**
+- Break your video into shorter segments and submit them separately
+- I can analyze multiple clips and provide focused feedback on each
+- This approach often leads to more detailed, actionable insights
+
+</details>
+
+---
+
+I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+
+          // Stream the response gradually for natural feel
+          setStage("generating");
+          setProgress(100);
+          
+          // Stream character by character with realistic typing speed
+          let accumulatedText = "";
+          const charsPerChunk = 3; // Characters to add per update
+          const delayMs = 5; // Milliseconds between updates (realistic typing speed)
+          
+          for (let i = 0; i < naturalResponse.length; i += charsPerChunk) {
+            const chunk = naturalResponse.slice(i, i + charsPerChunk);
+            accumulatedText += chunk;
+            
+            updateMessage(assistantMessageId, { 
+              content: accumulatedText,
+              isVideoSizeLimitError: true, // Flag this as a size limit error
+            });
+            
+            // Add delay for realistic typing effect
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+          
+          // Final update with complete metadata
+          const outputTokens = estimateTextTokens(naturalResponse);
+          updateMessage(assistantMessageId, { 
+            content: naturalResponse,
+            inputTokens: 0, // No API call made
+            outputTokens: outputTokens,
+            responseDuration: Date.now() - requestStartTime,
+            isVideoSizeLimitError: true,
+            modelSettings: {
+              thinkingMode,
+              mediaResolution,
+              domainExpertise,
+            },
+          });
+          
+          // Exit early - no upload or API call needed
+          return;
+        }
+      }
+      
       // Calculate input tokens for this request
       // Note: System prompt is constructed server-side and not exposed to client
       let inputTokens = ESTIMATED_SYSTEM_PROMPT_TOKENS + estimateTextTokens(prompt);
@@ -178,7 +280,6 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         inputTokens += historyTokens;
       }
       
-      const requestStartTime = Date.now();
       setStage("uploading");
       setProgress(0);
 

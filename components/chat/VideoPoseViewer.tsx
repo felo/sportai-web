@@ -926,17 +926,17 @@ export function VideoPoseViewer({
           }));
 
           // Calculate dynamic font size for angle text based on bounding box
-          let angleFontSize = 14; // Default font size
+          let angleFontSize = 20; // Default font size (increased for better readability)
           if (pose.box) {
             const boxHeight = pose.box.height * scaleY;
-            angleFontSize = Math.max(10, Math.min(20, boxHeight * 0.035));
+            angleFontSize = Math.max(16, Math.min(32, boxHeight * 0.05));
           } else {
             // Fallback: calculate from keypoints
             const validKeypoints = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
             if (validKeypoints.length > 0) {
               const yCoords = validKeypoints.map(kp => kp.y);
               const estimatedHeight = Math.max(...yCoords) - Math.min(...yCoords);
-              angleFontSize = Math.max(10, Math.min(20, estimatedHeight * 0.035));
+              angleFontSize = Math.max(16, Math.min(32, estimatedHeight * 0.05));
             }
           }
 

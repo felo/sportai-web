@@ -194,6 +194,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
     if (message.role === "assistant" && message.content) {
       const chatId = getCurrentChatId();
       
+      // Don't show PRO upsell for video size limit errors
+      if (message.isVideoSizeLimitError) {
+        setShowProUpsell(false);
+        return;
+      }
+      
       // Check if we've already shown the upsell for this chat
       if (hasShownProUpsell(chatId)) {
         setShowProUpsell(false);
@@ -213,7 +219,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
     } else {
       setShowProUpsell(false);
     }
-  }, [message.content, message.role]);
+  }, [message.content, message.role, message.isVideoSizeLimitError]);
 
   useEffect(() => {
     // Check if this is a video (not an image)
@@ -233,8 +239,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       
       const handleLoadedMetadata = () => {
         if (theatreMode && video.videoWidth && video.videoHeight) {
-          // Calculate max height: 720px for portrait videos in theatre mode
-          const maxHeight = 720;
+          // Calculate max height: 50vh for portrait videos in theatre mode
+          const maxHeight = window.innerHeight * 0.5;
           
           // Calculate dimensions respecting aspect ratio and max height
           const aspectRatio = video.videoWidth / video.videoHeight;
@@ -368,7 +374,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                 style={{
                   overflow: "hidden",
                   borderRadius: "var(--radius-3)",
-                  maxHeight: theatreMode ? "720px" : "none",
+                  maxHeight: theatreMode ? "50vh" : "none",
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
@@ -387,7 +393,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                     }}
                     style={{
                       maxWidth: "100%",
-                      maxHeight: theatreMode ? "720px" : "auto",
+                      maxHeight: theatreMode ? "50vh" : "auto",
                       display: "block",
                       objectFit: "contain",
                       margin: "0 auto",
@@ -401,7 +407,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                             position: "relative",
                             width: "100%",
                             aspectRatio: "16 / 9",
-                            maxHeight: theatreMode ? "720px" : "none",
+                            maxHeight: theatreMode ? "50vh" : "none",
                             backgroundColor: "var(--gray-3)",
                           }
                         : videoContainerStyle

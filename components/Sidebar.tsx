@@ -141,27 +141,21 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       style={{
         position: "fixed",
         left: 0,
-        top: 0, // Full height from top
+        top: 0,
         bottom: 0,
         width: isCollapsed ? "64px" : "280px",
         backgroundColor: "var(--gray-2)",
         borderRight: "1px solid var(--gray-6)",
         transition: "width 0.2s ease-in-out",
         zIndex: 10,
-        display: "flex",
-        flexDirection: "column",
-        padding: "var(--space-4)",
-        paddingTop: "calc(var(--space-4) + 57px)", // Account for header height on desktop
+        display: "grid",
+        gridTemplateRows: "57px 1fr auto", // header, scrollable content, fixed footer
+        gridTemplateColumns: "1fr",
       }}
     >
-      {/* Toggle Button - Aligned with header */}
+      {/* Toggle Button - Row 1: Aligned with header */}
       <Box
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "57px", // Match header height
           display: "flex",
           alignItems: "center",
           justifyContent: isCollapsed ? "center" : "flex-end",
@@ -190,9 +184,16 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         </Button>
       </Box>
 
-      {/* Sidebar Content */}
+      {/* Sidebar Content - Row 2: Scrollable */}
       {!isCollapsed && (
-        <Box style={{ flex: 1, overflowY: "auto" }}>
+        <Box 
+          style={{ 
+            overflowY: "auto",
+            padding: "var(--space-4)",
+            paddingTop: "var(--space-4)",
+            paddingBottom: "var(--space-3)",
+          }}
+        >
           {children || (
             <Flex direction="column" gap="3">
               <Button
@@ -242,7 +243,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   </Text>
                 </Button>
                 {chatsExpanded && (
-                  <Flex direction="column" gap="1" style={{ paddingLeft: "calc(16px + var(--space-1) + var(--space-2))", paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
+                  <Flex direction="column" gap="1" style={{ paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
                     {chats.length === 0 ? (
                       <Text size="2" color="gray" style={{ padding: "var(--space-2) var(--space-3)" }}>
                         No chats yet
@@ -466,152 +467,151 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         </Box>
       )}
 
-      {/* Settings Button - Bottom Left */}
-      <Box
-        style={{
-          position: "absolute",
-          bottom: "var(--space-4)",
-          left: "var(--space-4)",
-          right: "var(--space-4)",
-        }}
-      >
-        <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenu.Trigger>
-            <Button
-              variant="ghost"
-              size="2"
-              style={{
-                width: "100%",
-                justifyContent: isCollapsed ? "center" : "flex-start",
-                padding: isCollapsed ? "var(--space-2)" : "var(--space-2) var(--space-3)",
-              }}
-            >
-              <GearIcon width="20" height="20" />
-              {!isCollapsed && (
+      {/* Settings Button - Row 3: Fixed at bottom */}
+      {!isCollapsed && (
+        <Box
+          style={{
+            padding: "var(--space-4)",
+            paddingTop: "var(--space-3)",
+            borderTop: "1px solid var(--gray-6)",
+          }}
+        >
+          <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenu.Trigger>
+              <Button
+                variant="ghost"
+                size="2"
+                style={{
+                  width: "100%",
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <GearIcon width="20" height="20" />
                 <Text size="2" ml="2">
                   Settings
                 </Text>
-              )}
-            </Button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="start" side={isCollapsed ? "right" : "top"}>
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger>
-                <SunIcon width="16" height="16" />
-                <Text ml="2">Themes</Text>
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent>
-                <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
-                  <Text>Light</Text>
-                  {appearance === "light" && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
-                  <Text>Dark</Text>
-                  {appearance === "dark" && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
+              </Button>
+              </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="start" side="top">
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <SunIcon width="16" height="16" />
+                  <Text ml="2">Themes</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
+                    <Text>Light</Text>
+                    {appearance === "light" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
+                    <Text>Dark</Text>
+                    {appearance === "dark" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
 
-            <DropdownMenu.Separator />
+              <DropdownMenu.Separator />
 
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger>
-                <Text>Theatre mode</Text>
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent>
-                <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
-                  <Text>On</Text>
-                  {theatreMode && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
-                  <Text>Off</Text>
-                  {!theatreMode && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>Theatre mode</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
+                    <Text>On</Text>
+                    {theatreMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
+                    <Text>Off</Text>
+                    {!theatreMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
 
-            <DropdownMenu.Separator />
+              <DropdownMenu.Separator />
 
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger>
-                <Text>Developer mode</Text>
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent>
-                <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
-                  <Text>On</Text>
-                  {developerMode && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
-                  <Text>Off</Text>
-                  {!developerMode && (
-                    <Text ml="auto" size="1" color="gray">✓</Text>
-                  )}
-                </DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>Developer mode</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
+                    <Text>On</Text>
+                    {developerMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
+                    <Text>Off</Text>
+                    {!developerMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
 
-            <DropdownMenu.Separator />
+              <DropdownMenu.Separator />
 
-            <DropdownMenu.Item 
-              color="red"
-              disabled={messageCount === 0 || !onClearChat}
-              onSelect={(e) => {
-                if (messageCount > 0 && onClearChat) {
-                  e.preventDefault();
-                  setAlertOpen(true);
-                }
-              }}
-            >
-              <TrashIcon width="16" height="16" />
-              <Text ml="2">Clear chat history</Text>
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+              <DropdownMenu.Item 
+                color="red"
+                disabled={messageCount === 0 || !onClearChat}
+                onSelect={(e) => {
+                  if (messageCount > 0 && onClearChat) {
+                    e.preventDefault();
+                    setAlertOpen(true);
+                  }
+                }}
+              >
+                <TrashIcon width="16" height="16" />
+                <Text ml="2">Clear chat history</Text>
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
 
-        {/* Alert Dialog for clearing chat */}
-        {messageCount > 0 && onClearChat && (
-          <AlertDialog.Root open={alertOpen} onOpenChange={setAlertOpen}>
-            <AlertDialog.Content maxWidth="450px">
-              <AlertDialog.Title>Clear chat history?</AlertDialog.Title>
-              <AlertDialog.Description size="2">
-                This will permanently delete all messages in this conversation. This action cannot be undone.
-              </AlertDialog.Description>
-              <Flex gap="3" mt="4" justify="end">
-                <AlertDialog.Cancel>
-                  <Button variant="soft" color="gray">
-                    Cancel
-                  </Button>
-                </AlertDialog.Cancel>
-                <AlertDialog.Action>
-                  <Button 
-                    variant="solid" 
-                    color="red"
-                    onClick={() => {
-                      onClearChat();
-                      setAlertOpen(false);
-                      setDropdownOpen(false);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </AlertDialog.Action>
-              </Flex>
-            </AlertDialog.Content>
-          </AlertDialog.Root>
-        )}
-      </Box>
+          {/* Alert Dialog for clearing chat */}
+          {messageCount > 0 && onClearChat && (
+            <AlertDialog.Root open={alertOpen} onOpenChange={setAlertOpen}>
+              <AlertDialog.Content maxWidth="450px">
+                <AlertDialog.Title>Clear chat history?</AlertDialog.Title>
+                <AlertDialog.Description size="2">
+                  This will permanently delete all messages in this conversation. This action cannot be undone.
+                </AlertDialog.Description>
+                <Flex gap="3" mt="4" justify="end">
+                  <AlertDialog.Cancel>
+                    <Button variant="soft" color="gray">
+                      Cancel
+                    </Button>
+                  </AlertDialog.Cancel>
+                  <AlertDialog.Action>
+                    <Button 
+                      variant="solid" 
+                      color="red"
+                      onClick={() => {
+                        onClearChat();
+                        setAlertOpen(false);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </AlertDialog.Action>
+                </Flex>
+              </AlertDialog.Content>
+            </AlertDialog.Root>
+          )}
+        </Box>
+      )}
 
-      {/* Edit Chat Dialog */}
+      {/* Edit Chat Dialog - Outside grid flow as it's a modal */}
       <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <Dialog.Content maxWidth="450px">
           <Dialog.Title>Edit chat name</Dialog.Title>

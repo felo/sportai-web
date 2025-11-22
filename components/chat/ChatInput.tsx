@@ -28,6 +28,7 @@ interface ChatInputProps {
   onMediaResolutionChange?: (resolution: MediaResolution) => void;
   onDomainExpertiseChange?: (expertise: DomainExpertise) => void;
   disableTooltips?: boolean;
+  hideDisclaimer?: boolean; // Hide the "contact us" disclaimer
 }
 
 export function ChatInput({
@@ -50,6 +51,7 @@ export function ChatInput({
   onMediaResolutionChange,
   onDomainExpertiseChange,
   disableTooltips = false,
+  hideDisclaimer = false,
 }: ChatInputProps) {
   const isMobile = useIsMobile();
   
@@ -539,41 +541,43 @@ export function ChatInput({
           </Box>
 
           {/* Disclaimer text */}
-          <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
-            {isMobile ? (
-              <>
-                This is a demo, for enterprise level precision, please{" "}
-                <a 
-                  href="https://sportai.com/contact" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "inherit", textDecoration: "underline" }}
-                >
-                  contact us
-                </a>.
-              </>
-            ) : (
-              <>
-                This is a demo of the{" "}
-                <a 
-                  href="https://sportai.com/platform" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "inherit", textDecoration: "underline" }}
-                >
-                  SportAI API
-                </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
-                <a 
-                  href="https://sportai.com/contact" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: "inherit", textDecoration: "underline" }}
-                >
-                  contact us
-                </a>.
-              </>
-            )}
-          </Text>
+          {!hideDisclaimer && (
+            <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
+              {isMobile ? (
+                <>
+                  This is a demo, for enterprise level precision, please{" "}
+                  <a 
+                    href="https://sportai.com/contact" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit", textDecoration: "underline" }}
+                  >
+                    contact us
+                  </a>.
+                </>
+              ) : (
+                <>
+                  This is a demo of the{" "}
+                  <a 
+                    href="https://sportai.com/platform" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit", textDecoration: "underline" }}
+                  >
+                    SportAI API
+                  </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
+                  <a 
+                    href="https://sportai.com/contact" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit", textDecoration: "underline" }}
+                  >
+                    contact us
+                  </a>.
+                </>
+              )}
+            </Text>
+          )}
         </Flex>
       </form>
     </Box>
