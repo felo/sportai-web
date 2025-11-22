@@ -836,7 +836,7 @@ export function VideoPoseViewer({
             const personIndex = currentPoses.indexOf(pose) + 1;
             const idText = pose.id !== undefined 
               ? `ID: ${pose.id}` 
-              : (currentPoses.length === 1 ? "Person" : `Person ${personIndex}`);
+              : (currentPoses.length === 1 ? "Player" : `Player ${personIndex}`);
             const fontSize = 14;
             ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.textAlign = "left";
@@ -1488,7 +1488,7 @@ export function VideoPoseViewer({
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
               <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)" }}>
-                {currentPoses.length === 1 ? "Tracking person" : `Detected ${currentPoses.length} people`}
+                {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
               </Text>
               {currentPoses.map((pose, idx) => {
                 const stats = confidenceStats.current.get(idx);
@@ -1496,7 +1496,7 @@ export function VideoPoseViewer({
                 
                 return (
                   <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
-                    Person {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
+                    Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
                     {" • Avg: "}{(avgConfidence * 100).toFixed(0)}%
                   </Text>
                 );
@@ -2359,14 +2359,14 @@ export function VideoPoseViewer({
             </Flex>
           )}
 
-          {/* Max People Slider */}
+          {/* Max Players Slider */}
           <Flex direction="column" gap="1">
             <Flex justify="between" align="center">
               <Text size="2" color="gray" weight="medium">
-                Detect people
+                Detect players
               </Text>
               <Text size="2" color="mint" weight="bold">
-                {maxPoses} {maxPoses === 1 ? "person" : "people"}
+                {maxPoses} {maxPoses === 1 ? "player" : "players"}
               </Text>
             </Flex>
             <input
@@ -2383,12 +2383,12 @@ export function VideoPoseViewer({
             />
             <Text size="1" color="gray" style={{ opacity: 0.7 }}>
               {maxPoses === 1 
-                ? "Single person mode (Lightning/Thunder)" 
-                : `Multi-person mode (up to ${maxPoses} people)`}
+                ? "Single player mode (Lightning/Thunder)" 
+                : `Multi-player mode (up to ${maxPoses} players)`}
             </Text>
             {maxPoses > 1 && (
               <Text size="1" color="amber">
-                Note: MultiPose.Lightning is always used when detecting 2+ people
+                Note: MultiPose.Lightning is always used when detecting 2+ players
               </Text>
             )}
           </Flex>
