@@ -8,6 +8,7 @@ import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection"
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import { Pose3DViewer } from "./Pose3DViewer";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface VideoPoseViewerProps {
   videoUrl: string;
@@ -99,6 +100,7 @@ export function VideoPoseViewer({
   const [isExpanded, setIsExpanded] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
   const [isPortraitVideo, setIsPortraitVideo] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Dynamic import to avoid SSR issues with storage utility
@@ -1409,8 +1411,9 @@ export function VideoPoseViewer({
         ref={containerRef}
         style={{
           position: "relative",
-          width: `${dimensions.width}px`,
-          height: `${dimensions.height}px`,
+          width: "100%",
+          height: "auto",
+          aspectRatio: `${dimensions.width} / ${dimensions.height}`,
           maxWidth: "100%",
           maxHeight: "720px",
           backgroundColor: "var(--gray-2)",
@@ -1474,16 +1477,16 @@ export function VideoPoseViewer({
               color: isPoseEnabled ? "black" : "white",
               backdropFilter: "blur(4px)",
               borderRadius: "var(--radius-3)",
-              height: isPortraitVideo ? "24px" : "32px",
-              padding: isPortraitVideo ? "0 8px" : "0 12px",
+              height: isPortraitVideo ? "24px" : "28px",
+              padding: isPortraitVideo ? "0 8px" : "0 10px",
               cursor: "pointer",
               transition: "all 0.2s ease",
-              fontSize: isPortraitVideo ? "11px" : "inherit",
+              fontSize: "11px",
             }}
           >
             <Flex gap={isPortraitVideo ? "1" : "2"} align="center">
-              <MagicWandIcon width={isPortraitVideo ? 12 : 16} height={isPortraitVideo ? 12 : 16} />
-              <Text size="2" weight="medium" style={{ fontSize: isPortraitVideo ? "11px" : "inherit" }}>
+              <MagicWandIcon width={isPortraitVideo ? 12 : 14} height={isPortraitVideo ? 12 : 14} />
+              <Text size="2" weight="medium" style={{ fontSize: "11px" }}>
                 {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
               </Text>
             </Flex>
@@ -1503,19 +1506,19 @@ export function VideoPoseViewer({
               borderRadius: "var(--radius-3)",
               zIndex: 15,
               pointerEvents: "none",
-              fontSize: isPortraitVideo ? "10px" : "inherit",
+              fontSize: "10px",
             }}
           >
             <Flex direction="column" gap="1">
-              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: "10px" }}>
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
-              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
                 {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
               </Text>
               {currentPoses.map((pose, idx) => {
                 return (
-                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
                     Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
                   </Text>
                 );
@@ -1534,7 +1537,7 @@ export function VideoPoseViewer({
                 const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
                 
                 return (
-                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
                     Confidence {(overallAvg * 100).toFixed(0)}%
                   </Text>
                 );
@@ -1556,19 +1559,19 @@ export function VideoPoseViewer({
                 alignItems: "flex-end"
             }}
         >
-        {/* Angles Overlay - Hidden in portrait/vertical mode */}
-        {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && !isPortraitVideo && (
+        {/* Angles Overlay - Hidden on mobile and in portrait/vertical mode */}
+        {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && !isMobile && !isPortraitVideo && (
           <Box
             style={{
                   backgroundColor: "rgba(0, 0, 0, 0.6)",
                   backdropFilter: "blur(4px)",
-                  padding: "8px 12px",
+                  padding: isPortraitVideo ? "6px 8px" : "8px 12px",
                   borderRadius: "var(--radius-3)",
-                  minWidth: "140px",
+                  minWidth: isPortraitVideo ? "100px" : "140px",
                 }}
               >
                 <Flex direction="column" gap="1" align="end">
-                  <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                  <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: "10px" }}>
                     Angles
                   </Text>
                   {measuredAngles.map((angle, idx) => {
@@ -1579,7 +1582,7 @@ export function VideoPoseViewer({
                     const jointC = getJointName(idxC);
                     
                     return (
-                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px" }}>
                         {jointA} - {jointB} - {jointC}:{" "}
                         <span style={{ color: "#A855F7", fontWeight: "bold" }}>
                           {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
@@ -1593,15 +1596,15 @@ export function VideoPoseViewer({
 
             {/* Velocity Overlay */}
             {isPoseEnabled && showVelocity && currentPoses.length > 0 && (
-               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)", minWidth: isPortraitVideo ? "100px" : "140px" }}>
+               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)" }}>
                   <Flex direction="column" gap="1" align="end">
-                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
                         Wrist Velocity ({velocityWrist === 'left' ? "L" : "R"})
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
                         Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStats.current.toFixed(1)} km/h</span>
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
                         Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStats.peak.toFixed(1)} km/h</span>
                     </Text>
                   </Flex>

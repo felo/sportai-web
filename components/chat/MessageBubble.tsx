@@ -115,11 +115,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   }, []);
 
   // Determine if we should show pose detection
-  // It should be enabled by the message config, BUT disabled on mobile unless developer mode is on?
-  // Or strictly disabled on mobile as requested "not activate the pose detection altogether if you're on mobile".
-  // Let's assume strict disable on mobile for now to save performance/battery.
-  // NOTE: We always render VideoPoseViewer on desktop (even if enabled=false) to show the toggle button.
-  const showPoseViewer = !isMobile;
+  // We now show VideoPoseViewer on mobile as well so users can toggle the AI overlay on/off.
+  // The overlay button will be visible, and users can control whether to enable pose detection.
+  // NOTE: We always render VideoPoseViewer (on both mobile and desktop) to show the toggle button.
+  const showPoseViewer = true;
 
   // Calculate cumulative tokens up to this message
   // Only count assistant messages for cumulative (they represent actual API calls)
