@@ -1,0 +1,1 @@
+   - Provides methods for single-frame and continuous detection

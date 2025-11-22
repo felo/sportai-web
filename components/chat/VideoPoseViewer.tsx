@@ -773,6 +773,7 @@ export function VideoPoseViewer({
         
         // Calculate dynamic keypoint radius based on bounding box size
         let keypointRadius = 4; // Default radius
+        let angleFontSize = 14; // Default font size for angle text
         
         // Try to get bounding box dimensions
         if (pose.box) {
@@ -781,6 +782,8 @@ export function VideoPoseViewer({
           // Scale factor: normalize to a reference height (e.g., 400px = normal person)
           // Adjust the 0.01 factor to make dots larger/smaller
           keypointRadius = Math.max(2, Math.min(8, boxHeight * 0.01));
+          // Scale font size proportionally (0.035 factor for text, larger than joints)
+          angleFontSize = Math.max(10, Math.min(20, boxHeight * 0.035));
         } else {
           // Fallback: calculate from keypoints
           const validKeypoints = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
@@ -788,6 +791,7 @@ export function VideoPoseViewer({
             const yCoords = validKeypoints.map(kp => kp.y);
             const estimatedHeight = Math.max(...yCoords) - Math.min(...yCoords);
             keypointRadius = Math.max(2, Math.min(8, estimatedHeight * 0.01));
+            angleFontSize = Math.max(10, Math.min(20, estimatedHeight * 0.035));
           }
         }
         
@@ -855,19 +859,20 @@ export function VideoPoseViewer({
             const idText = pose.id !== undefined 
               ? `ID: ${pose.id}` 
               : (currentPoses.length === 1 ? "Player" : `Player ${personIndex}`);
-            const fontSize = 14;
-            ctx.font = `bold ${fontSize}px sans-serif`;
+            const labelFontSize = angleFontSize; // Use same dynamic size as angle text
+            ctx.font = `bold ${labelFontSize}px sans-serif`;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
             
             const textMetrics = ctx.measureText(idText);
             const textWidth = textMetrics.width;
-            const padding = 6;
-            const cornerRadius = 4;
+            const padding = Math.max(4, labelFontSize * 0.4);
+            const cornerRadius = Math.max(3, labelFontSize * 0.25);
+            const boxHeight = labelFontSize + padding * 1.5;
             
             // Draw label at top-left of box
             const labelX = boxX;
-            const labelY = boxY - 28; // Above box
+            const labelY = boxY - (boxHeight + 6); // Above box, with small gap
 
             // Draw dark background mask behind text (rounded rectangle) - same style as angles
             ctx.fillStyle = "rgba(0, 0, 0, 0.25)"; // Semi-transparent black background
@@ -875,10 +880,10 @@ export function VideoPoseViewer({
             ctx.moveTo(labelX + cornerRadius, labelY);
             ctx.lineTo(labelX + textWidth + padding * 2 - cornerRadius, labelY);
             ctx.quadraticCurveTo(labelX + textWidth + padding * 2, labelY, labelX + textWidth + padding * 2, labelY + cornerRadius);
-            ctx.lineTo(labelX + textWidth + padding * 2, labelY + 22 - cornerRadius);
-            ctx.quadraticCurveTo(labelX + textWidth + padding * 2, labelY + 22, labelX + textWidth + padding * 2 - cornerRadius, labelY + 22);
-            ctx.lineTo(labelX + cornerRadius, labelY + 22);
-            ctx.quadraticCurveTo(labelX, labelY + 22, labelX, labelY + 22 - cornerRadius);
+            ctx.lineTo(labelX + textWidth + padding * 2, labelY + boxHeight - cornerRadius);
+            ctx.quadraticCurveTo(labelX + textWidth + padding * 2, labelY + boxHeight, labelX + textWidth + padding * 2 - cornerRadius, labelY + boxHeight);
+            ctx.lineTo(labelX + cornerRadius, labelY + boxHeight);
+            ctx.quadraticCurveTo(labelX, labelY + boxHeight, labelX, labelY + boxHeight - cornerRadius);
             ctx.lineTo(labelX, labelY + cornerRadius);
             ctx.quadraticCurveTo(labelX, labelY, labelX + cornerRadius, labelY);
             ctx.closePath();
@@ -886,13 +891,13 @@ export function VideoPoseViewer({
 
             // Draw text outline/stroke for extra visibility (same as angles)
             ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = Math.max(2, labelFontSize * 0.2);
             ctx.lineJoin = "round";
-            ctx.strokeText(idText, labelX + padding, labelY + 4);
+            ctx.strokeText(idText, labelX + padding, labelY + padding * 0.5);
 
             // Draw text on top
             ctx.fillStyle = "#00E676"; // Bright green text to match box color
-            ctx.fillText(idText, labelX + padding, labelY + 4);
+            ctx.fillText(idText, labelX + padding, labelY + padding * 0.5);
           }
         }
       }
@@ -919,6 +924,21 @@ export function VideoPoseViewer({
             x: kp.x * scaleX,
             y: kp.y * scaleY,
           }));
+
+          // Calculate dynamic font size for angle text based on bounding box
+          let angleFontSize = 14; // Default font size
+          if (pose.box) {
+            const boxHeight = pose.box.height * scaleY;
+            angleFontSize = Math.max(10, Math.min(20, boxHeight * 0.035));
+          } else {
+            // Fallback: calculate from keypoints
+            const validKeypoints = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
+            if (validKeypoints.length > 0) {
+              const yCoords = validKeypoints.map(kp => kp.y);
+              const estimatedHeight = Math.max(...yCoords) - Math.min(...yCoords);
+              angleFontSize = Math.max(10, Math.min(20, estimatedHeight * 0.035));
+            }
+          }
 
         // Draw selected joints (in progress)
         if (selectedAngleJoints.length >= 2) {
@@ -951,7 +971,7 @@ export function VideoPoseViewer({
             arcColor: "rgba(168, 85, 247, 0.3)", // Semi-transparent purple
             textColor: "#FFFFFF", // White
             lineWidth: 2,
-            fontSize: 14,
+            fontSize: angleFontSize,
             minConfidence: 0.3,
           });
         });
@@ -1477,16 +1497,16 @@ export function VideoPoseViewer({
               color: isPoseEnabled ? "black" : "white",
               backdropFilter: "blur(4px)",
               borderRadius: "var(--radius-3)",
-              height: isPortraitVideo ? "24px" : "28px",
-              padding: isPortraitVideo ? "0 8px" : "0 10px",
+              height: isPortraitVideo || isMobile ? "24px" : "28px",
+              padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
               cursor: "pointer",
               transition: "all 0.2s ease",
-              fontSize: "11px",
+              fontSize: isMobile ? "10px" : "11px",
             }}
           >
-            <Flex gap={isPortraitVideo ? "1" : "2"} align="center">
-              <MagicWandIcon width={isPortraitVideo ? 12 : 14} height={isPortraitVideo ? 12 : 14} />
-              <Text size="2" weight="medium" style={{ fontSize: "11px" }}>
+            <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
+              <MagicWandIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+              <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
                 {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
               </Text>
             </Flex>
@@ -1506,17 +1526,19 @@ export function VideoPoseViewer({
               borderRadius: "var(--radius-3)",
               zIndex: 15,
               pointerEvents: "none",
-              fontSize: "10px",
+              fontSize: isMobile ? "9px" : "10px",
             }}
           >
             <Flex direction="column" gap="1">
-              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: "10px" }}>
+              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: isMobile ? "9px" : "10px" }}>
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
-              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
-                {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
-              </Text>
-              {currentPoses.map((pose, idx) => {
+              {!isMobile && (
+                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
+                  {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
+                </Text>
+              )}
+              {!isMobile && currentPoses.map((pose, idx) => {
                 return (
                   <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
                     Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
@@ -1537,7 +1559,7 @@ export function VideoPoseViewer({
                 const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
                 
                 return (
-                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
+                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isMobile ? "9px" : "10px" }}>
                     Confidence {(overallAvg * 100).toFixed(0)}%
                   </Text>
                 );
@@ -1571,7 +1593,7 @@ export function VideoPoseViewer({
                 }}
               >
                 <Flex direction="column" gap="1" align="end">
-                  <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: "10px" }}>
+                  <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isMobile ? "9px" : "10px" }}>
                     Angles
                   </Text>
                   {measuredAngles.map((angle, idx) => {
@@ -1582,7 +1604,7 @@ export function VideoPoseViewer({
                     const jointC = getJointName(idxC);
                     
                     return (
-                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px" }}>
+                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px" }}>
                         {jointA} - {jointB} - {jointC}:{" "}
                         <span style={{ color: "#A855F7", fontWeight: "bold" }}>
                           {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
@@ -1598,13 +1620,13 @@ export function VideoPoseViewer({
             {isPoseEnabled && showVelocity && currentPoses.length > 0 && (
                <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)" }}>
                   <Flex direction="column" gap="1" align="end">
-                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
+                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
                         Wrist Velocity ({velocityWrist === 'left' ? "L" : "R"})
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
                         Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStats.current.toFixed(1)} km/h</span>
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: "10px", whiteSpace: "nowrap" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
                         Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStats.peak.toFixed(1)} km/h</span>
                     </Text>
                   </Flex>
