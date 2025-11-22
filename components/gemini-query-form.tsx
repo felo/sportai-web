@@ -98,6 +98,16 @@ export function GeminiQueryForm() {
     }
   }, [isHydrated]);
 
+  // Intelligent preloading: When user uploads a video, preload pose detection components
+  // This ensures they're ready if user wants to use pose detection, with zero perceived delay
+  useEffect(() => {
+    if (videoFile) {
+      // Preload in background while user is reviewing the video or typing
+      import("@/components/chat/VideoPoseViewer");
+      import("@/components/chat/Pose3DViewer");
+    }
+  }, [videoFile]);
+
   // Ensure there's always a chat - create one on mount if none exists
   useEffect(() => {
     if (isHydrated) {

@@ -1,0 +1,55 @@
+/* Remove borders and background from Select dropdowns */
+.selectNoBorder,
+.selectNoBorder button,
+.selectNoBorder :global([data-radix-select-trigger]),
+.selectNoBorder:global(button[data-radix-select-trigger]) {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+/* Target Radix Select trigger directly */
+:global([data-radix-select-trigger]).selectNoBorder {
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+/* Styled Select Trigger - Matches action-button-square style */
+.selectTriggerStyled {
+  border-radius: var(--radius-3) !important;
+  border: 2px solid white !important;
+  background-color: transparent !important;
+  transition: all 0.2s ease-out !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.selectTriggerStyled:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--mint-6) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.selectTriggerStyled[data-state="open"] {
+  border-color: var(--mint-6) !important;
+  background-color: rgba(2, 89, 64, 0.05) !important;
+}
+
+/* Dark mode adjustments for styled trigger */
+:global(html[data-theme="dark"]) .selectTriggerStyled,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .selectTriggerStyled {
+  border-color: var(--gray-6) !important;
+  background-color: var(--gray-3) !important;
+}
+
+:global(html[data-theme="dark"]) .selectTriggerStyled:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .selectTriggerStyled:hover {
+  border-color: var(--mint-6) !important;
+  background-color: var(--gray-4) !important;
+}
+

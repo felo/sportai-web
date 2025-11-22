@@ -95,7 +95,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         // Enable model caching - this ensures models are saved to IndexedDB
         // TensorFlow.js should do this automatically, but we're being explicit
         console.log("🔧 TensorFlow.js backend:", tf.getBackend());
-        console.log("🔧 WebGL available:", await tf.backend().checkStorageUsage !== undefined);
+        console.log("🔧 WebGL backend ready:", tf.backend() !== null);
 
         let detectorConfig: any;
         let supportedModel: poseDetection.SupportedModels;

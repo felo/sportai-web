@@ -1,0 +1,172 @@
+/* Timestamp Links in Chat - Clickable video timestamps */
+.timestampLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: rgba(2, 89, 64, 0.1);
+  color: #025940;
+  border: 1px solid rgba(2, 89, 64, 0.3);
+}
+
+.timestampLink:hover {
+  background-color: rgba(2, 89, 64, 0.2);
+  border-color: rgba(2, 89, 64, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(2, 89, 64, 0.2);
+}
+
+/* Dark mode timestamp links */
+:global(html[data-theme="dark"]) .timestampLink,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink {
+  background-color: rgba(122, 219, 143, 0.15);
+  color: #7ADB8F;
+  border-color: rgba(122, 219, 143, 0.3);
+}
+
+:global(html[data-theme="dark"]) .timestampLink:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink:hover {
+  background-color: rgba(122, 219, 143, 0.25);
+  border-color: rgba(122, 219, 143, 0.5);
+  box-shadow: 0 2px 4px rgba(122, 219, 143, 0.3);
+}
+
+/* API Version Tooltip Styling */
+.apiVersionTooltip {
+  padding: 2px 0;
+  line-height: 1.4;
+}
+
+/* Ensure tooltip content inherits proper theme colors */
+:global([data-radix-tooltip-content]) .apiVersionTooltip {
+  background-color: var(--gray-2);
+  border: 1px solid var(--gray-6);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 0 0 1px var(--gray-5);
+}
+
+/* Dark mode tooltip adjustments */
+:global(html[data-theme="dark"] [data-radix-tooltip-content]) .apiVersionTooltip,
+:global([data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-tooltip-content]) .apiVersionTooltip {
+  background-color: var(--gray-2);
+  border-color: var(--gray-6);
+}
+
+/* Light mode tooltip adjustments */
+:global(html[data-theme="light"] [data-radix-tooltip-content]) .apiVersionTooltip,
+:global([data-radix-theme][data-radix-theme-appearance="light"] [data-radix-tooltip-content]) .apiVersionTooltip {
+  background-color: var(--gray-1);
+  border-color: var(--gray-5);
+}
+
+/* Collapsible Sections (details/summary) - Light Mode */
+.collapsibleSection {
+  margin: 1rem 0;
+  border: 1px solid rgba(2, 89, 64, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(2, 89, 64, 0.03);
+  transition: all 0.2s ease;
+}
+
+/* Add padding to the content area inside details */
+.collapsibleSection > *:not(summary) {
+  padding: 0 1rem;
+}
+
+/* Add top padding to the first element after summary */
+.collapsibleSection > summary + * {
+  padding-top: 1rem;
+}
+
+/* Add bottom padding to the last element inside details */
+.collapsibleSection > *:last-child {
+  padding-bottom: 1rem;
+}
+
+.collapsibleSection:hover {
+  border-color: rgba(2, 89, 64, 0.5);
+  background-color: rgba(2, 89, 64, 0.05);
+}
+
+.collapsibleSummary {
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  background-color: rgba(2, 89, 64, 0.08);
+  color: #025940;
+  user-select: none;
+  transition: all 0.2s ease;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collapsibleSummary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsibleSummary::before {
+  content: '▶';
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 0.75em;
+  color: #025940;
+}
+
+.collapsibleSection[open] .collapsibleSummary::before {
+  transform: rotate(90deg);
+}
+
+.collapsibleSummary:hover {
+  background-color: rgba(2, 89, 64, 0.15);
+}
+
+.collapsibleSection[open] .collapsibleSummary {
+  background-color: rgba(2, 89, 64, 0.12);
+  border-bottom: 1px solid rgba(2, 89, 64, 0.2);
+}
+
+/* Dark mode collapsible sections */
+:global(html[data-theme="dark"]) .collapsibleSection,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection {
+  border-color: rgba(122, 219, 143, 0.3);
+  background-color: rgba(122, 219, 143, 0.03);
+}
+
+:global(html[data-theme="dark"]) .collapsibleSection:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection:hover {
+  border-color: rgba(122, 219, 143, 0.5);
+  background-color: rgba(122, 219, 143, 0.05);
+}
+
+:global(html[data-theme="dark"]) .collapsibleSummary,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary {
+  background-color: rgba(122, 219, 143, 0.08);
+  color: #7ADB8F;
+}
+
+:global(html[data-theme="dark"]) .collapsibleSummary::before,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary::before {
+  color: #7ADB8F;
+}
+
+:global(html[data-theme="dark"]) .collapsibleSummary:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+}
+
+:global(html[data-theme="dark"]) .collapsibleSection[open] .collapsibleSummary,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection[open] .collapsibleSummary {
+  background-color: rgba(122, 219, 143, 0.12);
+  border-bottom-color: rgba(122, 219, 143, 0.2);
+}
+

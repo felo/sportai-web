@@ -1,4 +1,5 @@
 import React from "react";
+import styles from "@/styles/markdown.module.css";
 
 /**
  * Convert timestamp string to seconds
@@ -84,7 +85,7 @@ function processTextWithTimestamps(text: string): React.ReactNode[] {
           e.preventDefault();
           jumpToTimestamp(timestamp);
         }}
-        className="timestamp-link"
+        className={styles.timestampLink}
         title="Click to jump to this timestamp in the video"
       >
         {timestamp}
@@ -230,13 +231,13 @@ export const markdownComponents = {
   ),
   details: ({ node, ...props }: any) => (
     <details
-      className="collapsible-section"
+      className={styles.collapsibleSection}
       {...props}
     />
   ),
   summary: ({ node, ...props }: any) => (
     <summary
-      className="collapsible-summary"
+      className={styles.collapsibleSummary}
       {...props}
     />
   ),

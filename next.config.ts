@@ -1,4 +1,9 @@
 import type { NextConfig } from 'next'
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
 
 const nextConfig: NextConfig = {
   images: {
@@ -12,8 +17,53 @@ const nextConfig: NextConfig = {
         hostname: 'res.cloudinary.com',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 31536000, // 1 year for better caching
   },
+  
+  // Bundle optimization - remove console logs in production
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  
+  // Optimize package imports - reduces bundle size significantly
+  experimental: {
+    optimizePackageImports: [
+      '@radix-ui/react-icons',
+      '@radix-ui/themes',
+      'three',
+      '@tensorflow/tfjs',
+    ],
+  },
+  
+  // Webpack optimizations
+  webpack: (config, { isServer }) => {
+    // Optimize Three.js tree-shaking
+    config.module.rules.push({
+      test: /\.js$/,
+      include: /node_modules\/three/,
+      sideEffects: false,
+    });
+    
+    // Don't bundle TensorFlow on server side (it's client-only)
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@tensorflow/tfjs': 'commonjs @tensorflow/tfjs',
+        '@tensorflow/tfjs-backend-webgl': 'commonjs @tensorflow/tfjs-backend-webgl',
+        '@tensorflow-models/pose-detection': 'commonjs @tensorflow-models/pose-detection',
+      });
+    }
+    
+    return config;
+  },
+  
+  // Production optimizations
+  compress: true, // Enable gzip compression
+  poweredByHeader: false, // Remove X-Powered-By header for security
 }
 
-export default nextConfig
+export default withBundleAnalyzer(nextConfig)
 

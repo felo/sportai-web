@@ -9,6 +9,10 @@ const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'], // Use data-attribute instead of prefers-color-scheme
   theme: {
     extend: {
+      // Use CSS variable for optimized font
+      fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"],
+      },
       keyframes: {
         slideIn: {
           from: { transform: "translateX(calc(100% + 16px))" },
@@ -36,6 +40,10 @@ const config: Config = {
     },
   },
   plugins: [],
+  // Production optimizations
+  future: {
+    hoverOnlyWhenSupported: true, // Only apply hover styles on devices that support hover
+  },
 };
 export default config;
 

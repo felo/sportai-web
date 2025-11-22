@@ -11,6 +11,7 @@ import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/stor
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { VideoPoseViewer } from "./VideoPoseViewer";
+import buttonStyles from "@/styles/buttons.module.css";
 
 const THINKING_MESSAGES = [
   "Initializing environment model…",
@@ -188,6 +189,17 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       return () => clearInterval(interval);
     }
   }, [message.content, message.role, userSentVideo]);
+
+  // Intelligent preloading: Load pose detection components when video is present
+  // This ensures components are ready by the time user wants to enable pose detection
+  useEffect(() => {
+    if (hasVideo) {
+      // Preload VideoPoseViewer and its TensorFlow dependencies
+      import("./VideoPoseViewer");
+      // Also preload Pose3DViewer (Three.js) for BlazePose 3D mode
+      import("./Pose3DViewer");
+    }
+  }, [hasVideo]);
 
   // Show PRO upsell after message is complete with a natural delay (only once per chat)
   useEffect(() => {
@@ -547,7 +559,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                   <Button
                     size="2"
                     variant="soft"
-                    className="action-button"
+                    className={buttonStyles.actionButton}
                     onClick={() => {
                       window.open("https://sportai.com/contact", "_blank", "noopener,noreferrer");
                     }}

@@ -6,6 +6,7 @@ import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
 import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
 import * as tf from "@tensorflow/tfjs";
 import { getCacheDiagnostics, type CacheDiagnostics } from "@/lib/model-cache-diagnostics";
+import buttonStyles from "@/styles/buttons.module.css";
 
 export default function PoseDemoPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -137,7 +138,7 @@ export default function PoseDemoPage() {
               <Box style={{ borderTop: "1px solid var(--gray-5)", paddingTop: "12px" }}>
                 <Text size="2" weight="medium" mb="2">🧪 Test Instructions:</Text>
                 <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
-                  1. Open your browser's Developer Tools (F12)
+                  1. Open your browser&apos;s Developer Tools (F12)
                 </Text>
                 <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
                   2. Go to the Console tab to see detailed logging
@@ -146,7 +147,7 @@ export default function PoseDemoPage() {
                   3. Load a video below and wait for pose detection to initialize
                 </Text>
                 <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
-                  4. Check console for "Network: X requests, Y MB loaded" message
+                  4. Check console for &quot;Network: X requests, Y MB loaded&quot; message
                 </Text>
                 <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
                   5. Refresh the page (Cmd+R / Ctrl+R)
@@ -159,7 +160,7 @@ export default function PoseDemoPage() {
                   • First load: ~6-13MB download (depending on model)
                 </Text>
                 <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
-                  • Subsequent loads: Should show "loaded from cache" or minimal traffic
+                  • Subsequent loads: Should show &quot;loaded from cache&quot; or minimal traffic
                 </Text>
                 <Text size="1" color="gray" style={{ display: "block" }}>
                   • If you see large downloads every time, caching is NOT working
@@ -193,7 +194,7 @@ export default function PoseDemoPage() {
               <Button
                 size="4"
                 onClick={handleSelectFile}
-                className="action-button"
+                className={buttonStyles.actionButton}
               >
                 <UploadIcon width="20" height="20" />
                 Select Video File
@@ -215,7 +216,7 @@ export default function PoseDemoPage() {
                 </Text>
                 <Button
                   size="2"
-                  className="action-button-square"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={handleClearVideo}
                 >
                   <TrashIcon width="16" height="16" />

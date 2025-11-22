@@ -6,6 +6,7 @@ import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { STARTER_PROMPTS, type StarterPromptConfig } from "@/utils/prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import buttonStyles from "@/styles/buttons.module.css";
 
 interface StarterPromptsProps {
   onPromptSelect: (
@@ -142,7 +143,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
               <Button
                 size="2"
                 variant="soft"
-                className="action-button"
+                className={buttonStyles.actionButton}
                 onClick={() => handleCardClick(starterPrompt)}
                 loading={loadingVideoForCard === starterPrompt.id}
                 disabled={loadingVideoForCard !== null}
