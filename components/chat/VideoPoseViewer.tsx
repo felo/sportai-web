@@ -1491,16 +1491,31 @@ export function VideoPoseViewer({
                 {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
               </Text>
               {currentPoses.map((pose, idx) => {
-                const stats = confidenceStats.current.get(idx);
-                const avgConfidence = stats ? (stats.sum / stats.count) : (pose.score || 0);
-                
                 return (
                   <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
                     Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
-                    {" • Avg: "}{(avgConfidence * 100).toFixed(0)}%
                   </Text>
                 );
               })}
+              {currentPoses.length > 0 && (() => {
+                // Calculate combined average accuracy across all players
+                let totalSum = 0;
+                let totalCount = 0;
+                currentPoses.forEach((_, idx) => {
+                  const stats = confidenceStats.current.get(idx);
+                  if (stats) {
+                    totalSum += stats.sum;
+                    totalCount += stats.count;
+                  }
+                });
+                const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
+                
+                return (
+                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                    Confidence {(overallAvg * 100).toFixed(0)}%
+                  </Text>
+                );
+              })()}
             </Flex>
           </Box>
         )}
