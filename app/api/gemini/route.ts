@@ -122,6 +122,25 @@ export async function POST(request: NextRequest) {
       logger.timeEnd(`[${requestId}] ${fileType} processing`);
       logger.debug(`[${requestId}] ${fileType} buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     }
+    
+    // Warn about large video files that may cause API issues
+    if (videoData && videoData.mimeType.startsWith("video/")) {
+      const sizeMB = videoData.data.length / (1024 * 1024);
+      // Gemini API tends to have issues with videos > 50MB, especially longer duration ones
+      const LARGE_VIDEO_WARNING_MB = 50;
+      const LARGE_VIDEO_LIMIT_MB = 100;
+      
+      if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
+        logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds recommended limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
+        return NextResponse.json(
+          { error: `Video file is too large (${sizeMB.toFixed(1)} MB). Gemini API works best with videos under ${LARGE_VIDEO_LIMIT_MB} MB. Please use a shorter clip, compress the video, or use 'Low' media resolution.` },
+          { status: 413 }
+        );
+      } else if (sizeMB > LARGE_VIDEO_WARNING_MB) {
+        logger.warn(`[${requestId}] Large video detected (${sizeMB.toFixed(2)} MB) - may cause API timeout or errors`);
+        console.warn(`[Gemini API] ⚠️ Large video (${sizeMB.toFixed(2)} MB) - processing may be slow or fail. Consider using a shorter clip or lower resolution.`);
+      }
+    }
 
     // Check if streaming is requested (for both text-only and video queries)
     const shouldStream = request.headers.get("x-stream") === "true";

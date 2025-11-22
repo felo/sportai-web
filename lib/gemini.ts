@@ -475,6 +475,21 @@ export async function* streamGemini(
       statusText: error?.statusText,
       errorDetails: error?.errorDetails,
     });
+    
+    // Provide more helpful error messages for common issues
+    if (error?.status === 500 || error?.statusText === "Internal Server Error") {
+      if (videoData) {
+        const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
+        throw new Error(
+          `Gemini API encountered an internal error while processing your ${mediaSizeMB}MB video. This often happens with longer videos. Try: (1) Using a shorter video clip, (2) Compressing the video, or (3) Switching to 'Low' media resolution in settings.`
+        );
+      } else {
+        throw new Error(
+          "Gemini API encountered an internal error. Please try again in a few moments."
+        );
+      }
+    }
+    
     throw error;
   }
 }

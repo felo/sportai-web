@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon } from "@radix-ui/react-icons";
@@ -98,6 +98,7 @@ export function VideoPoseViewer({
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [isPortraitVideo, setIsPortraitVideo] = useState(false);
 
   useEffect(() => {
     // Dynamic import to avoid SSR issues with storage utility
@@ -275,13 +276,20 @@ export function VideoPoseViewer({
       const aspectRatio = video.videoWidth / video.videoHeight;
       const containerWidth = containerRef.current?.clientWidth || width;
       
+      // Detect if video is portrait (vertical)
+      setIsPortraitVideo(video.videoHeight > video.videoWidth);
+      
+      // Calculate max height: 720px for portrait videos in theatre mode
+      const maxHeight = 720;
+      
       let newWidth = containerWidth;
       let newHeight = containerWidth / aspectRatio;
 
       // Constrain height if needed
-      if (newHeight > height) {
-        newHeight = height;
-        newWidth = height * aspectRatio;
+      const effectiveMaxHeight = Math.min(height, maxHeight);
+      if (newHeight > effectiveMaxHeight) {
+        newHeight = effectiveMaxHeight;
+        newWidth = effectiveMaxHeight * aspectRatio;
       }
 
       setDimensions({ width: newWidth, height: newHeight });
@@ -337,6 +345,11 @@ export function VideoPoseViewer({
     }
   };
 
+  // Memoized callback for pose detection
+  const handlePosesDetected = useCallback((poses: PoseDetectionResult[]) => {
+    setCurrentPoses(poses);
+  }, []);
+
   // Handle continuous pose detection while playing (only if not using preprocessed mode)
   useEffect(() => {
     const video = videoRef.current;
@@ -352,15 +365,12 @@ export function VideoPoseViewer({
       return;
     }
 
-    startDetection(video, (poses) => {
-      setCurrentPoses(poses);
-    });
+    startDetection(video, handlePosesDetected);
 
     return () => {
       stopDetection();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, showSkeleton, isLoading, usePreprocessing]);
+  }, [isPlaying, showSkeleton, isLoading, usePreprocessing, isPoseEnabled, startDetection, stopDetection, handlePosesDetected]);
 
   // Auto-play video when model finishes loading
   useEffect(() => {
@@ -409,7 +419,7 @@ export function VideoPoseViewer({
 
     video.addEventListener('seeked', handleSeeked);
     return () => video.removeEventListener('seeked', handleSeeked);
-  }, [showSkeleton, isLoading, detectPose, videoFPS, usePreprocessing, preprocessedPoses]);
+  }, [showSkeleton, isLoading, detectPose, videoFPS, usePreprocessing, preprocessedPoses, isPoseEnabled]);
 
   // Track current frame number during playback
   useEffect(() => {
@@ -482,32 +492,41 @@ export function VideoPoseViewer({
     const scaleY = dimensions.height / video.videoHeight;
 
     setJointTrajectories(prev => {
-      const newTrajectories = new Map(prev);
-      
       // Track first person only for trajectories
       const firstPose = currentPoses[0];
       if (!firstPose) return prev;
+      
+      let hasChanges = false;
+      const newTrajectories = new Map(prev);
       
       for (const jointIndex of selectedJoints) {
         const keypoint = firstPose.keypoints[jointIndex];
         if (keypoint && (keypoint.score ?? 0) > 0.3) {
           const trajectory = newTrajectories.get(jointIndex) || [];
-          trajectory.push({
+          const newPoint = {
             x: keypoint.x * scaleX,
             y: keypoint.y * scaleY,
             frame: currentFrame,
-          });
+          };
           
-          // Keep last 300 points to avoid memory issues
-          if (trajectory.length > 300) {
-            trajectory.shift();
+          // Only add if this is a new frame (avoid duplicates)
+          const lastPoint = trajectory[trajectory.length - 1];
+          if (!lastPoint || lastPoint.frame !== currentFrame) {
+            trajectory.push(newPoint);
+            hasChanges = true;
+            
+            // Keep last 300 points to avoid memory issues
+            if (trajectory.length > 300) {
+              trajectory.shift();
+            }
+            
+            newTrajectories.set(jointIndex, trajectory);
           }
-          
-          newTrajectories.set(jointIndex, trajectory);
         }
       }
       
-      return newTrajectories;
+      // Only return new Map if we actually added points
+      return hasChanges ? newTrajectories : prev;
     });
   }, [currentPoses, showTrajectories, selectedJoints, currentFrame, dimensions.width, dimensions.height]);
 
@@ -794,9 +813,6 @@ export function VideoPoseViewer({
         if (showTrackingId) {
           let boxX = 0, boxY = 0, boxW = 0, boxH = 0;
           let hasBox = false;
-
-          // Debug: Log pose ID
-          console.log('Pose ID:', pose.id, 'Box:', pose.box);
 
           // 1. Try to use the model's bounding box if available
           if (pose.box) {
@@ -1393,10 +1409,14 @@ export function VideoPoseViewer({
         ref={containerRef}
         style={{
           position: "relative",
-          width: "100%",
+          width: `${dimensions.width}px`,
+          height: `${dimensions.height}px`,
+          maxWidth: "100%",
+          maxHeight: "720px",
           backgroundColor: "var(--gray-2)",
           borderRadius: "var(--radius-3)",
           overflow: "hidden",
+          margin: "0 auto",
         }}
       >
         <video
@@ -1413,7 +1433,8 @@ export function VideoPoseViewer({
           style={{
             display: "block",
             width: "100%",
-            height: "auto",
+            height: "100%",
+            objectFit: "contain",
           }}
           playsInline
           muted
@@ -1439,8 +1460,8 @@ export function VideoPoseViewer({
         <Box
           style={{
             position: "absolute",
-            top: "12px",
-            left: "12px",
+            top: isPortraitVideo ? "8px" : "12px",
+            left: isPortraitVideo ? "8px" : "12px",
             zIndex: 30, // Higher than overlays
           }}
         >
@@ -1453,15 +1474,16 @@ export function VideoPoseViewer({
               color: isPoseEnabled ? "black" : "white",
               backdropFilter: "blur(4px)",
               borderRadius: "var(--radius-3)",
-              height: "32px",
-              padding: "0 12px",
+              height: isPortraitVideo ? "24px" : "32px",
+              padding: isPortraitVideo ? "0 8px" : "0 12px",
               cursor: "pointer",
               transition: "all 0.2s ease",
+              fontSize: isPortraitVideo ? "11px" : "inherit",
             }}
           >
-            <Flex gap="2" align="center">
-              <MagicWandIcon width="16" height="16" />
-              <Text size="2" weight="medium">
+            <Flex gap={isPortraitVideo ? "1" : "2"} align="center">
+              <MagicWandIcon width={isPortraitVideo ? 12 : 16} height={isPortraitVideo ? 12 : 16} />
+              <Text size="2" weight="medium" style={{ fontSize: isPortraitVideo ? "11px" : "inherit" }}>
                 {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
               </Text>
             </Flex>
@@ -1473,26 +1495,27 @@ export function VideoPoseViewer({
           <Box
             style={{
               position: "absolute",
-              top: "52px", // Shifted down to make room for Toggle Button
-              left: "12px",
+              top: isPortraitVideo ? "38px" : "52px", // Shifted down to make room for Toggle Button
+              left: isPortraitVideo ? "8px" : "12px",
               backgroundColor: "rgba(0, 0, 0, 0.6)",
               backdropFilter: "blur(4px)",
-              padding: "8px 12px",
+              padding: isPortraitVideo ? "6px 8px" : "8px 12px",
               borderRadius: "var(--radius-3)",
               zIndex: 15,
               pointerEvents: "none",
+              fontSize: isPortraitVideo ? "10px" : "inherit",
             }}
           >
             <Flex direction="column" gap="1">
-              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)" }}>
+              <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
-              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)" }}>
+              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                 {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
               </Text>
               {currentPoses.map((pose, idx) => {
                 return (
-                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                     Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
                   </Text>
                 );
@@ -1511,7 +1534,7 @@ export function VideoPoseViewer({
                 const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
                 
                 return (
-                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                     Confidence {(overallAvg * 100).toFixed(0)}%
                   </Text>
                 );
@@ -1523,25 +1546,25 @@ export function VideoPoseViewer({
         {/* Top-Right Overlays Container */}
         <Flex 
             direction="column" 
-            gap="2" 
+            gap={isPortraitVideo ? "1" : "2"}
             style={{ 
                 position: "absolute", 
-                top: "12px", 
-                right: "12px", 
+                top: isPortraitVideo ? "8px" : "12px", 
+                right: isPortraitVideo ? "8px" : "12px", 
                 zIndex: 15,
                 pointerEvents: "none",
                 alignItems: "flex-end"
             }}
         >
-        {/* Angles Overlay */}
-        {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
+        {/* Angles Overlay - Hidden in portrait/vertical mode */}
+        {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && !isPortraitVideo && (
           <Box
             style={{
                   backgroundColor: "rgba(0, 0, 0, 0.6)",
                   backdropFilter: "blur(4px)",
                   padding: "8px 12px",
                   borderRadius: "var(--radius-3)",
-                  minWidth: "140px"
+                  minWidth: "140px",
                 }}
               >
                 <Flex direction="column" gap="1" align="end">
@@ -1570,15 +1593,15 @@ export function VideoPoseViewer({
 
             {/* Velocity Overlay */}
             {isPoseEnabled && showVelocity && currentPoses.length > 0 && (
-               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: "8px 12px", borderRadius: "var(--radius-3)", minWidth: "140px" }}>
+               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)", minWidth: isPortraitVideo ? "100px" : "140px" }}>
                   <Flex direction="column" gap="1" align="end">
-                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                         Wrist Velocity ({velocityWrist === 'left' ? "L" : "R"})
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                         Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStats.current.toFixed(1)} km/h</span>
                     </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right" }}>
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isPortraitVideo ? "10px" : "inherit" }}>
                         Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStats.peak.toFixed(1)} km/h</span>
                     </Text>
                   </Flex>

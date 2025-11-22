@@ -85,6 +85,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
   const [showProUpsell, setShowProUpsell] = useState(false);
+  const [videoContainerStyle, setVideoContainerStyle] = useState<React.CSSProperties>({});
   const isMobile = useIsMobile();
 
   // Load developer mode and theatre mode on mount
@@ -231,6 +232,49 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
         video.playbackRate = message.videoPlaybackSpeed;
       }
       
+      const handleLoadedMetadata = () => {
+        if (theatreMode && video.videoWidth && video.videoHeight) {
+          // Calculate max height: 720px for portrait videos in theatre mode
+          const maxHeight = 720;
+          
+          // Calculate dimensions respecting aspect ratio and max height
+          const aspectRatio = video.videoWidth / video.videoHeight;
+          
+          if (video.videoHeight > video.videoWidth) {
+            // Portrait video - height is the limiting factor
+            // Constrain by height and center horizontally
+            const constrainedHeight = Math.min(maxHeight, video.videoHeight);
+            const constrainedWidth = constrainedHeight * aspectRatio;
+            
+            setVideoContainerStyle({
+              position: "relative",
+              width: `${constrainedWidth}px`,
+              height: `${constrainedHeight}px`,
+              backgroundColor: "var(--gray-3)",
+              margin: "0 auto", // Center the video
+              maxWidth: "100%", // Ensure it doesn't overflow on small screens
+            });
+          } else {
+            // Landscape video - width is 100%, height auto-calculated with max constraint
+            setVideoContainerStyle({
+              position: "relative",
+              width: "100%",
+              maxHeight: `${maxHeight}px`,
+              aspectRatio: `${aspectRatio}`,
+              backgroundColor: "var(--gray-3)",
+            });
+          }
+        } else {
+          // Non-theatre mode: use standard 16:9
+          setVideoContainerStyle({
+            position: "relative",
+            width: "100%",
+            aspectRatio: "16 / 9",
+            backgroundColor: "var(--gray-3)",
+          });
+        }
+      };
+      
       const playVideo = async () => {
         try {
           if (video.readyState >= 3) {
@@ -251,8 +295,14 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       };
 
       // Add event listeners
+      video.addEventListener("loadedmetadata", handleLoadedMetadata);
       video.addEventListener("canplay", handleCanPlay);
       video.addEventListener("loadeddata", handleLoadedData);
+      
+      // Try to calculate dimensions if video is already loaded
+      if (video.readyState >= 1) {
+        handleLoadedMetadata();
+      }
       
       // Try to play if video is already loaded
       if (video.readyState >= 3) {
@@ -260,11 +310,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       }
 
       return () => {
+        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
         video.removeEventListener("canplay", handleCanPlay);
         video.removeEventListener("loadeddata", handleLoadedData);
       };
     }
-  }, [hasVideo, message.videoFile, message.videoUrl, message.videoPlaybackSpeed]);
+  }, [hasVideo, message.videoFile, message.videoUrl, message.videoPlaybackSpeed, theatreMode]);
 
   return (
     <Flex
@@ -318,6 +369,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                 style={{
                   overflow: "hidden",
                   borderRadius: "var(--radius-3)",
+                  maxHeight: theatreMode ? "720px" : "none",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
                 }}
               >
                 {message.videoFile?.type.startsWith("image/") || (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ? (
@@ -333,17 +388,25 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                     }}
                     style={{
                       maxWidth: "100%",
+                      maxHeight: theatreMode ? "720px" : "auto",
                       display: "block",
+                      objectFit: "contain",
+                      margin: "0 auto",
                     }}
                   />
                 ) : videoSrc ? (
                   <Box
-                    style={{
-                      position: "relative",
-                      width: "100%",
-                      aspectRatio: "16 / 9",
-                      backgroundColor: "var(--gray-3)",
-                    }}
+                    style={
+                      Object.keys(videoContainerStyle).length === 0
+                        ? {
+                            position: "relative",
+                            width: "100%",
+                            aspectRatio: "16 / 9",
+                            maxHeight: theatreMode ? "720px" : "none",
+                            backgroundColor: "var(--gray-3)",
+                          }
+                        : videoContainerStyle
+                    }
                   >
                     {showPoseViewer ? (
                       <VideoPoseViewer
