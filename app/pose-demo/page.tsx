@@ -115,23 +115,33 @@ export default function PoseDemoPage() {
         <Card size="2">
           <Flex direction="column" gap="3">
             <Heading size="4">How it works</Heading>
-            <Flex direction="column" gap="2" as="ul" style={{ listStyle: "none", padding: 0 }}>
-              <Text as="li" size="2">
-                ✅ <strong>Client-side processing</strong> - All analysis happens in your browser
-              </Text>
-              <Text as="li" size="2">
-                ✅ <strong>Real-time detection</strong> - Skeleton overlay updates as video plays
-              </Text>
-              <Text as="li" size="2">
-                ✅ <strong>MoveNet model</strong> - Fast and accurate pose estimation
-              </Text>
-              <Text as="li" size="2">
-                ✅ <strong>17 keypoints</strong> - Full body tracking from nose to ankles
-              </Text>
-              <Text as="li" size="2">
-                ✅ <strong>Privacy-first</strong> - No video data leaves your device
-              </Text>
-            </Flex>
+            <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
+              <li>
+                <Text size="2">
+                  ✅ <strong>Client-side processing</strong> - All analysis happens in your browser
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  ✅ <strong>Real-time detection</strong> - Skeleton overlay updates as video plays
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  ✅ <strong>MoveNet model</strong> - Fast and accurate pose estimation
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  ✅ <strong>17 keypoints</strong> - Full body tracking from nose to ankles
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  ✅ <strong>Privacy-first</strong> - No video data leaves your device
+                </Text>
+              </li>
+            </ul>
           </Flex>
         </Card>
 
@@ -139,23 +149,33 @@ export default function PoseDemoPage() {
         <Card size="2">
           <Flex direction="column" gap="3">
             <Heading size="4">Sports Analysis Use Cases</Heading>
-            <Flex direction="column" gap="2" as="ul" style={{ listStyle: "none", padding: 0 }}>
-              <Text as="li" size="2">
-                🏃 <strong>Form analysis</strong> - Track running, jumping, or lifting technique
-              </Text>
-              <Text as="li" size="2">
-                ⚽ <strong>Motion tracking</strong> - Analyze kicks, throws, and swings
-              </Text>
-              <Text as="li" size="2">
-                🤸 <strong>Pose comparison</strong> - Compare athlete form to ideal technique
-              </Text>
-              <Text as="li" size="2">
-                📊 <strong>Movement metrics</strong> - Extract angles, distances, and velocities
-              </Text>
-              <Text as="li" size="2">
-                🎯 <strong>Injury prevention</strong> - Identify potentially harmful movements
-              </Text>
-            </Flex>
+            <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
+              <li>
+                <Text size="2">
+                  🏃 <strong>Form analysis</strong> - Track running, jumping, or lifting technique
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  ⚽ <strong>Motion tracking</strong> - Analyze kicks, throws, and swings
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  🤸 <strong>Pose comparison</strong> - Compare athlete form to ideal technique
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  📊 <strong>Movement metrics</strong> - Extract angles, distances, and velocities
+                </Text>
+              </li>
+              <li>
+                <Text size="2">
+                  🎯 <strong>Injury prevention</strong> - Identify potentially harmful movements
+                </Text>
+              </li>
+            </ul>
           </Flex>
         </Card>
         </Flex>
@@ -163,4 +183,3 @@ export default function PoseDemoPage() {
     </div>
   );
 }
-
