@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
@@ -1305,7 +1305,7 @@ export function VideoPoseViewer({
               <Button
                 onClick={handlePlayPause}
                 disabled={isLoading || isPreprocessing}
-                variant="soft"
+                className="action-button-square"
                 size="2"
               >
                 {isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -1314,7 +1314,7 @@ export function VideoPoseViewer({
               <Button
                 onClick={handleReset}
                 disabled={isLoading || isPreprocessing}
-                variant="soft"
+                className="action-button-square"
                 size="2"
               >
                 <ResetIcon />
@@ -1325,17 +1325,17 @@ export function VideoPoseViewer({
                 <Button
                   onClick={handlePreprocess}
                   disabled={isLoading}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
-                  color="mint"
                 >
+                  <MagicWandIcon width="16" height="16" />
                   Pre-process All Frames
                 </Button>
                 {/* Frame-by-Frame Navigation */}
                 <Button
                   onClick={() => handleFrameStep('backward')}
                   disabled={isLoading || isPreprocessing}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
                 >
                   <ChevronLeftIcon width="16" height="16" />
@@ -1344,7 +1344,7 @@ export function VideoPoseViewer({
                 <Button
                   onClick={() => handleFrameStep('forward')}
                   disabled={isLoading || isPreprocessing}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
                 >
                   Next Frame
@@ -1359,9 +1359,8 @@ export function VideoPoseViewer({
                     setUsePreprocessing(false);
                     setPreprocessedPoses(new Map());
                   }}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
-                  color="amber"
                 >
                   Using Pre-processed • Click to Disable
                 </Button>
@@ -1369,7 +1368,7 @@ export function VideoPoseViewer({
                 <Button
                   onClick={() => handleFrameStep('backward')}
                   disabled={isLoading || isPreprocessing}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
                 >
                   <ChevronLeftIcon width="16" height="16" />
@@ -1378,7 +1377,7 @@ export function VideoPoseViewer({
                 <Button
                   onClick={() => handleFrameStep('forward')}
                   disabled={isLoading || isPreprocessing}
-                  variant="soft"
+                  className="action-button-square"
                   size="2"
                 >
                   Next Frame
@@ -1399,6 +1398,7 @@ export function VideoPoseViewer({
                 disabled={isLoading || showTrajectories}
               >
                 <Select.Trigger 
+                  className="select-trigger-styled"
                   style={{ width: "100%", height: "70px", padding: "12px" }}
                   placeholder="Select speed..."
                 >
@@ -1475,7 +1475,7 @@ export function VideoPoseViewer({
                 }}
                 disabled={isLoading || isPreprocessing}
               >
-                <Select.Trigger style={{ width: "100%", height: "70px", padding: "12px" }}>
+                <Select.Trigger className="select-trigger-styled" style={{ width: "100%", height: "70px", padding: "12px" }}>
                   <Flex direction="column" gap="1" align="start">
                     <Text weight="medium" size="2">
                       {selectedModel === "MoveNet" ? "MoveNet (2D)" : "BlazePose (3D)"}
@@ -1513,7 +1513,7 @@ export function VideoPoseViewer({
                   }}
                   disabled={isLoading || isPreprocessing}
                 >
-                  <Select.Trigger style={{ width: "100%", height: "70px", padding: "12px" }}>
+                  <Select.Trigger className="select-trigger-styled" style={{ width: "100%", height: "70px", padding: "12px" }}>
                     <Flex direction="column" gap="1" align="start">
                       <Text weight="medium" size="2">
                         {blazePoseModelType.charAt(0).toUpperCase() + blazePoseModelType.slice(1)}
@@ -2042,6 +2042,7 @@ export function VideoPoseViewer({
               disabled={isLoading || isDetecting}
             >
               <Select.Trigger 
+                className="select-trigger-styled"
                 style={{ width: "100%", height: "70px", padding: "12px" }}
                 placeholder="Select sensitivity..."
               >
@@ -2103,6 +2104,7 @@ export function VideoPoseViewer({
               disabled={isLoading || isDetecting}
             >
               <Select.Trigger 
+                className="select-trigger-styled"
                 style={{ width: "100%", height: "70px", padding: "12px" }}
                 placeholder="Select resolution..."
               >
@@ -2164,8 +2166,8 @@ export function VideoPoseViewer({
               </Text>
               <Button
                 size="1"
-                variant="soft"
-                color="red"
+                className="action-button-square"
+                data-accent-color="red"
                 onClick={async () => {
                   const cleared = await clearModelCache();
                   if (cleared > 0) {

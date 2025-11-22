@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { Container, Heading, Text, Flex, Box, Button, Card } from "@radix-ui/themes";
 import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
-import { UploadIcon } from "@radix-ui/react-icons";
+import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
 
 export default function PoseDemoPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -42,15 +42,9 @@ export default function PoseDemoPage() {
   };
 
   return (
-    <div
+    <Box
+      className="absolute inset-0 overflow-auto overscroll-contain"
       style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        overflow: "auto",
-        overscrollBehavior: "contain",
         WebkitOverflowScrolling: "touch",
       }}
     >
@@ -92,10 +86,10 @@ export default function PoseDemoPage() {
                 </Text>
                 <Button
                   size="2"
-                  variant="soft"
-                  color="red"
+                  className="action-button-square"
                   onClick={handleClearVideo}
                 >
+                  <TrashIcon width="16" height="16" />
                   Clear Video
                 </Button>
               </Flex>
@@ -111,75 +105,11 @@ export default function PoseDemoPage() {
           </Card>
         )}
 
-        {/* Info Section */}
-        <Card size="2">
-          <Flex direction="column" gap="3">
-            <Heading size="4">How it works</Heading>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
-              <li>
-                <Text size="2">
-                  ✅ <strong>Client-side processing</strong> - All analysis happens in your browser
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  ✅ <strong>Real-time detection</strong> - Skeleton overlay updates as video plays
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  ✅ <strong>MoveNet model</strong> - Fast and accurate pose estimation
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  ✅ <strong>17 keypoints</strong> - Full body tracking from nose to ankles
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  ✅ <strong>Privacy-first</strong> - No video data leaves your device
-                </Text>
-              </li>
-            </ul>
-          </Flex>
-        </Card>
+        
 
-        {/* Use Cases */}
-        <Card size="2">
-          <Flex direction="column" gap="3">
-            <Heading size="4">Sports Analysis Use Cases</Heading>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', listStyle: 'none', padding: 0, margin: 0 }}>
-              <li>
-                <Text size="2">
-                  🏃 <strong>Form analysis</strong> - Track running, jumping, or lifting technique
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  ⚽ <strong>Motion tracking</strong> - Analyze kicks, throws, and swings
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  🤸 <strong>Pose comparison</strong> - Compare athlete form to ideal technique
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  📊 <strong>Movement metrics</strong> - Extract angles, distances, and velocities
-                </Text>
-              </li>
-              <li>
-                <Text size="2">
-                  🎯 <strong>Injury prevention</strong> - Identify potentially harmful movements
-                </Text>
-              </li>
-            </ul>
-          </Flex>
-        </Card>
+
         </Flex>
       </Container>
-    </div>
+    </Box>
   );
 }
