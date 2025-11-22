@@ -1293,10 +1293,11 @@ export function VideoPoseViewer({
 
       // Pause and resume the video to trigger immediate overlay refresh
       const video = videoRef.current;
-      if (video && !video.paused) {
+      if (video) {
+        const wasPlaying = !video.paused;
         video.pause();
         setTimeout(() => {
-          if (video && !video.paused) {
+          if (video && wasPlaying) {
             video.play();
           }
         }, 50); // Small delay to ensure pause event is processed
@@ -1438,7 +1439,7 @@ export function VideoPoseViewer({
             <Flex gap="2" align="center">
               <MagicWandIcon width="16" height="16" />
               <Text size="2" weight="medium">
-                {isPoseEnabled ? "AI Overlay" : "Analyze"}
+                {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
               </Text>
             </Flex>
           </Button>
