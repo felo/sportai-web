@@ -750,6 +750,26 @@ export function VideoPoseViewer({
           }));
         }
         
+        // Calculate dynamic keypoint radius based on bounding box size
+        let keypointRadius = 4; // Default radius
+        
+        // Try to get bounding box dimensions
+        if (pose.box) {
+          // Use bounding box height to scale the radius
+          const boxHeight = pose.box.height * scaleY;
+          // Scale factor: normalize to a reference height (e.g., 400px = normal person)
+          // Adjust the 0.01 factor to make dots larger/smaller
+          keypointRadius = Math.max(2, Math.min(8, boxHeight * 0.01));
+        } else {
+          // Fallback: calculate from keypoints
+          const validKeypoints = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
+          if (validKeypoints.length > 0) {
+            const yCoords = validKeypoints.map(kp => kp.y);
+            const estimatedHeight = Math.max(...yCoords) - Math.min(...yCoords);
+            keypointRadius = Math.max(2, Math.min(8, estimatedHeight * 0.01));
+          }
+        }
+        
         // Draw skeleton if enabled
         if (showSkeleton) {
           // Use BlazePose connections if using BlazePose model, otherwise use MoveNet connections
@@ -761,7 +781,7 @@ export function VideoPoseViewer({
           drawPose(ctx, scaledKeypoints, {
             keypointColor: "#FF9800", // Orange center
             keypointOutlineColor: "#7ADB8F", // Mint green outline
-            keypointRadius: 4,
+            keypointRadius: keypointRadius,
             connectionColor: "#7ADB8F",
             connectionWidth: 3,
             minConfidence: 0.3,
@@ -813,7 +833,10 @@ export function VideoPoseViewer({
             ctx.strokeRect(boxX, boxY, boxW, boxH);
 
             // Draw ID Label - always show, use index if no ID
-            const idText = pose.id !== undefined ? `ID: ${pose.id}` : `Person ${currentPoses.indexOf(pose) + 1}`;
+            const personIndex = currentPoses.indexOf(pose) + 1;
+            const idText = pose.id !== undefined 
+              ? `ID: ${pose.id}` 
+              : (currentPoses.length === 1 ? "Person" : `Person ${personIndex}`);
             const fontSize = 14;
             ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.textAlign = "left";
@@ -1465,7 +1488,7 @@ export function VideoPoseViewer({
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
               <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)" }}>
-                Detected {currentPoses.length} {currentPoses.length === 1 ? "person" : "people"}
+                {currentPoses.length === 1 ? "Tracking person" : `Detected ${currentPoses.length} people`}
               </Text>
               {currentPoses.map((pose, idx) => {
                 const stats = confidenceStats.current.get(idx);
