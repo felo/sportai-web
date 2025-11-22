@@ -255,7 +255,9 @@ export function calculateAngle(
   // Convert to degrees
   const angleDeg = (diff * 180) / Math.PI;
   
-  return angleDeg;
+  // Clamp to 0-180 range for biomechanical relevance
+  // If angle > 180, return the smaller interior angle (360 - angle)
+  return angleDeg > 180 ? 360 - angleDeg : angleDeg;
 }
 
 /**

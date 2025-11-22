@@ -75,9 +75,9 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
       showSkeleton: true,
       showAngles: true,
       defaultAngles: [
-        [6, 8, 10],   // Right Arm (Shoulder-Elbow-Wrist)
-        [11, 13, 15], // Left Leg (Hip-Knee-Ankle)
-        [12, 14, 16]  // Right Leg (Hip-Knee-Ankle)
+        [10, 8, 6],   // Right Arm Reverse (Wrist-Elbow-Shoulder)
+        [15, 13, 11], // Left Leg Reverse (Ankle-Knee-Hip)
+        [16, 14, 12]  // Right Leg Reverse (Ankle-Knee-Hip)
       ],
       useAccurateMode: true, // Thunder
       confidenceMode: "low", // Challenging conditions
