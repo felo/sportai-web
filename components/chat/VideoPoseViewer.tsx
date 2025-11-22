@@ -580,6 +580,9 @@ export function VideoPoseViewer({
         
         // Use BlazePose connections if using BlazePose model, otherwise use MoveNet connections
         const connections = selectedModel === "BlazePose" ? BLAZEPOSE_CONNECTIONS_2D : undefined;
+        const faceIndices = selectedModel === "BlazePose" 
+          ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // BlazePose face indices
+          : undefined; // Default MoveNet indices
         
         drawPose(ctx, scaledKeypoints, {
           keypointColor: "#FF9800", // Orange center
@@ -589,6 +592,7 @@ export function VideoPoseViewer({
           connectionWidth: 3,
           minConfidence: 0.3,
           showFace: showFaceLandmarks,
+          faceIndices: faceIndices,
         }, connections);
       }
     }
@@ -769,6 +773,20 @@ export function VideoPoseViewer({
 
   // Get joint name from index
   const getJointName = (index: number): string => {
+    // BlazePose mapping
+    if (selectedModel === "BlazePose") {
+      const blazePoseNames: { [key: number]: string } = {
+        0: "Nose", 1: "L Eye (In)", 2: "L Eye", 3: "L Eye (Out)", 4: "R Eye (In)", 5: "R Eye", 6: "R Eye (Out)",
+        7: "L Ear", 8: "R Ear", 9: "Mouth (L)", 10: "Mouth (R)",
+        11: "L Shoulder", 12: "R Shoulder", 13: "L Elbow", 14: "R Elbow", 15: "L Wrist", 16: "R Wrist",
+        17: "L Pinky", 18: "R Pinky", 19: "L Index", 20: "R Index", 21: "L Thumb", 22: "R Thumb",
+        23: "L Hip", 24: "R Hip", 25: "L Knee", 26: "R Knee", 27: "L Ankle", 28: "R Ankle",
+        29: "L Heel", 30: "R Heel", 31: "L Foot", 32: "R Foot"
+      };
+      return blazePoseNames[index] || `Joint ${index}`;
+    }
+
+    // MoveNet mapping
     const jointNames: { [key: number]: string } = {
       0: "Nose",
       1: "L Eye",
@@ -963,15 +981,10 @@ export function VideoPoseViewer({
   };
 
   // Get first pose with 3D keypoints for visualization
-  // Track frame number to force re-renders
-  const [pose3DKey, setPose3DKey] = React.useState(0);
-  
   const pose3D = React.useMemo(() => {
     if (selectedModel === "BlazePose" && currentPoses.length > 0) {
       const pose = currentPoses[0];
       if (pose && pose.keypoints3D && pose.keypoints3D.length > 0) {
-        // Increment key to force re-render
-        setPose3DKey(prev => prev + 1);
         return pose;
       }
     }
@@ -1013,10 +1026,10 @@ export function VideoPoseViewer({
               touchAction: "none", 
             }}>
               <Pose3DViewer 
-                key={pose3DKey}
                 pose={pose3D} 
                 width={dimensions.width} 
                 height={dimensions.height} 
+                showFace={showFaceLandmarks}
               />
             </Box>
           ) : (

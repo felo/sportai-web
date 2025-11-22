@@ -136,6 +136,7 @@ export interface DrawOptions {
   minConfidence?: number;
   showConfidence?: boolean;
   showFace?: boolean;
+  faceIndices?: number[]; // Custom face indices to hide when showFace is false
 }
 
 export function drawPose(
@@ -153,10 +154,12 @@ export function drawPose(
     minConfidence = 0.3,
     showConfidence = false,
     showFace = false, // Default to false as requested
+    faceIndices,
   } = options;
 
-  // Face keypoint indices (0-4 in MoveNet)
-  const FACE_INDICES = [
+  // Face keypoint indices (0-4 in MoveNet, 0-10 in BlazePose)
+  // Use provided indices or default to MoveNet's 0-4
+  const FACE_INDICES = faceIndices || [
     POSE_KEYPOINTS.NOSE,
     POSE_KEYPOINTS.LEFT_EYE,
     POSE_KEYPOINTS.RIGHT_EYE,
@@ -236,25 +239,21 @@ export function calculateAngle(
   pointB: { x: number; y: number },
   pointC: { x: number; y: number }
 ): number {
-  // Vector from B to A
-  const vecBA = { x: pointA.x - pointB.x, y: pointA.y - pointB.y };
-  // Vector from B to C
-  const vecBC = { x: pointC.x - pointB.x, y: pointC.y - pointB.y };
+  // Use atan2 to get the signed angle
+  // Canvas Y is down, so we calculate angleBA and angleBC
+  // angleBA is angle from B to A
+  const angleBA = Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
+  const angleBC = Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x);
   
-  // Calculate dot product and magnitudes
-  const dotProduct = vecBA.x * vecBC.x + vecBA.y * vecBC.y;
-  const magBA = Math.sqrt(vecBA.x * vecBA.x + vecBA.y * vecBA.y);
-  const magBC = Math.sqrt(vecBC.x * vecBC.x + vecBC.y * vecBC.y);
+  // Calculate clockwise difference from BA to BC
+  // Standard math: counter-clockwise. Canvas Y-down: clockwise logic works better visually
+  let diff = angleBC - angleBA;
   
-  // Avoid division by zero
-  if (magBA === 0 || magBC === 0) return 0;
+  // Normalize to 0-2PI
+  if (diff < 0) diff += 2 * Math.PI;
   
-  // Calculate angle in radians, then convert to degrees
-  const cosAngle = dotProduct / (magBA * magBC);
-  // Clamp to [-1, 1] to avoid NaN from Math.acos
-  const clampedCos = Math.max(-1, Math.min(1, cosAngle));
-  const angleRad = Math.acos(clampedCos);
-  const angleDeg = (angleRad * 180) / Math.PI;
+  // Convert to degrees
+  const angleDeg = (diff * 180) / Math.PI;
   
   return angleDeg;
 }
@@ -329,12 +328,20 @@ export function drawAngle(
   ctx.strokeStyle = arcColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
+  // Use false (clockwise) for Y-down canvas to match the calculated angle direction
   ctx.arc(pointB.x, pointB.y, radius, angleBA, angleBC, false);
   ctx.stroke();
 
   // Draw angle text with background mask for visibility
-  const textX = pointB.x + radius * 0.7 * Math.cos((angleBA + angleBC) / 2);
-  const textY = pointB.y + radius * 0.7 * Math.sin((angleBA + angleBC) / 2);
+  // Calculate midpoint of the arc for text placement
+  // If angleBC < angleBA (crossing 0), we need to handle wrap-around
+  let midAngle = (angleBA + angleBC) / 2;
+  if (angleBC < angleBA) {
+    midAngle += Math.PI; // Add 180 degrees to get to the other side
+  }
+  
+  const textX = pointB.x + radius * 0.7 * Math.cos(midAngle);
+  const textY = pointB.y + radius * 0.7 * Math.sin(midAngle);
   
   const angleText = `${angle.toFixed(1)}°`;
   ctx.font = `bold ${fontSize}px sans-serif`;

@@ -5,12 +5,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import { Flex, IconButton, Tooltip } from "@radix-ui/themes";
-import { ResetIcon, PlusIcon, MinusIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { ResetIcon, PlusIcon, MinusIcon, ChevronLeftIcon, ChevronRightIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
 
 interface Pose3DViewerProps {
   pose: PoseDetectionResult | null;
   width: number;
   height: number;
+  showFace?: boolean;
 }
 
 // BlazePose 3D keypoint connections (33 keypoints)
@@ -35,7 +36,7 @@ const BLAZEPOSE_CONNECTIONS = [
   [24, 26], [26, 28], [28, 30], [28, 32], // Hip -> Knee -> Ankle -> Foot
 ];
 
-export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
+export function Pose3DViewer({ pose, width, height, showFace = true }: Pose3DViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Refs for Three.js objects to persist across renders
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -46,7 +47,8 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
   const frameIdRef = useRef<number | null>(null);
   
   // Camera state for buttons
-  const [cameraZoom, setCameraZoom] = useState(1);
+  // Start unmirrored (false) as requested
+  const [isMirrored, setIsMirrored] = useState(false);
 
   // Initialize Scene, Camera, Renderer, Controls
   useEffect(() => {
@@ -162,6 +164,10 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
     }
   };
 
+  const handleToggleMirror = () => {
+    setIsMirrored(prev => !prev);
+  };
+
   // Update size on prop change
   useEffect(() => {
     if (!rendererRef.current || !cameraRef.current) return;
@@ -228,7 +234,7 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
 
     // Normalize keypoints to fit in view
     const positions = keypoints3D.map(kp => ({
-      x: (kp.x || 0) * 2, // Scale to fit
+      x: ((kp.x || 0) * (isMirrored ? -1 : 1)) * 2, // Scale to fit and handle mirroring
       y: -(kp.y || 0) * 2, // Flip Y axis
       z: (kp.z || 0) * 2,
     }));
@@ -238,6 +244,9 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
     const sphereMaterial = new THREE.MeshPhongMaterial({ color: 0xff9800 });
     
     keypoints3D.forEach((kp, index) => {
+      // Skip face keypoints if hidden (indices 0-10)
+      if (!showFace && index <= 10) return;
+
       if (kp.score && kp.score > 0.3) {
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial.clone());
         sphere.position.set(positions[index].x, positions[index].y, positions[index].z);
@@ -249,6 +258,9 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
     const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7adb8f, linewidth: 2 });
     
     BLAZEPOSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+      // Skip connections involving face if hidden
+      if (!showFace && (startIdx <= 10 || endIdx <= 10)) return;
+
       if (startIdx < keypoints3D.length && endIdx < keypoints3D.length) {
         const startKp = keypoints3D[startIdx];
         const endKp = keypoints3D[endIdx];
@@ -281,7 +293,7 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
     if (rendererRef.current && sceneRef.current && cameraRef.current) {
       rendererRef.current.render(sceneRef.current, cameraRef.current);
     }
-  }, [pose]); // React will detect changes in pose object
+  }, [pose, isMirrored]); // React will detect changes in pose object
 
   return (
     <div style={{ position: "relative", width: `${width}px`, height: `${height}px` }}>
@@ -321,6 +333,11 @@ export function Pose3DViewer({ pose, width, height }: Pose3DViewerProps) {
           </IconButton>
         </Tooltip>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.2)", margin: "0 2px" }} />
+        <Tooltip content={isMirrored ? "Unmirror View" : "Mirror View"}>
+          <IconButton size="1" variant="ghost" onClick={handleToggleMirror} color={isMirrored ? "blue" : "gray"} highContrast>
+            <ViewHorizontalIcon width="18" height="18" />
+          </IconButton>
+        </Tooltip>
         <Tooltip content="Reset View">
           <IconButton size="1" variant="ghost" onClick={handleReset} color="gray" highContrast>
             <ResetIcon width="18" height="18" />
