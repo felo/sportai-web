@@ -125,7 +125,7 @@ export function VideoPoseViewer({
     velocityHistoryRef.current = [];
   }, [showVelocity, velocityWrist]);
 
-  // Calculate velocity
+  // Calculate velocity - triggered whenever currentPoses updates
   useEffect(() => {
     if (!showVelocity || currentPoses.length === 0) return;
 
@@ -159,6 +159,7 @@ export function VideoPoseViewer({
     }
 
     if (personHeightPx <= 0 || !wristKp || (wristKp.score ?? 0) < 0.3) {
+        // If wrist is not detected, keep current velocity but don't update
         return;
     }
 
@@ -171,12 +172,13 @@ export function VideoPoseViewer({
     const currentTime = video.currentTime;
 
     if (lastWristPosRef.current) {
-        const { x: lastX, y: lastY, time: lastTime } = lastWristPosRef.current;
+        const { x: lastX, y: lastY, time: lastTime, frame: lastFrame } = lastWristPosRef.current;
         const dt = currentTime - lastTime;
+        const frameDiff = Math.abs(currentFrame - lastFrame);
         
-        // Calculate velocity if time advanced (and not too much, e.g. seek)
-        // Use a minimum threshold of 0.01s (10ms) to avoid noise spikes from tiny time steps
-        if (dt > 0.01 && dt < 0.5) { 
+        // Calculate velocity if we've advanced to a new frame
+        // Accept any time delta > 0, but validate it's not a seek (< 0.5s)
+        if (frameDiff > 0 && dt > 0 && dt < 0.5) { 
             const dx = currentX - lastX;
             const dy = currentY - lastY;
             const distPx = Math.sqrt(dx*dx + dy*dy);
@@ -190,7 +192,7 @@ export function VideoPoseViewer({
                 // Add to history for smoothing
                 const history = velocityHistoryRef.current;
                 history.push(velocityKmh);
-                if (history.length > 5) history.shift(); // Keep last 5 frames
+                if (history.length > 3) history.shift(); // Keep last 3 frames
 
                 // Calculate smoothed velocity
                 const smoothedVelocity = history.reduce((a, b) => a + b, 0) / history.length;
@@ -199,15 +201,21 @@ export function VideoPoseViewer({
                     current: smoothedVelocity,
                     peak: Math.max(prev.peak, smoothedVelocity)
                 }));
+            } else {
+                // Outlier detected - keep displaying current velocity
+                console.log(`Velocity outlier detected: ${velocityKmh.toFixed(1)} km/h`);
             }
+        } else if (frameDiff === 0) {
+            // Same frame, keep current velocity (no update needed)
+            return;
         }
     } else {
-        // Reset history on new segment/seek
+        // First frame - reset history
         velocityHistoryRef.current = [];
     }
 
     lastWristPosRef.current = { x: currentX, y: currentY, time: currentTime, frame: currentFrame };
-  }, [currentPoses, showVelocity, velocityWrist, selectedModel]);
+  }, [currentPoses, showVelocity, velocityWrist, selectedModel, currentFrame, videoFPS]);
 
   // Track average confidence stats: Map<personIndex, { sum: number, count: number }>
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
@@ -1429,6 +1437,7 @@ export function VideoPoseViewer({
       {/* Video Container with Canvas Overlay */}
       <Box
         ref={containerRef}
+        tabIndex={0}
         style={{
           position: "relative",
           width: "100%",
@@ -1440,6 +1449,15 @@ export function VideoPoseViewer({
           borderRadius: "var(--radius-3)",
           overflow: "hidden",
           margin: "0 auto",
+          outline: "2px solid transparent",
+          transition: "outline 0.2s ease",
+          cursor: "pointer",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.outline = "2px solid var(--accent-9)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.outline = "2px solid transparent";
         }}
       >
         <video
@@ -1489,19 +1507,13 @@ export function VideoPoseViewer({
           }}
         >
           <Button
-            variant="soft"
-            color={isPoseEnabled ? "mint" : "gray"}
+            className="action-button-square"
             onClick={handleTogglePose}
             style={{
-              backgroundColor: isPoseEnabled ? "var(--mint-9)" : "rgba(0, 0, 0, 0.6)",
-              color: isPoseEnabled ? "black" : "white",
-              backdropFilter: "blur(4px)",
-              borderRadius: "var(--radius-3)",
               height: isPortraitVideo || isMobile ? "24px" : "28px",
               padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
               fontSize: isMobile ? "10px" : "11px",
+              opacity: isPoseEnabled ? 1 : 0.7,
             }}
           >
             <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
@@ -1583,13 +1595,13 @@ export function VideoPoseViewer({
         >
         {/* Angles Overlay - Hidden on mobile and in portrait/vertical mode */}
         {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && !isMobile && !isPortraitVideo && (
-          <Box
-            style={{
+              <Box
+                style={{
                   backgroundColor: "rgba(0, 0, 0, 0.6)",
                   backdropFilter: "blur(4px)",
                   padding: isPortraitVideo ? "6px 8px" : "8px 12px",
                   borderRadius: "var(--radius-3)",
-                  minWidth: isPortraitVideo ? "100px" : "140px",
+                  width: "fit-content",
                 }}
               >
                 <Flex direction="column" gap="1" align="end">
@@ -1599,13 +1611,11 @@ export function VideoPoseViewer({
                   {measuredAngles.map((angle, idx) => {
                     const [idxA, idxB, idxC] = angle;
                     const angleValue = getCurrentAngleValue(angle);
-                    const jointA = getJointName(idxA);
-                    const jointB = getJointName(idxB);
-                    const jointC = getJointName(idxC);
+                    const jointB = getJointName(idxB); // Vertex joint name
                     
                     return (
                       <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px" }}>
-                        {jointA} - {jointB} - {jointC}:{" "}
+                        {jointB}:{" "}
                         <span style={{ color: "#A855F7", fontWeight: "bold" }}>
                           {angleValue !== null ? `${angleValue.toFixed(1)}°` : "N/A"}
                         </span>
@@ -1655,15 +1665,10 @@ export function VideoPoseViewer({
                 <Spinner size="3" />
                 <Text size="4">
                   {isLoading 
-                    ? (loadingFromCache ? "Loading model from cache..." : "Analyzing...")
+                    ? "Preparing AI overlay..."
                     : "Starting playback..."}
                 </Text>
               </Flex>
-              {isLoading && !loadingFromCache && (
-                <Text size="1" style={{ opacity: 0.8 }}>
-                  First load: ~6-13MB. Will be cached for next time.
-                </Text>
-              )}
             </Flex>
           </Flex>
         )}

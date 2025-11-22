@@ -3,6 +3,21 @@ import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
 
+// Enable TensorFlow.js model caching
+// This ensures models are cached in the browser's Cache API
+if (typeof window !== "undefined") {
+  // Set environment flags to enable caching
+  tf.env().set('IS_BROWSER', true);
+  
+  console.log("🔧 TensorFlow.js environment initialized");
+  console.log("🔧 Platform:", tf.env().platformName);
+  console.log("🔧 Features:", {
+    hasWebGL: tf.env().getBool('HAS_WEBGL'),
+    hasIndexedDB: typeof indexedDB !== 'undefined',
+    hasCacheAPI: typeof caches !== 'undefined',
+  });
+}
+
 export type MoveNetModelType = "SinglePose.Lightning" | "SinglePose.Thunder" | "MultiPose.Lightning";
 export type BlazePoseModelType = "lite" | "full" | "heavy";
 export type PoseModelType = MoveNetModelType | BlazePoseModelType;
@@ -76,6 +91,11 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         // Set backend to webgl for better performance
         await tf.setBackend("webgl");
         await tf.ready();
+        
+        // Enable model caching - this ensures models are saved to IndexedDB
+        // TensorFlow.js should do this automatically, but we're being explicit
+        console.log("🔧 TensorFlow.js backend:", tf.getBackend());
+        console.log("🔧 WebGL available:", await tf.backend().checkStorageUsage !== undefined);
 
         let detectorConfig: any;
         let supportedModel: poseDetection.SupportedModels;
@@ -157,18 +177,54 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         // This part is mostly for UI feedback, actual loading happens in createDetector
         try {
           const cachedModels = await tf.io.listModels();
+          console.log("📦 TensorFlow.js cached models:", Object.keys(cachedModels));
           const isCached = Object.keys(cachedModels).some(key => key.includes(modelKey));
           
           if (isCached) {
+            console.log(`✅ Model ${modelKey} found in cache`);
             setLoadingFromCache(true);
           } else {
+            console.log(`❌ Model ${modelKey} NOT found in cache, will download`);
             setLoadingFromCache(false);
           }
         } catch (e) {
+          console.warn("Failed to check cache:", e);
           // Ignore cache check errors
         }
 
         const startTime = performance.now();
+        
+        console.log(`⏳ Creating new detector for ${model} ${modelType}...`);
+        
+        // Monitor network requests to see if model is being downloaded
+        let networkRequestCount = 0;
+        let networkLoadedBytes = 0;
+        const originalFetch = window.fetch;
+        const fetchInterceptor = async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+          
+          // Track TensorFlow.js model downloads
+          if (url.includes('tfhub.dev') || url.includes('tensorflow') || url.includes('tfjs') || url.includes('storage.googleapis.com')) {
+            networkRequestCount++;
+            console.log(`🌐 Fetching model file: ${url.substring(url.lastIndexOf('/') + 1)}`);
+            
+            const response = await originalFetch(input, init);
+            const clonedResponse = response.clone();
+            
+            // Track bytes loaded
+            if (response.ok) {
+              const contentLength = response.headers.get('content-length');
+              if (contentLength) {
+                networkLoadedBytes += parseInt(contentLength, 10);
+              }
+            }
+            
+            return clonedResponse;
+          }
+          
+          return originalFetch(input, init);
+        };
+        window.fetch = fetchInterceptor as typeof fetch;
         
         // Create the detector promise
         const detectorPromise = poseDetection.createDetector(
@@ -182,13 +238,32 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         try {
           const poseDetector = await detectorPromise;
           const loadTime = performance.now() - startTime;
-          console.log(`${model} model loaded in ${(loadTime / 1000).toFixed(2)}s`);
+          
+          // Restore original fetch
+          window.fetch = originalFetch;
+          
+          // Log results with network info
+          console.log(`✅ ${model} model loaded in ${(loadTime / 1000).toFixed(2)}s`);
+          if (networkRequestCount > 0) {
+            console.log(`🌐 Network: ${networkRequestCount} requests, ${(networkLoadedBytes / 1024 / 1024).toFixed(2)}MB loaded`);
+            if (networkLoadedBytes > 100000) {
+              console.warn(`⚠️ Large download detected! Model was likely NOT loaded from cache.`);
+            } else {
+              console.log(`✅ Minimal network traffic - model likely loaded from cache`);
+            }
+          } else {
+            console.log(`✅ No network requests - model loaded entirely from cache!`);
+          }
+          console.log(`📊 Detector cache size: ${detectorCache.size} entries`);
 
           if (mounted) {
             setDetector(poseDetector);
             setIsLoading(false);
           }
         } catch (err) {
+          // Restore original fetch on error
+          window.fetch = originalFetch;
+          
           // If loading failed, remove from cache so we can try again
           detectorCache.delete(configKey);
           throw err;

@@ -1,14 +1,37 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Container, Heading, Text, Flex, Box, Button, Card } from "@radix-ui/themes";
+import { useState, useRef, useEffect } from "react";
+import { Container, Heading, Text, Flex, Box, Button, Card, Code, Badge } from "@radix-ui/themes";
 import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
 import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
+import * as tf from "@tensorflow/tfjs";
+import { getCacheDiagnostics, type CacheDiagnostics } from "@/lib/model-cache-diagnostics";
 
 export default function PoseDemoPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
+  const [diagnostics, setDiagnostics] = useState<CacheDiagnostics | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check cache diagnostics on mount and periodically
+  useEffect(() => {
+    const checkDiagnostics = async () => {
+      try {
+        const diag = await getCacheDiagnostics();
+        console.log("🔍 Cache diagnostics:", diag);
+        setDiagnostics(diag);
+      } catch (err) {
+        console.error("Failed to get diagnostics:", err);
+      }
+    };
+    
+    checkDiagnostics();
+    
+    // Recheck every 5 seconds
+    const interval = setInterval(checkDiagnostics, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,6 +73,112 @@ export default function PoseDemoPage() {
     >
       <Container size="3" py="6">
         <Flex direction="column" gap="6">
+        
+        {/* Diagnostics Panel */}
+        {showDiagnostics && diagnostics && (
+          <Card size="2">
+            <Flex direction="column" gap="3">
+              <Flex justify="between" align="center">
+                <Text size="3" weight="bold">📊 Model Cache Diagnostics</Text>
+                <Button
+                  size="1"
+                  variant="ghost"
+                  onClick={() => setShowDiagnostics(false)}
+                >
+                  Hide
+                </Button>
+              </Flex>
+              
+              {/* Status Badges */}
+              <Flex gap="2" wrap="wrap">
+                <Badge color={diagnostics.indexedDBAvailable ? "green" : "red"}>
+                  IndexedDB: {diagnostics.indexedDBAvailable ? "✓" : "✗"}
+                </Badge>
+                <Badge color={diagnostics.cacheAPIAvailable ? "green" : "red"}>
+                  Cache API: {diagnostics.cacheAPIAvailable ? "✓" : "✗"}
+                </Badge>
+                <Badge color={diagnostics.cacheSize > 0 ? "green" : "orange"}>
+                  IDB Models: {diagnostics.cacheSize}
+                </Badge>
+                <Badge color={(diagnostics.cacheAPIEntries || 0) > 0 ? "green" : "orange"}>
+                  HTTP Cache: {diagnostics.cacheAPIEntries || 0} files
+                </Badge>
+                {diagnostics.storageQuota && (
+                  <Badge color={diagnostics.storageQuota.percentUsed > 80 ? "red" : "blue"}>
+                    Storage: {(diagnostics.storageQuota.usage / 1024 / 1024).toFixed(1)}MB / {(diagnostics.storageQuota.quota / 1024 / 1024).toFixed(0)}MB ({diagnostics.storageQuota.percentUsed.toFixed(1)}%)
+                  </Badge>
+                )}
+              </Flex>
+              
+              {/* Model List */}
+              {diagnostics.cacheSize === 0 ? (
+                <Box>
+                  <Text size="2" color="orange" weight="medium">
+                    ⚠️ No models cached yet
+                  </Text>
+                  <Text size="1" color="gray">
+                    Models will be downloaded when you load a video. This is normal on first use.
+                  </Text>
+                </Box>
+              ) : (
+                <Box>
+                  <Text size="2" weight="medium" mb="2">✅ Cached models:</Text>
+                  <Box style={{ maxHeight: "200px", overflow: "auto" }}>
+                    {diagnostics.cachedModels.map((key, idx) => (
+                      <Code key={idx} size="1" style={{ display: "block", marginBottom: "4px", wordBreak: "break-all" }}>
+                        {key}
+                      </Code>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              
+              {/* Instructions */}
+              <Box style={{ borderTop: "1px solid var(--gray-5)", paddingTop: "12px" }}>
+                <Text size="2" weight="medium" mb="2">🧪 Test Instructions:</Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  1. Open your browser's Developer Tools (F12)
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  2. Go to the Console tab to see detailed logging
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  3. Load a video below and wait for pose detection to initialize
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  4. Check console for "Network: X requests, Y MB loaded" message
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  5. Refresh the page (Cmd+R / Ctrl+R)
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "8px" }}>
+                  6. Load a video again and check if network traffic is reduced
+                </Text>
+                <Text size="2" weight="medium" mt="2" mb="1">📊 What to look for:</Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  • First load: ~6-13MB download (depending on model)
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block", marginBottom: "4px" }}>
+                  • Subsequent loads: Should show "loaded from cache" or minimal traffic
+                </Text>
+                <Text size="1" color="gray" style={{ display: "block" }}>
+                  • If you see large downloads every time, caching is NOT working
+                </Text>
+              </Box>
+            </Flex>
+          </Card>
+        )}
+        
+        {!showDiagnostics && (
+          <Button
+            size="1"
+            variant="soft"
+            onClick={() => setShowDiagnostics(true)}
+          >
+            Show Cache Diagnostics
+          </Button>
+        )}
+        
         {/* Upload Section */}
         {!videoUrl && (
           <Card size="3">
