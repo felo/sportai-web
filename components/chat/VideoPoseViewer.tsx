@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as React from "react";
-import { Box, Flex, Button, Text, Switch, Spinner, Select } from "@radix-ui/themes";
+import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
@@ -41,6 +41,7 @@ export function VideoPoseViewer({
   const [videoFPS, setVideoFPS] = useState(30); // Default FPS, will be detected
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showTrajectories, setShowTrajectories] = useState(false);
+  const [showTrackingId, setShowTrackingId] = useState(false);
   const [smoothTrajectories, setSmoothTrajectories] = useState(true);
   const [showFaceLandmarks, setShowFaceLandmarks] = useState(false);
   const [selectedJoints, setSelectedJoints] = useState<number[]>([9, 10]); // Default: wrists
@@ -548,10 +549,11 @@ export function VideoPoseViewer({
       });
     }
 
-    // Draw poses
-    if (showSkeleton && currentPoses.length > 0) {
+    // Draw poses and tracking boxes
+    if (currentPoses.length > 0) {
       for (const pose of currentPoses) {
         let scaledKeypoints;
+        let scaleX: number, scaleY: number;
         
         if (selectedModel === "BlazePose") {
           // BlazePose uses an internal input resolution
@@ -559,8 +561,8 @@ export function VideoPoseViewer({
           const blazePoseInputWidth = 850;
           const blazePoseInputHeight = 478;
           
-          const scaleX = canvas.width / blazePoseInputWidth;
-          const scaleY = canvas.height / blazePoseInputHeight;
+          scaleX = canvas.width / blazePoseInputWidth;
+          scaleY = canvas.height / blazePoseInputHeight;
           
           scaledKeypoints = pose.keypoints.map(kp => ({
             ...kp,
@@ -569,8 +571,8 @@ export function VideoPoseViewer({
           }));
         } else {
           // MoveNet returns coordinates in video pixel space
-          const scaleX = canvas.width / video.videoWidth;
-          const scaleY = canvas.height / video.videoHeight;
+          scaleX = canvas.width / video.videoWidth;
+          scaleY = canvas.height / video.videoHeight;
           scaledKeypoints = pose.keypoints.map(kp => ({
             ...kp,
             x: kp.x * scaleX,
@@ -578,22 +580,110 @@ export function VideoPoseViewer({
           }));
         }
         
-        // Use BlazePose connections if using BlazePose model, otherwise use MoveNet connections
-        const connections = selectedModel === "BlazePose" ? BLAZEPOSE_CONNECTIONS_2D : undefined;
-        const faceIndices = selectedModel === "BlazePose" 
-          ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // BlazePose face indices
-          : undefined; // Default MoveNet indices
-        
-        drawPose(ctx, scaledKeypoints, {
-          keypointColor: "#FF9800", // Orange center
-          keypointOutlineColor: "#7ADB8F", // Mint green outline
-          keypointRadius: 4,
-          connectionColor: "#7ADB8F",
-          connectionWidth: 3,
-          minConfidence: 0.3,
-          showFace: showFaceLandmarks,
-          faceIndices: faceIndices,
-        }, connections);
+        // Draw skeleton if enabled
+        if (showSkeleton) {
+          // Use BlazePose connections if using BlazePose model, otherwise use MoveNet connections
+          const connections = selectedModel === "BlazePose" ? BLAZEPOSE_CONNECTIONS_2D : undefined;
+          const faceIndices = selectedModel === "BlazePose" 
+            ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // BlazePose face indices
+            : undefined; // Default MoveNet indices
+          
+          drawPose(ctx, scaledKeypoints, {
+            keypointColor: "#FF9800", // Orange center
+            keypointOutlineColor: "#7ADB8F", // Mint green outline
+            keypointRadius: 4,
+            connectionColor: "#7ADB8F",
+            connectionWidth: 3,
+            minConfidence: 0.3,
+            showFace: showFaceLandmarks,
+            faceIndices: faceIndices,
+          }, connections);
+        }
+
+        // Draw Tracking ID & Bounding Box (independent of skeleton)
+        if (showTrackingId) {
+          let boxX = 0, boxY = 0, boxW = 0, boxH = 0;
+          let hasBox = false;
+
+          // Debug: Log pose ID
+          console.log('Pose ID:', pose.id, 'Box:', pose.box);
+
+          // 1. Try to use the model's bounding box if available
+          if (pose.box) {
+            boxX = pose.box.xMin * scaleX;
+            boxY = pose.box.yMin * scaleY;
+            boxW = pose.box.width * scaleX;
+            boxH = pose.box.height * scaleY;
+            hasBox = true;
+          } 
+          // 2. Fallback: Calculate bounding box from keypoints
+          else {
+            const validKeypoints = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
+            if (validKeypoints.length > 0) {
+              const xCoords = validKeypoints.map(kp => kp.x);
+              const yCoords = validKeypoints.map(kp => kp.y);
+              const minX = Math.min(...xCoords);
+              const maxX = Math.max(...xCoords);
+              const minY = Math.min(...yCoords);
+              const maxY = Math.max(...yCoords);
+              
+              const padding = 20;
+              boxX = minX - padding;
+              boxY = minY - padding;
+              boxW = maxX - minX + padding * 2;
+              boxH = maxY - minY + padding * 2;
+              hasBox = true;
+            }
+          }
+
+          if (hasBox) {
+            // Draw Bounding Box
+            ctx.strokeStyle = "#00E676"; // Bright Green
+            ctx.lineWidth = 2;
+            ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+            // Draw ID Label - always show, use index if no ID
+            const idText = pose.id !== undefined ? `ID: ${pose.id}` : `Person ${currentPoses.indexOf(pose) + 1}`;
+            const fontSize = 14;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            
+            const textMetrics = ctx.measureText(idText);
+            const textWidth = textMetrics.width;
+            const padding = 6;
+            const cornerRadius = 4;
+            
+            // Draw label at top-left of box
+            const labelX = boxX;
+            const labelY = boxY - 28; // Above box
+
+            // Draw dark background mask behind text (rounded rectangle) - same style as angles
+            ctx.fillStyle = "rgba(0, 0, 0, 0.25)"; // Semi-transparent black background
+            ctx.beginPath();
+            ctx.moveTo(labelX + cornerRadius, labelY);
+            ctx.lineTo(labelX + textWidth + padding * 2 - cornerRadius, labelY);
+            ctx.quadraticCurveTo(labelX + textWidth + padding * 2, labelY, labelX + textWidth + padding * 2, labelY + cornerRadius);
+            ctx.lineTo(labelX + textWidth + padding * 2, labelY + 22 - cornerRadius);
+            ctx.quadraticCurveTo(labelX + textWidth + padding * 2, labelY + 22, labelX + textWidth + padding * 2 - cornerRadius, labelY + 22);
+            ctx.lineTo(labelX + cornerRadius, labelY + 22);
+            ctx.quadraticCurveTo(labelX, labelY + 22, labelX, labelY + 22 - cornerRadius);
+            ctx.lineTo(labelX, labelY + cornerRadius);
+            ctx.quadraticCurveTo(labelX, labelY, labelX + cornerRadius, labelY);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw text outline/stroke for extra visibility (same as angles)
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+            ctx.lineWidth = 3;
+            ctx.lineJoin = "round";
+            ctx.strokeText(idText, labelX + padding, labelY + 4);
+
+            // Draw text on top
+            ctx.fillStyle = "#00E676"; // Bright green text to match box color
+            ctx.fillText(idText, labelX + padding, labelY + 4);
+          }
+        }
       }
     }
 
@@ -656,7 +746,7 @@ export function VideoPoseViewer({
         });
       }
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel]);
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId]);
 
   // Catmull-Rom spline interpolation for smooth trajectories
   // Creates smooth curves through points, simulating higher FPS
@@ -1486,155 +1576,155 @@ export function VideoPoseViewer({
             </Flex>
           )}
 
-          {/* Skeleton Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showSkeleton}
-              onCheckedChange={setShowSkeleton}
-              disabled={isLoading}
-            />
-            <Text size="2" color="gray">
-              Show skeleton overlay
-              {isDetecting && showSkeleton && (
-                <Text as="span" color="mint" ml="2">
-                  • Detecting
-                </Text>
-              )}
-            </Text>
-          </Flex>
-
-          {/* Face Landmarks Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showFaceLandmarks}
-              onCheckedChange={setShowFaceLandmarks}
-              disabled={isLoading || !showSkeleton}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                Show face landmarks
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {showFaceLandmarks 
-                  ? "Showing eyes, ears, and nose."
-                  : "Hiding face points for privacy/clarity."}
-              </Text>
-            </Flex>
-          </Flex>
-
-          {/* Temporal Smoothing Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={enableSmoothing}
-              onCheckedChange={setEnableSmoothing}
-              disabled={isLoading || isDetecting}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                Temporal smoothing
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {enableSmoothing 
-                  ? "Smooth tracking, reduces jitter. Better for viewing."
-                  : "Raw keypoints, no filtering. Shows exact frame data."}
-              </Text>
-            </Flex>
-          </Flex>
-
-          {/* Joint Trajectory Tracking Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showTrajectories}
-              onCheckedChange={(checked) => {
-                setShowTrajectories(checked);
-                if (!checked) {
-                  setJointTrajectories(new Map()); // Clear trajectories when disabled
-                }
-              }}
-              disabled={isLoading}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                Draw joint trajectories
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {showTrajectories 
-                  ? "Tracing selected joints over time. Select joints below to track their paths."
-                  : "Trace joint movement paths over time"}
-              </Text>
-            </Flex>
-          </Flex>
-
-          {/* Trajectory Smoothing Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={smoothTrajectories}
-              onCheckedChange={setSmoothTrajectories}
-              disabled={isLoading || !showTrajectories}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                Smooth trajectories
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {showTrajectories 
-                  ? (smoothTrajectories 
-                      ? "Interpolating paths with spline curves for smoother motion (simulates higher FPS)"
-                      : "Raw trajectory paths, shows exact recorded points")
-                  : "Enable trajectory tracking above to use smoothing"}
-              </Text>
-            </Flex>
-          </Flex>
-
-          {/* Angle Display Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showAngles}
-              onCheckedChange={(checked) => {
-                setShowAngles(checked);
-                if (!checked) {
-                  setEnableAngleClicking(false); // Disable clicking when hiding angles
-                }
-              }}
-              disabled={isLoading}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                Show angles
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {showAngles 
-                  ? "Display angle measurements on video" 
-                  : "Show angle measurements overlay"}
-              </Text>
-            </Flex>
-          </Flex>
-
-          {/* Angle Clicking Toggle */}
-          {showAngles && (
-            <Flex gap="2" align="center">
-              <Switch
-                checked={enableAngleClicking}
-                onCheckedChange={(checked) => {
-                  setEnableAngleClicking(checked);
-                  if (!checked) {
-                    setSelectedAngleJoints([]); // Clear selection when disabling clicking
-                  }
-                }}
-                disabled={isLoading}
-              />
-              <Flex direction="column" gap="0">
+          {/* Visualization Toggles Grid */}
+          <Grid columns="2" gap="4">
+            {/* Column 1: Main Feature Toggles */}
+            <Flex direction="column" gap="3">
+              {/* Skeleton Toggle */}
+              <Flex gap="2" align="center">
+                <Switch
+                  checked={showSkeleton}
+                  onCheckedChange={setShowSkeleton}
+                  disabled={isLoading}
+                />
                 <Text size="2" color="gray">
-                  Enable angle clicking
-                </Text>
-                <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                  {enableAngleClicking 
-                    ? "Click 3 joints to measure angle (A-B-C), or click existing angles to toggle order" 
-                    : "Click on joints or angles to measure/toggle"}
+                  Show skeleton
+                  {isDetecting && showSkeleton && (
+                    <Text as="span" color="mint" ml="2">
+                      • Detecting
+                    </Text>
+                  )}
                 </Text>
               </Flex>
+
+              {/* Joint Trajectory Tracking Toggle */}
+              <Flex direction="column" gap="2">
+                <Flex gap="2" align="center">
+                  <Switch
+                    checked={showTrajectories}
+                    onCheckedChange={(checked) => {
+                      setShowTrajectories(checked);
+                      if (!checked) {
+                        setJointTrajectories(new Map()); // Clear trajectories when disabled
+                      }
+                    }}
+                    disabled={isLoading}
+                  />
+                  <Text size="2" color="gray">
+                    Joint trajectories
+                  </Text>
+                </Flex>
+                {/* Trajectory Smoothing (nested) */}
+                {showTrajectories && (
+                  <Flex gap="2" align="center" pl="4">
+                    <Switch
+                      checked={smoothTrajectories}
+                      onCheckedChange={setSmoothTrajectories}
+                      disabled={isLoading || !showTrajectories}
+                      size="1"
+                    />
+                    <Text size="1" color="gray">
+                      Smooth paths
+                    </Text>
+                  </Flex>
+                )}
+              </Flex>
+
+              {/* Angle Display Toggle */}
+              <Flex direction="column" gap="2">
+                <Flex gap="2" align="center">
+                  <Switch
+                    checked={showAngles}
+                    onCheckedChange={(checked) => {
+                      setShowAngles(checked);
+                      if (!checked) {
+                        setEnableAngleClicking(false); // Disable clicking when hiding angles
+                      }
+                    }}
+                    disabled={isLoading}
+                  />
+                  <Text size="2" color="gray">
+                    Show angles
+                  </Text>
+                </Flex>
+                {/* Angle Clicking (nested) */}
+                {showAngles && (
+                  <Flex gap="2" align="center" pl="4">
+                    <Switch
+                      checked={enableAngleClicking}
+                      onCheckedChange={(checked) => {
+                        setEnableAngleClicking(checked);
+                        if (!checked) {
+                          setSelectedAngleJoints([]); // Clear selection when disabling clicking
+                        }
+                      }}
+                      disabled={isLoading}
+                      size="1"
+                    />
+                    <Text size="1" color="gray">
+                      Enable clicking
+                    </Text>
+                  </Flex>
+                )}
+              </Flex>
             </Flex>
-          )}
+
+            {/* Column 2: Standalone Settings */}
+            <Flex direction="column" gap="3">
+              {/* Tracking ID Toggle */}
+              <Flex gap="2" align="center">
+                <Switch
+                  checked={showTrackingId}
+                  onCheckedChange={setShowTrackingId}
+                  disabled={isLoading}
+                />
+                <Text size="2" color="gray">
+                  Show Tracking IDs
+                </Text>
+              </Flex>
+
+              {/* Face Landmarks Toggle */}
+              <Flex gap="2" align="center">
+                <Switch
+                  checked={showFaceLandmarks}
+                  onCheckedChange={setShowFaceLandmarks}
+                  disabled={isLoading || !showSkeleton}
+                />
+                <Text size="2" color="gray">
+                  Face landmarks
+                </Text>
+              </Flex>
+
+              {/* Temporal Smoothing Toggle */}
+              <Flex gap="2" align="center">
+                <Switch
+                  checked={enableSmoothing}
+                  onCheckedChange={setEnableSmoothing}
+                  disabled={isLoading || isDetecting}
+                />
+                <Text size="2" color="gray">
+                  Temporal smoothing
+                </Text>
+              </Flex>
+
+              {/* Accurate Mode Toggle */}
+              <Flex gap="2" align="center">
+                <Switch
+                  checked={useAccurateMode}
+                  onCheckedChange={setUseAccurateMode}
+                  disabled={isLoading || isDetecting || maxPoses > 1}
+                />
+                <Flex direction="column" gap="0">
+                  <Text size="2" color="gray">
+                    High accuracy
+                  </Text>
+                  <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                    {maxPoses === 1 ? (useAccurateMode ? "Thunder" : "Lightning") : "MultiPose"}
+                  </Text>
+                </Flex>
+              </Flex>
+            </Flex>
+          </Grid>
 
           {/* Angle Controls (shown when angles enabled) */}
           {showAngles && (
@@ -1939,42 +2029,6 @@ export function VideoPoseViewer({
                 Note: MultiPose.Lightning is always used when detecting 2+ people
               </Text>
             )}
-          </Flex>
-
-          {/* Accurate Mode Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={useAccurateMode}
-              onCheckedChange={setUseAccurateMode}
-              disabled={isLoading || isDetecting || maxPoses > 1}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                High accuracy mode
-                {maxPoses === 1 && useAccurateMode && (
-                  <Text as="span" color="amber" ml="2">
-                    • Thunder
-                  </Text>
-                )}
-                {maxPoses === 1 && !useAccurateMode && (
-                  <Text as="span" color="mint" ml="2">
-                    • Lightning
-                  </Text>
-                )}
-                {maxPoses > 1 && (
-                  <Text as="span" color="gray" ml="2">
-                    • N/A
-                  </Text>
-                )}
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {maxPoses > 1 
-                  ? "Not available for multi-person detection"
-                  : (useAccurateMode 
-                    ? "More accurate, slower (~2x). Best for analysis."
-                    : "Fast, real-time. Good for live viewing.")}
-              </Text>
-            </Flex>
           </Flex>
 
           {/* Confidence Threshold Selector */}

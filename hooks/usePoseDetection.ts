@@ -30,6 +30,8 @@ export interface PoseDetectionResult {
   keypoints: poseDetection.Keypoint[];
   score?: number;
   keypoints3D?: Keypoint3D[]; // For 3D models
+  id?: number;          // Tracking ID (for MultiPose)
+  box?: { xMin: number; yMin: number; width: number; height: number; score?: number }; // Bounding box
 }
 
 export function usePoseDetection(config: PoseDetectionConfig = {}) {
@@ -209,6 +211,8 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
             keypoints: pose.keypoints,
             score: pose.score,
             keypoints3D: keypoints3D,
+            id: poseAny.id, // Pass through tracking ID if available
+            box: poseAny.box, // Pass through bounding box if available
           };
         });
       } catch (err) {
