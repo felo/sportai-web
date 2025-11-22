@@ -1,0 +1,20 @@
+{
+  "name": "SportAI - AI Sports Video Analysis",
+  "short_name": "SportAI",
+  "description": "AI-powered sports video analysis for tennis, pickleball, and padel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#025940",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["sports", "fitness", "education"],
+  "shortcuts": []
+}
+
