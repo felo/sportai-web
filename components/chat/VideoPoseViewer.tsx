@@ -28,6 +28,7 @@ interface VideoPoseViewerProps {
   initialSelectedJoints?: number[];
   initialShowVelocity?: boolean;
   initialVelocityWrist?: "left" | "right";
+  initialPoseEnabled?: boolean;
 }
 
 export function VideoPoseViewer({
@@ -49,12 +50,14 @@ export function VideoPoseViewer({
   initialSelectedJoints = [9, 10],
   initialShowVelocity = false,
   initialVelocityWrist = "right",
+  initialPoseEnabled = true,
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPoseEnabled, setIsPoseEnabled] = useState(initialPoseEnabled);
   const [selectedModel, setSelectedModel] = useState<SupportedModel>(initialModel);
   const [blazePoseModelType, setBlazePoseModelType] = useState<"lite" | "full" | "heavy">("full");
   const [showSkeleton, setShowSkeleton] = useState(initialShowSkeleton);
@@ -260,6 +263,7 @@ export function VideoPoseViewer({
       minPartScore: currentConfidence.minPartScore,
       inputResolution: selectedModel === "MoveNet" ? currentResolution : undefined,
       maxPoses: selectedModel === "MoveNet" ? maxPoses : 1,
+      enabled: isPoseEnabled,
     });
 
   // Update canvas dimensions when video loads
@@ -343,7 +347,7 @@ export function VideoPoseViewer({
       return;
     }
     
-    if (!video || !showSkeleton || !isPlaying || isLoading) {
+    if (!video || !showSkeleton || !isPlaying || isLoading || !isPoseEnabled) {
       stopDetection();
       return;
     }
@@ -380,7 +384,7 @@ export function VideoPoseViewer({
   // Handle pose detection when scrubbing (seeked event) while paused
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !showSkeleton || isLoading) return;
+    if (!video || !showSkeleton || isLoading || !isPoseEnabled) return;
 
     const handleSeeked = async () => {
       // Update frame number
@@ -1230,7 +1234,7 @@ export function VideoPoseViewer({
     // Use preprocessed poses if available, otherwise detect in real-time
     if (usePreprocessing && preprocessedPoses.has(newFrame)) {
       setCurrentPoses(preprocessedPoses.get(newFrame) || []);
-    } else if (detectPose && showSkeleton && !isLoading) {
+    } else if (detectPose && showSkeleton && !isLoading && isPoseEnabled) {
       try {
         const poses = await detectPose(video);
         setCurrentPoses(poses);
@@ -1242,19 +1246,68 @@ export function VideoPoseViewer({
 
   // Get first pose with 3D keypoints for visualization
   const pose3D = React.useMemo(() => {
-    if (selectedModel === "BlazePose" && currentPoses.length > 0) {
+    if (isPoseEnabled && selectedModel === "BlazePose" && currentPoses.length > 0) {
       const pose = currentPoses[0];
       if (pose && pose.keypoints3D && pose.keypoints3D.length > 0) {
         return pose;
       }
     }
     return null;
-  }, [currentPoses, selectedModel]);
+  }, [currentPoses, selectedModel, isPoseEnabled]);
+
+  // Toggle Pose Detection (Enable/Disable)
+  const handleTogglePose = () => {
+    if (isPoseEnabled) {
+      // Disabling
+      setIsPoseEnabled(false);
+      setCurrentPoses([]);
+      setJointTrajectories(new Map());
+      stopDetection();
+    } else {
+      // Enabling
+      setIsPoseEnabled(true);
+      
+      // If enabling for the first time on a standard video (not a preset card), 
+      // apply the "Technique Analysis" default settings
+      if (!initialPoseEnabled) {
+        // Apply Technique preset
+        setUseAccurateMode(true); // Thunder
+        setConfidenceMode("low"); // Challenging conditions
+        setResolutionMode("accurate"); // 384x384
+        setShowTrackingId(true);
+        setShowAngles(true);
+        setMeasuredAngles([
+          [10, 8, 6],   // Right Arm Reverse (Wrist-Elbow-Shoulder)
+          [15, 13, 11], // Left Leg Reverse (Ankle-Knee-Hip)
+          [16, 14, 12]  // Right Leg Reverse (Ankle-Knee-Hip)
+        ]);
+        setShowVelocity(true);
+        setVelocityWrist("right");
+        setSelectedJoints([10]); // Right Wrist
+        setShowTrajectories(false);
+      }
+      
+      // Reset stats
+      confidenceStats.current.clear();
+      setVelocityStats({ current: 0, peak: 0 });
+
+      // Pause and resume the video to trigger immediate overlay refresh
+      const video = videoRef.current;
+      if (video && !video.paused) {
+        video.pause();
+        setTimeout(() => {
+          if (video && !video.paused) {
+            video.play();
+          }
+        }, 50); // Small delay to ensure pause event is processed
+      }
+    }
+  };
 
   return (
     <Flex direction="column" gap="3">
       {/* 3D Pose Viewer (shown when BlazePose is selected and 3D data is available) */}
-      {selectedModel === "BlazePose" && (
+      {isPoseEnabled && selectedModel === "BlazePose" && (
         <Box style={{ 
           width: "100%", 
           backgroundColor: "var(--gray-2)", 
@@ -1358,12 +1411,45 @@ export function VideoPoseViewer({
           }}
         />
 
+        {/* Toggle Pose Button (Top Left) */}
+        <Box
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            zIndex: 30, // Higher than overlays
+          }}
+        >
+          <Button
+            variant="soft"
+            color={isPoseEnabled ? "mint" : "gray"}
+            onClick={handleTogglePose}
+            style={{
+              backgroundColor: isPoseEnabled ? "var(--mint-9)" : "rgba(0, 0, 0, 0.6)",
+              color: isPoseEnabled ? "black" : "white",
+              backdropFilter: "blur(4px)",
+              borderRadius: "var(--radius-3)",
+              height: "32px",
+              padding: "0 12px",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <Flex gap="2" align="center">
+              <MagicWandIcon width="16" height="16" />
+              <Text size="2" weight="medium">
+                {isPoseEnabled ? "AI Overlay" : "Analyze"}
+              </Text>
+            </Flex>
+          </Button>
+        </Box>
+
         {/* Stats Overlay */}
-        {showSkeleton && currentPoses.length > 0 && (
+        {isPoseEnabled && showSkeleton && currentPoses.length > 0 && (
           <Box
             style={{
               position: "absolute",
-              top: "12px",
+              top: "52px", // Shifted down to make room for Toggle Button
               left: "12px",
               backgroundColor: "rgba(0, 0, 0, 0.6)",
               backdropFilter: "blur(4px)",
@@ -1408,10 +1494,10 @@ export function VideoPoseViewer({
                 alignItems: "flex-end"
             }}
         >
-            {/* Angles Overlay */}
-            {showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
-              <Box
-                style={{
+        {/* Angles Overlay */}
+        {isPoseEnabled && showAngles && measuredAngles.length > 0 && currentPoses.length > 0 && (
+          <Box
+            style={{
                   backgroundColor: "rgba(0, 0, 0, 0.6)",
                   backdropFilter: "blur(4px)",
                   padding: "8px 12px",
@@ -1444,7 +1530,7 @@ export function VideoPoseViewer({
             )}
 
             {/* Velocity Overlay */}
-            {showVelocity && currentPoses.length > 0 && (
+            {isPoseEnabled && showVelocity && currentPoses.length > 0 && (
                <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: "8px 12px", borderRadius: "var(--radius-3)", minWidth: "140px" }}>
                   <Flex direction="column" gap="1" align="end">
                     <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right" }}>
@@ -1462,7 +1548,7 @@ export function VideoPoseViewer({
         </Flex>
         
               {/* Loading Overlay */}
-        {(isLoading || (autoPlay && !isPlaying && !hasStartedPlaying)) && (
+        {isPoseEnabled && (isLoading || (autoPlay && !isPlaying && !hasStartedPlaying)) && (
           <Flex
             align="center"
             justify="center"

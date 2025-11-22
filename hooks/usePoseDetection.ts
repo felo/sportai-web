@@ -16,6 +16,7 @@ export interface PoseDetectionConfig {
   minPartScore?: number;
   inputResolution?: { width: number; height: number };
   maxPoses?: number;
+  enabled?: boolean;
 }
 
 export interface Keypoint3D {
@@ -54,10 +55,17 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     minPartScore = 0.3,
     inputResolution,
     maxPoses = 1,
+    enabled = true,
   } = config;
 
   // Initialize the pose detector
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      setDetector(null);
+      return;
+    }
+
     let mounted = true;
 
     async function initDetector() {
@@ -222,7 +230,8 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     minPartScore, 
     inputResolution?.width, 
     inputResolution?.height,
-    maxPoses
+    maxPoses,
+    enabled
   ]);
 
   // Detect poses from a single frame

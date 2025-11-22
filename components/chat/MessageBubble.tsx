@@ -109,7 +109,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
   // It should be enabled by the message config, BUT disabled on mobile unless developer mode is on?
   // Or strictly disabled on mobile as requested "not activate the pose detection altogether if you're on mobile".
   // Let's assume strict disable on mobile for now to save performance/battery.
-  const showPoseViewer = message.poseData?.enabled && !isMobile;
+  // NOTE: We always render VideoPoseViewer on desktop (even if enabled=false) to show the toggle button.
+  const showPoseViewer = !isMobile;
 
   // Calculate cumulative tokens up to this message
   // Only count assistant messages for cumulative (they represent actual API calls)
@@ -336,19 +337,20 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                       <VideoPoseViewer
                         videoUrl={videoSrc}
                         autoPlay
-                        initialModel={message.poseData!.model}
-                        initialShowSkeleton={message.poseData!.showSkeleton}
-                        initialShowAngles={message.poseData!.showAngles}
-                        initialMeasuredAngles={message.poseData!.defaultAngles}
+                        initialModel={message.poseData?.model ?? "MoveNet"}
+                        initialShowSkeleton={message.poseData?.showSkeleton ?? true}
+                        initialShowAngles={message.poseData?.showAngles ?? false}
+                        initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
                         initialPlaybackSpeed={message.videoPlaybackSpeed}
-                        initialUseAccurateMode={message.poseData!.useAccurateMode}
-                        initialConfidenceMode={message.poseData!.confidenceMode}
-                        initialResolutionMode={message.poseData!.resolutionMode}
-                        initialShowTrackingId={message.poseData!.showTrackingId}
-                        initialShowTrajectories={message.poseData!.showTrajectories}
-                        initialSelectedJoints={message.poseData!.selectedJoints}
-                        initialShowVelocity={message.poseData!.showVelocity}
-                        initialVelocityWrist={message.poseData!.velocityWrist}
+                        initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
+                        initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
+                        initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
+                        initialShowTrackingId={message.poseData?.showTrackingId ?? false}
+                        initialShowTrajectories={message.poseData?.showTrajectories ?? false}
+                        initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
+                        initialShowVelocity={message.poseData?.showVelocity ?? false}
+                        initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
+                        initialPoseEnabled={message.poseData?.enabled ?? false}
                       />
                     ) : (
                       <video
