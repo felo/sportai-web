@@ -17,7 +17,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
-import { getCurrentChatId, setCurrentChatId, createChat, updateChat, getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createChat, updateChat, updateChatSettings, getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById } from "@/utils/storage";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
@@ -89,9 +89,21 @@ export function GeminiQueryForm() {
     },
   });
 
-  // Load settings from localStorage after hydration
+  // Load settings from current chat after hydration
   useEffect(() => {
     if (isHydrated) {
+      const currentChatId = getCurrentChatId();
+      if (currentChatId) {
+        const chatData = getChatById(currentChatId);
+        if (chatData) {
+          // Restore settings from chat, fallback to defaults
+          setThinkingMode(chatData.thinkingMode || "fast");
+          setMediaResolution(chatData.mediaResolution || "medium");
+          setDomainExpertise(chatData.domainExpertise || "all-sports");
+          return;
+        }
+      }
+      // No chat found, use global settings
       setThinkingMode(getThinkingMode());
       setMediaResolution(getMediaResolution());
       setDomainExpertise(getDomainExpertise());
@@ -127,20 +139,25 @@ export function GeminiQueryForm() {
     }
   }, [isHydrated]);
 
-  // Reset settings to defaults when a new empty chat is created
+  // Restore settings when switching chats
   useEffect(() => {
     if (!isHydrated) return;
 
     const handleChatChange = () => {
       const currentChatId = getCurrentChatId();
       if (currentChatId) {
-        // Check if the current chat has no messages (it's a brand new chat)
         const chatData = getChatById(currentChatId);
-        if (chatData && chatData.messages.length === 0) {
-          console.log("[GeminiQueryForm] New empty chat detected, resetting settings to defaults");
-          setThinkingMode("fast");
-          setMediaResolution("medium");
-          setDomainExpertise("all-sports");
+        if (chatData) {
+          console.log("[GeminiQueryForm] Chat changed, restoring settings:", {
+            chatId: currentChatId,
+            thinkingMode: chatData.thinkingMode,
+            mediaResolution: chatData.mediaResolution,
+            domainExpertise: chatData.domainExpertise,
+          });
+          // Restore settings from the chat
+          setThinkingMode(chatData.thinkingMode || "fast");
+          setMediaResolution(chatData.mediaResolution || "medium");
+          setDomainExpertise(chatData.domainExpertise || "all-sports");
         }
       }
     };
@@ -254,14 +271,24 @@ export function GeminiQueryForm() {
       
       // Apply settings if provided
       if (settings) {
+        const currentChatId = getCurrentChatId();
+        const chatSettingsToUpdate: {
+          thinkingMode?: ThinkingMode;
+          mediaResolution?: MediaResolution;
+          domainExpertise?: DomainExpertise;
+        } = {};
+
         if (settings.thinkingMode) {
           setThinkingMode(settings.thinkingMode);
+          chatSettingsToUpdate.thinkingMode = settings.thinkingMode;
         }
         if (settings.mediaResolution) {
           setMediaResolution(settings.mediaResolution);
+          chatSettingsToUpdate.mediaResolution = settings.mediaResolution;
         }
         if (settings.domainExpertise) {
           setDomainExpertise(settings.domainExpertise);
+          chatSettingsToUpdate.domainExpertise = settings.domainExpertise;
         }
         if (settings.playbackSpeed !== undefined) {
           setVideoPlaybackSpeed(settings.playbackSpeed);
@@ -270,6 +297,11 @@ export function GeminiQueryForm() {
           setPoseData(settings.poseSettings);
         } else {
           setPoseData(undefined);
+        }
+
+        // Update chat settings
+        if (currentChatId && Object.keys(chatSettingsToUpdate).length > 0) {
+          updateChatSettings(currentChatId, chatSettingsToUpdate);
         }
       }
       
@@ -284,6 +316,31 @@ export function GeminiQueryForm() {
       // Still set the prompt even if video loading fails
       setPrompt(prompt);
       throw error;
+    }
+  };
+
+  // Wrapper functions to update both state and current chat settings
+  const handleThinkingModeChange = (mode: ThinkingMode) => {
+    setThinkingMode(mode);
+    const currentChatId = getCurrentChatId();
+    if (currentChatId) {
+      updateChatSettings(currentChatId, { thinkingMode: mode });
+    }
+  };
+
+  const handleMediaResolutionChange = (resolution: MediaResolution) => {
+    setMediaResolution(resolution);
+    const currentChatId = getCurrentChatId();
+    if (currentChatId) {
+      updateChatSettings(currentChatId, { mediaResolution: resolution });
+    }
+  };
+
+  const handleDomainExpertiseChange = (expertise: DomainExpertise) => {
+    setDomainExpertise(expertise);
+    const currentChatId = getCurrentChatId();
+    if (currentChatId) {
+      updateChatSettings(currentChatId, { domainExpertise: expertise });
     }
   };
 
@@ -703,9 +760,9 @@ export function GeminiQueryForm() {
             onSubmit={handleSubmit}
             onStop={handleStop}
             onPickleballCoachClick={handlePickleballCoachPrompt}
-            onThinkingModeChange={setThinkingMode}
-            onMediaResolutionChange={setMediaResolution}
-            onDomainExpertiseChange={setDomainExpertise}
+            onThinkingModeChange={handleThinkingModeChange}
+            onMediaResolutionChange={handleMediaResolutionChange}
+            onDomainExpertiseChange={handleDomainExpertiseChange}
             disableTooltips={hasJustDropped}
             hideDisclaimer={showingVideoSizeError}
           />

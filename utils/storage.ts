@@ -658,9 +658,18 @@ export function saveChatsToStorage(chats: Chat[]): void {
  * Create a new chat and save it to storage
  * @param messages - Initial messages for the chat
  * @param title - Optional custom title for the chat (defaults to generated title from messages)
+ * @param settings - Optional settings for the chat (defaults to current global settings)
  * @returns The created chat
  */
-export function createChat(messages: Message[] = [], title?: string): Chat {
+export function createChat(
+  messages: Message[] = [], 
+  title?: string,
+  settings?: {
+    thinkingMode?: ThinkingMode;
+    mediaResolution?: MediaResolution;
+    domainExpertise?: DomainExpertise;
+  }
+): Chat {
   const now = Date.now();
   const chat: Chat = {
     id: generateChatId(),
@@ -668,6 +677,10 @@ export function createChat(messages: Message[] = [], title?: string): Chat {
     createdAt: now,
     updatedAt: now,
     messages,
+    // Initialize with provided settings or current global settings
+    thinkingMode: settings?.thinkingMode || getThinkingMode(),
+    mediaResolution: settings?.mediaResolution || getMediaResolution(),
+    domainExpertise: settings?.domainExpertise || getDomainExpertise(),
   };
 
   const chats = loadChatsFromStorage();
@@ -763,6 +776,22 @@ export function deleteChat(chatId: string): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("chat-storage-change"));
   }
+}
+
+/**
+ * Update settings for the current chat
+ * @param chatId - ID of the chat to update settings for
+ * @param settings - Settings to update
+ */
+export function updateChatSettings(
+  chatId: string,
+  settings: {
+    thinkingMode?: ThinkingMode;
+    mediaResolution?: MediaResolution;
+    domainExpertise?: DomainExpertise;
+  }
+): void {
+  updateChat(chatId, settings, true); // Silent update to prevent unnecessary re-renders
 }
 
 /**

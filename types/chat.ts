@@ -47,5 +47,9 @@ export type Chat = {
   createdAt: number; // timestamp
   updatedAt: number; // timestamp
   messages: Message[];
+  // Per-chat settings
+  thinkingMode?: "fast" | "deep";
+  mediaResolution?: "low" | "medium" | "high";
+  domainExpertise?: "all-sports" | "tennis" | "pickleball" | "padel";
 };
 
