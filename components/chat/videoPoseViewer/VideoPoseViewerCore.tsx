@@ -17,9 +17,9 @@ import { Pose3DViewer } from "../Pose3DViewer";
 import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useVideoDimensions, useVideoFPS, useVelocityTracking } from "./hooks";
-import { VelocityDisplay } from "./components";
-import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS } from "./constants";
+import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings } from "./hooks";
+import { VelocityDisplay, AnglePresetButton, CollapsibleSection, PlaybackControls, DescriptiveSelect } from "./components";
+import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS } from "./constants";
 
 interface VideoPoseViewerProps {
   videoUrl: string;
@@ -84,7 +84,6 @@ export function VideoPoseViewer({
   const [smoothTrajectories, setSmoothTrajectories] = useState(true);
   const [showFaceLandmarks, setShowFaceLandmarks] = useState(false);
   const [selectedJoints, setSelectedJoints] = useState<number[]>(initialSelectedJoints); // Default: wrists
-  const [jointTrajectories, setJointTrajectories] = useState<Map<number, Array<{x: number, y: number, frame: number}>>>(new Map());
   const [playbackSpeed, setPlaybackSpeed] = useState(initialPlaybackSpeed);
   const [isPreprocessing, setIsPreprocessing] = useState(false);
   const [preprocessProgress, setPreprocessProgress] = useState(0);
@@ -152,6 +151,15 @@ export function VideoPoseViewer({
     currentFrame,
     currentTime: videoRef.current?.currentTime || 0,
     enabled: showVelocity,
+  });
+
+  // Use joint trajectories hook
+  const { jointTrajectories, clearTrajectories } = useJointTrajectories({
+    currentPoses,
+    showTrajectories,
+    selectedJoints,
+    currentFrame,
+    dimensions,
   });
 
   useEffect(() => {
@@ -1270,7 +1278,7 @@ export function VideoPoseViewer({
 
     video.currentTime = 0;
     setCurrentPoses([]);
-    setJointTrajectories(new Map()); // Clear trajectories
+    clearTrajectories(); // Clear trajectories using hook
     confidenceStats.current.clear(); // Clear confidence stats
     // Velocity stats are now managed by useVelocityTracking hook
   };
@@ -1780,26 +1788,13 @@ export function VideoPoseViewer({
           {/* Playback Controls - Always visible */}
           <Flex direction="column" gap="2">
             <Flex gap="2" align="center" wrap="wrap">
-              <Tooltip content={isPlaying ? "Pause" : "Play"}>
-                <Button
-                  onClick={handlePlayPause}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                </Button>
-              </Tooltip>
-              <Tooltip content="Reset">
-                <Button
-                  onClick={handleReset}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  <ResetIcon />
-                </Button>
-              </Tooltip>
+              <PlaybackControls
+                isPlaying={isPlaying}
+                isLoading={isLoading}
+                isPreprocessing={isPreprocessing}
+                onPlayPause={handlePlayPause}
+                onReset={handleReset}
+              />
             {!isPreprocessing && !usePreprocessing && (
               <>
                 {developerMode && (
@@ -1834,80 +1829,36 @@ export function VideoPoseViewer({
                     <ChevronRightIcon width="16" height="16" />
                   </Button>
                 </Tooltip>
-                <Tooltip content="Toggle left elbow angle">
-                  <Button
-                    onClick={() => {
-                      const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
-                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                      );
-                      if (!hasLeftElbow) {
-                        setVelocityWrist('left');
-                      }
-                      // Velocity is now managed by hook
-                      toggleAnglePreset([5, 7, 9]);
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => 
-                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                      ) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">LE</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle right elbow angle">
-                  <Button
-                    onClick={() => {
-                      const hasRightElbow = measuredAngles.some(([a, b, c]) => 
-                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                      );
-                      if (!hasRightElbow) {
-                        setVelocityWrist('right');
-                      }
-                      // Velocity is now managed by hook
-                      toggleAnglePreset([6, 8, 10]);
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => 
-                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                      ) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">RE</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle left knee angle">
-                  <Button
-                    onClick={() => toggleAnglePreset([11, 13, 15])}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => 
-                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
-                      ) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">LK</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle right knee angle">
-                  <Button
-                    onClick={() => toggleAnglePreset([12, 14, 16])}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => 
-                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
-                      ) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">RK</Text>
-                  </Button>
-                </Tooltip>
+                <AnglePresetButton
+                  label="LE"
+                  jointIndices={[5, 7, 9]}
+                  tooltip="Toggle left elbow angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                  onActivate={() => setVelocityWrist('left')}
+                />
+                <AnglePresetButton
+                  label="RE"
+                  jointIndices={[6, 8, 10]}
+                  tooltip="Toggle right elbow angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                  onActivate={() => setVelocityWrist('right')}
+                />
+                <AnglePresetButton
+                  label="LK"
+                  jointIndices={[11, 13, 15]}
+                  tooltip="Toggle left knee angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                />
+                <AnglePresetButton
+                  label="RK"
+                  jointIndices={[12, 14, 16]}
+                  tooltip="Toggle right knee angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                />
               </>
             )}
             {usePreprocessing && (
@@ -1944,109 +1895,48 @@ export function VideoPoseViewer({
                     <ChevronRightIcon width="16" height="16" />
                   </Button>
                 </Tooltip>
-                <Tooltip content="Toggle left elbow angle">
-                  <Button
-                    onClick={() => {
-                      const hasLeftElbow = measuredAngles.some(([a, b, c]) => a === 5 && b === 7 && c === 9);
-                      if (hasLeftElbow) {
-                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 5 && b === 7 && c === 9)));
-                      } else {
-                        setMeasuredAngles([...measuredAngles, [5, 7, 9]]);
-                        setVelocityWrist('left');
-                      }
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => a === 5 && b === 7 && c === 9) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">LE</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle right elbow angle">
-                  <Button
-                    onClick={() => {
-                      const hasRightElbow = measuredAngles.some(([a, b, c]) => a === 6 && b === 8 && c === 10);
-                      if (hasRightElbow) {
-                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 6 && b === 8 && c === 10)));
-                      } else {
-                        setMeasuredAngles([...measuredAngles, [6, 8, 10]]);
-                        setVelocityWrist('right');
-                      }
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => a === 6 && b === 8 && c === 10) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">RE</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle left knee angle">
-                  <Button
-                    onClick={() => {
-                      const hasLeftKnee = measuredAngles.some(([a, b, c]) => a === 11 && b === 13 && c === 15);
-                      if (hasLeftKnee) {
-                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 11 && b === 13 && c === 15)));
-                      } else {
-                        setMeasuredAngles([...measuredAngles, [11, 13, 15]]);
-                      }
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => a === 11 && b === 13 && c === 15) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">LK</Text>
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle right knee angle">
-                  <Button
-                    onClick={() => {
-                      const hasRightKnee = measuredAngles.some(([a, b, c]) => a === 12 && b === 14 && c === 16);
-                      if (hasRightKnee) {
-                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 12 && b === 14 && c === 16)));
-                      } else {
-                        setMeasuredAngles([...measuredAngles, [12, 14, 16]]);
-                      }
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: measuredAngles.some(([a, b, c]) => a === 12 && b === 14 && c === 16) ? 1 : 0.5
-                    }}
-                  >
-                    <Text size="1" weight="bold">RK</Text>
-                  </Button>
-                </Tooltip>
+                <AnglePresetButton
+                  label="LE"
+                  jointIndices={[5, 7, 9]}
+                  tooltip="Toggle left elbow angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                  onActivate={() => setVelocityWrist('left')}
+                />
+                <AnglePresetButton
+                  label="RE"
+                  jointIndices={[6, 8, 10]}
+                  tooltip="Toggle right elbow angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                  onActivate={() => setVelocityWrist('right')}
+                />
+                <AnglePresetButton
+                  label="LK"
+                  jointIndices={[11, 13, 15]}
+                  tooltip="Toggle left knee angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                />
+                <AnglePresetButton
+                  label="RK"
+                  jointIndices={[12, 14, 16]}
+                  tooltip="Toggle right knee angle"
+                  measuredAngles={measuredAngles}
+                  onToggle={toggleAnglePreset}
+                />
               </>
             )}
             </Flex>
 
             {/* Advanced Settings Toggle - Only in Developer Mode */}
-            {developerMode && (
-              <Box style={{ paddingTop: "var(--space-3)" }}>
-                <Button
-                  variant="ghost"
-                  onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
-                  style={{
-                    width: "100%",
-                    justifyContent: "space-between",
-                    padding: "var(--space-3)",
-                  }}
-                >
-                  <Text size="2" weight="medium">Advanced Settings</Text>
-                  {isAdvancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                </Button>
-              </Box>
-            )}
-
-            {/* Developer Settings Area - Collapsible */}
-            {developerMode && isAdvancedExpanded && (
-            <Flex direction="column" gap="3" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
+            <CollapsibleSection
+              title="Advanced Settings"
+              isExpanded={isAdvancedExpanded}
+              onToggle={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+              showWhen={developerMode}
+            >
+              <Flex direction="column" gap="3" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
                 {/* Playback Speed Selector */}
             <Flex direction="column" gap="1">
               <Text size="2" color="gray" weight="medium">
@@ -3144,9 +3034,9 @@ export function VideoPoseViewer({
             </Flex>
           )}
           
+              </Flex>
+            </CollapsibleSection>
           </Flex>
-            )}
-        </Flex>
         </Flex>
       )}
     </Flex>
