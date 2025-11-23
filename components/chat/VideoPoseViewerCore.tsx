@@ -101,6 +101,10 @@ export function VideoPoseViewer({
   const velocityHistoryLeftRef = useRef<number[]>([]);
   const velocityHistoryRightRef = useRef<number[]>([]);
 
+  // Label stability - prevents jitter by locking position for N frames after a change
+  const LABEL_POSITION_STABILITY_FRAMES = 5; // Configurable: frames to wait before allowing position swap
+  const labelPositionStateRef = useRef<Map<string, { multiplier: number; verticalOffset: number; framesSinceChange: number }>>(new Map());
+
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
@@ -244,6 +248,23 @@ export function VideoPoseViewer({
       }
     }
   }, [currentPoses, selectedModel, currentFrame, videoFPS, measuredAngles]);
+
+  // Clean up label position state when angles are removed
+  useEffect(() => {
+    const currentAngleKeys = new Set(
+      measuredAngles.map(([a, b, c]) => `${a}-${b}-${c}`)
+    );
+    
+    // Remove any tracked positions for angles that no longer exist
+    const keysToRemove: string[] = [];
+    labelPositionStateRef.current.forEach((_, key) => {
+      if (!currentAngleKeys.has(key)) {
+        keysToRemove.push(key);
+      }
+    });
+    
+    keysToRemove.forEach(key => labelPositionStateRef.current.delete(key));
+  }, [measuredAngles]);
 
   // Track average confidence stats: Map<personIndex, { sum: number, count: number }>
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
@@ -1000,16 +1021,50 @@ export function VideoPoseViewer({
           ctx.setLineDash([]);
         }
 
-        // Draw completed angles
+        // Draw completed angles with collision detection and stability
+        const labelBounds: import('@/types/pose').LabelBounds[] = [];
         measuredAngles.forEach(([idxA, idxB, idxC]) => {
-          drawAngle(ctx, scaledKeypoints, [idxA, idxB, idxC], {
+          const angleKey = `${idxA}-${idxB}-${idxC}`;
+          const labelState = labelPositionStateRef.current.get(angleKey);
+          
+          const result = drawAngle(ctx, scaledKeypoints, [idxA, idxB, idxC], {
             lineColor: "#A855F7", // Purple
             arcColor: "rgba(168, 85, 247, 0.3)", // Semi-transparent purple
             textColor: "#FFFFFF", // White
             lineWidth: 2,
             fontSize: angleFontSize,
             minConfidence: 0.3,
+            existingLabels: labelBounds,
+            currentMultiplier: labelState?.multiplier,
+            currentVerticalOffset: labelState?.verticalOffset,
+            framesSinceChange: labelState?.framesSinceChange ?? 0,
+            stabilityFrames: LABEL_POSITION_STABILITY_FRAMES,
           });
+          
+          if (result) {
+            labelBounds.push(result.bounds);
+            
+            // Update label state
+            const prevState = labelPositionStateRef.current.get(angleKey);
+            const positionChanged = prevState?.multiplier !== result.multiplier || 
+                                   prevState?.verticalOffset !== result.verticalOffset;
+            
+            if (prevState && !positionChanged) {
+              // Same position, increment frames
+              labelPositionStateRef.current.set(angleKey, {
+                multiplier: result.multiplier,
+                verticalOffset: result.verticalOffset,
+                framesSinceChange: prevState.framesSinceChange + 1,
+              });
+            } else {
+              // Position changed or new label, reset counter
+              labelPositionStateRef.current.set(angleKey, {
+                multiplier: result.multiplier,
+                verticalOffset: result.verticalOffset,
+                framesSinceChange: 0,
+              });
+            }
+          }
         });
       }
     }
@@ -1644,6 +1699,7 @@ export function VideoPoseViewer({
                   padding: isPortraitVideo ? "6px 8px" : "8px 12px",
                   borderRadius: "var(--radius-3)",
                   width: "fit-content",
+                  display: "none",
                 }}
               >
                 <Flex direction="column" gap="1" align="end">

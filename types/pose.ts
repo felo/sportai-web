@@ -5,6 +5,18 @@ export interface PoseConnection {
   end: number;
 }
 
+export interface LabelBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface LabelPositionState {
+  multiplier: number;
+  verticalOffset: number;
+}
+
 // MoveNet keypoint indices
 export const POSE_KEYPOINTS = {
   NOSE: 0,
@@ -261,6 +273,18 @@ export function calculateAngle(
 }
 
 /**
+ * Check if two rectangles overlap
+ */
+function rectanglesOverlap(a: LabelBounds, b: LabelBounds): boolean {
+  return !(
+    a.x + a.width < b.x ||
+    b.x + b.width < a.x ||
+    a.y + a.height < b.y ||
+    b.y + b.height < a.y
+  );
+}
+
+/**
  * Draw angle measurement between three keypoints
  */
 export function drawAngle(
@@ -274,8 +298,13 @@ export function drawAngle(
     lineWidth?: number;
     fontSize?: number;
     minConfidence?: number;
+    existingLabels?: LabelBounds[];
+    currentMultiplier?: number;
+    currentVerticalOffset?: number;
+    framesSinceChange?: number;
+    stabilityFrames?: number;
   } = {}
-) {
+): { bounds: LabelBounds; multiplier: number; verticalOffset: number } | null {
   const {
     lineColor = "#A855F7", // Purple
     arcColor = "rgba(168, 85, 247, 0.3)", // Semi-transparent purple
@@ -283,6 +312,11 @@ export function drawAngle(
     lineWidth = 2,
     fontSize = 20, // Increased default for better readability
     minConfidence = 0.3,
+    existingLabels = [],
+    currentMultiplier,
+    currentVerticalOffset,
+    framesSinceChange = 0,
+    stabilityFrames = 5,
   } = options;
 
   const [idxA, idxB, idxC] = jointIndices;
@@ -298,7 +332,7 @@ export function drawAngle(
     (pointB.score ?? 0) < minConfidence ||
     (pointC.score ?? 0) < minConfidence
   ) {
-    return;
+    return null;
   }
 
   // Calculate angle
@@ -351,8 +385,6 @@ export function drawAngle(
   
   // Place text on opposite side of arc (flip by 180 degrees)
   const textAngle = midAngle + Math.PI;
-  const textX = pointB.x + radius * 0.7 * Math.cos(textAngle);
-  const textY = pointB.y + radius * 0.7 * Math.sin(textAngle);
   
   const angleText = `${angle.toFixed(1)}°`;
   ctx.font = `bold ${fontSize}px sans-serif`;
@@ -381,6 +413,63 @@ export function drawAngle(
   const textHeight = fontSize;
   const padding = 6;
   const cornerRadius = 4;
+  
+  // Try vertical adjustments to avoid collisions
+  // If position is locked due to stability constraint, use the locked position
+  const defaultMultiplier = 0.7;
+  const radiusMultiplier = currentMultiplier ?? defaultMultiplier;
+  const isPositionLocked = currentMultiplier !== undefined && framesSinceChange < stabilityFrames;
+  
+  // Base position
+  const baseTextX = pointB.x + radius * radiusMultiplier * Math.cos(textAngle);
+  const baseTextY = pointB.y + radius * radiusMultiplier * Math.sin(textAngle);
+  
+  // Try different vertical offsets to avoid collisions (only vertical adjustment)
+  const allVerticalOffsets = [0, 20, -20, 40, -40, 60, -60]; // Pixels to shift vertically
+  // If position is locked, only try the current offset; otherwise try all
+  const verticalOffsetsToTry = isPositionLocked && currentVerticalOffset !== undefined 
+    ? [currentVerticalOffset] 
+    : allVerticalOffsets;
+  
+  let textX = baseTextX;
+  let textY = baseTextY;
+  let verticalOffset = verticalOffsetsToTry[0];
+  let labelBounds: LabelBounds;
+  let hasCollision = true;
+  
+  for (const offset of verticalOffsetsToTry) {
+    textX = baseTextX;
+    textY = baseTextY + offset;
+    
+    // Calculate bounds based on text alignment
+    let boundsX: number;
+    if (textAlign === "left") {
+      boundsX = textX - padding;
+    } else if (textAlign === "right") {
+      boundsX = textX - textWidth - padding;
+    } else {
+      boundsX = textX - textWidth / 2 - padding;
+    }
+    
+    labelBounds = {
+      x: boundsX,
+      y: textY - textHeight / 2 - padding,
+      width: textWidth + padding * 2,
+      height: textHeight + padding * 2,
+    };
+    
+    // Check if this position collides with any existing labels
+    hasCollision = existingLabels.some(existing => rectanglesOverlap(labelBounds, existing));
+    
+    if (!hasCollision) {
+      verticalOffset = offset;
+      break;
+    }
+  }
+  
+  // Use the final position (even if it still collides after all attempts)
+  textX = baseTextX;
+  textY = baseTextY + verticalOffset;
   
   // Draw dark background mask behind text (rounded rectangle)
   // Adjust background position based on text alignment
@@ -420,5 +509,17 @@ export function drawAngle(
   // Draw text on top
   ctx.fillStyle = textColor;
   ctx.fillText(angleText, textX, textY);
+  
+  // Return the bounds, multiplier, and vertical offset for collision detection and stability tracking
+  return {
+    bounds: {
+      x: bgX,
+      y: bgY,
+      width: bgWidth,
+      height: bgHeight,
+    },
+    multiplier: radiusMultiplier,
+    verticalOffset: verticalOffset,
+  };
 }
 
