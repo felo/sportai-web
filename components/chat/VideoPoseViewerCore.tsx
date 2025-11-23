@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
-import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon } from "@radix-ui/react-icons";
+import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip } from "@radix-ui/themes";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
@@ -94,12 +94,16 @@ export function VideoPoseViewer({
   // Velocity Measurement State
   const [showVelocity, setShowVelocity] = useState(initialShowVelocity);
   const [velocityWrist, setVelocityWrist] = useState<'left' | 'right'>(initialVelocityWrist);
-  const [velocityStats, setVelocityStats] = useState<{ current: number; peak: number }>({ current: 0, peak: 0 });
-  const lastWristPosRef = useRef<{ x: number; y: number; frame: number; time: number } | null>(null);
-  const velocityHistoryRef = useRef<number[]>([]);
+  const [velocityStatsLeft, setVelocityStatsLeft] = useState<{ current: number; peak: number }>({ current: 0, peak: 0 });
+  const [velocityStatsRight, setVelocityStatsRight] = useState<{ current: number; peak: number }>({ current: 0, peak: 0 });
+  const lastWristPosLeftRef = useRef<{ x: number; y: number; frame: number; time: number } | null>(null);
+  const lastWristPosRightRef = useRef<{ x: number; y: number; frame: number; time: number } | null>(null);
+  const velocityHistoryLeftRef = useRef<number[]>([]);
+  const velocityHistoryRightRef = useRef<number[]>([]);
 
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
   const [isPortraitVideo, setIsPortraitVideo] = useState(false);
   const isMobile = useIsMobile();
@@ -120,16 +124,19 @@ export function VideoPoseViewer({
     return () => window.removeEventListener("developer-mode-change", handleStorageChange);
   }, []);
 
-  // Reset velocity stats when toggling feature or changing wrist
+  // Reset velocity stats when toggling feature
   useEffect(() => {
-    setVelocityStats({ current: 0, peak: 0 });
-    lastWristPosRef.current = null;
-    velocityHistoryRef.current = [];
-  }, [showVelocity, velocityWrist]);
+    setVelocityStatsLeft({ current: 0, peak: 0 });
+    setVelocityStatsRight({ current: 0, peak: 0 });
+    lastWristPosLeftRef.current = null;
+    lastWristPosRightRef.current = null;
+    velocityHistoryLeftRef.current = [];
+    velocityHistoryRightRef.current = [];
+  }, [showVelocity]);
 
-  // Calculate velocity - triggered whenever currentPoses updates
+  // Calculate velocity for both wrists - triggered whenever currentPoses updates
   useEffect(() => {
-    if (!showVelocity || currentPoses.length === 0) return;
+    if (currentPoses.length === 0) return;
 
     const video = videoRef.current;
     if (!video) return;
@@ -137,22 +144,19 @@ export function VideoPoseViewer({
     const pose = currentPoses[0];
     if (!pose) return;
 
-    // Determine wrist index based on model and side
-    let wristIndex;
-    if (selectedModel === "BlazePose") {
-      wristIndex = velocityWrist === 'left' ? 15 : 16;
-    } else {
-      wristIndex = velocityWrist === 'left' ? 9 : 10;
-    }
+    // Check which elbows are active
+    const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+      (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+    );
+    const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+      (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+    );
 
-    const wristKp = pose.keypoints[wristIndex];
-    
-    // Calculate person height in pixels (use bounding box or keypoints range)
+    // Calculate person height in pixels
     let personHeightPx = 0;
     if (pose.box) {
       personHeightPx = pose.box.height;
     } else {
-       // Fallback: calculate from keypoints
        const validKps = pose.keypoints.filter(k => (k.score ?? 0) > 0.3);
        if (validKps.length > 0) {
          const ys = validKps.map(k => k.y);
@@ -160,64 +164,86 @@ export function VideoPoseViewer({
        }
     }
 
-    if (personHeightPx <= 0 || !wristKp || (wristKp.score ?? 0) < 0.3) {
-        // If wrist is not detected, keep current velocity but don't update
-        return;
-    }
-
-    // Calculate scale: person is assumed to be 1.80m (180cm)
-    const pixelsPerMeter = personHeightPx / 1.8; 
-
-    // Current Wrist Position
-    const currentX = wristKp.x;
-    const currentY = wristKp.y;
+    if (personHeightPx <= 0) return;
+    const pixelsPerMeter = personHeightPx / 1.8;
     const currentTime = video.currentTime;
 
-    if (lastWristPosRef.current) {
-        const { x: lastX, y: lastY, time: lastTime, frame: lastFrame } = lastWristPosRef.current;
-        const dt = currentTime - lastTime;
-        const frameDiff = Math.abs(currentFrame - lastFrame);
-        
-        // Calculate velocity if we've advanced to a new frame
-        // Accept any time delta > 0, but validate it's not a seek (< 0.5s)
-        if (frameDiff > 0 && dt > 0 && dt < 0.5) { 
+    // Calculate left wrist velocity if left elbow is active
+    if (hasLeftElbow) {
+      const leftWristIndex = selectedModel === "BlazePose" ? 15 : 9;
+      const leftWristKp = pose.keypoints[leftWristIndex];
+      
+      if (leftWristKp && (leftWristKp.score ?? 0) >= 0.3) {
+        const currentX = leftWristKp.x;
+        const currentY = leftWristKp.y;
+
+        if (lastWristPosLeftRef.current) {
+          const { x: lastX, y: lastY, time: lastTime, frame: lastFrame } = lastWristPosLeftRef.current;
+          const dt = currentTime - lastTime;
+          const frameDiff = Math.abs(currentFrame - lastFrame);
+          
+          if (frameDiff > 0 && dt > 0 && dt < 0.5) {
             const dx = currentX - lastX;
             const dy = currentY - lastY;
             const distPx = Math.sqrt(dx*dx + dy*dy);
-            
             const distM = distPx / pixelsPerMeter;
-            const velocityMs = distM / dt;
-            const velocityKmh = velocityMs * 3.6;
+            const velocityKmh = (distM / dt) * 3.6;
 
-            // Filter outliers (e.g. > 300 km/h is likely tracking glitch)
             if (velocityKmh < 300) {
-                // Add to history for smoothing
-                const history = velocityHistoryRef.current;
-                history.push(velocityKmh);
-                if (history.length > 3) history.shift(); // Keep last 3 frames
-
-                // Calculate smoothed velocity
-                const smoothedVelocity = history.reduce((a, b) => a + b, 0) / history.length;
-
-                setVelocityStats(prev => ({
-                    current: smoothedVelocity,
-                    peak: Math.max(prev.peak, smoothedVelocity)
-                }));
-            } else {
-                // Outlier detected - keep displaying current velocity
-                console.log(`Velocity outlier detected: ${velocityKmh.toFixed(1)} km/h`);
+              velocityHistoryLeftRef.current.push(velocityKmh);
+              if (velocityHistoryLeftRef.current.length > 3) velocityHistoryLeftRef.current.shift();
+              const smoothedVelocity = velocityHistoryLeftRef.current.reduce((a, b) => a + b, 0) / velocityHistoryLeftRef.current.length;
+              setVelocityStatsLeft(prev => ({
+                current: smoothedVelocity,
+                peak: Math.max(prev.peak, smoothedVelocity)
+              }));
             }
-        } else if (frameDiff === 0) {
-            // Same frame, keep current velocity (no update needed)
-            return;
+          }
+        } else {
+          velocityHistoryLeftRef.current = [];
         }
-    } else {
-        // First frame - reset history
-        velocityHistoryRef.current = [];
+        lastWristPosLeftRef.current = { x: currentX, y: currentY, time: currentTime, frame: currentFrame };
+      }
     }
 
-    lastWristPosRef.current = { x: currentX, y: currentY, time: currentTime, frame: currentFrame };
-  }, [currentPoses, showVelocity, velocityWrist, selectedModel, currentFrame, videoFPS]);
+    // Calculate right wrist velocity if right elbow is active
+    if (hasRightElbow) {
+      const rightWristIndex = selectedModel === "BlazePose" ? 16 : 10;
+      const rightWristKp = pose.keypoints[rightWristIndex];
+      
+      if (rightWristKp && (rightWristKp.score ?? 0) >= 0.3) {
+        const currentX = rightWristKp.x;
+        const currentY = rightWristKp.y;
+
+        if (lastWristPosRightRef.current) {
+          const { x: lastX, y: lastY, time: lastTime, frame: lastFrame } = lastWristPosRightRef.current;
+          const dt = currentTime - lastTime;
+          const frameDiff = Math.abs(currentFrame - lastFrame);
+          
+          if (frameDiff > 0 && dt > 0 && dt < 0.5) {
+            const dx = currentX - lastX;
+            const dy = currentY - lastY;
+            const distPx = Math.sqrt(dx*dx + dy*dy);
+            const distM = distPx / pixelsPerMeter;
+            const velocityKmh = (distM / dt) * 3.6;
+
+            if (velocityKmh < 300) {
+              velocityHistoryRightRef.current.push(velocityKmh);
+              if (velocityHistoryRightRef.current.length > 3) velocityHistoryRightRef.current.shift();
+              const smoothedVelocity = velocityHistoryRightRef.current.reduce((a, b) => a + b, 0) / velocityHistoryRightRef.current.length;
+              setVelocityStatsRight(prev => ({
+                current: smoothedVelocity,
+                peak: Math.max(prev.peak, smoothedVelocity)
+              }));
+            }
+          }
+        } else {
+          velocityHistoryRightRef.current = [];
+        }
+        lastWristPosRightRef.current = { x: currentX, y: currentY, time: currentTime, frame: currentFrame };
+      }
+    }
+  }, [currentPoses, selectedModel, currentFrame, videoFPS, measuredAngles]);
 
   // Track average confidence stats: Map<personIndex, { sum: number, count: number }>
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
@@ -1199,9 +1225,12 @@ export function VideoPoseViewer({
     setCurrentPoses([]);
     setJointTrajectories(new Map()); // Clear trajectories
     confidenceStats.current.clear(); // Clear confidence stats
-    setVelocityStats({ current: 0, peak: 0 });
-    lastWristPosRef.current = null;
-    velocityHistoryRef.current = [];
+    setVelocityStatsLeft({ current: 0, peak: 0 });
+    setVelocityStatsRight({ current: 0, peak: 0 });
+    lastWristPosLeftRef.current = null;
+    lastWristPosRightRef.current = null;
+    velocityHistoryLeftRef.current = [];
+    velocityHistoryRightRef.current = [];
   };
 
   const handlePreprocess = async () => {
@@ -1360,7 +1389,8 @@ export function VideoPoseViewer({
       
       // Reset stats
       confidenceStats.current.clear();
-      setVelocityStats({ current: 0, peak: 0 });
+      setVelocityStatsLeft({ current: 0, peak: 0 });
+      setVelocityStatsRight({ current: 0, peak: 0 });
 
       // Pause and resume the video to trigger immediate overlay refresh
       const video = videoRef.current;
@@ -1377,7 +1407,7 @@ export function VideoPoseViewer({
   };
 
   return (
-    <Flex direction="column" gap="3">
+    <Flex direction="column" gap="0">
       {/* 3D Pose Viewer (shown when BlazePose is selected and 3D data is available) */}
       {isPoseEnabled && selectedModel === "BlazePose" && (
         <Box style={{ 
@@ -1489,8 +1519,9 @@ export function VideoPoseViewer({
           }}
         />
 
-        {/* Toggle Pose Button (Top Left) */}
-        <Box
+        {/* Toggle Pose Button and Config Button (Top Left) */}
+        <Flex
+          gap={isPortraitVideo || isMobile ? "1" : "2"}
           style={{
             position: "absolute",
             top: isPortraitVideo ? "8px" : "12px",
@@ -1515,7 +1546,26 @@ export function VideoPoseViewer({
               </Text>
             </Flex>
           </Button>
-        </Box>
+
+          {/* Config Button - Only show when AI overlay is enabled */}
+          {isPoseEnabled && (
+            <Button
+              className={buttonStyles.actionButtonSquare}
+              onClick={() => setIsExpanded(!isExpanded)}
+              style={{
+                height: isPortraitVideo || isMobile ? "24px" : "28px",
+                width: isPortraitVideo || isMobile ? "24px" : "28px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: isExpanded ? 1 : 0.7,
+              }}
+            >
+              <GearIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+            </Button>
+          )}
+        </Flex>
 
         {/* Stats Overlay */}
         {isPoseEnabled && showSkeleton && currentPoses.length > 0 && (
@@ -1618,22 +1668,53 @@ export function VideoPoseViewer({
               </Box>
             )}
 
-            {/* Velocity Overlay */}
-            {isPoseEnabled && showVelocity && currentPoses.length > 0 && (
-               <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)" }}>
-                  <Flex direction="column" gap="1" align="end">
-                    <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
-                        Wrist Velocity ({velocityWrist === 'left' ? "L" : "R"})
-                    </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
-                        Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStats.current.toFixed(1)} km/h</span>
-                    </Text>
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
-                        Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStats.peak.toFixed(1)} km/h</span>
-                    </Text>
-                  </Flex>
-               </Box>
-            )}
+            {/* Velocity Overlays - Show based on active elbow angles */}
+            {isPoseEnabled && currentPoses.length > 0 && (() => {
+              const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+              );
+              const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+              );
+              
+              return (hasLeftElbow || hasRightElbow) && (
+                <Flex direction="column" gap="1" align="end">
+                  {/* Left Wrist Velocity */}
+                  {hasLeftElbow && (
+                    <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)" }}>
+                      <Flex direction="column" gap="1" align="end">
+                        <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          L Wrist Velocity
+                        </Text>
+                        <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsLeft.current.toFixed(1)} km/h</span>
+                        </Text>
+                        <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsLeft.peak.toFixed(1)} km/h</span>
+                        </Text>
+                      </Flex>
+                    </Box>
+                  )}
+                  
+                  {/* Right Wrist Velocity */}
+                  {hasRightElbow && (
+                    <Box style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)", padding: isPortraitVideo ? "6px 8px" : "8px 12px", borderRadius: "var(--radius-3)" }}>
+                      <Flex direction="column" gap="1" align="end">
+                        <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          R Wrist Velocity
+                        </Text>
+                        <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsRight.current.toFixed(1)} km/h</span>
+                        </Text>
+                        <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", textAlign: "right", fontSize: isMobile ? "9px" : "10px", whiteSpace: "nowrap" }}>
+                          Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsRight.peak.toFixed(1)} km/h</span>
+                        </Text>
+                      </Flex>
+                    </Box>
+                  )}
+                </Flex>
+              );
+            })()}
         </Flex>
         
               {/* Loading Overlay */}
@@ -1667,110 +1748,287 @@ export function VideoPoseViewer({
       </Box>
 
       {/* Controls */}
-      {showControls && developerMode && (
-        <Flex direction="column" gap="2">
+      {showControls && isExpanded && (
+        <Flex direction="column" gap="2" style={{
+          backgroundColor: "var(--gray-2)",
+          padding: "var(--space-3)",
+          borderRadius: "0 0 var(--radius-3) var(--radius-3)",
+        }}>
           {/* Playback Controls - Always visible */}
           <Flex direction="column" gap="2">
             <Flex gap="2" align="center" wrap="wrap">
-              <Button
-                onClick={handlePlayPause}
-                disabled={isLoading || isPreprocessing}
-                className={buttonStyles.actionButtonSquare}
-                size="2"
-              >
-                {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                {isPlaying ? "Pause" : "Play"}
-              </Button>
-              <Button
-                onClick={handleReset}
-                disabled={isLoading || isPreprocessing}
-                className={buttonStyles.actionButtonSquare}
-                size="2"
-              >
-                <ResetIcon />
-                Reset
-              </Button>
-              {developerMode && (
+              <Tooltip content={isPlaying ? "Pause" : "Play"}>
                 <Button
-                  variant="soft"
-                  color="gray"
-                  onClick={() => setIsExpanded(!isExpanded)}
+                  onClick={handlePlayPause}
+                  disabled={isLoading || isPreprocessing}
                   className={buttonStyles.actionButtonSquare}
                   size="2"
                 >
-                  {isExpanded ? "Hide Config" : "Config"}
+                  {isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </Button>
-              )}
+              </Tooltip>
+              <Tooltip content="Reset">
+                <Button
+                  onClick={handleReset}
+                  disabled={isLoading || isPreprocessing}
+                  className={buttonStyles.actionButtonSquare}
+                  size="2"
+                >
+                  <ResetIcon />
+                </Button>
+              </Tooltip>
             {!isPreprocessing && !usePreprocessing && (
               <>
-                <Button
-                  onClick={handlePreprocess}
-                  disabled={isLoading}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  <MagicWandIcon width="16" height="16" />
-                  Pre-process All Frames
-                </Button>
-                {/* Frame-by-Frame Navigation */}
-                <Button
-                  onClick={() => handleFrameStep('backward')}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  <ChevronLeftIcon width="16" height="16" />
-                  Previous Frame
-                </Button>
-                <Button
-                  onClick={() => handleFrameStep('forward')}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  Next Frame
-                  <ChevronRightIcon width="16" height="16" />
-                </Button>
+                <Tooltip content="Pre-process all frames in the video for smoother playback and analysis">
+                  <Button
+                    onClick={handlePreprocess}
+                    disabled={isLoading}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                    <MagicWandIcon width="16" height="16" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Previous Frame">
+                  <Button
+                    onClick={() => handleFrameStep('backward')}
+                    disabled={isLoading || isPreprocessing}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                    <ChevronLeftIcon width="16" height="16" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Next Frame">
+                  <Button
+                    onClick={() => handleFrameStep('forward')}
+                    disabled={isLoading || isPreprocessing}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle left elbow angle">
+                  <Button
+                    onClick={() => {
+                      const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                      );
+                      if (!hasLeftElbow) {
+                        setVelocityWrist('left');
+                      } else {
+                        // Reset left velocity when turning off
+                        setVelocityStatsLeft({ current: 0, peak: 0 });
+                        lastWristPosLeftRef.current = null;
+                        velocityHistoryLeftRef.current = [];
+                      }
+                      toggleAnglePreset([5, 7, 9]);
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => 
+                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                      ) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">LE</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle right elbow angle">
+                  <Button
+                    onClick={() => {
+                      const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                      );
+                      if (!hasRightElbow) {
+                        setVelocityWrist('right');
+                      } else {
+                        // Reset right velocity when turning off
+                        setVelocityStatsRight({ current: 0, peak: 0 });
+                        lastWristPosRightRef.current = null;
+                        velocityHistoryRightRef.current = [];
+                      }
+                      toggleAnglePreset([6, 8, 10]);
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => 
+                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                      ) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">RE</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle left knee angle">
+                  <Button
+                    onClick={() => toggleAnglePreset([11, 13, 15])}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => 
+                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
+                      ) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">LK</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle right knee angle">
+                  <Button
+                    onClick={() => toggleAnglePreset([12, 14, 16])}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => 
+                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
+                      ) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">RK</Text>
+                  </Button>
+                </Tooltip>
               </>
             )}
             {usePreprocessing && (
               <>
-                <Button
-                  onClick={() => {
-                    setUsePreprocessing(false);
-                    setPreprocessedPoses(new Map());
-                  }}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  Using Pre-processed • Click to Disable
-                </Button>
-                {/* Frame-by-Frame Navigation */}
-                <Button
-                  onClick={() => handleFrameStep('backward')}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  <ChevronLeftIcon width="16" height="16" />
-                  Previous Frame
-                </Button>
-                <Button
-                  onClick={() => handleFrameStep('forward')}
-                  disabled={isLoading || isPreprocessing}
-                  className={buttonStyles.actionButtonSquare}
-                  size="2"
-                >
-                  Next Frame
-                  <ChevronRightIcon width="16" height="16" />
-                </Button>
+                <Tooltip content="Disable pre-processed frames">
+                  <Button
+                    onClick={() => {
+                      setUsePreprocessing(false);
+                      setPreprocessedPoses(new Map());
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                    <CrossCircledIcon width="16" height="16" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Previous Frame">
+                  <Button
+                    onClick={() => handleFrameStep('backward')}
+                    disabled={isLoading || isPreprocessing}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                    <ChevronLeftIcon width="16" height="16" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Next Frame">
+                  <Button
+                    onClick={() => handleFrameStep('forward')}
+                    disabled={isLoading || isPreprocessing}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                  >
+                    <ChevronRightIcon width="16" height="16" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle left elbow angle">
+                  <Button
+                    onClick={() => {
+                      const hasLeftElbow = measuredAngles.some(([a, b, c]) => a === 5 && b === 7 && c === 9);
+                      if (hasLeftElbow) {
+                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 5 && b === 7 && c === 9)));
+                      } else {
+                        setMeasuredAngles([...measuredAngles, [5, 7, 9]]);
+                        setVelocityWrist('left');
+                      }
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => a === 5 && b === 7 && c === 9) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">LE</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle right elbow angle">
+                  <Button
+                    onClick={() => {
+                      const hasRightElbow = measuredAngles.some(([a, b, c]) => a === 6 && b === 8 && c === 10);
+                      if (hasRightElbow) {
+                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 6 && b === 8 && c === 10)));
+                      } else {
+                        setMeasuredAngles([...measuredAngles, [6, 8, 10]]);
+                        setVelocityWrist('right');
+                      }
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => a === 6 && b === 8 && c === 10) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">RE</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle left knee angle">
+                  <Button
+                    onClick={() => {
+                      const hasLeftKnee = measuredAngles.some(([a, b, c]) => a === 11 && b === 13 && c === 15);
+                      if (hasLeftKnee) {
+                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 11 && b === 13 && c === 15)));
+                      } else {
+                        setMeasuredAngles([...measuredAngles, [11, 13, 15]]);
+                      }
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => a === 11 && b === 13 && c === 15) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">LK</Text>
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle right knee angle">
+                  <Button
+                    onClick={() => {
+                      const hasRightKnee = measuredAngles.some(([a, b, c]) => a === 12 && b === 14 && c === 16);
+                      if (hasRightKnee) {
+                        setMeasuredAngles(measuredAngles.filter(([a, b, c]) => !(a === 12 && b === 14 && c === 16)));
+                      } else {
+                        setMeasuredAngles([...measuredAngles, [12, 14, 16]]);
+                      }
+                    }}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: measuredAngles.some(([a, b, c]) => a === 12 && b === 14 && c === 16) ? 1 : 0.5
+                    }}
+                  >
+                    <Text size="1" weight="bold">RK</Text>
+                  </Button>
+                </Tooltip>
               </>
             )}
             </Flex>
 
+            {/* Advanced Settings Toggle - Only in Developer Mode */}
+            {developerMode && (
+              <Box style={{ paddingTop: "var(--space-3)" }}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+                  style={{
+                    width: "100%",
+                    justifyContent: "space-between",
+                    padding: "var(--space-3)",
+                  }}
+                >
+                  <Text size="2" weight="medium">Advanced Settings</Text>
+                  {isAdvancedExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                </Button>
+              </Box>
+            )}
+
             {/* Developer Settings Area - Collapsible */}
-            {developerMode && isExpanded && (
-              <Flex direction="column" gap="3" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
+            {developerMode && isAdvancedExpanded && (
+            <Flex direction="column" gap="3" p="3" style={{ backgroundColor: "var(--gray-2)", borderRadius: "var(--radius-3)" }}>
                 {/* Playback Speed Selector */}
             <Flex direction="column" gap="1">
               <Text size="2" color="gray" weight="medium">
@@ -1841,96 +2099,6 @@ export function VideoPoseViewer({
                   ? "Auto-set to 0.25× for accurate trajectory tracking"
                   : `Current speed: ${playbackSpeed}×`}
               </Text>
-            </Flex>
-
-            {/* Model Selection */}
-            <Flex direction="column" gap="1">
-              <Text size="2" color="gray" weight="medium">
-                Pose Detection Model
-              </Text>
-              <Select.Root
-                value={selectedModel}
-                onValueChange={(value) => {
-                  setSelectedModel(value as SupportedModel);
-                  // Reset poses when switching models
-                  setCurrentPoses([]);
-                  setJointTrajectories(new Map());
-                  setMeasuredAngles([]);
-                }}
-                disabled={isLoading || isPreprocessing}
-              >
-                <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
-                  <Flex direction="column" gap="1" align="start">
-                    <Text weight="medium" size="2">
-                      {selectedModel === "MoveNet" ? "MoveNet (2D)" : "BlazePose (3D)"}
-                    </Text>
-                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                      {selectedModel === "MoveNet" 
-                        ? "Fast, 17 keypoints, 2D only"
-                        : "Accurate, 33 keypoints, 3D depth"}
-                    </Text>
-                  </Flex>
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="MoveNet" style={{ minHeight: "70px", padding: "12px" }}>
-                    <Flex direction="column" gap="1">
-                      <Text weight="medium" size="2">MoveNet (2D)</Text>
-                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fast, 17 keypoints, 2D only</Text>
-                    </Flex>
-                  </Select.Item>
-                  <Select.Item value="BlazePose" style={{ minHeight: "70px", padding: "12px" }}>
-                    <Flex direction="column" gap="1">
-                      <Text weight="medium" size="2">BlazePose (3D)</Text>
-                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Accurate, 33 keypoints, 3D depth</Text>
-                    </Flex>
-                  </Select.Item>
-                </Select.Content>
-              </Select.Root>
-              
-              {/* BlazePose Model Type Selector */}
-              {selectedModel === "BlazePose" && (
-                <Select.Root
-                  value={blazePoseModelType}
-                  onValueChange={(value) => {
-                    setBlazePoseModelType(value as "lite" | "full" | "heavy");
-                    setCurrentPoses([]);
-                  }}
-                  disabled={isLoading || isPreprocessing}
-                >
-                  <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
-                    <Flex direction="column" gap="1" align="start">
-                      <Text weight="medium" size="2">
-                        {blazePoseModelType.charAt(0).toUpperCase() + blazePoseModelType.slice(1)}
-                      </Text>
-                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                        {blazePoseModelType === "lite" && "Fastest, lower accuracy"}
-                        {blazePoseModelType === "full" && "Balanced speed and accuracy"}
-                        {blazePoseModelType === "heavy" && "Slowest, highest accuracy"}
-                      </Text>
-                    </Flex>
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="lite" style={{ minHeight: "70px", padding: "12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium" size="2">Lite</Text>
-                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fastest, lower accuracy</Text>
-                      </Flex>
-                    </Select.Item>
-                    <Select.Item value="full" style={{ minHeight: "70px", padding: "12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium" size="2">Full</Text>
-                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Balanced speed and accuracy</Text>
-                      </Flex>
-                    </Select.Item>
-                    <Select.Item value="heavy" style={{ minHeight: "70px", padding: "12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium" size="2">Heavy</Text>
-                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Slowest, highest accuracy</Text>
-                      </Flex>
-                    </Select.Item>
-                  </Select.Content>
-                </Select.Root>
-              )}
             </Flex>
 
           {/* Pre-processing Progress */}
@@ -2066,22 +2234,28 @@ export function VideoPoseViewer({
                 {/* Wrist Selection (nested) */}
                 {showVelocity && (
                   <Flex gap="2" align="center" pl="4">
-                     <Flex gap="1" style={{ backgroundColor: "var(--gray-4)", padding: "2px", borderRadius: "var(--radius-2)" }}>
+                     <Flex gap="1">
                         <Button 
                             size="1" 
-                            variant={velocityWrist === 'left' ? "solid" : "ghost"} 
-                            color={velocityWrist === 'left' ? "mint" : "gray"}
+                            className={buttonStyles.actionButtonSquare}
                             onClick={() => setVelocityWrist('left')}
-                            style={{ height: "20px", padding: "0 6px" }}
+                            style={{ 
+                              height: "20px", 
+                              padding: "0 8px",
+                              opacity: velocityWrist === 'left' ? 1 : 0.5
+                            }}
                         >
                             Left
                         </Button>
                         <Button 
                             size="1" 
-                            variant={velocityWrist === 'right' ? "solid" : "ghost"}
-                            color={velocityWrist === 'right' ? "mint" : "gray"}
+                            className={buttonStyles.actionButtonSquare}
                             onClick={() => setVelocityWrist('right')}
-                            style={{ height: "20px", padding: "0 6px" }}
+                            style={{ 
+                              height: "20px", 
+                              padding: "0 8px",
+                              opacity: velocityWrist === 'right' ? 1 : 0.5
+                            }}
                         >
                             Right
                         </Button>
@@ -2154,7 +2328,7 @@ export function VideoPoseViewer({
               <Flex gap="2" wrap="wrap">
                 <Button 
                   size="1" 
-                  variant="soft" 
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => {
                     setMeasuredAngles([]);
                     setSelectedAngleJoints([]);
@@ -2169,32 +2343,28 @@ export function VideoPoseViewer({
                 <Flex gap="1" wrap="wrap">
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([5, 7, 9])} // Left arm: shoulder-elbow-wrist
                   >
                     L Arm
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([6, 8, 10])} // Right arm: shoulder-elbow-wrist
                   >
                     R Arm
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([9, 7, 5])} // Left arm reverse: wrist-elbow-shoulder
                   >
                     L Arm (rev)
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([10, 8, 6])} // Right arm reverse: wrist-elbow-shoulder
                   >
                     R Arm (rev)
@@ -2207,32 +2377,28 @@ export function VideoPoseViewer({
                 <Flex gap="1" wrap="wrap">
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([11, 13, 15])} // Left leg: hip-knee-ankle
                   >
                     L Leg
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([12, 14, 16])} // Right leg: hip-knee-ankle
                   >
                     R Leg
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([15, 13, 11])} // Left leg reverse: ankle-knee-hip
                   >
                     L Leg (rev)
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([16, 14, 12])} // Right leg reverse: ankle-knee-hip
                   >
                     R Leg (rev)
@@ -2245,40 +2411,35 @@ export function VideoPoseViewer({
                 <Flex gap="1" wrap="wrap">
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([7, 5, 11])} // Left shoulder elevation: elbow-shoulder-hip
                   >
                     L Shoulder
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([8, 6, 12])} // Right shoulder elevation: elbow-shoulder-hip
                   >
                     R Shoulder
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([5, 11, 13])} // Left hip angle: shoulder-hip-knee
                   >
                     L Hip
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([6, 12, 14])} // Right hip angle: shoulder-hip-knee
                   >
                     R Hip
                   </Button>
                   <Button 
                     size="1" 
-                    variant="soft" 
-                    color="mint"
+                    className={buttonStyles.actionButtonSquare}
                     onClick={() => toggleAnglePreset([5, 11, 12])} // Torso rotation: left shoulder-left hip-right hip
                   >
                     Torso
@@ -2301,44 +2462,39 @@ export function VideoPoseViewer({
               <Flex gap="1" wrap="wrap">
                 <Button
                   size="1"
-                  variant="soft"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => setSelectedJoints([9, 10])}
-                  color={selectedJoints.length === 2 && selectedJoints.includes(9) && selectedJoints.includes(10) ? "mint" : "gray"}
                 >
                   Wrists
                 </Button>
                 <Button
                   size="1"
-                  variant="soft"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => setSelectedJoints([7, 8, 9, 10])}
-                  color="gray"
                 >
                   Arms
                 </Button>
                 <Button
                   size="1"
-                  variant="soft"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => setSelectedJoints([11, 12, 13, 14, 15, 16])}
-                  color="gray"
                 >
                   Legs
                 </Button>
                 <Button
                   size="1"
-                  variant="soft"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => setSelectedJoints([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])}
-                  color="gray"
                 >
                   All
                 </Button>
                 <Button
                   size="1"
-                  variant="soft"
+                  className={buttonStyles.actionButtonSquare}
                   onClick={() => {
                     setJointTrajectories(new Map());
                     setSelectedJoints([]);
                   }}
-                  color="gray"
                 >
                   Clear
                 </Button>
@@ -2577,6 +2733,96 @@ export function VideoPoseViewer({
             </Text>
           </Flex>
 
+          {/* Model Selection */}
+          <Flex direction="column" gap="1">
+            <Text size="2" color="gray" weight="medium">
+              Pose Detection Model
+            </Text>
+            <Select.Root
+              value={selectedModel}
+              onValueChange={(value) => {
+                setSelectedModel(value as SupportedModel);
+                // Reset poses when switching models
+                setCurrentPoses([]);
+                setJointTrajectories(new Map());
+                setMeasuredAngles([]);
+              }}
+              disabled={isLoading || isPreprocessing}
+            >
+              <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
+                <Flex direction="column" gap="1" align="start">
+                  <Text weight="medium" size="2">
+                    {selectedModel === "MoveNet" ? "MoveNet (2D)" : "BlazePose (3D)"}
+                  </Text>
+                  <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                    {selectedModel === "MoveNet" 
+                      ? "Fast, 17 keypoints, 2D only"
+                      : "Accurate, 33 keypoints, 3D depth"}
+                  </Text>
+                </Flex>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="MoveNet" style={{ minHeight: "70px", padding: "12px" }}>
+                  <Flex direction="column" gap="1">
+                    <Text weight="medium" size="2">MoveNet (2D)</Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fast, 17 keypoints, 2D only</Text>
+                  </Flex>
+                </Select.Item>
+                <Select.Item value="BlazePose" style={{ minHeight: "70px", padding: "12px" }}>
+                  <Flex direction="column" gap="1">
+                    <Text weight="medium" size="2">BlazePose (3D)</Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Accurate, 33 keypoints, 3D depth</Text>
+                  </Flex>
+                </Select.Item>
+              </Select.Content>
+            </Select.Root>
+            
+            {/* BlazePose Model Type Selector */}
+            {selectedModel === "BlazePose" && (
+              <Select.Root
+                value={blazePoseModelType}
+                onValueChange={(value) => {
+                  setBlazePoseModelType(value as "lite" | "full" | "heavy");
+                  setCurrentPoses([]);
+                }}
+                disabled={isLoading || isPreprocessing}
+              >
+                <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
+                  <Flex direction="column" gap="1" align="start">
+                    <Text weight="medium" size="2">
+                      {blazePoseModelType.charAt(0).toUpperCase() + blazePoseModelType.slice(1)}
+                    </Text>
+                    <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                      {blazePoseModelType === "lite" && "Fastest, lower accuracy"}
+                      {blazePoseModelType === "full" && "Balanced speed and accuracy"}
+                      {blazePoseModelType === "heavy" && "Slowest, highest accuracy"}
+                    </Text>
+                  </Flex>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="lite" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">Lite</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fastest, lower accuracy</Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="full" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">Full</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Balanced speed and accuracy</Text>
+                    </Flex>
+                  </Select.Item>
+                  <Select.Item value="heavy" style={{ minHeight: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="medium" size="2">Heavy</Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Slowest, highest accuracy</Text>
+                    </Flex>
+                  </Select.Item>
+                </Select.Content>
+              </Select.Root>
+            )}
+          </Flex>
+
           {/* Error Display */}
           {error && (
             <Flex direction="column" gap="2">
@@ -2600,7 +2846,7 @@ export function VideoPoseViewer({
           )}
           
           </Flex>
-        )}
+            )}
         </Flex>
         </Flex>
       )}

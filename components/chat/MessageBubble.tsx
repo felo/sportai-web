@@ -384,11 +384,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
               <Box 
                 mb={message.content.trim() ? "2" : "0"}
                 style={{
-                  overflow: "hidden",
-                  borderRadius: "var(--radius-3)",
-                  maxHeight: theatreMode ? "50vh" : "none",
+                  overflow: "visible",
                   display: "flex",
-                  justifyContent: "center",
+                  flexDirection: "column",
+                  justifyContent: "flex-start",
                   alignItems: "center",
                 }}
               >
@@ -409,6 +408,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                       display: "block",
                       objectFit: "contain",
                       margin: "0 auto",
+                      borderRadius: "var(--radius-3)",
                     }}
                   />
                 ) : videoSrc ? (
@@ -418,9 +418,9 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                         ? {
                             position: "relative",
                             width: "100%",
-                            aspectRatio: "16 / 9",
-                            maxHeight: theatreMode ? "50vh" : "none",
                             backgroundColor: "var(--gray-3)",
+                            overflow: "hidden",
+                            borderRadius: "var(--radius-3)",
                           }
                         : videoContainerStyle
                     }
