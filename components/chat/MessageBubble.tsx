@@ -8,6 +8,7 @@ import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/stor
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { VideoPoseViewer } from "./VideoPoseViewer";
+import { StreamingIndicator } from "./StreamingIndicator";
 import buttonStyles from "@/styles/buttons.module.css";
 
 const THINKING_MESSAGES = [
@@ -541,12 +542,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                     {message.content}
                   </MarkdownWithSwings>
                   {message.isStreaming && (
-                    <span 
-                      className="inline-block w-1 h-4 ml-1 bg-mint-9 dark:bg-mint-8"
-                      style={{
-                        animation: "blink 1s step-end infinite"
-                      }}
-                    />
+                    <>
+                      {console.log("[MessageBubble] Rendering StreamingIndicator for message:", message.id)}
+                      <StreamingIndicator />
+                    </>
                   )}
                 </>
               ) : (

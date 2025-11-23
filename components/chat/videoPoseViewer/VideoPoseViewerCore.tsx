@@ -481,55 +481,6 @@ export function VideoPoseViewer({
     }
   }, [showTrajectories, playbackSpeed]);
 
-  // Update trajectories when poses change (only track first person for now)
-  useEffect(() => {
-    if (!showTrajectories || currentPoses.length === 0) return;
-
-    const video = videoRef.current;
-    if (!video) return;
-
-    const scaleX = dimensions.width / video.videoWidth;
-    const scaleY = dimensions.height / video.videoHeight;
-
-    setJointTrajectories(prev => {
-      // Track first person only for trajectories
-      const firstPose = currentPoses[0];
-      if (!firstPose) return prev;
-      
-      let hasChanges = false;
-      const newTrajectories = new Map(prev);
-      
-      for (const jointIndex of selectedJoints) {
-        const keypoint = firstPose.keypoints[jointIndex];
-        if (keypoint && (keypoint.score ?? 0) > 0.3) {
-          const trajectory = newTrajectories.get(jointIndex) || [];
-          const newPoint = {
-            x: keypoint.x * scaleX,
-            y: keypoint.y * scaleY,
-            frame: currentFrame,
-          };
-          
-          // Only add if this is a new frame (avoid duplicates)
-          const lastPoint = trajectory[trajectory.length - 1];
-          if (!lastPoint || lastPoint.frame !== currentFrame) {
-            trajectory.push(newPoint);
-            hasChanges = true;
-            
-            // Keep last 300 points to avoid memory issues
-            if (trajectory.length > 300) {
-              trajectory.shift();
-            }
-            
-            newTrajectories.set(jointIndex, trajectory);
-          }
-        }
-      }
-      
-      // Only return new Map if we actually added points
-      return hasChanges ? newTrajectories : prev;
-    });
-  }, [currentPoses, showTrajectories, selectedJoints, currentFrame, dimensions.width, dimensions.height]);
-
   // Handle canvas clicks for angle measurement
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!enableAngleClicking || currentPoses.length === 0) return;
@@ -1411,7 +1362,7 @@ export function VideoPoseViewer({
       // Disabling
       setIsPoseEnabled(false);
       setCurrentPoses([]);
-      setJointTrajectories(new Map());
+      clearTrajectories();
       stopDetection();
     } else {
       // Enabling
@@ -2064,7 +2015,7 @@ export function VideoPoseViewer({
                     onCheckedChange={(checked) => {
                       setShowTrajectories(checked);
                       if (!checked) {
-                        setJointTrajectories(new Map()); // Clear trajectories when disabled
+                        clearTrajectories(); // Clear trajectories when disabled
                       }
                     }}
                     disabled={isLoading}
@@ -2400,7 +2351,7 @@ export function VideoPoseViewer({
                   size="1"
                   className={buttonStyles.actionButtonSquare}
                   onClick={() => {
-                    setJointTrajectories(new Map());
+                    clearTrajectories();
                     setSelectedJoints([]);
                   }}
                 >
@@ -2454,11 +2405,7 @@ export function VideoPoseViewer({
                       onClick={() => {
                         if (selectedJoints.includes(joint.id)) {
                           setSelectedJoints(selectedJoints.filter(j => j !== joint.id));
-                          setJointTrajectories(prev => {
-                            const newMap = new Map(prev);
-                            newMap.delete(joint.id);
-                            return newMap;
-                          });
+                          // Trajectory will be automatically removed via the hook when selectedJoints updates
                         } else {
                           setSelectedJoints([...selectedJoints, joint.id]);
                         }
@@ -2672,7 +2619,7 @@ export function VideoPoseViewer({
                 setSelectedModel(value as SupportedModel);
                 // Reset poses when switching models
                 setCurrentPoses([]);
-                setJointTrajectories(new Map());
+                clearTrajectories();
                 setMeasuredAngles([]);
               }}
               disabled={isLoading || isPreprocessing}

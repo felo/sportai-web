@@ -8,4 +8,5 @@ export { ChatHeader } from "./ChatHeader";
 export { DragOverlay } from "./DragOverlay";
 export { ScrollToBottom } from "./ScrollToBottom";
 export { ScrollToVideo } from "./ScrollToVideo";
+export { StreamingIndicator } from "./StreamingIndicator";
 
