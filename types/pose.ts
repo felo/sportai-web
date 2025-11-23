@@ -342,12 +342,30 @@ export function drawAngle(
     midAngle += Math.PI; // Add 180 degrees to get to the other side
   }
   
-  const textX = pointB.x + radius * 0.7 * Math.cos(midAngle);
-  const textY = pointB.y + radius * 0.7 * Math.sin(midAngle);
+  // Place text on opposite side of arc (flip by 180 degrees)
+  const textAngle = midAngle + Math.PI;
+  const textX = pointB.x + radius * 0.7 * Math.cos(textAngle);
+  const textY = pointB.y + radius * 0.7 * Math.sin(textAngle);
   
   const angleText = `${angle.toFixed(1)}°`;
   ctx.font = `bold ${fontSize}px sans-serif`;
-  ctx.textAlign = "center";
+  
+  // Determine text alignment based on which side of the joint the text is positioned
+  // This ensures the edge of the text closest to the joint is on the same side as the arc
+  const cosTextAngle = Math.cos(textAngle);
+  let textAlign: CanvasTextAlign;
+  if (cosTextAngle > 0.3) {
+    // Text is to the right of joint, align left so left edge is near joint
+    textAlign = "left";
+  } else if (cosTextAngle < -0.3) {
+    // Text is to the left of joint, align right so right edge is near joint
+    textAlign = "right";
+  } else {
+    // Text is above or below joint, center it
+    textAlign = "center";
+  }
+  
+  ctx.textAlign = textAlign;
   ctx.textBaseline = "middle";
   
   // Measure text to size the background
@@ -358,9 +376,17 @@ export function drawAngle(
   const cornerRadius = 4;
   
   // Draw dark background mask behind text (rounded rectangle)
+  // Adjust background position based on text alignment
   ctx.fillStyle = "rgba(0, 0, 0, 0.25)"; // Semi-transparent black background
   ctx.beginPath();
-  const bgX = textX - textWidth / 2 - padding;
+  let bgX: number;
+  if (textAlign === "left") {
+    bgX = textX - padding;
+  } else if (textAlign === "right") {
+    bgX = textX - textWidth - padding;
+  } else {
+    bgX = textX - textWidth / 2 - padding;
+  }
   const bgY = textY - textHeight / 2 - padding;
   const bgWidth = textWidth + padding * 2;
   const bgHeight = textHeight + padding * 2;

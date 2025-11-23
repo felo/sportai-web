@@ -1806,6 +1806,7 @@ export function VideoPoseViewer({
                     className={buttonStyles.actionButtonSquare}
                     size="2"
                   >
+                    <ChevronRightIcon width="16" height="16" />
                   </Button>
                 </Tooltip>
                 <Tooltip content="Toggle left elbow angle">
