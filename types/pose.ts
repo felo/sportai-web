@@ -327,20 +327,27 @@ export function drawAngle(
   const angleBA = Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
   const angleBC = Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x);
 
+  // Calculate the angular difference to determine which direction gives the shorter arc
+  let angleDiff = angleBC - angleBA;
+  
+  // Normalize to [-PI, PI]
+  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+  
+  // Determine if we should draw clockwise or counterclockwise for the shorter arc
+  // If the absolute difference is > PI, we need to go the other way
+  const drawCounterClockwise = angleDiff < 0;
+
   ctx.strokeStyle = arcColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  // Use false (clockwise) for Y-down canvas to match the calculated angle direction
-  ctx.arc(pointB.x, pointB.y, radius, angleBA, angleBC, false);
+  // Draw arc in the direction that gives us the smaller angle (< 180°)
+  ctx.arc(pointB.x, pointB.y, radius, angleBA, angleBC, drawCounterClockwise);
   ctx.stroke();
 
   // Draw angle text with background mask for visibility
-  // Calculate midpoint of the arc for text placement
-  // If angleBC < angleBA (crossing 0), we need to handle wrap-around
-  let midAngle = (angleBA + angleBC) / 2;
-  if (angleBC < angleBA) {
-    midAngle += Math.PI; // Add 180 degrees to get to the other side
-  }
+  // Calculate midpoint of the arc for text placement (works for both directions)
+  const midAngle = angleBA + angleDiff / 2;
   
   // Place text on opposite side of arc (flip by 180 degrees)
   const textAngle = midAngle + Math.PI;
