@@ -73,6 +73,17 @@ export function ChatInput({
   const [thinkingModeOpen, setThinkingModeOpen] = useState(false);
   const [mediaResolutionOpen, setMediaResolutionOpen] = useState(false);
   const [domainExpertiseOpen, setDomainExpertiseOpen] = useState(false);
+  const [isGlowing, setIsGlowing] = useState(false);
+  const glowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup glow timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (glowTimeoutRef.current) {
+        clearTimeout(glowTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Update local state when props change (e.g., from starter prompts)
   useEffect(() => {
@@ -140,9 +151,114 @@ export function ChatInput({
     });
   }, [prompt]);
 
+  // Detect sport names in text and auto-switch domain expertise
+  const detectAndSwitchSport = (text: string) => {
+    // Define sport keywords (case-insensitive, whole word matching)
+    // Primary sports with dedicated modes
+    const primarySportKeywords: Record<string, DomainExpertise> = {
+      'tennis': 'tennis',
+      'pickleball': 'pickleball',
+      'padel': 'padel',
+    };
+
+    // Other sports that switch to "all-sports" mode
+    // Excluded generic names that could cause false positives: running, swimming, cycling, boxing, racing, walking, etc.
+    const otherSportKeywords = [
+      'basketball',
+      'volleyball',
+      'baseball',
+      'football',
+      'soccer',
+      'golf',
+      'rugby',
+      'cricket',
+      'badminton',
+      'squash',
+      'hockey',
+      'softball',
+      'lacrosse',
+      'handball',
+      'waterpolo',
+      'polo',
+      'skiing',
+      'snowboarding',
+      'surfing',
+      'skateboarding',
+      'wrestling',
+      'judo',
+      'karate',
+      'taekwondo',
+      'fencing',
+      'archery',
+      'gymnastics',
+      'crossfit',
+    ];
+
+    // Convert text to lowercase for matching
+    const lowerText = text.toLowerCase();
+    
+    // First check primary sports (tennis, pickleball, padel)
+    for (const [keyword, expertise] of Object.entries(primarySportKeywords)) {
+      // Use word boundary regex to match whole words only
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(lowerText) && domainExpertise !== expertise) {
+        // Switch to detected sport
+        setDomainExpertiseState(expertise);
+        setDomainExpertise(expertise);
+        onDomainExpertiseChange?.(expertise);
+        
+        // Trigger glow effect
+        setIsGlowing(true);
+        
+        // Clear existing timeout
+        if (glowTimeoutRef.current) {
+          clearTimeout(glowTimeoutRef.current);
+        }
+        
+        // Remove glow after 2 seconds
+        glowTimeoutRef.current = setTimeout(() => {
+          setIsGlowing(false);
+        }, 2000);
+        
+        // Only switch to the first detected sport
+        return;
+      }
+    }
+    
+    // Then check other sports (switch to "all-sports")
+    for (const keyword of otherSportKeywords) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(lowerText) && domainExpertise !== 'all-sports') {
+        // Switch to all-sports
+        setDomainExpertiseState('all-sports');
+        setDomainExpertise('all-sports');
+        onDomainExpertiseChange?.('all-sports');
+        
+        // Trigger glow effect
+        setIsGlowing(true);
+        
+        // Clear existing timeout
+        if (glowTimeoutRef.current) {
+          clearTimeout(glowTimeoutRef.current);
+        }
+        
+        // Remove glow after 2 seconds
+        glowTimeoutRef.current = setTimeout(() => {
+          setIsGlowing(false);
+        }, 2000);
+        
+        // Only switch to the first detected sport
+        return;
+      }
+    }
+  };
+
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     onPromptChange(newValue);
+    
+    // Detect sport names and auto-switch
+    detectAndSwitchSport(newValue);
     
     // Use requestAnimationFrame to ensure DOM is updated before measuring
     requestAnimationFrame(() => {
@@ -252,7 +368,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Ask anything sports related…"
+              placeholder={`Ask anything ${domainExpertise === 'all-sports' ? 'sports' : domainExpertise} related…`}
               aria-label="Chat input"
               resize="none"
               size="3"
@@ -284,8 +400,8 @@ export function ChatInput({
                 <label
                   htmlFor="video"
                   style={{
-                    width: "32px",
-                    height: "32px",
+                    width: "36px",
+                    height: "36px",
                     borderRadius: "9999px",
                     backgroundColor: "#7ADB8F",
                     display: "flex",
@@ -319,7 +435,7 @@ export function ChatInput({
                     onChange={onVideoChange}
                     style={{ display: "none" }}
                   />
-                  <PlusIcon width="16" height="16" color="#1C1C1C" />
+                  <PlusIcon width="18" height="18" color="#1C1C1C" />
                 </label>
               </Tooltip>
 
@@ -407,7 +523,18 @@ export function ChatInput({
                 content="Domain expertise: Choose the sport for specialized analysis"
                 open={disableTooltips ? false : (!domainExpertiseOpen ? undefined : false)}
               >
-                <Box>
+                <Box
+                  style={{
+                    borderRadius: "var(--radius-2)",
+                    transition: "box-shadow 0.3s ease, filter 0.3s ease",
+                    boxShadow: isGlowing 
+                      ? "0 0 0 2px var(--mint-8), 0 0 16px var(--mint-6), 0 0 24px var(--mint-5)" 
+                      : "none",
+                    filter: isGlowing 
+                      ? "brightness(1.2)" 
+                      : "none",
+                  }}
+                >
                   <Select.Root
                     value={domainExpertise}
                     open={domainExpertiseOpen}
@@ -417,6 +544,11 @@ export function ChatInput({
                       setDomainExpertiseState(expertise);
                       setDomainExpertise(expertise);
                       onDomainExpertiseChange?.(expertise);
+                      // Clear glow effect when manually changed
+                      setIsGlowing(false);
+                      if (glowTimeoutRef.current) {
+                        clearTimeout(glowTimeoutRef.current);
+                      }
                     }}
                   >
                     <Select.Trigger
@@ -454,8 +586,8 @@ export function ChatInput({
                       type="button"
                       onClick={onStop}
                       style={{
-                        width: "32px",
-                        height: "32px",
+                        width: "36px",
+                        height: "36px",
                         borderRadius: "50%",
                         backgroundColor: "var(--red-3)",
                         display: "flex",
@@ -472,7 +604,7 @@ export function ChatInput({
                         e.currentTarget.style.backgroundColor = "var(--red-3)";
                       }}
                     >
-                      <StopIcon width="16" height="16" color="var(--red-11)" />
+                      <StopIcon width="18" height="18" color="var(--red-11)" />
                     </button>
                   </Tooltip>
                 ) : (
@@ -481,8 +613,8 @@ export function ChatInput({
                       type="button"
                       disabled
                       style={{
-                        width: "32px",
-                        height: "32px",
+                        width: "36px",
+                        height: "36px",
                         borderRadius: "50%",
                         backgroundColor: "var(--gray-3)",
                         display: "flex",
@@ -493,7 +625,7 @@ export function ChatInput({
                         opacity: 0.5,
                       }}
                     >
-                      <ArrowUpIcon width="16" height="16" color="var(--gray-9)" />
+                      <ArrowUpIcon width="18" height="18" color="var(--gray-9)" />
                     </button>
                   </Tooltip>
                 )
@@ -503,8 +635,8 @@ export function ChatInput({
                     type="submit"
                     disabled={!prompt.trim() && !videoFile}
                     style={{
-                      width: "32px",
-                      height: "32px",
+                      width: "36px",
+                      height: "36px",
                       borderRadius: "9999px",
                       backgroundColor: (!prompt.trim() && !videoFile) ? "var(--gray-4)" : "#7ADB8F",
                       display: "flex",
@@ -533,7 +665,7 @@ export function ChatInput({
                       }
                     }}
                   >
-                    <ArrowUpIcon width="16" height="16" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "#1C1C1C"} />
+                    <ArrowUpIcon width="18" height="18" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "#1C1C1C"} />
                   </button>
                 </Tooltip>
               )}

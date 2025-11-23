@@ -202,3 +202,120 @@ html[data-theme="dark"] .radix-themes,
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+/* Fade in and slide up animation for scroll-to-bottom button */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade in and slide down animation for scroll-to-video button */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom List Styling - Bullet points and numbers in brand color */
+.markdown-ul {
+  padding-left: 0;
+}
+
+.markdown-ul .markdown-li {
+  position: relative;
+  padding-left: 1.75rem;
+  margin-bottom: 0.625rem;
+  line-height: 1.6;
+}
+
+.markdown-ul .markdown-li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0.125rem;
+  color: #025940;
+  font-size: 1.25em;
+  line-height: 1;
+  font-weight: bold;
+}
+
+html[data-theme="dark"] .markdown-ul .markdown-li::before,
+[data-radix-theme][data-radix-theme-appearance="dark"] .markdown-ul .markdown-li::before {
+  color: #7ADB8F;
+}
+
+.markdown-ol {
+  padding-left: 0;
+}
+
+.markdown-ol .markdown-li {
+  counter-increment: markdown-counter;
+  position: relative;
+  padding-left: 2rem;
+  margin-bottom: 0.625rem;
+  line-height: 1.6;
+}
+
+.markdown-ol .markdown-li::before {
+  content: counter(markdown-counter) ".";
+  position: absolute;
+  left: 0;
+  top: 0.125rem;
+  color: #025940;
+  font-weight: 600;
+  min-width: 1.5em;
+}
+
+html[data-theme="dark"] .markdown-ol .markdown-li::before,
+[data-radix-theme][data-radix-theme-appearance="dark"] .markdown-ol .markdown-li::before {
+  color: #7ADB8F;
+}
+
+/* Lists inside collapsible sections need extra left margin to account for section padding */
+details .markdown-ul,
+details .markdown-ol {
+  margin-left: 1rem;
+}
+
+/* Decorative Horizontal Rule Dividers */
+.markdown-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.markdown-divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: rgba(2, 89, 64, 0.3);
+}
+
+html[data-theme="dark"] .markdown-divider-line,
+[data-radix-theme][data-radix-theme-appearance="dark"] .markdown-divider-line {
+  background-color: rgba(122, 219, 143, 0.3);
+}
+
+.markdown-divider-dots {
+  color: #025940;
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+  user-select: none;
+}
+
+html[data-theme="dark"] .markdown-divider-dots,
+[data-radix-theme][data-radix-theme-appearance="dark"] .markdown-divider-dots {
+  color: #7ADB8F;
+}

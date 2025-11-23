@@ -2,10 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import { markdownComponents } from "@/components/markdown/markdown-components";
+import { MarkdownWithSwings } from "@/components/markdown";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
@@ -538,13 +535,9 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
           <Box style={{ maxWidth: "none" }}>
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={markdownComponents}
-                >
+                <MarkdownWithSwings>
                   {message.content}
-                </ReactMarkdown>
+                </MarkdownWithSwings>
               ) : (
                 <Flex gap="2" align="center">
                   <Spinner size="1" />
@@ -557,14 +550,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
             {showProUpsell && (
               <Box
                 mt="4"
-                pt="4"
                 style={{
-                  borderTop: "1px solid var(--gray-6)",
                   opacity: 0,
                   animation: "fadeInUpsell 0.5s ease-in forwards",
                 }}
               >
-                <Flex direction="column" gap="3">
+                {/* Custom separator reusing markdown divider design */}
+                <div className="markdown-divider" role="separator" aria-label="Section divider">
+                  <div className="markdown-divider-line" />
+                  <span className="markdown-divider-dots" aria-hidden="true">
+                    •••
+                  </span>
+                  <div className="markdown-divider-line" />
+                </div>
+                
+                <Flex direction="column" gap="3" mt="4">
                   <Flex direction="column" gap="2">
                     <Text size="3" weight="medium">
                       Want more accuracy and deeper insights?

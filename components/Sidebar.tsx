@@ -208,6 +208,34 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               direction="column" 
               gap="3"
             >
+            {/* New Chat Button */}
+            <Button
+              variant="ghost"
+              size="2"
+              onClick={async () => {
+                // Check if chat is thinking before creating new chat
+                if (onChatSwitchAttempt) {
+                  const result = await Promise.resolve(onChatSwitchAttempt());
+                  if (!result) {
+                    return; // User cancelled
+                  }
+                }
+                const newChat = createChat();
+                saveCurrentChatId(newChat.id);
+                closeSidebar(); // Close sidebar after creating new chat
+                // State will be updated via event handler
+              }}
+              style={{
+                justifyContent: "flex-start",
+                padding: "var(--space-2) var(--space-3)",
+              }}
+            >
+              <PlusIcon width="16" height="16" />
+              <Text size="2" ml="2">
+                New chat
+              </Text>
+            </Button>
+
             {/* Chats Section */}
             <Flex direction="column" gap="2">
               <Button

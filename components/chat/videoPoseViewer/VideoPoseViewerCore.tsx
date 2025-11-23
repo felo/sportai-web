@@ -1617,7 +1617,7 @@ export function VideoPoseViewer({
         </Flex>
 
         {/* Stats Overlay */}
-        {((isPoseEnabled && showSkeleton && currentPoses.length > 0) || (isObjectDetectionEnabled && currentObjects.length > 0) || (isProjectileDetectionEnabled && currentProjectile)) && (
+        {!isMobile && ((isPoseEnabled && showSkeleton && currentPoses.length > 0) || (isObjectDetectionEnabled && currentObjects.length > 0) || (isProjectileDetectionEnabled && currentProjectile)) && (
           <Box
             style={{
               position: "absolute",

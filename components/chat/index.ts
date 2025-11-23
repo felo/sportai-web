@@ -6,4 +6,6 @@ export { VideoPoseViewer } from "./VideoPoseViewer";
 export { ChatInput } from "./ChatInput";
 export { ChatHeader } from "./ChatHeader";
 export { DragOverlay } from "./DragOverlay";
+export { ScrollToBottom } from "./ScrollToBottom";
+export { ScrollToVideo } from "./ScrollToVideo";
 

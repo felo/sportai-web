@@ -37,6 +37,71 @@
   box-shadow: 0 2px 4px rgba(122, 219, 143, 0.3);
 }
 
+/* Metric Highlights - Subtle highlighting for sports metrics */
+.metricHighlight {
+  display: inline;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: none;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.95em;
+  font-weight: 600;
+  background-color: rgba(2, 89, 64, 0.08);
+  color: #025940;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.metricHighlight:hover {
+  background-color: rgba(2, 89, 64, 0.15);
+}
+
+/* Dark mode metric highlights */
+:global(html[data-theme="dark"]) .metricHighlight,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight {
+  background-color: rgba(122, 219, 143, 0.12);
+  color: #7ADB8F;
+}
+
+:global(html[data-theme="dark"]) .metricHighlight:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight:hover {
+  background-color: rgba(122, 219, 143, 0.2);
+}
+
+/* Swing Type Highlights - Interactive technique glossary */
+.swingHighlight {
+  display: inline;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: #025940;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  text-decoration: underline;
+  text-decoration-color: #025940;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.swingHighlight:hover {
+  opacity: 0.7;
+}
+
+/* Dark mode swing highlights */
+:global(html[data-theme="dark"]) .swingHighlight,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight {
+  color: #7ADB8F;
+  text-decoration-color: #7ADB8F;
+}
+
+:global(html[data-theme="dark"]) .swingHighlight:hover,
+:global([data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight:hover {
+  opacity: 0.7;
+}
+
 /* API Version Tooltip Styling */
 .apiVersionTooltip {
   padding: 2px 0;
@@ -77,13 +142,15 @@
 }
 
 /* Add padding to the content area inside details */
-.collapsibleSection > *:not(summary) {
+/* Exclude lists as they manage their own padding */
+.collapsibleSection > *:not(summary):not(ul):not(ol) {
   padding: 0 1rem;
 }
 
 /* Add top padding to the first element after summary */
 .collapsibleSection > summary + * {
   padding-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 /* Add bottom padding to the last element inside details */

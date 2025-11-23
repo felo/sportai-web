@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import styles from "@/styles/markdown.module.css";
+import { swingExplanations, type SwingExplanation } from "@/database";
 
 /**
  * Convert timestamp string to seconds
@@ -59,6 +60,51 @@ function jumpToTimestamp(timestamp: string) {
 }
 
 /**
+ * Process text content to detect and highlight metrics (speeds, angles, times, distances)
+ */
+function processTextWithMetrics(text: string): React.ReactNode[] {
+  // Pattern to match sports metrics:
+  // - Speeds: 23 mph, 45.5 km/h, 120 kph
+  // - Angles: 45°, 90 degrees
+  // - Times: 2.5 seconds, 1.2s, 500ms, 3.4 sec
+  // - Distances: 10 meters, 5.5m, 20 feet, 15ft, 30 yards
+  // - Percentages: 85%, 92.5%
+  // - Clock positions: 10 o'clock, 2 o'clock
+  const metricPattern = /\b(\d+\.?\d*)\s*(mph|km\/h|kph|°|degrees?|seconds?|sec|ms|milliseconds?|meters?|m|feet|ft|yards?|yd|%|o'clock)\b/gi;
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = metricPattern.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // Add the metric as a highlighted span
+    const metric = match[0];
+    parts.push(
+      <span
+        key={`metric-${match.index}`}
+        className={styles.metricHighlight}
+      >
+        {metric}
+      </span>
+    );
+    
+    lastIndex = match.index + metric.length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
  * Process text content to detect and linkify timestamps
  */
 function processTextWithTimestamps(text: string): React.ReactNode[] {
@@ -104,17 +150,200 @@ function processTextWithTimestamps(text: string): React.ReactNode[] {
 }
 
 /**
- * Custom text component that processes timestamps
+ * Process text with both timestamps, metrics, and swing types
  */
-const TextWithTimestamps: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+function processTextWithTimestampsAndMetrics(
+  text: string,
+  onSwingClick?: (swing: SwingExplanation) => void,
+  onMetricClick?: (value: number, unit: string, originalText: string) => void
+): React.ReactNode[] {
+  // Timestamps take precedence (they are clickable)
+  const timestampPattern = /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g;
+  // Compound clock positions like "10 or 2 o'clock" (processed before single metrics to avoid partial matches)
+  const compoundClockPattern = /\b(\d+)\s+or\s+(\d+)\s+o'clock\b/gi;
+  // Regular metrics including single clock positions like "2 o'clock"
+  const metricPattern = /\b(\d+\.?\d*)\s*(mph|km\/h|kph|°|degrees?|seconds?|sec|ms|milliseconds?|meters?|m|feet|ft|yards?|yd|%|o'clock)\b/gi;
+  // Swing types pattern (case-insensitive)
+  const swingNames = Object.keys(swingExplanations).join('|');
+  const swingPattern = new RegExp(`\\b(${swingNames})\\b`, 'gi');
+  
+  // Collect all matches with their types
+  const matches: Array<{ 
+    index: number; 
+    length: number; 
+    text: string; 
+    type: 'timestamp' | 'metric' | 'swing';
+    value?: number;
+    unit?: string;
+  }> = [];
+  
+  let timestampMatch: RegExpExecArray | null;
+  while ((timestampMatch = timestampPattern.exec(text)) !== null) {
+    matches.push({
+      index: timestampMatch.index,
+      length: timestampMatch[0].length,
+      text: timestampMatch[0],
+      type: 'timestamp'
+    });
+  }
+  
+  // Process swing types (high priority, processed before metrics)
+  let swingMatch: RegExpExecArray | null;
+  while ((swingMatch = swingPattern.exec(text)) !== null) {
+    const overlaps = matches.some(m => 
+      m.index <= swingMatch!.index && swingMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      matches.push({
+        index: swingMatch.index,
+        length: swingMatch[0].length,
+        text: swingMatch[0],
+        type: 'swing'
+      });
+    }
+  }
+  
+  // Process compound clock positions (e.g., "10 or 2 o'clock")
+  let compoundClockMatch: RegExpExecArray | null;
+  while ((compoundClockMatch = compoundClockPattern.exec(text)) !== null) {
+    const overlaps = matches.some(m => 
+      m.index <= compoundClockMatch!.index && compoundClockMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      matches.push({
+        index: compoundClockMatch.index,
+        length: compoundClockMatch[0].length,
+        text: compoundClockMatch[0],
+        type: 'metric'
+      });
+    }
+  }
+  
+  let metricMatch: RegExpExecArray | null;
+  while ((metricMatch = metricPattern.exec(text)) !== null) {
+    // Check if this metric overlaps with existing matches
+    const overlaps = matches.some(m => 
+      m.index <= metricMatch!.index && metricMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      // Extract value and unit from the match
+      const value = parseFloat(metricMatch[1]);
+      const unit = metricMatch[2];
+      
+      matches.push({
+        index: metricMatch.index,
+        length: metricMatch[0].length,
+        text: metricMatch[0],
+        type: 'metric',
+        value: value,
+        unit: unit
+      });
+    }
+  }
+  
+  // Sort matches by index
+  matches.sort((a, b) => a.index - b.index);
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  
+  matches.forEach((matchItem) => {
+    // Add text before the match
+    if (matchItem.index > lastIndex) {
+      parts.push(text.substring(lastIndex, matchItem.index));
+    }
+    
+    // Add the match based on type
+    if (matchItem.type === 'timestamp') {
+      parts.push(
+        <a
+          key={`timestamp-${matchItem.index}`}
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            jumpToTimestamp(matchItem.text);
+          }}
+          className={styles.timestampLink}
+          title="Click to jump to this timestamp in the video"
+        >
+          {matchItem.text}
+        </a>
+      );
+    } else if (matchItem.type === 'swing') {
+      const swingKey = matchItem.text.toLowerCase();
+      const swingInfo = swingExplanations[swingKey];
+      parts.push(
+        <button
+          key={`swing-${matchItem.index}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onSwingClick?.(swingInfo);
+          }}
+          className={styles.swingHighlight}
+          title="Click to learn more about this technique"
+          type="button"
+        >
+          {matchItem.text}
+        </button>
+      );
+    } else {
+      // Metric with conversion support
+      if (matchItem.value !== undefined && matchItem.unit && onMetricClick) {
+        parts.push(
+          <button
+            key={`metric-${matchItem.index}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onMetricClick(matchItem.value!, matchItem.unit!, matchItem.text);
+            }}
+            className={styles.metricHighlight}
+            title="Click to see conversions"
+            type="button"
+          >
+            {matchItem.text}
+          </button>
+        );
+      } else {
+        parts.push(
+          <span
+            key={`metric-${matchItem.index}`}
+            className={styles.metricHighlight}
+          >
+            {matchItem.text}
+          </span>
+        );
+      }
+    }
+    
+    lastIndex = matchItem.index + matchItem.length;
+  });
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Custom text component that processes timestamps, metrics, and swings
+ */
+const TextWithTimestamps: React.FC<{ 
+  children?: React.ReactNode;
+  onSwingClick?: (swing: SwingExplanation) => void;
+  onMetricClick?: (value: number, unit: string, originalText: string) => void;
+}> = ({ children, onSwingClick, onMetricClick }) => {
   if (typeof children === 'string') {
-    return <>{processTextWithTimestamps(children)}</>;
+    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick)}</>;
   }
   
   if (Array.isArray(children)) {
     return <>{children.map((child, index) => {
       if (typeof child === 'string') {
-        return <React.Fragment key={index}>{processTextWithTimestamps(child)}</React.Fragment>;
+        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick)}</React.Fragment>;
       }
       return <React.Fragment key={index}>{child}</React.Fragment>;
     })}</>;
@@ -123,7 +352,11 @@ const TextWithTimestamps: React.FC<{ children?: React.ReactNode }> = ({ children
   return <>{children}</>;
 };
 
-export const markdownComponents = {
+// Factory function to create markdown components with swing and metric click handlers
+export const createMarkdownComponents = (
+  onSwingClick?: (swing: SwingExplanation) => void,
+  onMetricClick?: (value: number, unit: string, originalText: string) => void
+) => ({
   h1: ({ node, ...props }: any) => (
     <h1
       className="text-2xl font-bold mt-6 mb-4 text-gray-900 dark:text-gray-100"
@@ -147,24 +380,29 @@ export const markdownComponents = {
       className="mb-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed"
       {...props}
     >
-      <TextWithTimestamps>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
     </p>
   ),
   ul: ({ node, ...props }: any) => (
     <ul
-      className="list-disc list-inside mb-4 space-y-2 text-base text-gray-700 dark:text-gray-300"
+      className="markdown-ul mb-4 text-base text-gray-700 dark:text-gray-300"
+      style={{ listStyle: "none" }}
       {...props}
     />
   ),
   ol: ({ node, ...props }: any) => (
     <ol
-      className="list-decimal list-inside mb-4 space-y-2 text-base text-gray-700 dark:text-gray-300"
+      className="markdown-ol mb-4 text-base text-gray-700 dark:text-gray-300"
+      style={{ listStyle: "none", counterReset: "markdown-counter" }}
       {...props}
     />
   ),
   li: ({ node, children, ...props }: any) => (
-    <li className="ml-4 mb-1" {...props}>
-      <TextWithTimestamps>{children}</TextWithTimestamps>
+    <li
+      className="markdown-li"
+      {...props}
+    >
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
     </li>
   ),
   code: ({ node, inline, ...props }: any) =>
@@ -190,12 +428,12 @@ export const markdownComponents = {
   ),
   strong: ({ node, children, ...props }: any) => (
     <strong className="font-semibold text-gray-900 dark:text-gray-100" {...props}>
-      <TextWithTimestamps>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
     </strong>
   ),
   em: ({ node, children, ...props }: any) => (
     <em className="italic" {...props}>
-      <TextWithTimestamps>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
     </em>
   ),
   a: ({ node, ...props }: any) => (
@@ -227,7 +465,13 @@ export const markdownComponents = {
     />
   ),
   hr: ({ node, ...props }: any) => (
-    <hr className="my-6 border-gray-300 dark:border-gray-600" {...props} />
+    <div className="markdown-divider" role="separator" aria-label="Section divider">
+      <div className="markdown-divider-line" />
+      <span className="markdown-divider-dots" aria-hidden="true">
+        •••
+      </span>
+      <div className="markdown-divider-line" />
+    </div>
   ),
   details: ({ node, ...props }: any) => (
     <details
@@ -241,5 +485,8 @@ export const markdownComponents = {
       {...props}
     />
   ),
-};
+});
+
+// Default export without swing click handler for backward compatibility
+export const markdownComponents = createMarkdownComponents();
 

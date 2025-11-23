@@ -12,6 +12,8 @@ import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { DragOverlay } from "@/components/chat/DragOverlay";
+import { ScrollToBottom } from "@/components/chat/ScrollToBottom";
+import { ScrollToVideo } from "@/components/chat/ScrollToVideo";
 import { ErrorToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
@@ -32,6 +34,7 @@ export function GeminiQueryForm() {
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const [showingVideoSizeError, setShowingVideoSizeError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
   const isMobile = useIsMobile();
@@ -709,7 +712,7 @@ export function GeminiQueryForm() {
 
           {/* Messages area - this is the scrolling container with fade overlay */}
           <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-            <div style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+            <div ref={scrollContainerRef} style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
               {messages.length === 0 && !loading ? (
                 <StarterPrompts 
                   onPromptSelect={handleStarterPromptSelect}
@@ -725,6 +728,23 @@ export function GeminiQueryForm() {
                 />
               )}
             </div>
+            
+            {/* Scroll to video button */}
+            {messages.length > 0 && (
+              <ScrollToVideo 
+                scrollContainerRef={scrollContainerRef}
+              />
+            )}
+            
+            {/* Scroll to bottom button */}
+            {messages.length > 0 && (
+              <ScrollToBottom 
+                scrollContainerRef={scrollContainerRef}
+                onScrollToBottom={() => {
+                  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                }}
+              />
+            )}
             
             {/* Bottom fade overlay - fades content at bottom - only show when there are messages */}
             {messages.length > 0 && (

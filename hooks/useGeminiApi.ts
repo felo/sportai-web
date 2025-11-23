@@ -100,6 +100,9 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
 
       if (reader) {
         try {
+          // Mark as streaming when we start
+          updateMessage(assistantMessageId, { isStreaming: true });
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -112,6 +115,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
               content: accumulatedText,
               inputTokens: inputTokens,
               outputTokens: outputTokens,
+              isStreaming: true, // Keep streaming flag active
             });
           }
           
@@ -119,6 +123,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
           const duration = Date.now() - requestStartTime;
           updateMessage(assistantMessageId, {
             responseDuration: duration,
+            isStreaming: false, // Mark as complete
             modelSettings: {
               thinkingMode,
               mediaResolution,
@@ -126,6 +131,8 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
             },
           });
         } catch (error) {
+          // Also set streaming to false on error
+          updateMessage(assistantMessageId, { isStreaming: false });
           // Handle abort errors gracefully
           if (error instanceof Error && error.name === "AbortError") {
             reader.cancel();
@@ -417,6 +424,9 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
 
         console.log("[Gemini API] Starting to read stream...");
         try {
+          // Mark as streaming when we start
+          updateMessage(assistantMessageId, { isStreaming: true });
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
@@ -437,6 +447,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               content: accumulatedText,
               inputTokens: inputTokens,
               outputTokens: outputTokens,
+              isStreaming: true, // Keep streaming flag active
             });
           }
             
@@ -444,6 +455,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           const duration = Date.now() - requestStartTime;
           updateMessage(assistantMessageId, {
             responseDuration: duration,
+            isStreaming: false, // Mark as complete
             modelSettings: {
               thinkingMode,
               mediaResolution,
@@ -451,6 +463,8 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             },
           });
         } catch (error) {
+          // Also set streaming to false on error
+          updateMessage(assistantMessageId, { isStreaming: false });
           // Handle abort errors gracefully
           if (error instanceof Error && error.name === "AbortError") {
             reader.cancel();
@@ -540,6 +554,9 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
 
         if (reader) {
           try {
+            // Mark as streaming when we start
+            updateMessage(assistantMessageId, { isStreaming: true });
+            
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
@@ -552,6 +569,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
                 content: accumulatedText,
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
+                isStreaming: true, // Keep streaming flag active
               });
             }
             
@@ -559,6 +577,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             const duration = Date.now() - requestStartTime;
             updateMessage(assistantMessageId, {
               responseDuration: duration,
+              isStreaming: false, // Mark as complete
               modelSettings: {
                 thinkingMode,
                 mediaResolution,
@@ -566,6 +585,8 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               },
             });
           } catch (error) {
+            // Also set streaming to false on error
+            updateMessage(assistantMessageId, { isStreaming: false });
             // Handle abort errors gracefully
             if (error instanceof Error && error.name === "AbortError") {
               reader.cancel();
