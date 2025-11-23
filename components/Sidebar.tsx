@@ -19,7 +19,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchAttempt }: SidebarProps) {
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar, closeSidebar } = useSidebar();
   const [alertOpen, setAlertOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>("dark");
@@ -132,11 +132,533 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     window.dispatchEvent(new CustomEvent("theatre-mode-change"));
   };
 
-  // Don't render sidebar on mobile
+  // Mobile: Full screen overlay when open
   if (isMobile) {
-    return null;
+    return (
+      <>
+        {/* Backdrop overlay */}
+        {!isCollapsed && (
+          <Box
+            onClick={closeSidebar}
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 30,
+              transition: "opacity 0.2s ease-in-out",
+            }}
+          />
+        )}
+        
+        {/* Sidebar */}
+        <Box
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: "100%",
+            backgroundColor: "var(--gray-2)",
+            transform: isCollapsed ? "translateX(-100%)" : "translateX(0)",
+            transition: "transform 0.3s ease-in-out",
+            zIndex: 40,
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: "calc(var(--space-4) + env(safe-area-inset-top))",
+            paddingBottom: "calc(var(--space-4) + env(safe-area-inset-bottom))",
+          }}
+        >
+          {/* Close button */}
+          <Box
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "flex-end",
+              paddingRight: "var(--space-4)",
+              marginBottom: "var(--space-4)",
+            }}
+          >
+            <Button
+              variant="ghost"
+              size="2"
+              onClick={closeSidebar}
+              style={{
+                minWidth: "32px",
+                width: "32px",
+                height: "32px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Cross2Icon width="20" height="20" />
+            </Button>
+          </Box>
+
+          {/* Scrollable content area */}
+          <Box
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "0 var(--space-4)",
+            }}
+          >
+            <Flex 
+              direction="column" 
+              gap="3"
+            >
+            {/* Chats Section */}
+            <Flex direction="column" gap="2">
+              <Button
+                variant="ghost"
+                size="2"
+                onClick={() => setChatsExpanded(!chatsExpanded)}
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                {chatsExpanded ? (
+                  <ChevronDownIcon width="16" height="16" />
+                ) : (
+                  <ChevronRightIcon width="16" height="16" />
+                )}
+                <Text size="2" ml="2" weight="medium">
+                  Chats
+                </Text>
+              </Button>
+              {chatsExpanded && (
+                <Flex direction="column" gap="1" style={{ paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
+                  {chats.length === 0 ? (
+                    <Text size="2" color="gray" style={{ padding: "var(--space-2) var(--space-3)" }}>
+                      No chats yet
+                    </Text>
+                  ) : (
+                    chats.map((chat) => (
+                      <Flex
+                        key={chat.id}
+                        align="center"
+                        gap="2"
+                        style={{
+                          position: "relative",
+                        }}
+                      >
+                        <Button
+                          variant={currentChatId === chat.id ? "soft" : "ghost"}
+                          size="2"
+                          onClick={async () => {
+                            // Don't warn if clicking on the same chat
+                            if (currentChatId !== chat.id) {
+                              // Check if chat is thinking before switching
+                              if (onChatSwitchAttempt) {
+                                const result = await Promise.resolve(onChatSwitchAttempt());
+                                if (!result) {
+                                  return; // User cancelled
+                                }
+                              }
+                            }
+                            saveCurrentChatId(chat.id);
+                            closeSidebar(); // Close sidebar after selecting chat
+                            // State will be updated via event handler
+                          }}
+                          style={{
+                            justifyContent: "flex-start",
+                            padding: "var(--space-2) var(--space-3)",
+                            paddingRight: "var(--space-8)",
+                            flex: 1,
+                            height: "auto",
+                            minHeight: "32px",
+                            whiteSpace: "normal",
+                            wordWrap: "break-word",
+                          }}
+                        >
+                          <Text 
+                            size="2" 
+                            color={currentChatId === chat.id ? undefined : "gray"} 
+                            style={{ 
+                              textAlign: "left",
+                              wordBreak: "break-word",
+                              overflowWrap: "break-word",
+                              whiteSpace: "normal",
+                              lineHeight: "1.4",
+                            }}
+                          >
+                            {chat.title}
+                          </Text>
+                        </Button>
+                        {/* Always show edit/delete on mobile - right aligned */}
+                        <Flex
+                          gap="3"
+                          style={{
+                            position: "absolute",
+                            right: "var(--space-2)",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingChat(chat);
+                              setEditTitle(chat.title);
+                              setEditDialogOpen(true);
+                            }}
+                            style={{
+                              padding: "var(--space-1)",
+                              minWidth: "auto",
+                              width: "24px",
+                              height: "24px",
+                            }}
+                          >
+                            <Pencil1Icon width="14" height="14"/>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            color="red"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              // If deleting the current chat while it's thinking, warn the user
+                              if (currentChatId === chat.id && onChatSwitchAttempt) {
+                                const result = await Promise.resolve(onChatSwitchAttempt());
+                                if (!result) {
+                                  return; // User cancelled
+                                }
+                              }
+                              
+                              // Check if this is the last chat - if so, clear it instead of deleting
+                              const allChats = loadChatsFromStorage();
+                              if (allChats.length === 1) {
+                                // Last chat - clear messages instead of deleting
+                                console.log("[Sidebar] Last chat - clearing messages instead of deleting");
+                                updateChat(chat.id, { messages: [] }, false);
+                                // Refresh chat list
+                                const updatedChats = loadChatsFromStorage();
+                                setChats(updatedChats);
+                                // Also clear the chat in the UI state
+                                if (currentChatId === chat.id && onClearChat) {
+                                  onClearChat();
+                                }
+                              } else {
+                                // Not the last chat - delete normally
+                                deleteChat(chat.id);
+                                const updatedChats = loadChatsFromStorage();
+                                setChats(updatedChats);
+                                if (currentChatId === chat.id) {
+                                  const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
+                                  setCurrentChatId(newCurrentChatId);
+                                  saveCurrentChatId(newCurrentChatId);
+                                }
+                              }
+                            }}
+                            style={{
+                              padding: "var(--space-1)",
+                              minWidth: "auto",
+                              width: "24px",
+                              height: "24px",
+                            }}
+                          >
+                            <TrashIcon width="14" height="14"/>
+                          </Button>
+                        </Flex>
+                      </Flex>
+                    ))
+                  )}
+                </Flex>
+              )}
+            </Flex>
+            
+            <Separator size="4" />
+            
+            {/* Navigation Links */}
+            <Flex direction="column" gap="2">
+              <Button
+                variant="ghost"
+                size="2"
+                asChild
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <a
+                  href="https://sportai.com/platform"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => closeSidebar()}
+                >
+                  <GlobeIcon width="16" height="16" />
+                  <Text size="2" ml="2">SportAI Platform</Text>
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                size="2"
+                asChild
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <a
+                  href="https://sportai.mintlify.app/api-reference/introduction"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => closeSidebar()}
+                >
+                  <FileTextIcon width="16" height="16" />
+                  <Text size="2" ml="2">API Documentation</Text>
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                size="2"
+                asChild
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <a
+                  href="https://sportai.com/contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => closeSidebar()}
+                >
+                  <EnvelopeClosedIcon width="16" height="16" />
+                  <Text size="2" ml="2">Contact Us</Text>
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                size="2"
+                asChild
+                style={{
+                  justifyContent: "flex-start",
+                  padding: "var(--space-2) var(--space-3)",
+                }}
+              >
+                <a
+                  href="https://sportai.com/about-us"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => closeSidebar()}
+                >
+                  <InfoCircledIcon width="16" height="16" />
+                  <Text size="2" ml="2">About Us</Text>
+                </a>
+              </Button>
+            </Flex>
+            </Flex>
+          </Box>
+
+          {/* Settings - Docked to bottom */}
+          <Box
+            style={{
+              borderTop: "1px solid var(--gray-6)",
+              padding: "var(--space-4)",
+            }}
+          >
+            <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
+              <DropdownMenu.Trigger>
+                <Button
+                  variant="ghost"
+                  size="2"
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    padding: "var(--space-2) var(--space-3)",
+                  }}
+                >
+                  <GearIcon width="20" height="20" />
+                  <Text size="2" ml="2">
+                    Settings
+                  </Text>
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="start">
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <SunIcon width="16" height="16" />
+                    <Text ml="2">Themes</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
+                      <Text>Light</Text>
+                      {appearance === "light" && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
+                      <Text>Dark</Text>
+                      {appearance === "dark" && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator />
+
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <Text>Theatre mode</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
+                      <Text>On</Text>
+                      {theatreMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
+                      <Text>Off</Text>
+                      {!theatreMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator />
+
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <Text>Developer mode</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
+                      <Text>On</Text>
+                      {developerMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
+                      <Text>Off</Text>
+                      {!developerMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator />
+
+                <DropdownMenu.Item 
+                  color="red"
+                  disabled={messageCount === 0 || !onClearChat}
+                  onSelect={(e) => {
+                    if (messageCount > 0 && onClearChat) {
+                      e.preventDefault();
+                      setAlertOpen(true);
+                    }
+                  }}
+                >
+                  <TrashIcon width="16" height="16" />
+                  <Text ml="2">Clear chat history</Text>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Box>
+        </Box>
+
+        {/* Alert Dialog for clearing chat */}
+        {messageCount > 0 && onClearChat && (
+          <AlertDialog.Root open={alertOpen} onOpenChange={setAlertOpen}>
+            <AlertDialog.Content maxWidth="450px">
+              <AlertDialog.Title>Clear chat history?</AlertDialog.Title>
+              <AlertDialog.Description size="2">
+                This will permanently delete all messages in this conversation. This action cannot be undone.
+              </AlertDialog.Description>
+              <Flex gap="3" mt="4" justify="end">
+                <AlertDialog.Cancel>
+                  <Button variant="soft" color="gray">
+                    Cancel
+                  </Button>
+                </AlertDialog.Cancel>
+                <AlertDialog.Action>
+                  <Button 
+                    variant="solid" 
+                    color="red"
+                    onClick={() => {
+                      onClearChat();
+                      setAlertOpen(false);
+                      setDropdownOpen(false);
+                      closeSidebar();
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </AlertDialog.Action>
+              </Flex>
+            </AlertDialog.Content>
+          </AlertDialog.Root>
+        )}
+
+        {/* Edit Chat Dialog */}
+        <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <Dialog.Content maxWidth="450px">
+            <Dialog.Title>Edit chat name</Dialog.Title>
+            <Dialog.Description size="2" mb="4">
+              Change the name of this chat.
+            </Dialog.Description>
+            
+            <Flex direction="column" gap="3" mt="4">
+              <TextField.Root
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Chat name"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && editTitle.trim() && editingChat) {
+                    e.preventDefault();
+                    updateChat(editingChat.id, { title: editTitle.trim() }, false);
+                    setChats(loadChatsFromStorage());
+                    setEditDialogOpen(false);
+                    setEditingChat(null);
+                    setEditTitle("");
+                  }
+                }}
+              />
+              
+              <Flex gap="3" justify="end" mt="2">
+                <Dialog.Close>
+                  <Button variant="soft" color="gray">
+                    Cancel
+                  </Button>
+                </Dialog.Close>
+                <Button
+                  className={buttonStyles.actionButton}
+                  onClick={() => {
+                    if (editTitle.trim() && editingChat) {
+                      console.log("[Sidebar] Updating chat title:", editingChat.id, "from:", editingChat.title, "to:", editTitle.trim());
+                      updateChat(editingChat.id, { title: editTitle.trim() }, false);
+                      // Small delay to ensure storage write completes before reloading
+                      setTimeout(() => {
+                        const updatedChats = loadChatsFromStorage();
+                        const updatedChat = updatedChats.find(c => c.id === editingChat.id);
+                        console.log("[Sidebar] After update - chat title:", updatedChat?.title);
+                        setChats(updatedChats);
+                      }, 10);
+                      setEditDialogOpen(false);
+                      setEditingChat(null);
+                      setEditTitle("");
+                    }
+                  }}
+                  disabled={!editTitle.trim()}
+                >
+                  Save
+                </Button>
+              </Flex>
+            </Flex>
+          </Dialog.Content>
+        </Dialog.Root>
+      </>
+    );
   }
 
+  // Desktop layout
   return (
     <Box
       style={{
@@ -210,6 +732,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   }
                   const newChat = createChat();
                   saveCurrentChatId(newChat.id);
+                  closeSidebar(); // Close sidebar after creating new chat
                   // State will be updated via event handler
                 }}
                 style={{
@@ -274,6 +797,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                                 }
                               }
                               saveCurrentChatId(chat.id);
+                              closeSidebar(); // Close sidebar after selecting chat
                               // State will be updated via event handler
                             }}
                             style={{
@@ -303,7 +827,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           </Button>
                           {hoveredChatId === chat.id && (
                             <Flex
-                              gap="4"
+                              gap="3"
                               style={{
                                 position: "absolute",
                                 right: "var(--space-2)",
@@ -403,6 +927,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     href="https://sportai.com/platform"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => closeSidebar()}
                   >
                     <GlobeIcon width="16" height="16" />
                     <Text size="2" ml="2">SportAI Platform</Text>
@@ -421,6 +946,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     href="https://sportai.mintlify.app/api-reference/introduction"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => closeSidebar()}
                   >
                     <FileTextIcon width="16" height="16" />
                     <Text size="2" ml="2">API Documentation</Text>
@@ -439,6 +965,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     href="https://sportai.com/contact"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => closeSidebar()}
                   >
                     <EnvelopeClosedIcon width="16" height="16" />
                     <Text size="2" ml="2">Contact Us</Text>
@@ -457,6 +984,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     href="https://sportai.com/about-us"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => closeSidebar()}
                   >
                     <InfoCircledIcon width="16" height="16" />
                     <Text size="2" ml="2">About Us</Text>
@@ -600,6 +1128,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                         onClearChat();
                         setAlertOpen(false);
                         setDropdownOpen(false);
+                        closeSidebar();
                       }}
                     >
                       Clear

@@ -1,7 +1,7 @@
 "use client";
 
 import { Flex, Box, Text, Badge, Tooltip, Button } from "@radix-ui/themes";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { PlusIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -12,11 +12,11 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
-  const { isCollapsed } = useSidebar();
+  const { isCollapsed, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const sidebarWidth = isCollapsed ? "64px" : "280px";
 
-  // Mobile layout: + New Chat button (left), centered logo, no version badge
+  // Mobile layout: Hamburger menu (left), centered logo, + button (right)
   if (isMobile) {
     return (
       <Box
@@ -36,7 +36,7 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
           position: "relative",
         }}
       >
-        {/* New Chat Button - Positioned on left */}
+        {/* Hamburger Menu - Positioned on left */}
         <Box
           style={{
             position: "absolute",
@@ -48,15 +48,18 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
           <Button
             variant="ghost"
             size="2"
-            onClick={onNewChat}
+            onClick={toggleSidebar}
             style={{
+              minWidth: "32px",
+              width: "32px",
+              height: "32px",
+              padding: 0,
               display: "flex",
               alignItems: "center",
-              gap: "var(--space-1)",
+              justifyContent: "center",
             }}
           >
-            <PlusIcon width="16" height="16" />
-            <Text size="2">New Chat</Text>
+            <HamburgerMenuIcon width="20" height="20" />
           </Button>
         </Box>
 
@@ -68,6 +71,33 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
           height={38}
           style={{ objectFit: "contain", height: "auto" }}
         />
+
+        {/* New Chat Button - Positioned on right */}
+        <Box
+          style={{
+            position: "absolute",
+            right: "var(--space-3)",
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        >
+          <Button
+            variant="ghost"
+            size="2"
+            onClick={onNewChat}
+            style={{
+              minWidth: "32px",
+              width: "32px",
+              height: "32px",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <PlusIcon width="20" height="20" />
+          </Button>
+        </Box>
       </Box>
     );
   }
