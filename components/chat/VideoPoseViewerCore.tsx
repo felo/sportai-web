@@ -5,8 +5,14 @@ import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
+import { useObjectDetection } from "@/hooks/useObjectDetection";
+import { useProjectileDetection } from "@/hooks/useProjectileDetection";
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
+import { drawDetectedObjects } from "@/types/object-detection";
+import { drawProjectile } from "@/types/projectile-detection";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
+import type { ObjectDetectionResult } from "@/types/detection";
+import type { ProjectileDetectionResult } from "@/types/detection";
 import { Pose3DViewer } from "./Pose3DViewer";
 import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
@@ -100,6 +106,22 @@ export function VideoPoseViewer({
   const lastWristPosRightRef = useRef<{ x: number; y: number; frame: number; time: number } | null>(null);
   const velocityHistoryLeftRef = useRef<number[]>([]);
   const velocityHistoryRightRef = useRef<number[]>([]);
+
+  // Object Detection State (YOLOv8n)
+  const [isObjectDetectionEnabled, setIsObjectDetectionEnabled] = useState(false);
+  const [selectedObjectModel, setSelectedObjectModel] = useState<"YOLOv8n" | "YOLOv8s" | "YOLOv8m">("YOLOv8n");
+  const [objectConfidenceThreshold, setObjectConfidenceThreshold] = useState(0.5);
+  const [showObjectLabels, setShowObjectLabels] = useState(true);
+  const [enableObjectTracking, setEnableObjectTracking] = useState(true);
+  const [currentObjects, setCurrentObjects] = useState<any[]>([]);
+
+  // Projectile Detection State (TrackNet)
+  const [isProjectileDetectionEnabled, setIsProjectileDetectionEnabled] = useState(false);
+  const [selectedProjectileModel, setSelectedProjectileModel] = useState<"TrackNet" | "TrackNetV2">("TrackNet");
+  const [projectileConfidenceThreshold, setProjectileConfidenceThreshold] = useState(0.5);
+  const [showProjectileTrajectory, setShowProjectileTrajectory] = useState(true);
+  const [showProjectilePrediction, setShowProjectilePrediction] = useState(false);
+  const [currentProjectile, setCurrentProjectile] = useState<any | null>(null);
 
   // Label stability - prevents jitter by locking position for N frames after a change
   const LABEL_POSITION_STABILITY_FRAMES = 5; // Configurable: frames to wait before allowing position swap
@@ -326,6 +348,29 @@ export function VideoPoseViewer({
       enabled: isPoseEnabled,
     });
 
+  // Object Detection Hook
+  const { 
+    isLoading: isObjectDetectionLoading, 
+    error: objectDetectionError, 
+    detectObjects 
+  } = useObjectDetection({
+    model: selectedObjectModel,
+    confidenceThreshold: objectConfidenceThreshold,
+    enableTracking: enableObjectTracking,
+    enabled: isObjectDetectionEnabled,
+  });
+
+  // Projectile Detection Hook
+  const { 
+    isLoading: isProjectileDetectionLoading, 
+    error: projectileDetectionError, 
+    detectProjectile 
+  } = useProjectileDetection({
+    model: selectedProjectileModel,
+    confidenceThreshold: projectileConfidenceThreshold,
+    enabled: isProjectileDetectionEnabled,
+  });
+
   // Update canvas dimensions when video loads
   useEffect(() => {
     const video = videoRef.current;
@@ -430,6 +475,84 @@ export function VideoPoseViewer({
       stopDetection();
     };
   }, [isPlaying, showSkeleton, isLoading, usePreprocessing, isPoseEnabled, startDetection, stopDetection, handlePosesDetected]);
+
+  // Handle continuous object detection while playing
+  useEffect(() => {
+    const video = videoRef.current;
+    
+    if (!video || !isObjectDetectionEnabled || !isPlaying || isObjectDetectionLoading) {
+      return;
+    }
+
+    let rafId: number;
+    let lastDetectionTime = 0;
+    const detectionInterval = 100; // Detect every 100ms (10 FPS) to balance performance
+
+    const detectLoop = async () => {
+      if (!video.paused && !video.ended) {
+        const now = performance.now();
+        
+        if (now - lastDetectionTime >= detectionInterval) {
+          try {
+            const objects = await detectObjects(video);
+            setCurrentObjects(objects);
+            lastDetectionTime = now;
+          } catch (err) {
+            console.error('Error detecting objects:', err);
+          }
+        }
+        
+        rafId = requestAnimationFrame(detectLoop);
+      }
+    };
+
+    detectLoop();
+
+    return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [isPlaying, isObjectDetectionEnabled, isObjectDetectionLoading, detectObjects]);
+
+  // Handle continuous projectile detection while playing
+  useEffect(() => {
+    const video = videoRef.current;
+    
+    if (!video || !isProjectileDetectionEnabled || !isPlaying || isProjectileDetectionLoading) {
+      return;
+    }
+
+    let rafId: number;
+    let lastDetectionTime = 0;
+    const detectionInterval = 33; // Detect every 33ms (~30 FPS) for smooth ball tracking
+
+    const detectLoop = async () => {
+      if (!video.paused && !video.ended) {
+        const now = performance.now();
+        
+        if (now - lastDetectionTime >= detectionInterval) {
+          try {
+            const projectile = await detectProjectile(video, undefined, video.currentTime);
+            setCurrentProjectile(projectile);
+            lastDetectionTime = now;
+          } catch (err) {
+            console.error('Error detecting projectile:', err);
+          }
+        }
+        
+        rafId = requestAnimationFrame(detectLoop);
+      }
+    };
+
+    detectLoop();
+
+    return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [isPlaying, isProjectileDetectionEnabled, isProjectileDetectionLoading, detectProjectile]);
 
   // Auto-play video when model finishes loading
   useEffect(() => {
@@ -1068,7 +1191,66 @@ export function VideoPoseViewer({
         });
       }
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId]);
+
+    // Draw object detection results (YOLO)
+    if (isObjectDetectionEnabled && currentObjects.length > 0) {
+      // Scale object bounding boxes to canvas coordinates
+      // Object detection happens on video element, so we need to scale from video dimensions to canvas
+      const scaleX = canvas.width / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+      
+      const scaledObjects = currentObjects.map(obj => ({
+        ...obj,
+        bbox: {
+          x: obj.bbox.x * scaleX,
+          y: obj.bbox.y * scaleY,
+          width: obj.bbox.width * scaleX,
+          height: obj.bbox.height * scaleY,
+        },
+      }));
+      
+      drawDetectedObjects(ctx, scaledObjects, {
+        showLabel: showObjectLabels,
+        showConfidence: true,
+        lineWidth: 3,
+        fontSize: 14,
+      });
+    }
+
+    // Draw projectile detection results (TrackNet)
+    if (isProjectileDetectionEnabled && currentProjectile) {
+      // Scale projectile position to canvas coordinates
+      const scaleX = canvas.width / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+      
+      const scaledProjectile = {
+        ...currentProjectile,
+        position: {
+          x: currentProjectile.position.x * scaleX,
+          y: currentProjectile.position.y * scaleY,
+        },
+        trajectory: currentProjectile.trajectory?.map((point: { x: number; y: number; frame: number; timestamp: number }) => ({
+          ...point,
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+        })),
+        predictedPath: currentProjectile.predictedPath?.map((point: { x: number; y: number; confidence: number }) => ({
+          ...point,
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+        })),
+      };
+      
+      drawProjectile(ctx, scaledProjectile, {
+        ballColor: "#FFEB3B",
+        ballRadius: 6,
+        trajectoryColor: "rgba(255, 235, 59, 0.6)",
+        trajectoryWidth: 2,
+        predictionColor: "rgba(255, 235, 59, 0.3)",
+        showVelocity: true,
+      });
+    }
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId, isObjectDetectionEnabled, currentObjects, showObjectLabels, isProjectileDetectionEnabled, currentProjectile]);
 
   // Catmull-Rom spline interpolation for smooth trajectories
   // Creates smooth curves through points, simulating higher FPS
@@ -2666,6 +2848,26 @@ export function VideoPoseViewer({
             )}
           </Flex>
 
+          {/* Pose Detection Section Header with Toggle */}
+          <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
+            <Flex align="center" justify="between">
+              <Flex direction="column" gap="1">
+                <Text size="2" weight="bold">
+                  Pose Detection
+                </Text>
+                <Text size="1" color="gray">
+                  Track body movement and skeleton
+                </Text>
+              </Flex>
+              <Switch
+                checked={isPoseEnabled}
+                onCheckedChange={setIsPoseEnabled}
+                disabled={isLoading}
+              />
+            </Flex>
+
+          {isPoseEnabled && (
+            <Flex direction="column" gap="3">
           {/* Confidence Threshold Selector */}
           <Flex direction="column" gap="1">
             <Text size="2" color="gray" weight="medium">
@@ -2877,6 +3079,196 @@ export function VideoPoseViewer({
                   </Select.Item>
                 </Select.Content>
               </Select.Root>
+            )}
+          </Flex>
+            </Flex>
+          )}
+          </Flex>
+
+          {/* Object Detection Section (YOLOv8n) */}
+          <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
+            <Flex align="center" justify="between">
+              <Flex direction="column" gap="1">
+                <Text size="2" weight="bold">
+                  Object Detection (YOLO)
+                </Text>
+                <Text size="1" color="gray">
+                  Detect and track objects in the video
+                </Text>
+              </Flex>
+              <Switch
+                checked={isObjectDetectionEnabled}
+                onCheckedChange={setIsObjectDetectionEnabled}
+                disabled={isObjectDetectionLoading}
+              />
+            </Flex>
+
+            {isObjectDetectionEnabled && (
+              <Flex direction="column" gap="3">
+                {/* Object Model Selection */}
+                <Select.Root
+                  value={selectedObjectModel}
+                  onValueChange={(value) => {
+                    setSelectedObjectModel(value as "YOLOv8n" | "YOLOv8s" | "YOLOv8m");
+                    setCurrentObjects([]);
+                  }}
+                  disabled={isObjectDetectionLoading}
+                >
+                  <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1" align="start">
+                      <Text weight="medium" size="2">
+                        {selectedObjectModel}
+                      </Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        {selectedObjectModel === "YOLOv8n" && "Fast, lightweight detection"}
+                        {selectedObjectModel === "YOLOv8s" && "Balanced speed and accuracy"}
+                        {selectedObjectModel === "YOLOv8m" && "High accuracy, slower"}
+                      </Text>
+                    </Flex>
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="YOLOv8n" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">YOLOv8n (Nano)</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Fast, lightweight detection</Text>
+                      </Flex>
+                    </Select.Item>
+                    <Select.Item value="YOLOv8s" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">YOLOv8s (Small)</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Balanced speed and accuracy</Text>
+                      </Flex>
+                    </Select.Item>
+                    <Select.Item value="YOLOv8m" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">YOLOv8m (Medium)</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>High accuracy, slower</Text>
+                      </Flex>
+                    </Select.Item>
+                  </Select.Content>
+                </Select.Root>
+
+                {/* Object Detection Options */}
+                <Flex direction="column" gap="2">
+                  <Flex align="center" justify="between">
+                    <Text size="2">Show Labels</Text>
+                    <Switch
+                      checked={showObjectLabels}
+                      onCheckedChange={setShowObjectLabels}
+                    />
+                  </Flex>
+                  <Flex align="center" justify="between">
+                    <Text size="2">Enable Tracking</Text>
+                    <Switch
+                      checked={enableObjectTracking}
+                      onCheckedChange={setEnableObjectTracking}
+                    />
+                  </Flex>
+                </Flex>
+
+                {isObjectDetectionLoading && (
+                  <Flex align="center" gap="2">
+                    <Spinner />
+                    <Text size="2" color="gray">Loading object detection model...</Text>
+                  </Flex>
+                )}
+
+                {objectDetectionError && (
+                  <Text size="2" color="red">
+                    Error: {objectDetectionError}
+                  </Text>
+                )}
+              </Flex>
+            )}
+          </Flex>
+
+          {/* Projectile Detection Section (TrackNet) */}
+          <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
+            <Flex align="center" justify="between">
+              <Flex direction="column" gap="1">
+                <Text size="2" weight="bold">
+                  Ball Tracking (TrackNet)
+                </Text>
+                <Text size="1" color="gray">
+                  Track ball/projectile trajectory
+                </Text>
+              </Flex>
+              <Switch
+                checked={isProjectileDetectionEnabled}
+                onCheckedChange={setIsProjectileDetectionEnabled}
+                disabled={isProjectileDetectionLoading}
+              />
+            </Flex>
+
+            {isProjectileDetectionEnabled && (
+              <Flex direction="column" gap="3">
+                {/* Projectile Model Selection */}
+                <Select.Root
+                  value={selectedProjectileModel}
+                  onValueChange={(value) => {
+                    setSelectedProjectileModel(value as "TrackNet" | "TrackNetV2");
+                    setCurrentProjectile(null);
+                  }}
+                  disabled={isProjectileDetectionLoading}
+                >
+                  <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
+                    <Flex direction="column" gap="1" align="start">
+                      <Text weight="medium" size="2">
+                        {selectedProjectileModel}
+                      </Text>
+                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
+                        {selectedProjectileModel === "TrackNet" && "Original TrackNet model"}
+                        {selectedProjectileModel === "TrackNetV2" && "Enhanced TrackNet V2"}
+                      </Text>
+                    </Flex>
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="TrackNet" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">TrackNet</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Original TrackNet model</Text>
+                      </Flex>
+                    </Select.Item>
+                    <Select.Item value="TrackNetV2" style={{ minHeight: "70px", padding: "12px" }}>
+                      <Flex direction="column" gap="1">
+                        <Text weight="medium" size="2">TrackNet V2</Text>
+                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Enhanced TrackNet V2</Text>
+                      </Flex>
+                    </Select.Item>
+                  </Select.Content>
+                </Select.Root>
+
+                {/* Projectile Detection Options */}
+                <Flex direction="column" gap="2">
+                  <Flex align="center" justify="between">
+                    <Text size="2">Show Trajectory</Text>
+                    <Switch
+                      checked={showProjectileTrajectory}
+                      onCheckedChange={setShowProjectileTrajectory}
+                    />
+                  </Flex>
+                  <Flex align="center" justify="between">
+                    <Text size="2">Show Prediction</Text>
+                    <Switch
+                      checked={showProjectilePrediction}
+                      onCheckedChange={setShowProjectilePrediction}
+                    />
+                  </Flex>
+                </Flex>
+
+                {isProjectileDetectionLoading && (
+                  <Flex align="center" gap="2">
+                    <Spinner />
+                    <Text size="2" color="gray">Loading projectile detection model...</Text>
+                  </Flex>
+                )}
+
+                {projectileDetectionError && (
+                  <Text size="2" color="red">
+                    Error: {projectileDetectionError}
+                  </Text>
+                )}
+              </Flex>
             )}
           </Flex>
 
