@@ -356,11 +356,14 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
 
       <Box
         style={{
-          maxWidth: isMobile && message.role === "assistant" 
-            ? "100%" 
+          maxWidth: isMobile 
+            ? "100%"
             : theatreMode && hasVideo
             ? "100%"
             : "80%",
+          width: isMobile && message.role === "user"
+            ? "100%"
+            : "auto",
           borderRadius: message.role === "user" && !hasVideo
             ? "24px 8px 24px 24px" 
             : "var(--radius-3)",
@@ -505,14 +508,28 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
             ) : null}
             {/* Show text if present */}
             {message.content.trim() && (
-              <Text 
-                style={{ 
-                  whiteSpace: "pre-wrap",
-                  color: "inherit", // Inherit from parent Box which uses var(--gray-12)
+              <Box
+                style={{
+                  ...(isMobile && theatreMode && hasVideo && Object.keys(videoContainerStyle).length > 0
+                    ? {
+                        width: videoContainerStyle.width,
+                        margin: "0 auto",
+                        padding: "var(--space-3) var(--space-4)",
+                      }
+                    : {
+                        padding: "var(--space-3) var(--space-4)",
+                      }),
                 }}
               >
-                {message.content}
-              </Text>
+                <Text 
+                  style={{ 
+                    whiteSpace: "pre-wrap",
+                    color: "inherit", // Inherit from parent Box which uses var(--gray-12)
+                  }}
+                >
+                  {message.content}
+                </Text>
+              </Box>
             )}
           </Box>
         )}

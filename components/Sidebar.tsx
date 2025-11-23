@@ -502,27 +502,32 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
 
                 <DropdownMenu.Separator />
 
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger>
-                    <Text>Theatre mode</Text>
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
-                    <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
-                      <Text>On</Text>
-                      {theatreMode && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
-                      <Text>Off</Text>
-                      {!theatreMode && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Sub>
+                {/* Theatre mode setting - hidden on mobile as it's always on */}
+                {!isMobile && (
+                  <>
+                    <DropdownMenu.Sub>
+                      <DropdownMenu.SubTrigger>
+                        <Text>Theatre mode</Text>
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.SubContent>
+                        <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
+                          <Text>On</Text>
+                          {theatreMode && (
+                            <Text ml="auto" size="1" color="gray">✓</Text>
+                          )}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
+                          <Text>Off</Text>
+                          {!theatreMode && (
+                            <Text ml="auto" size="1" color="gray">✓</Text>
+                          )}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.SubContent>
+                    </DropdownMenu.Sub>
 
-                <DropdownMenu.Separator />
+                    <DropdownMenu.Separator />
+                  </>
+                )}
 
                 <DropdownMenu.Sub>
                   <DropdownMenu.SubTrigger>
@@ -997,32 +1002,37 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       )}
 
       {/* Settings Button - Row 3: Fixed at bottom */}
-      {!isCollapsed && (
-        <Box
-          style={{
-            padding: "var(--space-4)",
-            paddingTop: "var(--space-3)",
-            borderTop: "1px solid var(--gray-6)",
-          }}
-        >
-          <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
-            <DropdownMenu.Trigger>
-              <Button
-                variant="ghost"
-                size="2"
-                style={{
-                  width: "100%",
-                  justifyContent: "flex-start",
-                  padding: "var(--space-2) var(--space-3)",
-                }}
-              >
-                <GearIcon width="20" height="20" />
+      <Box
+        style={{
+          padding: isCollapsed ? "var(--space-3) 0" : "var(--space-4)",
+          paddingTop: "var(--space-3)",
+          borderTop: "1px solid var(--gray-6)",
+          display: "flex",
+          justifyContent: isCollapsed ? "center" : "flex-start",
+        }}
+      >
+        <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenu.Trigger>
+            <Button
+              variant="ghost"
+              size="2"
+              style={{
+                width: isCollapsed ? "32px" : "100%",
+                justifyContent: isCollapsed ? "center" : "flex-start",
+                padding: isCollapsed ? "0" : "var(--space-2) var(--space-3)",
+                minWidth: isCollapsed ? "32px" : "auto",
+                height: "32px",
+              }}
+            >
+              <GearIcon width="20" height="20" />
+              {!isCollapsed && (
                 <Text size="2" ml="2">
                   Settings
                 </Text>
-              </Button>
-              </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="start" side="top">
+              )}
+            </Button>
+          </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="start" side={isCollapsed ? "right" : "top"}>
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>
                   <SunIcon width="16" height="16" />
@@ -1139,7 +1149,6 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             </AlertDialog.Root>
           )}
         </Box>
-      )}
 
       {/* Edit Chat Dialog - Outside grid flow as it's a modal */}
       <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>

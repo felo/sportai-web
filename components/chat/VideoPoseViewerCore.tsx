@@ -2053,16 +2053,18 @@ export function VideoPoseViewer({
               </Tooltip>
             {!isPreprocessing && !usePreprocessing && (
               <>
-                <Tooltip content="Pre-process all frames in the video for smoother playback and analysis">
-                  <Button
-                    onClick={handlePreprocess}
-                    disabled={isLoading}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                  >
-                    <MagicWandIcon width="16" height="16" />
-                  </Button>
-                </Tooltip>
+                {developerMode && (
+                  <Tooltip content="Pre-process all frames in the video for smoother playback and analysis">
+                    <Button
+                      onClick={handlePreprocess}
+                      disabled={isLoading}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                    >
+                      <MagicWandIcon width="16" height="16" />
+                    </Button>
+                  </Tooltip>
+                )}
                 <Tooltip content="Previous Frame">
                   <Button
                     onClick={() => handleFrameStep('backward')}

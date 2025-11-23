@@ -40,7 +40,7 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         <Box
           style={{
             position: "absolute",
-            left: "var(--space-3)",
+            left: "var(--space-4)",
             top: "50%",
             transform: "translateY(-50%)",
           }}
@@ -76,7 +76,7 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         <Box
           style={{
             position: "absolute",
-            right: "var(--space-3)",
+            right: "var(--space-4)",
             top: "50%",
             transform: "translateY(-50%)",
           }}
