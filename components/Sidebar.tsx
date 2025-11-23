@@ -676,9 +676,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         borderRight: "1px solid var(--gray-6)",
         transition: "width 0.2s ease-in-out",
         zIndex: 10,
-        display: "grid",
-        gridTemplateRows: "57px 1fr auto", // header, scrollable content, fixed footer
-        gridTemplateColumns: "1fr",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Toggle Button - Row 1: Aligned with header */}
@@ -688,6 +687,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           alignItems: "center",
           justifyContent: isCollapsed ? "center" : "flex-end",
           padding: isCollapsed ? "0" : "0 var(--space-4)",
+          height: "57px",
+          flexShrink: 0,
         }}
       >
         <Button
@@ -713,17 +714,17 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       </Box>
 
       {/* Sidebar Content - Row 2: Scrollable */}
-      {!isCollapsed && (
-        <Box 
-          style={{ 
-            overflowY: "auto",
-            padding: "var(--space-4)",
-            paddingTop: "var(--space-4)",
-            paddingBottom: "var(--space-3)",
-          }}
-        >
-          {children || (
-            <Flex direction="column" gap="3">
+      <Box 
+        style={{ 
+          flex: 1,
+          overflowY: isCollapsed ? "hidden" : "auto",
+          padding: isCollapsed ? "0" : "var(--space-4)",
+          paddingTop: isCollapsed ? "0" : "var(--space-4)",
+          paddingBottom: isCollapsed ? "0" : "var(--space-3)",
+        }}
+      >
+        {!isCollapsed && (children || (
+          <Flex direction="column" gap="3">
               <Button
                 variant="ghost"
                 size="2"
@@ -997,18 +998,18 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 </Button>
               </Flex>
             </Flex>
-          )}
+          ))}
         </Box>
-      )}
 
       {/* Settings Button - Row 3: Fixed at bottom */}
       <Box
         style={{
-          padding: isCollapsed ? "var(--space-3) 0" : "var(--space-4)",
+          padding: isCollapsed ? "var(--space-5)" : "var(--space-4)",
           paddingTop: "var(--space-3)",
-          borderTop: "1px solid var(--gray-6)",
+          borderTop: isCollapsed ? "none" : "1px solid var(--gray-6)",
           display: "flex",
           justifyContent: isCollapsed ? "center" : "flex-start",
+          flexShrink: 0,
         }}
       >
         <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
