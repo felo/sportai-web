@@ -6,7 +6,7 @@ import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, 
 import { useSidebar } from "./SidebarContext";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat } from "@/utils/storage";
+import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat, getHighlightingPreferences, updateHighlightingPreference, type HighlightingPreferences } from "@/utils/storage";
 import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
@@ -26,6 +26,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
   const [chatsExpanded, setChatsExpanded] = useState(true);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
+  const [highlightingPrefs, setHighlightingPrefs] = useState<HighlightingPreferences>({
+    terminology: true,
+    technique: true,
+    timestamps: true,
+    swings: true,
+  });
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
@@ -51,6 +57,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     
     // Load theatre mode from localStorage
     setTheatreMode(getTheatreMode());
+
+    // Load highlighting preferences from localStorage
+    setHighlightingPrefs(getHighlightingPreferences());
 
     // Load chats from localStorage
     setChats(loadChatsFromStorage());
@@ -90,14 +99,21 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         setCurrentChatId(updatedCurrentChatId);
       });
     };
+
+    // Listen for highlighting preferences changes
+    const handleHighlightingPreferencesChange = () => {
+      setHighlightingPrefs(getHighlightingPreferences());
+    };
     
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("chat-storage-change", handleChatStorageChange);
+    window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
     
     return () => {
       window.removeEventListener("theme-change", handleThemeChange);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("chat-storage-change", handleChatStorageChange);
+      window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
     };
   }, []);
 
@@ -130,6 +146,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     saveTheatreMode(checked);
     // Dispatch custom event for components listening to theatre mode changes
     window.dispatchEvent(new CustomEvent("theatre-mode-change"));
+  };
+
+  const handleHighlightingToggle = (key: keyof HighlightingPreferences, checked: boolean) => {
+    updateHighlightingPreference(key, checked);
+    // State will be updated via event handler
   };
 
   // Mobile: Full screen overlay when open
@@ -571,6 +592,40 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
                       <Text>Off</Text>
                       {!developerMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator />
+
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <Text>Highlighting</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("terminology", !highlightingPrefs.terminology)}>
+                      <Text>Terminology</Text>
+                      {highlightingPrefs.terminology && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("technique", !highlightingPrefs.technique)}>
+                      <Text>Technique terms</Text>
+                      {highlightingPrefs.technique && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("timestamps", !highlightingPrefs.timestamps)}>
+                      <Text>Timestamps</Text>
+                      {highlightingPrefs.timestamps && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("swings", !highlightingPrefs.swings)}>
+                      <Text>Swings</Text>
+                      {highlightingPrefs.swings && (
                         <Text ml="auto" size="1" color="gray">✓</Text>
                       )}
                     </DropdownMenu.Item>
@@ -1121,6 +1176,40 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
                     <Text>Off</Text>
                     {!developerMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+
+              <DropdownMenu.Separator />
+
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>Highlighting</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("terminology", !highlightingPrefs.terminology)}>
+                    <Text>Terminology</Text>
+                    {highlightingPrefs.terminology && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("technique", !highlightingPrefs.technique)}>
+                    <Text>Technique terms</Text>
+                    {highlightingPrefs.technique && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("timestamps", !highlightingPrefs.timestamps)}>
+                    <Text>Timestamps</Text>
+                    {highlightingPrefs.timestamps && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("swings", !highlightingPrefs.swings)}>
+                    <Text>Swings</Text>
+                    {highlightingPrefs.swings && (
                       <Text ml="auto" size="1" color="gray">✓</Text>
                     )}
                   </DropdownMenu.Item>

@@ -3,6 +3,7 @@
 import React from "react";
 import { Dialog, Flex, Text, Button, Heading, Box } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
+import styles from "@/styles/buttons.module.css";
 
 export interface MetricConversion {
   original: string;
@@ -30,6 +31,20 @@ export function MetricConversionModal({ open, onOpenChange, metric }: MetricConv
           if (target && typeof target.focus === 'function') {
             target.focus({ preventScroll: true });
           }
+        }}
+        onCloseAutoFocus={(e) => {
+          // Prevent default focus behavior that might cause scrolling when closing
+          e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          // Prevent any scroll on outside click
+          e.preventDefault();
+          onOpenChange(false);
+        }}
+        onEscapeKeyDown={(e) => {
+          // Prevent any scroll on escape
+          e.preventDefault();
+          onOpenChange(false);
         }}
       >
         <Flex direction="column" gap="3">
@@ -75,7 +90,7 @@ export function MetricConversionModal({ open, onOpenChange, metric }: MetricConv
 
           <Flex justify="end" pt="1">
             <Dialog.Close>
-              <Button size="1" style={{ cursor: "pointer" }}>
+              <Button className={styles.actionButtonSquare} style={{ cursor: "pointer" }}>
                 Close
               </Button>
             </Dialog.Close>

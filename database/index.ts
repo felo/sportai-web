@@ -13,6 +13,9 @@ import { tennisTerminology } from "./tennis/terminology";
 import { pickleballTerminology } from "./pickleball/terminology";
 import { padelTerminology } from "./padel/terminology";
 
+// Import technique analysis terms
+import { sharedTechnique } from "./shared/technique";
+
 // Import all court databases
 import { tennisCourts } from "./tennis/courts";
 import { pickleballCourts } from "./pickleball/courts";
@@ -28,6 +31,7 @@ export const swingExplanations = {
   ...tennisTerminology,
   ...pickleballTerminology,
   ...padelTerminology,
+  ...sharedTechnique,
   ...tennisCourts,
   ...pickleballCourts,
   ...padelCourts,
@@ -43,6 +47,8 @@ export { sharedTerminology } from "./shared/terminology";
 export { tennisTerminology } from "./tennis/terminology";
 export { pickleballTerminology } from "./pickleball/terminology";
 export { padelTerminology } from "./padel/terminology";
+
+export { sharedTechnique } from "./shared/technique";
 
 export { tennisCourts } from "./tennis/courts";
 export { pickleballCourts } from "./pickleball/courts";

@@ -4,14 +4,16 @@ import React from "react";
 import { Dialog, Flex, Text, Button, Heading } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import type { SwingExplanation } from "@/database";
+import styles from "@/styles/buttons.module.css";
 
 interface SwingExplanationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   swing: SwingExplanation | null;
+  onAskForHelp?: (termName: string) => void;
 }
 
-export function SwingExplanationModal({ open, onOpenChange, swing }: SwingExplanationModalProps) {
+export function SwingExplanationModal({ open, onOpenChange, swing, onAskForHelp }: SwingExplanationModalProps) {
   if (!swing) return null;
 
   return (
@@ -26,6 +28,20 @@ export function SwingExplanationModal({ open, onOpenChange, swing }: SwingExplan
           if (target && typeof target.focus === 'function') {
             target.focus({ preventScroll: true });
           }
+        }}
+        onCloseAutoFocus={(e) => {
+          // Prevent default focus behavior that might cause scrolling when closing
+          e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          // Prevent any scroll on outside click
+          e.preventDefault();
+          onOpenChange(false);
+        }}
+        onEscapeKeyDown={(e) => {
+          // Prevent any scroll on escape
+          e.preventDefault();
+          onOpenChange(false);
         }}
       >
         <Flex direction="column" gap="4">
@@ -68,9 +84,21 @@ export function SwingExplanationModal({ open, onOpenChange, swing }: SwingExplan
             )}
           </Flex>
 
-          <Flex justify="end" pt="2">
+          <Flex justify="end" pt="2" gap="2">
+            {onAskForHelp && (
+              <Button 
+                className={styles.actionButtonSquare}
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  onAskForHelp(swing.name);
+                  onOpenChange(false);
+                }}
+              >
+                Ask AI for tips
+              </Button>
+            )}
             <Dialog.Close>
-              <Button style={{ cursor: "pointer" }}>
+              <Button className={styles.actionButtonSquare} style={{ cursor: "pointer" }}>
                 Got it
               </Button>
             </Dialog.Close>

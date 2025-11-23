@@ -101,6 +101,9 @@ As the database grows, you can add new folders and files:
 - **Pickleball**: 3 techniques (dink, erne, third shot drive)
 - **Padel**: 5 techniques (bandeja, víbora, chiquita, bajada, remate)
 
+### Technical Analysis
+- **Shared**: 10 terms (trophy position, contact point, follow through, backswing, unit turn, sweet spot, ready position, grip, stroke mechanics, weight transfer)
+
 ### Terminology
 - **Shared**: 5 common terms (baseline, rally, cross-court, down the line, mishit)
 - **Tennis**: 4 terms (deuce, advantage, ace, let serve)
@@ -112,5 +115,5 @@ As the database grows, you can add new folders and files:
 - **Pickleball**: 4 types (indoor court, outdoor court, dedicated court, converted court)
 - **Padel**: 5 types (indoor court, outdoor court, panoramic court, single glass court, artificial turf)
 
-**Total**: 57 interactive glossary entries + clickable metric conversions
+**Total**: 67 interactive glossary entries + clickable metric conversions
 

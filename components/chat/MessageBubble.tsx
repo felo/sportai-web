@@ -75,9 +75,10 @@ interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
   messageIndex?: number;
+  onAskForHelp?: (termName: string) => void;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
@@ -535,9 +536,19 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
           <Box style={{ maxWidth: "none" }}>
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
-                <MarkdownWithSwings>
-                  {message.content}
-                </MarkdownWithSwings>
+                <>
+                  <MarkdownWithSwings onAskForHelp={onAskForHelp}>
+                    {message.content}
+                  </MarkdownWithSwings>
+                  {message.isStreaming && (
+                    <span 
+                      className="inline-block w-1 h-4 ml-1 bg-mint-9 dark:bg-mint-8"
+                      style={{
+                        animation: "blink 1s step-end infinite"
+                      }}
+                    />
+                  )}
+                </>
               ) : (
                 <Flex gap="2" align="center">
                   <Spinner size="1" />

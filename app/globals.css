@@ -227,6 +227,33 @@ html[data-theme="dark"] .radix-themes,
   }
 }
 
+/* Radix Dialog scroll prevention - ensure dialog doesn't affect main scroll container */
+[data-radix-dialog-content] {
+  /* Prevent focus from causing scroll in parent containers */
+  scroll-margin: 0;
+  /* Lock dialog position */
+  position: fixed !important;
+}
+
+[data-radix-dialog-overlay] {
+  /* Prevent overlay from interfering with scroll */
+  position: fixed !important;
+}
+
+/* When dialog is open, prevent scroll position changes in other containers */
+body[data-scroll-locked] {
+  /* Override Radix's scroll lock to not affect our custom scroll container */
+  overflow: hidden !important;
+  /* Prevent layout shift */
+  padding-right: 0 !important;
+}
+
+/* Ensure dialog trigger elements don't cause scroll when clicked */
+button[data-radix-dialog-trigger],
+a[data-radix-dialog-trigger] {
+  scroll-margin: 0;
+}
+
 /* Custom List Styling - Bullet points and numbers in brand color */
 .markdown-ul {
   padding-left: 0;

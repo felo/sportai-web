@@ -368,6 +368,17 @@ export function GeminiQueryForm() {
     setShowingVideoSizeError(false);
   };
 
+  const handleAskForHelp = (termName: string) => {
+    // Create a question about the term
+    const question = `How can I improve my ${termName.toLowerCase()}?`;
+    setPrompt(question);
+    // Auto-submit after a brief delay to allow state update
+    setTimeout(() => {
+      const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as any;
+      handleSubmit(fakeEvent);
+    }, 100);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!prompt.trim() && !videoFile) || loading) return;
@@ -725,6 +736,7 @@ export function GeminiQueryForm() {
                   progressStage={progressStage}
                   uploadProgress={uploadProgress}
                   messagesEndRef={messagesEndRef}
+                  onAskForHelp={handleAskForHelp}
                 />
               )}
             </div>

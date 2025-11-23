@@ -15,6 +15,7 @@ interface MessageListProps {
   progressStage: ProgressStage;
   uploadProgress: number;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  onAskForHelp?: (termName: string) => void;
 }
 
 export function MessageList({
@@ -24,6 +25,7 @@ export function MessageList({
   progressStage,
   uploadProgress,
   messagesEndRef,
+  onAskForHelp,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -89,7 +91,13 @@ export function MessageList({
       )}
 
       {messages.map((message, index) => (
-        <MessageBubble key={message.id} message={message} allMessages={messages} messageIndex={index} />
+        <MessageBubble 
+          key={message.id} 
+          message={message} 
+          allMessages={messages} 
+          messageIndex={index}
+          onAskForHelp={onAskForHelp}
+        />
       ))}
 
       {loading && videoFile && (

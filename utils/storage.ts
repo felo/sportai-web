@@ -359,6 +359,21 @@ const MEDIA_RESOLUTION_KEY = "media-resolution";
 const DOMAIN_EXPERTISE_KEY = "domain-expertise";
 
 /**
+ * Highlighting preferences type
+ */
+export interface HighlightingPreferences {
+  terminology: boolean;
+  technique: boolean;
+  timestamps: boolean;
+  swings: boolean;
+}
+
+/**
+ * Highlighting preferences storage key
+ */
+const HIGHLIGHTING_PREFERENCES_KEY = "highlighting-preferences";
+
+/**
  * Get thinking mode setting from localStorage
  * @returns "fast" or "deep", defaults to "fast"
  */
@@ -858,5 +873,74 @@ export function clearChatsFromStorage(): void {
   } catch (error) {
     console.error("Failed to clear chats from storage:", error);
   }
+}
+
+/**
+ * Get highlighting preferences from localStorage
+ * @returns Highlighting preferences object with all settings enabled by default
+ */
+export function getHighlightingPreferences(): HighlightingPreferences {
+  if (typeof window === "undefined") {
+    return {
+      terminology: true,
+      technique: true,
+      timestamps: true,
+      swings: true,
+    };
+  }
+
+  try {
+    const stored = localStorage.getItem(HIGHLIGHTING_PREFERENCES_KEY);
+    if (!stored) {
+      // Default: all highlights enabled
+      return {
+        terminology: true,
+        technique: true,
+        timestamps: true,
+        swings: true,
+      };
+    }
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error("Failed to load highlighting preferences from storage:", error);
+    return {
+      terminology: true,
+      technique: true,
+      timestamps: true,
+      swings: true,
+    };
+  }
+}
+
+/**
+ * Save highlighting preferences to localStorage
+ * @param preferences - Highlighting preferences to save
+ */
+export function setHighlightingPreferences(preferences: HighlightingPreferences): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(HIGHLIGHTING_PREFERENCES_KEY, JSON.stringify(preferences));
+    // Dispatch custom event to notify components of highlighting preference changes
+    window.dispatchEvent(new CustomEvent("highlighting-preferences-change"));
+  } catch (error) {
+    console.error("Failed to save highlighting preferences to storage:", error);
+  }
+}
+
+/**
+ * Update a single highlighting preference
+ * @param key - The preference key to update
+ * @param value - The new value for the preference
+ */
+export function updateHighlightingPreference(
+  key: keyof HighlightingPreferences,
+  value: boolean
+): void {
+  const preferences = getHighlightingPreferences();
+  preferences[key] = value;
+  setHighlightingPreferences(preferences);
 }
 

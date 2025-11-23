@@ -1,6 +1,52 @@
 import React, { useState } from "react";
 import styles from "@/styles/markdown.module.css";
-import { swingExplanations, type SwingExplanation } from "@/database";
+import { 
+  swingExplanations, 
+  type SwingExplanation,
+  sharedSwings,
+  tennisSwings,
+  pickleballSwings,
+  padelSwings,
+  sharedTerminology,
+  tennisTerminology,
+  pickleballTerminology,
+  padelTerminology,
+  tennisCourts,
+  pickleballCourts,
+  padelCourts,
+  sharedTechnique,
+} from "@/database";
+import type { HighlightingPreferences } from "@/utils/storage";
+
+/**
+ * Categorize swing explanations by type
+ */
+const swingsByType = {
+  swings: { ...sharedSwings, ...tennisSwings, ...pickleballSwings, ...padelSwings },
+  terminology: { 
+    ...sharedTerminology, 
+    ...tennisTerminology, 
+    ...pickleballTerminology, 
+    ...padelTerminology,
+    ...tennisCourts,
+    ...pickleballCourts,
+    ...padelCourts,
+  },
+  technique: { ...sharedTechnique },
+};
+
+/**
+ * Get the category of a term
+ */
+function getTermCategory(term: string): 'swing' | 'terminology' | 'technique' | null {
+  const lowerTerm = term.toLowerCase();
+  
+  if (swingsByType.swings[lowerTerm]) return 'swing';
+  if (swingsByType.terminology[lowerTerm]) return 'terminology';
+  if (swingsByType.technique[lowerTerm]) return 'technique';
+  
+  return null;
+}
 
 /**
  * Convert timestamp string to seconds
@@ -155,17 +201,38 @@ function processTextWithTimestamps(text: string): React.ReactNode[] {
 function processTextWithTimestampsAndMetrics(
   text: string,
   onSwingClick?: (swing: SwingExplanation) => void,
-  onMetricClick?: (value: number, unit: string, originalText: string) => void
+  onMetricClick?: (value: number, unit: string, originalText: string) => void,
+  highlightingPrefs?: HighlightingPreferences
 ): React.ReactNode[] {
-  // Timestamps take precedence (they are clickable)
-  const timestampPattern = /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g;
+  // Default to all enabled if not provided
+  const prefs = highlightingPrefs || {
+    terminology: true,
+    technique: true,
+    timestamps: true,
+    swings: true,
+  };
+  // Only process patterns if their corresponding preference is enabled
+  const timestampPattern = prefs.timestamps ? /\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b/g : null;
   // Compound clock positions like "10 or 2 o'clock" (processed before single metrics to avoid partial matches)
   const compoundClockPattern = /\b(\d+)\s+or\s+(\d+)\s+o'clock\b/gi;
   // Regular metrics including single clock positions like "2 o'clock"
   const metricPattern = /\b(\d+\.?\d*)\s*(mph|km\/h|kph|°|degrees?|seconds?|sec|ms|milliseconds?|meters?|m|feet|ft|yards?|yd|%|o'clock)\b/gi;
-  // Swing types pattern (case-insensitive)
-  const swingNames = Object.keys(swingExplanations).join('|');
-  const swingPattern = new RegExp(`\\b(${swingNames})\\b`, 'gi');
+  
+  // Build swing types pattern based on enabled preferences
+  let enabledSwingNames: string[] = [];
+  if (prefs.swings) {
+    enabledSwingNames.push(...Object.keys(swingsByType.swings));
+  }
+  if (prefs.terminology) {
+    enabledSwingNames.push(...Object.keys(swingsByType.terminology));
+  }
+  if (prefs.technique) {
+    enabledSwingNames.push(...Object.keys(swingsByType.technique));
+  }
+  
+  const swingPattern = enabledSwingNames.length > 0 
+    ? new RegExp(`\\b(${enabledSwingNames.join('|')})\\b`, 'gi')
+    : null;
   
   // Collect all matches with their types
   const matches: Array<{ 
@@ -175,31 +242,47 @@ function processTextWithTimestampsAndMetrics(
     type: 'timestamp' | 'metric' | 'swing';
     value?: number;
     unit?: string;
+    category?: 'swing' | 'terminology' | 'technique';
   }> = [];
   
-  let timestampMatch: RegExpExecArray | null;
-  while ((timestampMatch = timestampPattern.exec(text)) !== null) {
-    matches.push({
-      index: timestampMatch.index,
-      length: timestampMatch[0].length,
-      text: timestampMatch[0],
-      type: 'timestamp'
-    });
+  // Only process timestamps if enabled
+  if (timestampPattern) {
+    let timestampMatch: RegExpExecArray | null;
+    while ((timestampMatch = timestampPattern.exec(text)) !== null) {
+      matches.push({
+        index: timestampMatch.index,
+        length: timestampMatch[0].length,
+        text: timestampMatch[0],
+        type: 'timestamp'
+      });
+    }
   }
   
-  // Process swing types (high priority, processed before metrics)
-  let swingMatch: RegExpExecArray | null;
-  while ((swingMatch = swingPattern.exec(text)) !== null) {
-    const overlaps = matches.some(m => 
-      m.index <= swingMatch!.index && swingMatch!.index < m.index + m.length
-    );
-    if (!overlaps) {
-      matches.push({
-        index: swingMatch.index,
-        length: swingMatch[0].length,
-        text: swingMatch[0],
-        type: 'swing'
-      });
+  // Process swing types (high priority, processed before metrics) - only if any category is enabled
+  if (swingPattern) {
+    let swingMatch: RegExpExecArray | null;
+    while ((swingMatch = swingPattern.exec(text)) !== null) {
+      const overlaps = matches.some(m => 
+        m.index <= swingMatch!.index && swingMatch!.index < m.index + m.length
+      );
+      if (!overlaps) {
+        const category = getTermCategory(swingMatch[0]);
+        // Only add if the category is enabled
+        const shouldAdd = 
+          (category === 'swing' && prefs.swings) ||
+          (category === 'terminology' && prefs.terminology) ||
+          (category === 'technique' && prefs.technique);
+        
+        if (shouldAdd && category) {
+          matches.push({
+            index: swingMatch.index,
+            length: swingMatch[0].length,
+            text: swingMatch[0],
+            type: 'swing',
+            category: category
+          });
+        }
+      }
     }
   }
   
@@ -335,15 +418,16 @@ const TextWithTimestamps: React.FC<{
   children?: React.ReactNode;
   onSwingClick?: (swing: SwingExplanation) => void;
   onMetricClick?: (value: number, unit: string, originalText: string) => void;
-}> = ({ children, onSwingClick, onMetricClick }) => {
+  highlightingPrefs?: HighlightingPreferences;
+}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs }) => {
   if (typeof children === 'string') {
-    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick)}</>;
+    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs)}</>;
   }
   
   if (Array.isArray(children)) {
     return <>{children.map((child, index) => {
       if (typeof child === 'string') {
-        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick)}</React.Fragment>;
+        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs)}</React.Fragment>;
       }
       return <React.Fragment key={index}>{child}</React.Fragment>;
     })}</>;
@@ -355,7 +439,8 @@ const TextWithTimestamps: React.FC<{
 // Factory function to create markdown components with swing and metric click handlers
 export const createMarkdownComponents = (
   onSwingClick?: (swing: SwingExplanation) => void,
-  onMetricClick?: (value: number, unit: string, originalText: string) => void
+  onMetricClick?: (value: number, unit: string, originalText: string) => void,
+  highlightingPrefs?: HighlightingPreferences
 ) => ({
   h1: ({ node, ...props }: any) => (
     <h1
@@ -380,7 +465,7 @@ export const createMarkdownComponents = (
       className="mb-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed"
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </p>
   ),
   ul: ({ node, ...props }: any) => (
@@ -402,7 +487,7 @@ export const createMarkdownComponents = (
       className="markdown-li"
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </li>
   ),
   code: ({ node, inline, ...props }: any) =>
@@ -428,12 +513,12 @@ export const createMarkdownComponents = (
   ),
   strong: ({ node, children, ...props }: any) => (
     <strong className="font-semibold text-gray-900 dark:text-gray-100" {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </strong>
   ),
   em: ({ node, children, ...props }: any) => (
     <em className="italic" {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </em>
   ),
   a: ({ node, ...props }: any) => (

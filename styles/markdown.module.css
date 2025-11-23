@@ -13,6 +13,8 @@
   background-color: rgba(2, 89, 64, 0.1);
   color: #025940;
   border: 1px solid rgba(2, 89, 64, 0.3);
+  /* Prevent scroll on focus/click */
+  scroll-margin: 0;
 }
 
 .timestampLink:hover {
@@ -50,6 +52,8 @@
   color: #025940;
   cursor: pointer;
   transition: all 0.15s ease;
+  /* Prevent scroll on focus/click */
+  scroll-margin: 0;
 }
 
 .metricHighlight:hover {
@@ -84,6 +88,8 @@
   text-decoration-color: #025940;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+  /* Prevent scroll on focus/click */
+  scroll-margin: 0;
 }
 
 .swingHighlight:hover {
