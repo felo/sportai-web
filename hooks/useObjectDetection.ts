@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
-import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import type { YOLOModelType, ObjectDetectionResult } from "@/types/detection";
+
+// Dynamic imports for heavy ML libraries (code-splitting)
+// These are only loaded when object detection is actually enabled
+type CocoSsdModule = typeof import("@tensorflow-models/coco-ssd");
+type YOLOv8Module = typeof import("@/utils/yolov8-detector");
 
 export interface ObjectDetectionConfig {
   model?: YOLOModelType;
   confidenceThreshold?: number;
+  iouThreshold?: number; // For NMS in YOLOv8
   detectionClasses?: string[]; // Filter specific classes
+  classFilter?: number[]; // Filter by class IDs (for YOLOv8)
   enableTracking?: boolean;
   maxDetections?: number;
   enabled?: boolean;
+  useYOLOv8?: boolean; // Use YOLOv8 instead of COCO-SSD
 }
 
 // Global cache for loaded detectors (prevents re-downloading models)
@@ -93,10 +100,13 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
   const {
     model = "YOLOv8n",
     confidenceThreshold = 0.5,
+    iouThreshold = 0.45,
     detectionClasses,
+    classFilter,
     enableTracking = false,
     maxDetections = 10,
     enabled = true,
+    useYOLOv8 = true, // Default to YOLOv8 if available
   } = config;
 
   // Initialize the object detector
@@ -148,26 +158,62 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         console.log(`Loading ${model} object detector...`);
 
         const startTime = performance.now();
+        let realDetector: any;
+        let modelType: 'yolov8' | 'coco-ssd' = 'coco-ssd';
         
-        // Use COCO-SSD as a working implementation
-        // This detects 80 object classes including person, sports ball, tennis racket, etc.
-        // Model selection maps to COCO-SSD base models:
-        // - YOLOv8n -> lite_mobilenet_v2 (fastest)
-        // - YOLOv8s -> mobilenet_v2 (balanced)
-        // - YOLOv8m -> mobilenet_v2 (same as s, but we can tune confidence later)
-        const baseModel = model === "YOLOv8n" ? "lite_mobilenet_v2" : "mobilenet_v2";
+        // Try to load YOLOv8 ONNX model first (if enabled)
+        if (useYOLOv8) {
+          try {
+            console.log('📦 Dynamically importing YOLOv8Detector...');
+            // Dynamic import to code-split ONNX Runtime (~3-4MB)
+            const { YOLOv8Detector } = await import("@/utils/yolov8-detector");
+            
+            const yolov8 = new YOLOv8Detector();
+            const modelPath = '/models/yolov8n.onnx'; // Model should be in public/models/
+            
+            await yolov8.load(modelPath);
+            realDetector = yolov8;
+            modelType = 'yolov8';
+            
+            const loadTime = performance.now() - startTime;
+            console.log(`✅ ${model} (YOLOv8 ONNX) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+          } catch (error) {
+            console.warn('⚠️ YOLOv8 model not found, falling back to COCO-SSD');
+            console.warn('📝 To use YOLOv8, export the model and place it in public/models/yolov8n.onnx');
+            console.warn('   See docs/EXPORT_YOLOV8.md for instructions');
+            
+            console.log('📦 Dynamically importing COCO-SSD...');
+            // Dynamic import to code-split COCO-SSD (~5MB)
+            const cocoSsd = await import("@tensorflow-models/coco-ssd");
+            
+            // Fallback to COCO-SSD
+            const baseModel = model === "YOLOv8n" ? "lite_mobilenet_v2" : "mobilenet_v2";
+            realDetector = await cocoSsd.load({ base: baseModel as any });
+            modelType = 'coco-ssd';
+            
+            const loadTime = performance.now() - startTime;
+            console.log(`✅ ${model} (COCO-SSD fallback) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+          }
+        } else {
+          console.log('📦 Dynamically importing COCO-SSD...');
+          // Dynamic import to code-split COCO-SSD (~5MB)
+          const cocoSsd = await import("@tensorflow-models/coco-ssd");
+          
+          // Use COCO-SSD directly
+          const baseModel = model === "YOLOv8n" ? "lite_mobilenet_v2" : "mobilenet_v2";
+          realDetector = await cocoSsd.load({ base: baseModel as any });
+          modelType = 'coco-ssd';
+          
+          const loadTime = performance.now() - startTime;
+          console.log(`✅ ${model} (COCO-SSD) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+        }
         
-        const detectorPromise = cocoSsd.load({
-          base: baseModel as any,
-        });
+        // Store model type with detector
+        (realDetector as any).modelType = modelType;
         
         // Cache the detector promise
+        const detectorPromise = Promise.resolve(realDetector);
         detectorCache.set(configKey, detectorPromise);
-        
-        const realDetector = await detectorPromise;
-
-        const loadTime = performance.now() - startTime;
-        console.log(`✅ ${model} object detector (COCO-SSD) loaded in ${(loadTime / 1000).toFixed(2)}s`);
 
         if (mounted) {
           setDetector(realDetector);
@@ -195,7 +241,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [model, confidenceThreshold, detectionClasses, enabled]);
+  }, [model, confidenceThreshold, iouThreshold, classFilter, detectionClasses, enabled, useYOLOv8]);
 
   // Detect objects from a single frame
   const detectObjects = useCallback(
@@ -203,31 +249,52 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
       element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
     ): Promise<ObjectDetectionResult[]> => {
       if (!detector) {
-        throw new Error("Detector not initialized");
+        // Return empty array instead of throwing - allows graceful handling during loading
+        return [];
       }
 
       try {
-        // Run object detection with COCO-SSD
-        const rawResults = await detector.detect(element);
+        const detectorType = (detector as any).modelType;
+        let results: ObjectDetectionResult[];
 
-        // Process COCO-SSD results into our format
-        // COCO-SSD returns: { class, score, bbox: [x, y, width, height] }
-        let results: ObjectDetectionResult[] = rawResults.map((result: any) => ({
-          bbox: {
-            x: result.bbox[0],
-            y: result.bbox[1],
-            width: result.bbox[2],
-            height: result.bbox[3],
-          },
-          class: result.class,
-          classId: 0, // COCO-SSD doesn't provide class IDs
-          confidence: result.score,
-        }));
+        if (detectorType === 'yolov8') {
+          // Use YOLOv8 detector (detector has detect method from YOLOv8Detector)
+          const yolov8Results = await detector.detect(element, {
+            confidenceThreshold,
+            iouThreshold,
+            classFilter,
+          });
+          
+          // YOLOv8 returns results in our format already
+          results = yolov8Results.map((result: any) => ({
+            bbox: result.bbox,
+            class: result.class,
+            classId: result.classId,
+            confidence: result.confidence,
+          }));
+        } else {
+          // Use COCO-SSD detector
+          const rawResults = await detector.detect(element);
 
-        // Filter by confidence threshold
-        results = results.filter((r) => r.confidence >= confidenceThreshold);
+          // Process COCO-SSD results into our format
+          // COCO-SSD returns: { class, score, bbox: [x, y, width, height] }
+          results = rawResults.map((result: any) => ({
+            bbox: {
+              x: result.bbox[0],
+              y: result.bbox[1],
+              width: result.bbox[2],
+              height: result.bbox[3],
+            },
+            class: result.class,
+            classId: 0, // COCO-SSD doesn't provide class IDs
+            confidence: result.score,
+          }));
 
-        // Filter by detection classes if specified
+          // Filter by confidence threshold for COCO-SSD (YOLOv8 does it internally)
+          results = results.filter((r) => r.confidence >= confidenceThreshold);
+        }
+
+        // Filter by detection classes if specified (for COCO-SSD)
         if (detectionClasses && detectionClasses.length > 0) {
           results = results.filter((r) => detectionClasses.includes(r.class));
         }
@@ -249,7 +316,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         return [];
       }
     },
-    [detector, confidenceThreshold, detectionClasses, maxDetections, enableTracking]
+    [detector, confidenceThreshold, iouThreshold, classFilter, detectionClasses, maxDetections, enableTracking]
   );
 
   // Start continuous object detection on a video element

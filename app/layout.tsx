@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
 // Import Radix CSS in proper order to allow overrides
 import "@radix-ui/themes/tokens.css";
@@ -8,11 +8,12 @@ import "./globals.css"; // Our custom styles go here, between components and uti
 import "@radix-ui/themes/utilities.css";
 
 // Optimize font loading with next/font
-const inter = Inter({
+const poppins = Poppins({
   subsets: ["latin"],
   display: "swap", // Use font-display: swap for better performance
   preload: true,
-  variable: "--font-inter",
+  variable: "--font-poppins",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -85,7 +86,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={poppins.variable}>
       <body className="font-sans">
         <RadixThemeProvider>{children}</RadixThemeProvider>
       </body>

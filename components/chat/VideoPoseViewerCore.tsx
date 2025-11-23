@@ -111,6 +111,8 @@ export function VideoPoseViewer({
   const [isObjectDetectionEnabled, setIsObjectDetectionEnabled] = useState(false);
   const [selectedObjectModel, setSelectedObjectModel] = useState<"YOLOv8n" | "YOLOv8s" | "YOLOv8m">("YOLOv8n");
   const [objectConfidenceThreshold, setObjectConfidenceThreshold] = useState(0.5);
+  const [objectIoUThreshold, setObjectIoUThreshold] = useState(0.45);
+  const [sportFilter, setSportFilter] = useState<"all" | "tennis" | "pickleball" | "basketball" | "baseball" | "skating">("all");
   const [showObjectLabels, setShowObjectLabels] = useState(true);
   const [enableObjectTracking, setEnableObjectTracking] = useState(true);
   const [currentObjects, setCurrentObjects] = useState<any[]>([]);
@@ -348,16 +350,28 @@ export function VideoPoseViewer({
       enabled: isPoseEnabled,
     });
 
+  // Get class filter based on sport selection
+  const objectClassFilter = React.useMemo(() => {
+    const { SPORT_FILTERS } = require("@/types/detection");
+    return sportFilter === "all" ? undefined : SPORT_FILTERS[sportFilter];
+  }, [sportFilter]);
+
   // Object Detection Hook
+  // Note: Object detection must run if either object detection OR ball tracking is enabled
+  // because ball tracking depends on YOLO detections
   const { 
+    detector: objectDetector,
     isLoading: isObjectDetectionLoading, 
     error: objectDetectionError, 
     detectObjects 
   } = useObjectDetection({
     model: selectedObjectModel,
     confidenceThreshold: objectConfidenceThreshold,
+    iouThreshold: objectIoUThreshold,
+    classFilter: objectClassFilter,
     enableTracking: enableObjectTracking,
-    enabled: isObjectDetectionEnabled,
+    enabled: isObjectDetectionEnabled || isProjectileDetectionEnabled, // Enable if either is active
+    useYOLOv8: true, // Try to use YOLOv8, fallback to COCO-SSD
   });
 
   // Projectile Detection Hook
@@ -368,7 +382,10 @@ export function VideoPoseViewer({
   } = useProjectileDetection({
     model: selectedProjectileModel,
     confidenceThreshold: projectileConfidenceThreshold,
+    trajectoryLength: showProjectileTrajectory ? 30 : 10,
+    videoFPS: videoFPS,
     enabled: isProjectileDetectionEnabled,
+    useYOLODetections: true, // Use YOLO detections for ball tracking
   });
 
   // Update canvas dimensions when video loads
@@ -415,20 +432,37 @@ export function VideoPoseViewer({
     if ('requestVideoFrameCallback' in video) {
       let frameCount = 0;
       let startTime = 0;
-      const maxFrames = 60; // Sample 60 frames to calculate FPS
+      let lastMediaTime = 0;
+      const maxFrames = 30; // Reduced from 60 for faster detection
 
       const callback = (now: number, metadata: any) => {
         if (frameCount === 0) {
           startTime = now;
+          lastMediaTime = metadata.mediaTime || 0;
         }
         
         frameCount++;
         
         if (frameCount >= maxFrames) {
           const elapsed = (now - startTime) / 1000; // Convert to seconds
-          const detectedFPS = Math.round(frameCount / elapsed);
-          setVideoFPS(detectedFPS);
-          console.log(`Detected video FPS: ${detectedFPS}`);
+          let detectedFPS = Math.round(frameCount / elapsed);
+          
+          // Use metadata.mediaTime for more accurate FPS if available
+          if (metadata.mediaTime && frameCount > 10) {
+            const mediaTimeDiff = metadata.mediaTime - lastMediaTime;
+            if (mediaTimeDiff > 0) {
+              detectedFPS = Math.round(frameCount / mediaTimeDiff);
+            }
+          }
+          
+          // Clamp to common frame rates
+          const commonFPS = [24, 25, 30, 50, 60, 120];
+          const closest = commonFPS.reduce((prev, curr) => 
+            Math.abs(curr - detectedFPS) < Math.abs(prev - detectedFPS) ? curr : prev
+          );
+          
+          setVideoFPS(closest);
+          console.log(`Detected video FPS: ${closest} (raw: ${detectedFPS})`);
         } else if (!video.paused && !video.ended) {
           (video as any).requestVideoFrameCallback(callback);
         }
@@ -476,11 +510,18 @@ export function VideoPoseViewer({
     };
   }, [isPlaying, showSkeleton, isLoading, usePreprocessing, isPoseEnabled, startDetection, stopDetection, handlePosesDetected]);
 
-  // Handle continuous object detection while playing
+  // Handle continuous object detection while playing (also handles ball tracking)
   useEffect(() => {
     const video = videoRef.current;
     
-    if (!video || !isObjectDetectionEnabled || !isPlaying || isObjectDetectionLoading) {
+    // Run if either object detection or ball tracking is enabled
+    // IMPORTANT: Must wait for detector to be fully ready!
+    const shouldRun = (isObjectDetectionEnabled || isProjectileDetectionEnabled) && 
+                      !isObjectDetectionLoading && 
+                      objectDetector !== null && 
+                      detectObjects !== undefined;
+    
+    if (!video || !shouldRun || !isPlaying) {
       return;
     }
 
@@ -494,8 +535,22 @@ export function VideoPoseViewer({
         
         if (now - lastDetectionTime >= detectionInterval) {
           try {
+            // Run object detection (needed for both object detection and ball tracking)
+            // Note: detectObjects returns empty array if detector not ready yet
             const objects = await detectObjects(video);
-            setCurrentObjects(objects);
+            
+            // Update object detections if object detection is enabled
+            if (isObjectDetectionEnabled) {
+              setCurrentObjects(objects);
+            }
+            
+            // Run ball tracking if enabled (uses same object detections)
+            if (isProjectileDetectionEnabled && detectProjectile) {
+              const currentFrame = Math.floor(video.currentTime * videoFPS);
+              const projectile = detectProjectile(objects, currentFrame, video.currentTime);
+              setCurrentProjectile(projectile);
+            }
+            
             lastDetectionTime = now;
           } catch (err) {
             console.error('Error detecting objects:', err);
@@ -513,46 +568,10 @@ export function VideoPoseViewer({
         cancelAnimationFrame(rafId);
       }
     };
-  }, [isPlaying, isObjectDetectionEnabled, isObjectDetectionLoading, detectObjects]);
+  }, [isPlaying, isObjectDetectionEnabled, isObjectDetectionLoading, isProjectileDetectionEnabled, objectDetector, detectObjects, detectProjectile, videoFPS]);
 
-  // Handle continuous projectile detection while playing
-  useEffect(() => {
-    const video = videoRef.current;
-    
-    if (!video || !isProjectileDetectionEnabled || !isPlaying || isProjectileDetectionLoading) {
-      return;
-    }
-
-    let rafId: number;
-    let lastDetectionTime = 0;
-    const detectionInterval = 33; // Detect every 33ms (~30 FPS) for smooth ball tracking
-
-    const detectLoop = async () => {
-      if (!video.paused && !video.ended) {
-        const now = performance.now();
-        
-        if (now - lastDetectionTime >= detectionInterval) {
-          try {
-            const projectile = await detectProjectile(video, undefined, video.currentTime);
-            setCurrentProjectile(projectile);
-            lastDetectionTime = now;
-          } catch (err) {
-            console.error('Error detecting projectile:', err);
-          }
-        }
-        
-        rafId = requestAnimationFrame(detectLoop);
-      }
-    };
-
-    detectLoop();
-
-    return () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [isPlaying, isProjectileDetectionEnabled, isProjectileDetectionLoading, detectProjectile]);
+  // Note: Projectile detection is now integrated with object detection loop above
+  // No separate loop needed - ball tracking uses YOLO detections
 
   // Auto-play video when model finishes loading
   useEffect(() => {
@@ -1243,10 +1262,10 @@ export function VideoPoseViewer({
       
       drawProjectile(ctx, scaledProjectile, {
         ballColor: "#FFEB3B",
-        ballRadius: 6,
-        trajectoryColor: "rgba(255, 235, 59, 0.6)",
-        trajectoryWidth: 2,
-        predictionColor: "rgba(255, 235, 59, 0.3)",
+        ballRadius: 8, // Slightly larger for visibility
+        trajectoryColor: "rgba(255, 235, 59, 0.8)", // More opaque
+        trajectoryWidth: 3, // Thicker for visibility
+        predictionColor: "rgba(255, 235, 59, 0.5)", // More visible
         showVelocity: true,
       });
     }
@@ -1805,7 +1824,7 @@ export function VideoPoseViewer({
         </Flex>
 
         {/* Stats Overlay */}
-        {isPoseEnabled && showSkeleton && currentPoses.length > 0 && (
+        {((isPoseEnabled && showSkeleton && currentPoses.length > 0) || (isObjectDetectionEnabled && currentObjects.length > 0) || (isProjectileDetectionEnabled && currentProjectile)) && (
           <Box
             style={{
               position: "absolute",
@@ -1824,37 +1843,54 @@ export function VideoPoseViewer({
               <Text size="1" weight="medium" style={{ color: "white", fontFamily: "var(--font-mono)", fontSize: isMobile ? "9px" : "10px" }}>
                 Frame {currentFrame} • {videoFPS} FPS
               </Text>
-              {!isMobile && (
+              {/* Pose Detection Stats */}
+              {isPoseEnabled && currentPoses.length > 0 && (
+                <>
+                  {!isMobile && (
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
+                      {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
+                    </Text>
+                  )}
+                  {!isMobile && currentPoses.map((pose, idx) => {
+                    return (
+                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
+                        Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
+                      </Text>
+                    );
+                  })}
+                  {currentPoses.length > 0 && (() => {
+                    // Calculate combined average accuracy across all players
+                    let totalSum = 0;
+                    let totalCount = 0;
+                    currentPoses.forEach((_, idx) => {
+                      const stats = confidenceStats.current.get(idx);
+                      if (stats) {
+                        totalSum += stats.sum;
+                        totalCount += stats.count;
+                      }
+                    });
+                    const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
+                    
+                    return (
+                      <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isMobile ? "9px" : "10px" }}>
+                        Confidence {(overallAvg * 100).toFixed(0)}%
+                      </Text>
+                    );
+                  })()}
+                </>
+              )}
+              {/* Object Detection Stats */}
+              {isObjectDetectionEnabled && currentObjects.length > 0 && !isMobile && (
                 <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
-                  {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
+                  Objects: {currentObjects.length}
                 </Text>
               )}
-              {!isMobile && currentPoses.map((pose, idx) => {
-                return (
-                  <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
-                    Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
-                  </Text>
-                );
-              })}
-              {currentPoses.length > 0 && (() => {
-                // Calculate combined average accuracy across all players
-                let totalSum = 0;
-                let totalCount = 0;
-                currentPoses.forEach((_, idx) => {
-                  const stats = confidenceStats.current.get(idx);
-                  if (stats) {
-                    totalSum += stats.sum;
-                    totalCount += stats.count;
-                  }
-                });
-                const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
-                
-                return (
-                  <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isMobile ? "9px" : "10px" }}>
-                    Confidence {(overallAvg * 100).toFixed(0)}%
-                  </Text>
-                );
-              })()}
+              {/* Ball Tracking Stats */}
+              {isProjectileDetectionEnabled && currentProjectile && !isMobile && (
+                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
+                  Ball tracked • {(currentProjectile.confidence * 100).toFixed(0)}% confidence
+                </Text>
+              )}
             </Flex>
           </Box>
         )}
@@ -3149,7 +3185,76 @@ export function VideoPoseViewer({
                 </Select.Root>
 
                 {/* Object Detection Options */}
-                <Flex direction="column" gap="2">
+                <Flex direction="column" gap="3">
+                  {/* Sport Filter */}
+                  <Flex direction="column" gap="1">
+                    <Text size="2" weight="medium">Sport Filter</Text>
+                    <Select.Root
+                      value={sportFilter}
+                      onValueChange={(value: any) => setSportFilter(value)}
+                    >
+                      <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", padding: "8px" }}>
+                        <Text size="2">
+                          {sportFilter === "all" && "All Objects"}
+                          {sportFilter === "tennis" && "Tennis"}
+                          {sportFilter === "pickleball" && "Pickleball"}
+                          {sportFilter === "basketball" && "Basketball"}
+                          {sportFilter === "baseball" && "Baseball"}
+                          {sportFilter === "skating" && "Skating"}
+                        </Text>
+                      </Select.Trigger>
+                      <Select.Content>
+                        <Select.Item value="all">All Objects</Select.Item>
+                        <Select.Item value="tennis">Tennis (person, ball, racket)</Select.Item>
+                        <Select.Item value="pickleball">Pickleball (person, ball)</Select.Item>
+                        <Select.Item value="basketball">Basketball (person, ball)</Select.Item>
+                        <Select.Item value="baseball">Baseball (person, ball, bat, glove)</Select.Item>
+                        <Select.Item value="skating">Skating (person, skateboard)</Select.Item>
+                      </Select.Content>
+                    </Select.Root>
+                  </Flex>
+
+                  {/* Confidence Threshold */}
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" justify="between">
+                      <Text size="2" weight="medium">Confidence</Text>
+                      <Text size="2" color="gray">{(objectConfidenceThreshold * 100).toFixed(0)}%</Text>
+                    </Flex>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      value={objectConfidenceThreshold}
+                      onChange={(e) => setObjectConfidenceThreshold(parseFloat(e.target.value))}
+                      style={{ width: "100%" }}
+                    />
+                    <Text size="1" color="gray">
+                      Higher = fewer false positives, lower = more detections
+                    </Text>
+                  </Flex>
+
+                  {/* IoU Threshold (NMS) */}
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" justify="between">
+                      <Text size="2" weight="medium">NMS Threshold</Text>
+                      <Text size="2" color="gray">{(objectIoUThreshold * 100).toFixed(0)}%</Text>
+                    </Flex>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      value={objectIoUThreshold}
+                      onChange={(e) => setObjectIoUThreshold(parseFloat(e.target.value))}
+                      style={{ width: "100%" }}
+                    />
+                    <Text size="1" color="gray">
+                      Controls duplicate detection removal
+                    </Text>
+                  </Flex>
+
+                  {/* Display Options */}
                   <Flex align="center" justify="between">
                     <Text size="2">Show Labels</Text>
                     <Switch
@@ -3182,15 +3287,15 @@ export function VideoPoseViewer({
             )}
           </Flex>
 
-          {/* Projectile Detection Section (TrackNet) */}
+          {/* Projectile Detection Section (Smart Ball Tracking) */}
           <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
             <Flex align="center" justify="between">
               <Flex direction="column" gap="1">
                 <Text size="2" weight="bold">
-                  Ball Tracking (TrackNet)
+                  Ball Tracking (Smart Detection)
                 </Text>
                 <Text size="1" color="gray">
-                  Track ball/projectile trajectory
+                  Track ball trajectory using YOLO + tracking
                 </Text>
               </Flex>
               <Switch
@@ -3202,43 +3307,45 @@ export function VideoPoseViewer({
 
             {isProjectileDetectionEnabled && (
               <Flex direction="column" gap="3">
-                {/* Projectile Model Selection */}
-                <Select.Root
-                  value={selectedProjectileModel}
-                  onValueChange={(value) => {
-                    setSelectedProjectileModel(value as "TrackNet" | "TrackNetV2");
-                    setCurrentProjectile(null);
-                  }}
-                  disabled={isProjectileDetectionLoading}
-                >
-                  <Select.Trigger className={selectStyles.selectTriggerStyled} style={{ width: "100%", height: "70px", padding: "12px" }}>
-                    <Flex direction="column" gap="1" align="start">
-                      <Text weight="medium" size="2">
-                        {selectedProjectileModel}
-                      </Text>
-                      <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                        {selectedProjectileModel === "TrackNet" && "Original TrackNet model"}
-                        {selectedProjectileModel === "TrackNetV2" && "Enhanced TrackNet V2"}
-                      </Text>
-                    </Flex>
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="TrackNet" style={{ minHeight: "70px", padding: "12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium" size="2">TrackNet</Text>
-                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Original TrackNet model</Text>
-                      </Flex>
-                    </Select.Item>
-                    <Select.Item value="TrackNetV2" style={{ minHeight: "70px", padding: "12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium" size="2">TrackNet V2</Text>
-                        <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>Enhanced TrackNet V2</Text>
-                      </Flex>
-                    </Select.Item>
-                  </Select.Content>
-                </Select.Root>
+                {/* Info about detection method */}
+                <Flex direction="column" gap="1" p="2" style={{ backgroundColor: "var(--blue-a2)", borderRadius: "6px" }}>
+                  <Text size="2" weight="medium">YOLOv8 + Smart Tracking</Text>
+                  <Text size="1" color="gray">
+                    Uses object detection + temporal tracking for accurate ball trajectories
+                  </Text>
+                  {currentProjectile && (
+                    <Text size="1" weight="bold" style={{ color: "var(--green-11)" }}>
+                      ✓ Ball detected! ({(currentProjectile.confidence * 100).toFixed(0)}% confidence)
+                    </Text>
+                  )}
+                  {!currentProjectile && isPlaying && (
+                    <Text size="1" color="amber">
+                      Searching for ball... (Check console for detections)
+                    </Text>
+                  )}
+                </Flex>
 
-                {/* Projectile Detection Options */}
+                {/* Ball Detection Confidence */}
+                <Flex direction="column" gap="1">
+                  <Flex align="center" justify="between">
+                    <Text size="2" weight="medium">Ball Confidence</Text>
+                    <Text size="2" color="gray">{(projectileConfidenceThreshold * 100).toFixed(0)}%</Text>
+                  </Flex>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="0.7"
+                    step="0.05"
+                    value={projectileConfidenceThreshold}
+                    onChange={(e) => setProjectileConfidenceThreshold(parseFloat(e.target.value))}
+                    style={{ width: "100%" }}
+                  />
+                  <Text size="1" color="gray">
+                    Lower threshold for small/fast balls
+                  </Text>
+                </Flex>
+
+                {/* Display Options */}
                 <Flex direction="column" gap="2">
                   <Flex align="center" justify="between">
                     <Text size="2">Show Trajectory</Text>
@@ -3259,7 +3366,7 @@ export function VideoPoseViewer({
                 {isProjectileDetectionLoading && (
                   <Flex align="center" gap="2">
                     <Spinner />
-                    <Text size="2" color="gray">Loading projectile detection model...</Text>
+                    <Text size="2" color="gray">Initializing ball tracking...</Text>
                   </Flex>
                 )}
 

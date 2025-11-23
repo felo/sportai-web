@@ -11,7 +11,7 @@ const config: Config = {
     extend: {
       // Use CSS variable for optimized font
       fontFamily: {
-        sans: ["var(--font-inter)", "sans-serif"],
+        sans: ["var(--font-poppins)", "sans-serif"],
       },
       keyframes: {
         slideIn: {
