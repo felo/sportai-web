@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Container, Heading, Text, Flex, Box, Button, Card, Code, Badge } from "@radix-ui/themes";
+import { Container, Heading, Text, Flex, Box, Button, Card, Code, Badge, Tabs } from "@radix-ui/themes";
 import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
+import { SAM2Viewer } from "@/components/chat/SAM2Viewer";
 import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
 import * as tf from "@tensorflow/tfjs";
 import { getCacheDiagnostics, type CacheDiagnostics } from "@/lib/model-cache-diagnostics";
@@ -206,7 +207,7 @@ export default function PoseDemoPage() {
           </Card>
         )}
 
-        {/* Video Player with Pose Detection */}
+        {/* Video Player with Model Detection */}
         {videoUrl && (
           <Card size="3">
             <Flex direction="column" gap="4">
@@ -224,13 +225,69 @@ export default function PoseDemoPage() {
                 </Button>
               </Flex>
               
-              <VideoPoseViewer
-                videoUrl={videoUrl}
-                width={800}
-                height={600}
-                autoPlay={false}
-                showControls={true}
-              />
+              {/* Tabbed interface for different detection models */}
+              <Tabs.Root defaultValue="pose">
+                <Tabs.List>
+                  <Tabs.Trigger value="pose">Pose Detection</Tabs.Trigger>
+                  <Tabs.Trigger value="sam2">SAM 2 Segmentation</Tabs.Trigger>
+                </Tabs.List>
+
+                <Box pt="4">
+                  <Tabs.Content value="pose">
+                    <VideoPoseViewer
+                      videoUrl={videoUrl}
+                      width={800}
+                      height={600}
+                      autoPlay={false}
+                      showControls={true}
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="sam2">
+                    <Flex direction="column" gap="3">
+                      <Box p="3" style={{ background: "var(--blue-3)", borderRadius: "8px" }}>
+                        <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
+                          🎯 SAM 2 Interactive Segmentation
+                        </Text>
+                        <Text size="1" color="gray" style={{ display: "block" }}>
+                          SAM 2 (Segment Anything Model 2) provides pixel-perfect segmentation for rackets, balls, and other sports equipment.
+                          Enable it below and click on objects in the video to segment them!
+                        </Text>
+                      </Box>
+                      
+                      <SAM2Viewer
+                        videoUrl={videoUrl}
+                        width={800}
+                        height={600}
+                      />
+                      
+                      <Box p="3" style={{ background: "var(--gray-2)", borderRadius: "8px" }}>
+                        <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
+                          📚 Usage Tips
+                        </Text>
+                        <Text size="1" style={{ display: "block", marginBottom: "4px" }}>
+                          • Start with <strong>Tiny</strong> model for fast, real-time segmentation
+                        </Text>
+                        <Text size="1" style={{ display: "block", marginBottom: "4px" }}>
+                          • Click <strong>foreground points</strong> (red) on objects you want to segment
+                        </Text>
+                        <Text size="1" style={{ display: "block", marginBottom: "4px" }}>
+                          • Add <strong>background points</strong> (blue) to exclude unwanted areas
+                        </Text>
+                        <Text size="1" style={{ display: "block", marginBottom: "4px" }}>
+                          • Use 2-5 points for best results
+                        </Text>
+                        <Text size="1" style={{ display: "block", marginBottom: "8px" }}>
+                          • Models will be downloaded on first use (~40-900MB depending on size)
+                        </Text>
+                        <Text size="1" weight="bold" style={{ display: "block" }}>
+                          ⚠️ Note: SAM 2 models must be exported first. See <Code>docs/SAM2_INTEGRATION.md</Code> for instructions.
+                        </Text>
+                      </Box>
+                    </Flex>
+                  </Tabs.Content>
+                </Box>
+              </Tabs.Root>
             </Flex>
           </Card>
         )}

@@ -6,7 +6,7 @@ import { Box, Flex, Text } from "@radix-ui/themes";
 
 // Dynamic import of the TensorFlow-heavy component
 const VideoPoseViewerCore = lazy(() => 
-  import("./VideoPoseViewerCore").then(mod => ({ 
+  import("./videoPoseViewer/VideoPoseViewerCore").then(mod => ({ 
     default: mod.VideoPoseViewer 
   }))
 );

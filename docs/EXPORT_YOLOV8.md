@@ -123,3 +123,4 @@ Once the model is in `public/models/yolov8n.onnx`, the application will automati
 
 The model will be loaded on first use and cached by the browser for subsequent loads.
 
+

@@ -7,4 +7,5 @@ export { useNavigationWarning } from "./useNavigationWarning";
 export { usePoseDetection } from "./usePoseDetection";
 export { useObjectDetection } from "./useObjectDetection";
 export { useProjectileDetection } from "./useProjectileDetection";
+export { useSAM2Detection } from "./useSAM2Detection";
 

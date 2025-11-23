@@ -13,13 +13,13 @@ import { drawProjectile } from "@/types/projectile-detection";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import type { ObjectDetectionResult } from "@/types/detection";
 import type { ProjectileDetectionResult } from "@/types/detection";
-import { Pose3DViewer } from "./Pose3DViewer";
+import { Pose3DViewer } from "../Pose3DViewer";
 import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useVideoDimensions, useVideoFPS, useVelocityTracking } from "./videoPoseViewer/hooks";
-import { VelocityDisplay } from "./videoPoseViewer/components";
-import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS } from "./videoPoseViewer/constants";
+import { useVideoDimensions, useVideoFPS, useVelocityTracking } from "./hooks";
+import { VelocityDisplay } from "./components";
+import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS } from "./constants";
 
 interface VideoPoseViewerProps {
   videoUrl: string;

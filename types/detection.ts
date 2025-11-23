@@ -9,7 +9,7 @@ import type { Keypoint } from "@tensorflow-models/pose-detection";
 // Detection Type Enums
 // ============================================================================
 
-export type DetectionType = "pose" | "object" | "projectile";
+export type DetectionType = "pose" | "object" | "projectile" | "sam2";
 
 // ============================================================================
 // Base Detection Config
@@ -134,13 +134,72 @@ export interface ProjectileDrawOptions {
 }
 
 // ============================================================================
+// SAM 2 Segmentation (Segment Anything Model 2)
+// ============================================================================
+
+export type SAM2ModelType = "tiny" | "small" | "base" | "large";
+
+export interface SAM2DetectionConfig extends BaseDetectionConfig {
+  type: "sam2";
+  model: SAM2ModelType;
+  showMask: boolean;
+  showBoundingBox: boolean;
+  maskOpacity?: number; // 0-1, default: 0.5
+  maskColor?: string; // Hex color, default: auto
+  confidenceThreshold?: number;
+  imageSize?: number; // Model input size, default: 1024
+  interactiveMode?: boolean; // Allow user to click for prompts
+}
+
+export interface SAM2Point {
+  x: number;
+  y: number;
+  label: 1 | 0; // 1 = foreground, 0 = background
+}
+
+export interface SAM2Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SAM2Mask {
+  data: Uint8Array; // Binary mask (0 or 255)
+  width: number;
+  height: number;
+  score: number;
+}
+
+export interface SAM2DetectionResult {
+  masks: SAM2Mask[];
+  bbox?: SAM2Box;
+  confidence: number;
+  prompt?: {
+    points?: SAM2Point[];
+    box?: SAM2Box;
+  };
+}
+
+export interface SAM2DrawOptions {
+  maskColor?: string;
+  maskOpacity?: number;
+  boundingBoxColor?: string;
+  lineWidth?: number;
+  showPromptPoints?: boolean;
+  promptPointColor?: string;
+  promptPointRadius?: number;
+}
+
+// ============================================================================
 // Unified Detection Config (Discriminated Union)
 // ============================================================================
 
 export type DetectionConfig =
   | PoseDetectionConfig
   | ObjectDetectionConfig
-  | ProjectileDetectionConfig;
+  | ProjectileDetectionConfig
+  | SAM2DetectionConfig;
 
 // ============================================================================
 // Detection Results Union
@@ -149,7 +208,8 @@ export type DetectionConfig =
 export type DetectionResult =
   | { type: "pose"; results: PoseDetectionResult[] }
   | { type: "object"; results: ObjectDetectionResult[] }
-  | { type: "projectile"; results: ProjectileDetectionResult[] };
+  | { type: "projectile"; results: ProjectileDetectionResult[] }
+  | { type: "sam2"; results: SAM2DetectionResult[] };
 
 // ============================================================================
 // Multi-Detection Container (for components that support multiple detections)
@@ -171,6 +231,12 @@ export interface MultiDetectionState {
   projectile?: {
     enabled: boolean;
     results: ProjectileDetectionResult[];
+    isLoading: boolean;
+    error: string | null;
+  };
+  sam2?: {
+    enabled: boolean;
+    results: SAM2DetectionResult[];
     isLoading: boolean;
     error: string | null;
   };
