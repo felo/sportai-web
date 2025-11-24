@@ -62,7 +62,7 @@ export function VideoPoseViewer({
   initialSelectedJoints = [9, 10],
   initialShowVelocity = false,
   initialVelocityWrist = "right",
-  initialPoseEnabled = true,
+  initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

@@ -14,7 +14,7 @@ interface UseDetectionSettingsProps {
  * Groups pose, object, and projectile detection state into organized groups.
  */
 export function useDetectionSettings({
-  initialPoseEnabled = true,
+  initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
   initialModel = "MoveNet",
   initialShowSkeleton = true,
   initialObjectDetectionEnabled = false,
