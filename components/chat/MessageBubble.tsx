@@ -1,16 +1,16 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import { markdownComponents } from "@/components/markdown/markdown-components";
+import { Avatar, Box, Button, Flex, Text } from "@radix-ui/themes";
+import { MarkdownWithSwings } from "@/components/markdown";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { VideoPoseViewer } from "./VideoPoseViewer";
+import { StreamingIndicator } from "./StreamingIndicator";
+import { FeedbackButtons } from "./FeedbackButtons";
+import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import buttonStyles from "@/styles/buttons.module.css";
 
 const THINKING_MESSAGES = [
@@ -78,16 +78,42 @@ interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
   messageIndex?: number;
+  onAskForHelp?: (termName: string, swing?: any) => void;
+  onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
   const [showProUpsell, setShowProUpsell] = useState(false);
   const [videoContainerStyle, setVideoContainerStyle] = useState<React.CSSProperties>({});
+  const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+  const [ttsUsage, setTtsUsage] = useState(message.ttsUsage || {
+    totalCharacters: 0,
+    totalCost: 0,
+    requestCount: 0,
+    voiceQuality: '',
+  });
   const isMobile = useIsMobile();
+
+  // Callback to track TTS usage
+  const handleTTSUsage = (characters: number, cost: number, quality: string) => {
+    setTtsUsage((prev) => ({
+      totalCharacters: prev.totalCharacters + characters,
+      totalCost: prev.totalCost + cost,
+      requestCount: prev.requestCount + 1,
+      voiceQuality: quality,
+    }));
+  };
+
+  // Save TTS usage to message when it changes
+  useEffect(() => {
+    if (ttsUsage.requestCount > 0 && onUpdateMessage) {
+      onUpdateMessage(message.id, { ttsUsage });
+    }
+  }, [ttsUsage, message.id, onUpdateMessage]);
 
   // Load developer mode and theatre mode on mount
   useEffect(() => {
@@ -134,6 +160,26 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
     },
     { input: 0, output: 0 }
   );
+
+  // Calculate cumulative TTS usage up to this message
+  const cumulativeTTSUsage = allMessages.slice(0, messageIndex + 1).reduce(
+    (acc, msg) => {
+      if (msg.role === "assistant" && msg.ttsUsage) {
+        acc.characters += msg.ttsUsage.totalCharacters;
+        acc.cost += msg.ttsUsage.totalCost;
+        acc.requests += msg.ttsUsage.requestCount;
+      }
+      return acc;
+    },
+    { characters: 0, cost: 0, requests: 0 }
+  );
+
+  // Add current message's TTS usage (from state)
+  const totalTTSUsage = {
+    characters: cumulativeTTSUsage.characters + ttsUsage.totalCharacters,
+    cost: cumulativeTTSUsage.cost + ttsUsage.totalCost,
+    requests: cumulativeTTSUsage.requests + ttsUsage.requestCount,
+  };
 
   // Calculate tokens for this specific message
   const messageTokens = {
@@ -356,12 +402,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
 
       <Box
         style={{
-          maxWidth: isMobile || (theatreMode && hasVideo && message.role === "user")
+          maxWidth: isMobile 
             ? "100%"
-            : message.role === "assistant"
+            : theatreMode && hasVideo
             ? "100%"
             : "80%",
-          width: (isMobile && message.role === "user") || (message.role === "user" && theatreMode && hasVideo)
+          width: isMobile && message.role === "user"
             ? "100%"
             : "auto",
           borderRadius: message.role === "user" && !hasVideo
@@ -538,16 +584,39 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
           <Box style={{ maxWidth: "none" }}>
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={markdownComponents}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                <>
+                  <MarkdownWithSwings 
+                    messageId={message.id} 
+                    onAskForHelp={onAskForHelp}
+                    onTTSUsage={handleTTSUsage}
+                    feedbackButtons={!message.isStreaming ? (
+                      <FeedbackButtons 
+                        messageId={message.id}
+                        onFeedback={() => setShowFeedbackToast(true)}
+                      />
+                    ) : undefined}
+                  >
+                    {message.content}
+                  </MarkdownWithSwings>
+                  {message.isStreaming && (
+                    <>
+                      {console.log("[MessageBubble] Rendering StreamingIndicator for message:", message.id)}
+                      <StreamingIndicator />
+                    </>
+                  )}
+                </>
               ) : (
                 <Flex gap="2" align="center">
-                  <Spinner size="1" />
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    marginRight: "4px",
+                  }}>
+                    <span className="thinking-dot" style={{ animationDelay: "0s" }}></span>
+                    <span className="thinking-dot" style={{ animationDelay: "0.2s" }}></span>
+                    <span className="thinking-dot" style={{ animationDelay: "0.4s" }}></span>
+                  </div>
                   <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
                 </Flex>
               )}
@@ -557,14 +626,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
             {showProUpsell && (
               <Box
                 mt="4"
-                pt="4"
                 style={{
-                  borderTop: "1px solid var(--gray-6)",
                   opacity: 0,
                   animation: "fadeInUpsell 0.5s ease-in forwards",
                 }}
               >
-                <Flex direction="column" gap="3">
+                {/* Custom separator reusing markdown divider design */}
+                <div className="markdown-divider" role="separator" aria-label="Section divider">
+                  <div className="markdown-divider-line" />
+                  <span className="markdown-divider-dots" aria-hidden="true">
+                    •••
+                  </span>
+                  <div className="markdown-divider-line" />
+                </div>
+                
+                <Flex direction="column" gap="3" mt="4">
                   <Flex direction="column" gap="2">
                     <Text size="3" weight="medium">
                       Want more accuracy and deeper insights?
@@ -580,7 +656,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                     onClick={() => {
                       window.open("https://sportai.com/contact", "_blank", "noopener,noreferrer");
                     }}
-                    style={{ width: "fit-content", cursor: "pointer" }}
+                    style={{ width: "fit-content", cursor: "pointer", marginTop: "var(--space-2)" }}
                   >
                     Contact us for PRO
                   </Button>
@@ -599,6 +675,26 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                   transform: translateY(0);
                 }
               }
+
+              .thinking-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--accent-9);
+                animation: thinkingPulse 1.4s ease-in-out infinite;
+                display: block;
+              }
+
+              @keyframes thinkingPulse {
+                0%, 60%, 100% {
+                  opacity: 0.4;
+                  transform: scale(1);
+                }
+                30% {
+                  opacity: 1;
+                  transform: scale(1.2);
+                }
+              }
             `}</style>
             
             {/* Developer mode token information */}
@@ -607,11 +703,19 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                 mt="3"
                 pt="3"
                 style={{
-                  borderTop: "1px solid var(--gray-6)",
                   fontSize: "var(--font-size-1)",
                   color: "var(--gray-11)",
                 }}
               >
+                {/* Decorative separator matching markdown conventions */}
+                <div className="markdown-divider" role="separator" aria-label="Developer section divider">
+                  <div className="markdown-divider-line" />
+                  <span className="markdown-divider-dots" aria-hidden="true">
+                    •••
+                  </span>
+                  <div className="markdown-divider-line" />
+                </div>
+                
                 <Flex direction="column" gap="2">
                   <Text size="1" weight="medium" color="gray">
                     Developer Mode
@@ -646,6 +750,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                         <strong>Settings:</strong> Thinking={message.modelSettings.thinkingMode}, Resolution={message.modelSettings.mediaResolution}
                       </Text>
                     )}
+                    {ttsUsage.requestCount > 0 && (
+                      <>
+                        <Text size="1">
+                          <strong>TTS usage (this message):</strong>{" "}
+                          {ttsUsage.totalCharacters.toLocaleString()} characters, {ttsUsage.requestCount} request{ttsUsage.requestCount !== 1 ? 's' : ''} ({formatCost(ttsUsage.totalCost)})
+                        </Text>
+                        <Text size="1">
+                          <strong>TTS usage (total in chat):</strong>{" "}
+                          {totalTTSUsage.characters.toLocaleString()} characters, {totalTTSUsage.requests} request{totalTTSUsage.requests !== 1 ? 's' : ''} ({formatCost(totalTTSUsage.cost)})
+                        </Text>
+                      </>
+                    )}
                   </Flex>
                 </Flex>
               </Box>
@@ -653,6 +769,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
           </Box>
         )}
       </Box>
+      
+      {/* Feedback Toast */}
+      <FeedbackToast 
+        open={showFeedbackToast}
+        onOpenChange={setShowFeedbackToast}
+      />
     </Flex>
   );
 }
