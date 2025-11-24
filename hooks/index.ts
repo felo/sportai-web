@@ -1,7 +1,7 @@
 export { useDragAndDrop } from "./useDragAndDrop";
 export { useVideoUpload } from "./useVideoUpload";
-export { useGeminiChat } from "./useGeminiChat";
-export { useGeminiApi } from "./useGeminiApi";
+export { useAIChat } from "./useAIChat";
+export { useAIApi } from "./useAIApi";
 export { useIsMobile } from "./useIsMobile";
 export { useNavigationWarning } from "./useNavigationWarning";
 export { usePoseDetection } from "./usePoseDetection";

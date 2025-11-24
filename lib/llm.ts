@@ -30,7 +30,7 @@ export interface ConversationHistory {
   parts: Array<{ text: string }>;
 }
 
-export async function queryGemini(
+export async function queryLLM(
   prompt: string,
   videoData?: { data: Buffer; mimeType: string } | null,
   conversationHistory?: ConversationHistory[],
@@ -44,7 +44,7 @@ export async function queryGemini(
   const systemPrompt = getSystemPromptWithDomain(domainExpertise);
   const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
-  logger.info(`[${requestId}] Starting Gemini query`);
+  logger.info(`[${requestId}] Starting LLM query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
@@ -159,7 +159,7 @@ export async function queryGemini(
       result = await model.generateContent(parts);
     }
     
-    logger.debug(`[${requestId}] Sending request to Gemini API...`);
+    logger.debug(`[${requestId}] Sending request to LLM API...`);
     const response = await result.response;
     const responseText = response.text();
     
@@ -263,7 +263,7 @@ export async function queryGemini(
       }
     }
     
-    logger.error(`[${requestId}] Error querying Gemini:`, {
+    logger.error(`[${requestId}] Error querying LLM:`, {
       message: error?.message,
       status: error?.status,
       statusText: error?.statusText,
@@ -283,7 +283,7 @@ export async function queryGemini(
     if (error?.status) {
       const statusText = error?.statusText || error?.message || "Unknown error";
       logger.error(`[${requestId}] API error ${error.status}: ${statusText}`);
-      throw new Error(`Gemini API error (${error.status}): ${statusText}`);
+      throw new Error(`LLM API error (${error.status}): ${statusText}`);
     }
     
     // Handle errors with errorDetails array
@@ -291,21 +291,21 @@ export async function queryGemini(
       const firstError = error.errorDetails[0];
       const errorMsg = firstError?.message || firstError?.reason || "API error";
       logger.error(`[${requestId}] API error details:`, firstError);
-      throw new Error(`Gemini API error: ${errorMsg}`);
+      throw new Error(`LLM API error: ${errorMsg}`);
     }
     
     // Handle generic errors
-    const errorMessage = error?.message || error?.toString() || "Failed to query Gemini API";
+    const errorMessage = error?.message || error?.toString() || "Failed to query LLM API";
     logger.error(`[${requestId}] Generic error: ${errorMessage}`);
     throw new Error(errorMessage);
   }
 }
 
 /**
- * Stream Gemini response (for text-only and video queries)
+ * Stream LLM response (for text-only and video queries)
  * Returns an async generator that yields text chunks
  */
-export async function* streamGemini(
+export async function* streamLLM(
   prompt: string,
   conversationHistory?: ConversationHistory[],
   videoData?: { data: Buffer; mimeType: string } | null,
@@ -319,7 +319,7 @@ export async function* streamGemini(
   const systemPrompt = getSystemPromptWithDomain(domainExpertise);
   const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
-  logger.info(`[${requestId}] Starting Gemini stream`);
+  logger.info(`[${requestId}] Starting LLM stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
@@ -402,7 +402,7 @@ export async function* streamGemini(
       result = await model.generateContentStream(parts);
     }
     
-    logger.debug(`[${requestId}] Streaming request to Gemini API...`);
+    logger.debug(`[${requestId}] Streaming request to LLM API...`);
     
     let fullText = "";
     for await (const chunk of result.stream) {
@@ -469,7 +469,7 @@ export async function* streamGemini(
       return;
     }
     
-    logger.error(`[${requestId}] Error streaming Gemini:`, {
+    logger.error(`[${requestId}] Error streaming LLM:`, {
       message: error?.message,
       status: error?.status,
       statusText: error?.statusText,
@@ -481,11 +481,11 @@ export async function* streamGemini(
       if (videoData) {
         const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
         throw new Error(
-          `Gemini API encountered an internal error while processing your ${mediaSizeMB}MB video. This often happens with longer videos. Try: (1) Using a shorter video clip, (2) Compressing the video, or (3) Switching to 'Low' media resolution in settings.`
+          `LLM API encountered an internal error while processing your ${mediaSizeMB}MB video. This often happens with longer videos. Try: (1) Using a shorter video clip, (2) Compressing the video, or (3) Switching to 'Low' media resolution in settings.`
         );
       } else {
         throw new Error(
-          "Gemini API encountered an internal error. Please try again in a few moments."
+          "LLM API encountered an internal error. Please try again in a few moments."
         );
       }
     }

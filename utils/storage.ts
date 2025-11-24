@@ -558,7 +558,7 @@ export async function generateAIChatTitle(messages: Message[]): Promise<string> 
       formData.append("thinkingMode", "fast");
       formData.append("mediaResolution", "low");
       
-      const response = await fetch("/api/gemini", {
+      const response = await fetch("/api/llm", {
         method: "POST",
         body: formData,
       });

@@ -9,11 +9,11 @@ import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/sto
 // This includes base system prompt + potential domain expertise enhancement
 const ESTIMATED_SYSTEM_PROMPT_TOKENS = 500;
 
-interface UseGeminiApiOptions {
+interface UseAIApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
 }
 
-export function useGeminiApi(options: UseGeminiApiOptions = {}) {
+export function useAIApi(options: UseAIApiOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -80,7 +80,7 @@ export function useGeminiApi(options: UseGeminiApiOptions = {}) {
         }
       }
 
-      const response = await fetch("/api/gemini", {
+      const response = await fetch("/api/llm", {
         method: "POST",
         headers: {
           "x-stream": "true",
@@ -351,7 +351,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         
         // Step 2: Send S3 URL to Gemini API - backend will download it efficiently
         setStage("processing");
-        console.log("[S3] Sending S3 URL to Gemini API (backend will download)...", {
+        console.log("[S3] Sending S3 URL to AI API (backend will download)...", {
           s3Url: s3Url,
           promptLength: prompt.length,
         });
@@ -378,10 +378,10 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           }
         }
 
-        console.log("[Gemini API] Sending request to /api/gemini with S3 URL...");
+        console.log("[AI API] Sending request to /api/llm with S3 URL...");
         let res: Response;
         try {
-          res = await fetch("/api/gemini", {
+          res = await fetch("/api/llm", {
             method: "POST",
             headers: {
               "x-stream": "true",
@@ -389,14 +389,14 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             body: formData,
             signal: abortController?.signal,
           });
-          console.log("[Gemini API] Response received:", {
+          console.log("[AI API] Response received:", {
             ok: res.ok,
             status: res.status,
             statusText: res.statusText,
             hasBody: !!res.body,
           });
         } catch (fetchError) {
-          console.error("[Gemini API] ❌ Fetch error:", fetchError);
+          console.error("[AI API] ❌ Fetch error:", fetchError);
           throw fetchError;
         }
 
@@ -405,7 +405,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.error("[Gemini API] ❌ Request failed:", {
+          console.error("[AI API] ❌ Request failed:", {
             status: res.status,
             statusText: res.statusText,
             errorText,
@@ -418,11 +418,11 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         let accumulatedText = "";
 
         if (!reader) {
-          console.error("[Gemini API] ❌ Response body is null or undefined");
+          console.error("[AI API] ❌ Response body is null or undefined");
           throw new Error("Response body is null");
         }
 
-        console.log("[Gemini API] Starting to read stream...");
+        console.log("[AI API] Starting to read stream...");
         try {
           // Mark as streaming when we start
           updateMessage(assistantMessageId, { isStreaming: true });
@@ -430,13 +430,13 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
-              console.log("[Gemini API] Stream completed. Total length:", accumulatedText.length);
+              console.log("[AI API] Stream completed. Total length:", accumulatedText.length);
               break;
             }
 
             const chunk = decoder.decode(value, { stream: true });
             accumulatedText += chunk;
-            console.log("[Gemini API] Received chunk:", {
+            console.log("[AI API] Received chunk:", {
               chunkLength: chunk.length,
               totalLength: accumulatedText.length,
               preview: chunk.substring(0, 50),
@@ -501,8 +501,8 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
         } else {
           // This is an API error, not an S3 error - rethrow it
-          console.error("[Gemini API] ❌ API call failed:", error);
-          console.error("[Gemini API] Error details:", {
+          console.error("[AI API] ❌ API call failed:", error);
+          console.error("[AI API] Error details:", {
             error: error instanceof Error ? error.message : String(error),
             errorName: error instanceof Error ? error.name : undefined,
             errorStack: error instanceof Error ? error.stack : undefined,
@@ -531,7 +531,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         }
 
         setStage("processing");
-        const res = await fetch("/api/gemini", {
+        const res = await fetch("/api/llm", {
           method: "POST",
           headers: {
             "x-stream": "true",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryGemini, streamGemini, type ConversationHistory } from "@/lib/gemini";
+import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   const requestId = `api_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const startTime = Date.now();
   
-  logger.info(`[${requestId}] Received POST request to /api/gemini`);
+  logger.info(`[${requestId}] Received POST request to /api/llm`);
   
   // Check content length to catch 413 errors early
   // Note: Vercel has a hard limit of 4.5MB for serverless functions
@@ -90,17 +90,17 @@ export async function POST(request: NextRequest) {
     if (videoUrl) {
       // Download from S3 using AWS SDK (efficient server-side download)
       logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
-      console.log(`[Gemini API] 📥 Downloading from S3 (server-side): ${videoUrl}`);
+      console.log(`[LLM API] 📥 Downloading from S3 (server-side): ${videoUrl}`);
       logger.time(`[${requestId}] S3 download`);
       
       try {
         videoData = await downloadFromS3(videoUrl);
         logger.timeEnd(`[${requestId}] S3 download`);
         logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
-        console.log(`[Gemini API] ✅ Successfully downloaded from S3: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`[LLM API] ✅ Successfully downloaded from S3: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
       } catch (error) {
         logger.error(`[${requestId}] Failed to download from S3:`, error);
-        console.error(`[Gemini API] ❌ Failed to download from S3:`, error);
+        console.error(`[LLM API] ❌ Failed to download from S3:`, error);
         return NextResponse.json(
           { error: `Failed to download media from S3: ${error instanceof Error ? error.message : "Unknown error"}` },
           { status: 500 }
@@ -190,7 +190,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         );
       } else if (sizeMB > LARGE_VIDEO_WARNING_MB) {
         logger.warn(`[${requestId}] Large video detected (${sizeMB.toFixed(2)} MB) - may cause API timeout or errors`);
-        console.warn(`[Gemini API] ⚠️ Large video (${sizeMB.toFixed(2)} MB) - processing may be slow or fail. Consider using a shorter clip or lower resolution.`);
+        console.warn(`[LLM API] ⚠️ Large video (${sizeMB.toFixed(2)} MB) - processing may be slow or fail. Consider using a shorter clip or lower resolution.`);
       }
     }
 
@@ -290,7 +290,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               }
             }
             
-            for await (const chunk of streamGemini(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise)) {
+            for await (const chunk of streamLLM(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise)) {
               // Check if controller is still open before enqueueing
               // This can happen if the client aborts the request
               try {
@@ -341,8 +341,8 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
       });
     }
     
-    logger.info(`[${requestId}] Calling queryGemini...`);
-    const response = await queryGemini(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise);
+    logger.info(`[${requestId}] Calling queryLLM...`);
+    const response = await queryLLM(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise);
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);

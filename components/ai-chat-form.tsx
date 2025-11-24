@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { AlertDialog, Button, Flex } from "@radix-ui/themes";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
-import { useGeminiChat } from "@/hooks/useGeminiChat";
-import { useGeminiApi } from "@/hooks/useGeminiApi";
+import { useAIChat } from "@/hooks/useAIChat";
+import { useAIApi } from "@/hooks/useAIApi";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useNavigationWarning } from "@/hooks/useNavigationWarning";
 import { MessageList } from "@/components/chat/messages/MessageList";
@@ -40,7 +40,7 @@ import {
   padelCourts,
 } from "@/database";
 
-export function GeminiQueryForm() {
+export function AIChatForm() {
   const [prompt, setPrompt] = useState("");
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>("fast");
@@ -80,14 +80,14 @@ export function GeminiQueryForm() {
     removeMessage,
     clearMessages,
     isHydrated,
-  } = useGeminiChat();
+  } = useAIChat();
 
   const {
     error: apiError,
     setError: setApiError,
     sendTextOnlyQuery,
     sendVideoQuery,
-  } = useGeminiApi({
+  } = useAIApi({
     onProgressUpdate: (stage, progress) => {
       setProgressStage(stage);
       setUploadProgress(progress);
@@ -144,16 +144,16 @@ export function GeminiQueryForm() {
     if (isHydrated) {
       const currentChatId = getCurrentChatId();
       if (!currentChatId) {
-        console.log("[GeminiQueryForm] No chat exists, creating default chat");
+        console.log("[AIChatForm] No chat exists, creating default chat");
         const newChat = createChat([], undefined);
         setCurrentChatId(newChat.id);
-        console.log("[GeminiQueryForm] Created default chat:", newChat.id);
+        console.log("[AIChatForm] Created default chat:", newChat.id);
         // Reset settings to defaults for new chat
         setThinkingMode("fast");
         setMediaResolution("medium");
         setDomainExpertise("all-sports");
       } else {
-        console.log("[GeminiQueryForm] Using existing chat:", currentChatId);
+        console.log("[AIChatForm] Using existing chat:", currentChatId);
       }
     }
   }, [isHydrated]);
@@ -167,7 +167,7 @@ export function GeminiQueryForm() {
       if (currentChatId) {
         const chatData = getChatById(currentChatId);
         if (chatData) {
-          console.log("[GeminiQueryForm] Chat changed, restoring settings:", {
+          console.log("[AIChatForm] Chat changed, restoring settings:", {
             chatId: currentChatId,
             thinkingMode: chatData.thinkingMode,
             mediaResolution: chatData.mediaResolution,
@@ -464,15 +464,15 @@ export function GeminiQueryForm() {
     
     // Get the current chat ID - there should always be one (created on mount)
     const requestChatId = getCurrentChatId();
-    console.log("[GeminiQueryForm] Using chat:", requestChatId);
+    console.log("[AIChatForm] Using chat:", requestChatId);
     
     if (!requestChatId) {
-      console.error("[GeminiQueryForm] No chat ID available! This should not happen - chat should be created on mount.");
+      console.error("[AIChatForm] No chat ID available! This should not happen - chat should be created on mount.");
       return;
     }
 
     // Set loading state
-    console.log("[GeminiQueryForm] Setting loading state to true");
+    console.log("[AIChatForm] Setting loading state to true");
     setLoading(true);
     setUploadProgress(0);
     setProgressStage(currentVideoFile ? "uploading" : "processing");
@@ -495,14 +495,14 @@ export function GeminiQueryForm() {
       return tokens;
     };
     
-    console.log("[GeminiQueryForm] Creating user messages...", {
+    console.log("[AIChatForm] Creating user messages...", {
       hasVideo: !!currentVideoFile,
       hasPrompt: !!currentPrompt.trim(),
     });
     
     // If both video and text are present, create two separate messages
     if (currentVideoFile && currentPrompt.trim()) {
-      console.log("[GeminiQueryForm] Creating two messages: video + text");
+      console.log("[AIChatForm] Creating two messages: video + text");
       // First message: video only
       videoMessageId = `user-video-${timestamp}`;
       const videoTokens = calculateUserMessageTokens("", currentVideoFile);
@@ -516,7 +516,7 @@ export function GeminiQueryForm() {
         inputTokens: videoTokens,
         poseData: poseData,
       };
-      console.log("[GeminiQueryForm] Adding video message:", videoMessageId);
+      console.log("[AIChatForm] Adding video message:", videoMessageId);
       addMessage(videoMessage);
       
       // Second message: text only
@@ -530,11 +530,11 @@ export function GeminiQueryForm() {
         videoPreview: null,
         inputTokens: textTokens,
       };
-      console.log("[GeminiQueryForm] Adding text message:", textMessageId);
+      console.log("[AIChatForm] Adding text message:", textMessageId);
       addMessage(textMessage);
     } else {
       // Single message: either video or text
-      console.log("[GeminiQueryForm] Creating single message");
+      console.log("[AIChatForm] Creating single message");
       const userMessageId = `user-${timestamp}`;
       if (currentVideoFile) {
         videoMessageId = userMessageId;
@@ -550,7 +550,7 @@ export function GeminiQueryForm() {
         inputTokens: userTokens,
         poseData: currentVideoFile ? poseData : undefined,
       };
-      console.log("[GeminiQueryForm] Adding user message:", userMessageId, {
+      console.log("[AIChatForm] Adding user message:", userMessageId, {
         hasVideo: !!userMessage.videoFile,
         hasPreview: !!userMessage.videoPreview,
         contentLength: userMessage.content.length,
@@ -558,7 +558,7 @@ export function GeminiQueryForm() {
       addMessage(userMessage);
     }
 
-    console.log("[GeminiQueryForm] User messages added, current messages state length:", messages.length);
+    console.log("[AIChatForm] User messages added, current messages state length:", messages.length);
 
     // Clear input
     setPrompt("");
@@ -581,25 +581,25 @@ export function GeminiQueryForm() {
       role: "assistant",
       content: "",
     };
-    console.log("[GeminiQueryForm] Adding assistant placeholder message:", assistantMessageId);
+    console.log("[AIChatForm] Adding assistant placeholder message:", assistantMessageId);
     addMessage(assistantMessage);
-    console.log("[GeminiQueryForm] All messages added, waiting for state update...");
+    console.log("[AIChatForm] All messages added, waiting for state update...");
 
     // Wait a tick for React to update state, then save messages to chat
     setTimeout(() => {
       // Get current messages from state (they should be updated by now)
       const currentChatId = getCurrentChatId();
-      console.log("[GeminiQueryForm] Saving messages to chat:", {
+      console.log("[AIChatForm] Saving messages to chat:", {
         requestChatId,
         currentChatId,
         match: currentChatId === requestChatId,
       });
       
       if (requestChatId && currentChatId === requestChatId) {
-        // Messages will be saved by useGeminiChat useEffect, but we can also save here explicitly
-        console.log("[GeminiQueryForm] Chat IDs match, messages should be saved by useEffect");
+        // Messages will be saved by useAIChat useEffect, but we can also save here explicitly
+        console.log("[AIChatForm] Chat IDs match, messages should be saved by useEffect");
       } else {
-        console.warn("[GeminiQueryForm] Chat ID mismatch:", { requestChatId, currentChatId });
+        console.warn("[AIChatForm] Chat ID mismatch:", { requestChatId, currentChatId });
       }
     }, 0);
 
@@ -624,7 +624,7 @@ export function GeminiQueryForm() {
       // Check if chat changed before starting request
       const currentChatId = getCurrentChatId();
       if (currentChatId !== requestChatId) {
-        console.warn("[GeminiQueryForm] Chat changed before request started, aborting");
+        console.warn("[AIChatForm] Chat changed before request started, aborting");
         removeMessage(assistantMessageId);
         return;
       }
@@ -640,7 +640,7 @@ export function GeminiQueryForm() {
             if (chatId === requestChatId) {
               updateMessage(id, updates);
             } else {
-              console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
+              console.warn("[AIChatForm] Chat changed during streaming, stopping updates");
             }
           },
           conversationHistory,
@@ -661,7 +661,7 @@ export function GeminiQueryForm() {
             if (chatId === requestChatId) {
               updateMessage(id, updates);
             } else {
-              console.warn("[GeminiQueryForm] Chat changed during streaming, stopping updates");
+              console.warn("[AIChatForm] Chat changed during streaming, stopping updates");
             }
           },
           setUploadProgress,
@@ -687,7 +687,7 @@ export function GeminiQueryForm() {
       if (currentChatId === requestChatId) {
         // Don't show error if request was aborted (user clicked stop)
         if (err instanceof Error && err.name === "AbortError") {
-          console.log("[GeminiQueryForm] Request was cancelled by user");
+          console.log("[AIChatForm] Request was cancelled by user");
           // Optionally update the message to indicate it was stopped
           const currentContent = messages.find(m => m.id === assistantMessageId)?.content || "";
           if (currentContent.trim()) {

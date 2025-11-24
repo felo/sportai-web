@@ -12,7 +12,7 @@ import {
   getChatById,
 } from "@/utils/storage";
 
-export function useGeminiChat() {
+export function useAIChat() {
   // Start with empty array to avoid hydration mismatch
   // Load from localStorage only on client after hydration
   const [messages, setMessages] = useState<Message[]>([]);
@@ -85,7 +85,7 @@ export function useGeminiChat() {
       const currentChatId = getCurrentChatId();
       const isSwitchingToDifferentChat = activeChatIdRef.current !== currentChatId;
       
-      console.log("[useGeminiChat] ===== CHAT CHANGE HANDLER =====", {
+      console.log("[useAIChat] ===== CHAT CHANGE HANDLER =====", {
         currentChatId,
         activeChatId: activeChatIdRef.current,
         isSwitchingToDifferentChat,
@@ -95,7 +95,7 @@ export function useGeminiChat() {
       
       // If this is the same chat we're already on, don't reload
       if (!isSwitchingToDifferentChat && currentChatId) {
-        console.log("[useGeminiChat] Same chat, skipping reload", {
+        console.log("[useAIChat] Same chat, skipping reload", {
           chatId: currentChatId,
           messageCount: messages.length,
         });
@@ -110,7 +110,7 @@ export function useGeminiChat() {
         // Only keep messages if the new chat is empty AND we're actively submitting
         // This prevents losing messages mid-submission
         if (chat && chat.messages.length === 0 && messages.length > 0) {
-          console.log("[useGeminiChat] ⚠️ Switching to empty chat during submission - KEEPING STATE MESSAGES", {
+          console.log("[useAIChat] ⚠️ Switching to empty chat during submission - KEEPING STATE MESSAGES", {
             chatId: currentChatId,
             chatMessages: chat.messages.length,
             stateMessages: messages.length,
@@ -124,7 +124,7 @@ export function useGeminiChat() {
       
       // Don't interfere if we're already loading AND not switching chats
       if (loading && !isSwitchingToDifferentChat) {
-        console.log("[useGeminiChat] Ignoring chat change during active loading (same chat)", {
+        console.log("[useAIChat] Ignoring chat change during active loading (same chat)", {
           currentChatId,
           activeChatId: activeChatIdRef.current,
         });
@@ -144,7 +144,7 @@ export function useGeminiChat() {
       if (currentChatId) {
         const chat = getChatById(currentChatId);
         if (chat) {
-          console.log("[useGeminiChat] Loading messages from chat:", {
+          console.log("[useAIChat] Loading messages from chat:", {
             chatId: currentChatId,
             messageCount: chat.messages.length,
             currentMessages: messages.length,
@@ -152,26 +152,26 @@ export function useGeminiChat() {
           
           // If chat is empty, clear messages immediately (before async operations)
           if (chat.messages.length === 0) {
-            console.log("[useGeminiChat] Chat is empty, clearing messages immediately");
+            console.log("[useAIChat] Chat is empty, clearing messages immediately");
             setMessages([]);
             clearMessagesFromStorage();
           } else {
             // Load messages from the selected chat
             const refreshed = await refreshVideoUrls(chat.messages);
             setMessages(refreshed);
-            console.log("[useGeminiChat] Messages loaded:", refreshed.length);
+            console.log("[useAIChat] Messages loaded:", refreshed.length);
             // Update chat with refreshed URLs (silent to prevent event loop)
             updateChat(currentChatId, { messages: refreshed }, true);
           }
         } else {
           // Chat not found, clear messages
-          console.log("[useGeminiChat] Chat not found, clearing messages");
+          console.log("[useAIChat] Chat not found, clearing messages");
           setMessages([]);
           clearMessagesFromStorage();
         }
       } else {
         // No current chat, try old storage for backward compatibility
-        console.log("[useGeminiChat] No current chat, loading from old storage");
+        console.log("[useAIChat] No current chat, loading from old storage");
         const storedMessages = await loadMessagesFromStorage();
         if (storedMessages.length > 0) {
           const refreshed = await refreshVideoUrls(storedMessages);
@@ -196,7 +196,7 @@ export function useGeminiChat() {
 
   // Save messages to localStorage and update chat whenever they change (but only after hydration)
   useEffect(() => {
-    console.log("[useGeminiChat] ===== MESSAGES CHANGED EFFECT =====", {
+    console.log("[useAIChat] ===== MESSAGES CHANGED EFFECT =====", {
       isHydrated,
       isSwitchingChat: isSwitchingChatRef.current,
       messagesCount: messages.length,
@@ -209,12 +209,12 @@ export function useGeminiChat() {
       
       // Only save if we're still on the same chat
       if (activeChatIdRef.current !== currentChatId) {
-        console.warn(`[useGeminiChat] Ignoring message save - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
+        console.warn(`[useAIChat] Ignoring message save - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
         return;
       }
       
       if (messages.length > 0) {
-        console.log("[useGeminiChat] Saving messages:", {
+        console.log("[useAIChat] Saving messages:", {
           count: messages.length,
           chatId: currentChatId,
           messageIds: messages.map(m => m.id),
@@ -223,25 +223,25 @@ export function useGeminiChat() {
         
         // Update current chat with messages
         if (currentChatId) {
-          console.log("[useGeminiChat] Updating chat with messages:", currentChatId);
+          console.log("[useAIChat] Updating chat with messages:", currentChatId);
           updateChat(currentChatId, { messages }, true);
-          console.log("[useGeminiChat] Chat updated successfully");
+          console.log("[useAIChat] Chat updated successfully");
         } else {
-          console.warn("[useGeminiChat] No current chat ID, cannot update chat");
+          console.warn("[useAIChat] No current chat ID, cannot update chat");
         }
       } else {
         // Clear storage if messages array is empty
-        console.log("[useGeminiChat] Messages array is empty, clearing storage");
+        console.log("[useAIChat] Messages array is empty, clearing storage");
         clearMessagesFromStorage();
         
         // Also update current chat to have empty messages (if we're on a chat)
         if (currentChatId) {
-          console.log("[useGeminiChat] Updating chat to have empty messages:", currentChatId);
+          console.log("[useAIChat] Updating chat to have empty messages:", currentChatId);
           updateChat(currentChatId, { messages: [] }, true);
         }
       }
     } else {
-      console.log("[useGeminiChat] Skipping save:", {
+      console.log("[useAIChat] Skipping save:", {
         isHydrated,
         isSwitchingChat: isSwitchingChatRef.current,
       });
@@ -253,7 +253,7 @@ export function useGeminiChat() {
   }, []);
 
   const addMessage = useCallback((message: Message) => {
-    console.log("[useGeminiChat] ===== ADD MESSAGE =====", {
+    console.log("[useAIChat] ===== ADD MESSAGE =====", {
       id: message.id,
       role: message.role,
       hasContent: !!message.content,
@@ -262,7 +262,7 @@ export function useGeminiChat() {
     });
     setMessages((prev) => {
       const newMessages = [...prev, message];
-      console.log("[useGeminiChat] State updated:", {
+      console.log("[useAIChat] State updated:", {
         previousCount: prev.length,
         newCount: newMessages.length,
         messageIds: newMessages.map(m => m.id),
@@ -272,7 +272,7 @@ export function useGeminiChat() {
   }, [messages.length]);
 
   const updateMessage = useCallback((id: string, updates: Partial<Message>) => {
-    console.log("[useGeminiChat] ===== UPDATE MESSAGE =====", {
+    console.log("[useAIChat] ===== UPDATE MESSAGE =====", {
       id,
       updates,
       activeChatId: activeChatIdRef.current,
@@ -282,20 +282,20 @@ export function useGeminiChat() {
     // Check if chat has changed - if so, don't update messages
     const currentChatId = getCurrentChatId();
     if (activeChatIdRef.current !== currentChatId) {
-      console.warn(`[useGeminiChat] Ignoring message update - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
+      console.warn(`[useAIChat] Ignoring message update - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
       return;
     }
     
     setMessages((prev) => {
       const messageExists = prev.find(m => m.id === id);
-      console.log("[useGeminiChat] Updating message in state:", {
+      console.log("[useAIChat] Updating message in state:", {
         messageExists: !!messageExists,
         previousCount: prev.length,
         updatingId: id,
       });
       
       const updated = prev.map((msg) => (msg.id === id ? { ...msg, ...updates } : msg));
-      console.log("[useGeminiChat] Updated messages:", {
+      console.log("[useAIChat] Updated messages:", {
         newCount: updated.length,
         updatedMessage: updated.find(m => m.id === id),
       });

@@ -1,11 +1,11 @@
-import { GeminiQueryForm } from "@/components/gemini-query-form";
+import { AIChatForm } from "@/components/ai-chat-form";
 import { SidebarProvider } from "@/components/SidebarContext";
 
 export default function Home() {
   return (
     <SidebarProvider>
       <main className="h-screen flex flex-col">
-        <GeminiQueryForm />
+        <AIChatForm />
       </main>
     </SidebarProvider>
   );
