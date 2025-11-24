@@ -25,6 +25,12 @@ export type Message = {
     mediaResolution: string;
     domainExpertise?: string;
   };
+  ttsUsage?: {
+    totalCharacters: number; // Total characters converted to speech
+    totalCost: number; // Total cost in USD
+    requestCount: number; // Number of TTS requests made
+    voiceQuality: string; // Voice quality used (for reference)
+  };
   poseData?: {
     enabled: boolean;
     model: "MoveNet" | "BlazePose";

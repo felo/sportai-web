@@ -802,6 +802,7 @@ export function GeminiQueryForm() {
                   uploadProgress={uploadProgress}
                   messagesEndRef={messagesEndRef}
                   onAskForHelp={handleAskForHelp}
+                  onUpdateMessage={updateMessage}
                 />
               )}
             </div>

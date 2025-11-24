@@ -16,6 +16,7 @@ interface MessageListProps {
   uploadProgress: number;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onAskForHelp?: (termName: string, swing?: any) => void;
+  onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
 }
 
 export function MessageList({
@@ -26,6 +27,7 @@ export function MessageList({
   uploadProgress,
   messagesEndRef,
   onAskForHelp,
+  onUpdateMessage,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -97,6 +99,7 @@ export function MessageList({
           allMessages={messages} 
           messageIndex={index}
           onAskForHelp={onAskForHelp}
+          onUpdateMessage={onUpdateMessage}
         />
       ))}
 

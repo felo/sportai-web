@@ -9,12 +9,14 @@ import { SwingExplanationModal } from "./SwingExplanationModal";
 import { MetricConversionModal, convertMetric, type MetricConversion } from "./MetricConversionModal";
 import { SectionSpeaker } from "./SectionSpeaker";
 import type { SwingExplanation } from "@/database";
-import { getHighlightingPreferences, type HighlightingPreferences } from "@/utils/storage";
+import { getHighlightingPreferences, getTTSSettings, type HighlightingPreferences } from "@/utils/storage";
 
 interface MarkdownWithSwingsProps {
   children: string;
   messageId?: string;
   onAskForHelp?: (termName: string, swing?: any) => void;
+  feedbackButtons?: React.ReactNode;
+  onTTSUsage?: (characters: number, cost: number, quality: string) => void;
 }
 
 /**
@@ -39,7 +41,7 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -50,20 +52,31 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp }: Markdo
     timestamps: true,
     swings: true,
   });
+  const [ttsEnabled, setTTSEnabled] = useState(false);
 
   useEffect(() => {
     // Load highlighting preferences from localStorage
     setHighlightingPrefs(getHighlightingPreferences());
+    
+    // Load TTS enabled state from localStorage
+    setTTSEnabled(getTTSSettings().enabled);
 
     // Listen for highlighting preferences changes
     const handleHighlightingPreferencesChange = () => {
       setHighlightingPrefs(getHighlightingPreferences());
     };
 
+    // Listen for TTS settings changes
+    const handleTTSSettingsChange = () => {
+      setTTSEnabled(getTTSSettings().enabled);
+    };
+
     window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
+    window.addEventListener("tts-settings-change", handleTTSSettingsChange);
 
     return () => {
       window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
+      window.removeEventListener("tts-settings-change", handleTTSSettingsChange);
     };
   }, []);
 
@@ -124,36 +137,47 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp }: Markdo
                 <div className="markdown-divider-line" />
               </div>
               
-              {/* Section speaker button - positioned near separator */}
-              {messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
+              {/* Section speaker button - positioned on the separator line */}
+              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
                 <div style={{ 
                   position: 'absolute',
-                  right: '0',
-                  top: 0,
+                  right: '0px',
+                  top: '0%',
                   transform: 'translateY(-100%)',
                 }}>
                   <SectionSpeaker
                     sectionText={section.plainText}
                     sectionId={String(section.id)}
                     messageId={messageId}
+                    onTTSUsage={onTTSUsage}
                   />
                 </div>
               )}
             </div>
           )}
           
-          {/* Last section speaker button (no separator after) */}
-          {index === sections.length - 1 && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
+          {/* Last section: speaker button and feedback buttons in same row */}
+          {index === sections.length - 1 && (
             <div style={{ 
               display: 'flex', 
-              justifyContent: 'flex-end', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginTop: '16px',
             }}>
-              <SectionSpeaker
-                sectionText={section.plainText}
-                sectionId={String(section.id)}
-                messageId={messageId}
-              />
+              {/* Feedback buttons on the left */}
+              <div>
+                {feedbackButtons}
+              </div>
+              
+              {/* Speaker button on the right */}
+              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
+                <SectionSpeaker
+                  sectionText={section.plainText}
+                  sectionId={String(section.id)}
+                  messageId={messageId}
+                  onTTSUsage={onTTSUsage}
+                />
+              )}
             </div>
           )}
         </div>

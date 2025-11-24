@@ -33,10 +33,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     swings: true,
   });
   const [ttsSettings, setTTSSettings] = useState<TTSSettings>({
-    quality: "neural2",
-    gender: "female",
-    language: "en-US",
-    speakingRate: 1.0,
+    enabled: false,
+    quality: "studio",
+    gender: "male",
+    language: "en-GB",
+    speakingRate: 0.75,
     pitch: 0.0,
   });
   const [chats, setChats] = useState<Chat[]>([]);
@@ -656,6 +657,28 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
 
                 <DropdownMenu.Separator />
 
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <Text>Text-to-Speech</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", true)}>
+                      <Text>On</Text>
+                      {ttsSettings.enabled && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", false)}>
+                      <Text>Off</Text>
+                      {!ttsSettings.enabled && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator />
+
                 <DropdownMenu.Item 
                   color="red"
                   disabled={messageCount === 0 || !onClearChat}
@@ -1244,6 +1267,16 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   <Text>Text-to-Speech</Text>
                 </DropdownMenu.SubTrigger>
                 <DropdownMenu.SubContent>
+                  {/* TTS Enable/Disable */}
+                  <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", !ttsSettings.enabled)}>
+                    <Text>{ttsSettings.enabled ? "Enabled" : "Disabled"}</Text>
+                    {ttsSettings.enabled && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  
+                  <DropdownMenu.Separator />
+                  
                   {/* Voice Quality */}
                   <DropdownMenu.Sub>
                     <DropdownMenu.SubTrigger>

@@ -9,9 +9,10 @@ interface SectionSpeakerProps {
   sectionText: string;
   sectionId: string;
   messageId: string;
+  onTTSUsage?: (characters: number, cost: number, quality: string) => void;
 }
 
-export function SectionSpeaker({ sectionText, sectionId, messageId }: SectionSpeakerProps) {
+export function SectionSpeaker({ sectionText, sectionId, messageId, onTTSUsage }: SectionSpeakerProps) {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const { playAudio, isCurrentlyPlaying } = useAudioPlayer();
   
@@ -49,6 +50,19 @@ export function SectionSpeaker({ sectionText, sectionId, messageId }: SectionSpe
       }
       
       const data = await response.json();
+      
+      // Calculate TTS cost
+      const characterCount = sectionText.length;
+      const costPerMillionChars = ttsSettings.quality === 'studio' ? 100.00 :
+                                   ttsSettings.quality === 'wavenet' ? 16.00 :
+                                   ttsSettings.quality === 'neural2' ? 16.00 :
+                                   4.00; // standard
+      const cost = (characterCount / 1000000) * costPerMillionChars;
+      
+      // Report TTS usage
+      if (onTTSUsage) {
+        onTTSUsage(characterCount, cost, ttsSettings.quality);
+      }
       
       // Play the audio
       await playAudio(uniqueId, data.audioUrl);

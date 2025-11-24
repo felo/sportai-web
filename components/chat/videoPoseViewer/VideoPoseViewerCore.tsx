@@ -1783,85 +1783,87 @@ export function VideoPoseViewer({
                 </Tooltip>
                 
                 {/* Angles Dropdown Menu */}
-                <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
-                  <DropdownMenu.Trigger>
-                    <Button
-                      className={buttonStyles.actionButtonSquare}
-                      size="2"
-                      style={{
-                        opacity: measuredAngles.length > 0 ? 1 : 0.5
-                      }}
-                    >
-                      <Text size="1" weight="bold">Angles</Text>
-                    </Button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                <Box style={{ marginLeft: 'auto' }}>
+                  <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
+                    <DropdownMenu.Trigger>
+                      <Button
+                        className={buttonStyles.actionButtonSquare}
+                        size="2"
+                        style={{
+                          opacity: measuredAngles.length > 0 ? 1 : 0.5
+                        }}
+                      >
+                        <Text size="1" weight="bold">Angles</Text>
+                      </Button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                            (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                          );
+                          if (!hasLeftElbow) {
+                            setVelocityWrist('left');
+                          }
+                          toggleAnglePreset([5, 7, 9]);
+                        }}
+                      >
+                        <Text>Left Elbow</Text>
+                        {measuredAngles.some(([a, b, c]) => 
                           (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                        );
-                        if (!hasLeftElbow) {
-                          setVelocityWrist('left');
-                        }
-                        toggleAnglePreset([5, 7, 9]);
-                      }}
-                    >
-                      <Text>Left Elbow</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                            (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                          );
+                          if (!hasRightElbow) {
+                            setVelocityWrist('right');
+                          }
+                          toggleAnglePreset([6, 8, 10]);
+                        }}
+                      >
+                        <Text>Right Elbow</Text>
+                        {measuredAngles.some(([a, b, c]) => 
                           (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                        );
-                        if (!hasRightElbow) {
-                          setVelocityWrist('right');
-                        }
-                        toggleAnglePreset([6, 8, 10]);
-                      }}
-                    >
-                      <Text>Right Elbow</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        toggleAnglePreset([11, 13, 15]);
-                      }}
-                    >
-                      <Text>Left Knee</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        toggleAnglePreset([12, 14, 16]);
-                      }}
-                    >
-                      <Text>Right Knee</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          toggleAnglePreset([11, 13, 15]);
+                        }}
+                      >
+                        <Text>Left Knee</Text>
+                        {measuredAngles.some(([a, b, c]) => 
+                          (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          toggleAnglePreset([12, 14, 16]);
+                        }}
+                      >
+                        <Text>Right Knee</Text>
+                        {measuredAngles.some(([a, b, c]) => 
+                          (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
+                </Box>
               </>
             )}
             {usePreprocessing && (
@@ -1900,85 +1902,87 @@ export function VideoPoseViewer({
                 </Tooltip>
                 
                 {/* Angles Dropdown Menu */}
-                <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
-                  <DropdownMenu.Trigger>
-                    <Button
-                      className={buttonStyles.actionButtonSquare}
-                      size="2"
-                      style={{
-                        opacity: measuredAngles.length > 0 ? 1 : 0.5
-                      }}
-                    >
-                      <Text size="1" weight="bold">Angles</Text>
-                    </Button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                <Box style={{ marginLeft: 'auto' }}>
+                  <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
+                    <DropdownMenu.Trigger>
+                      <Button
+                        className={buttonStyles.actionButtonSquare}
+                        size="2"
+                        style={{
+                          opacity: measuredAngles.length > 0 ? 1 : 0.5
+                        }}
+                      >
+                        <Text size="1" weight="bold">Angles</Text>
+                      </Button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                            (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                          );
+                          if (!hasLeftElbow) {
+                            setVelocityWrist('left');
+                          }
+                          toggleAnglePreset([5, 7, 9]);
+                        }}
+                      >
+                        <Text>Left Elbow</Text>
+                        {measuredAngles.some(([a, b, c]) => 
                           (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                        );
-                        if (!hasLeftElbow) {
-                          setVelocityWrist('left');
-                        }
-                        toggleAnglePreset([5, 7, 9]);
-                      }}
-                    >
-                      <Text>Left Elbow</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                            (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                          );
+                          if (!hasRightElbow) {
+                            setVelocityWrist('right');
+                          }
+                          toggleAnglePreset([6, 8, 10]);
+                        }}
+                      >
+                        <Text>Right Elbow</Text>
+                        {measuredAngles.some(([a, b, c]) => 
                           (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                        );
-                        if (!hasRightElbow) {
-                          setVelocityWrist('right');
-                        }
-                        toggleAnglePreset([6, 8, 10]);
-                      }}
-                    >
-                      <Text>Right Elbow</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        toggleAnglePreset([11, 13, 15]);
-                      }}
-                    >
-                      <Text>Left Knee</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item 
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        toggleAnglePreset([12, 14, 16]);
-                      }}
-                    >
-                      <Text>Right Knee</Text>
-                      {measuredAngles.some(([a, b, c]) => 
-                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
-                      ) && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          toggleAnglePreset([11, 13, 15]);
+                        }}
+                      >
+                        <Text>Left Knee</Text>
+                        {measuredAngles.some(([a, b, c]) => 
+                          (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          toggleAnglePreset([12, 14, 16]);
+                        }}
+                      >
+                        <Text>Right Knee</Text>
+                        {measuredAngles.some(([a, b, c]) => 
+                          (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
+                        ) && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
+                </Box>
               </>
             )}
             </Flex>

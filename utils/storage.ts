@@ -362,6 +362,7 @@ export type TTSLanguage = "en-US" | "en-GB" | "en-AU" | "en-IN";
  * TTS settings interface
  */
 export interface TTSSettings {
+  enabled: boolean; // Master on/off switch for TTS
   quality: TTSVoiceQuality;
   gender: TTSVoiceGender;
   language: TTSLanguage;
@@ -982,10 +983,11 @@ export function updateHighlightingPreference(
 export function getTTSSettings(): TTSSettings {
   if (typeof window === "undefined") {
     return {
-      quality: "neural2",
-      gender: "female",
-      language: "en-US",
-      speakingRate: 1.0,
+      enabled: false,
+      quality: "studio",
+      gender: "male",
+      language: "en-GB",
+      speakingRate: 0.75,
       pitch: 0.0,
     };
   }
@@ -993,23 +995,34 @@ export function getTTSSettings(): TTSSettings {
   try {
     const stored = localStorage.getItem(TTS_SETTINGS_KEY);
     if (!stored) {
-      // Default: Neural2 female voice with normal speed and pitch
+      // Default: TTS disabled, Studio male UK voice with slower speed
       return {
-        quality: "neural2",
-        gender: "female",
-        language: "en-US",
-        speakingRate: 1.0,
+        enabled: false,
+        quality: "studio",
+        gender: "male",
+        language: "en-GB",
+        speakingRate: 0.75,
         pitch: 0.0,
       };
     }
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    // Ensure enabled property exists (for backwards compatibility)
+    return {
+      enabled: parsed.enabled ?? false,
+      quality: parsed.quality ?? "studio",
+      gender: parsed.gender ?? "male",
+      language: parsed.language ?? "en-GB",
+      speakingRate: parsed.speakingRate ?? 0.75,
+      pitch: parsed.pitch ?? 0.0,
+    };
   } catch (error) {
     console.error("Failed to load TTS settings from storage:", error);
     return {
-      quality: "neural2",
-      gender: "female",
-      language: "en-US",
-      speakingRate: 1.0,
+      enabled: false,
+      quality: "studio",
+      gender: "male",
+      language: "en-GB",
+      speakingRate: 0.75,
       pitch: 0.0,
     };
   }

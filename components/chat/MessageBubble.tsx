@@ -79,9 +79,10 @@ interface MessageBubbleProps {
   allMessages?: Message[];
   messageIndex?: number;
   onAskForHelp?: (termName: string, swing?: any) => void;
+  onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
@@ -89,7 +90,30 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
   const [showProUpsell, setShowProUpsell] = useState(false);
   const [videoContainerStyle, setVideoContainerStyle] = useState<React.CSSProperties>({});
   const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+  const [ttsUsage, setTtsUsage] = useState(message.ttsUsage || {
+    totalCharacters: 0,
+    totalCost: 0,
+    requestCount: 0,
+    voiceQuality: '',
+  });
   const isMobile = useIsMobile();
+
+  // Callback to track TTS usage
+  const handleTTSUsage = (characters: number, cost: number, quality: string) => {
+    setTtsUsage((prev) => ({
+      totalCharacters: prev.totalCharacters + characters,
+      totalCost: prev.totalCost + cost,
+      requestCount: prev.requestCount + 1,
+      voiceQuality: quality,
+    }));
+  };
+
+  // Save TTS usage to message when it changes
+  useEffect(() => {
+    if (ttsUsage.requestCount > 0 && onUpdateMessage) {
+      onUpdateMessage(message.id, { ttsUsage });
+    }
+  }, [ttsUsage, message.id, onUpdateMessage]);
 
   // Load developer mode and theatre mode on mount
   useEffect(() => {
@@ -136,6 +160,26 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
     },
     { input: 0, output: 0 }
   );
+
+  // Calculate cumulative TTS usage up to this message
+  const cumulativeTTSUsage = allMessages.slice(0, messageIndex + 1).reduce(
+    (acc, msg) => {
+      if (msg.role === "assistant" && msg.ttsUsage) {
+        acc.characters += msg.ttsUsage.totalCharacters;
+        acc.cost += msg.ttsUsage.totalCost;
+        acc.requests += msg.ttsUsage.requestCount;
+      }
+      return acc;
+    },
+    { characters: 0, cost: 0, requests: 0 }
+  );
+
+  // Add current message's TTS usage (from state)
+  const totalTTSUsage = {
+    characters: cumulativeTTSUsage.characters + ttsUsage.totalCharacters,
+    cost: cumulativeTTSUsage.cost + ttsUsage.totalCost,
+    requests: cumulativeTTSUsage.requests + ttsUsage.requestCount,
+  };
 
   // Calculate tokens for this specific message
   const messageTokens = {
@@ -541,7 +585,17 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
                 <>
-                  <MarkdownWithSwings messageId={message.id} onAskForHelp={onAskForHelp}>
+                  <MarkdownWithSwings 
+                    messageId={message.id} 
+                    onAskForHelp={onAskForHelp}
+                    onTTSUsage={handleTTSUsage}
+                    feedbackButtons={!message.isStreaming ? (
+                      <FeedbackButtons 
+                        messageId={message.id}
+                        onFeedback={() => setShowFeedbackToast(true)}
+                      />
+                    ) : undefined}
+                  >
                     {message.content}
                   </MarkdownWithSwings>
                   {message.isStreaming && (
@@ -567,16 +621,6 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                 </Flex>
               )}
             </Box>
-            
-            {/* Feedback Buttons - only show when message is complete (not streaming) */}
-            {message.content && !message.isStreaming && (
-              <Box mt="3">
-                <FeedbackButtons 
-                  messageId={message.id}
-                  onFeedback={() => setShowFeedbackToast(true)}
-                />
-              </Box>
-            )}
             
             {/* PRO Membership Upsell */}
             {showProUpsell && (
@@ -705,6 +749,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                       <Text size="1">
                         <strong>Settings:</strong> Thinking={message.modelSettings.thinkingMode}, Resolution={message.modelSettings.mediaResolution}
                       </Text>
+                    )}
+                    {ttsUsage.requestCount > 0 && (
+                      <>
+                        <Text size="1">
+                          <strong>TTS usage (this message):</strong>{" "}
+                          {ttsUsage.totalCharacters.toLocaleString()} characters, {ttsUsage.requestCount} request{ttsUsage.requestCount !== 1 ? 's' : ''} ({formatCost(ttsUsage.totalCost)})
+                        </Text>
+                        <Text size="1">
+                          <strong>TTS usage (total in chat):</strong>{" "}
+                          {totalTTSUsage.characters.toLocaleString()} characters, {totalTTSUsage.requests} request{totalTTSUsage.requests !== 1 ? 's' : ''} ({formatCost(totalTTSUsage.cost)})
+                        </Text>
+                      </>
                     )}
                   </Flex>
                 </Flex>

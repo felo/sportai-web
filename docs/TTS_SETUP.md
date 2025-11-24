@@ -96,10 +96,10 @@ The application supports multiple voice quality levels:
 ## Pricing
 
 - **Standard voices**: $4.00 per 1M characters
-- **WaveNet/Neural2 voices**: $16.00 per 1M characters (default)
-- **Studio voices**: $100.00 per 1M characters (limited availability)
+- **WaveNet/Neural2 voices**: $16.00 per 1M characters
+- **Studio voices**: $100.00 per 1M characters (default - limited availability)
 - **Free tier**: 1M characters per month for WaveNet/Neural2 voices
-- A typical 1000-character response costs ~$0.016
+- A typical 1000-character response costs ~$0.10 with Studio voices
 
 ## Testing
 
@@ -115,12 +115,23 @@ After setting up credentials:
    [TTS] ✅ Client initialized with service account credentials (JSON)
    ```
 
-3. In the app, click the speaker icon (🔊) next to any AI response
+3. In the app, click the speaker icon (🔊) at the end of any response section
 
 4. You should see:
    - Loading spinner while audio generates
    - Audio starts playing automatically
    - Red stop button appears in bottom-right corner
+
+## Default Settings
+
+The application defaults to:
+- **Voice Quality**: Studio (Premium)
+- **Voice Gender**: Male
+- **Language/Accent**: English (UK)
+- **Speaking Rate**: 0.75x (Slower)
+- **Pitch**: Normal (0)
+
+You can change these in Settings (gear icon, bottom left) → Audio → Text-to-Speech
 
 ## Troubleshooting
 
