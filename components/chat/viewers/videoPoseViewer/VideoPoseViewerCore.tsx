@@ -932,6 +932,7 @@ export function VideoPoseViewer({
             currentVerticalOffset: labelState?.verticalOffset,
             framesSinceChange: labelState?.framesSinceChange ?? 0,
             stabilityFrames: LABEL_POSITION_STABILITY_FRAMES,
+            isPlaying: isPlaying,
           });
           
           if (result) {
@@ -1377,13 +1378,9 @@ export function VideoPoseViewer({
         setConfidenceMode("low"); // Challenging conditions
         setResolutionMode("accurate"); // 384x384
         setShowTrackingId(true);
-        setShowAngles(true);
-        setMeasuredAngles([
-          [10, 8, 6],   // Right Arm Reverse (Wrist-Elbow-Shoulder)
-          [15, 13, 11], // Left Leg Reverse (Ankle-Knee-Hip)
-          [16, 14, 12]  // Right Leg Reverse (Ankle-Knee-Hip)
-        ]);
-        setShowVelocity(true);
+        setShowAngles(false); // Don't show angles by default
+        setMeasuredAngles([]); // No default angles
+        setShowVelocity(false); // Don't show velocity by default
         setVelocityWrist("right");
         setSelectedJoints([10]); // Right Wrist
         setShowTrajectories(false);

@@ -48,7 +48,7 @@ export function VelocityDisplay({
               fontSize: isMobile ? "9px" : "10px", 
               whiteSpace: "nowrap" 
             }}>
-              Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsLeft.current.toFixed(1)} km/h</span>
+              Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsLeft.current.toFixed(0)} km/h</span>
             </Text>
             <Text size="1" style={{ 
               color: "rgba(255, 255, 255, 0.9)", 
@@ -56,7 +56,7 @@ export function VelocityDisplay({
               fontSize: isMobile ? "9px" : "10px", 
               whiteSpace: "nowrap" 
             }}>
-              Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsLeft.peak.toFixed(1)} km/h</span>
+              Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsLeft.peak.toFixed(0)} km/h</span>
             </Text>
           </Flex>
         </Box>
@@ -86,7 +86,7 @@ export function VelocityDisplay({
               fontSize: isMobile ? "9px" : "10px", 
               whiteSpace: "nowrap" 
             }}>
-              Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsRight.current.toFixed(1)} km/h</span>
+              Current: <span style={{ color: "#00E676", fontWeight: "bold" }}>{velocityStatsRight.current.toFixed(0)} km/h</span>
             </Text>
             <Text size="1" style={{ 
               color: "rgba(255, 255, 255, 0.9)", 
@@ -94,7 +94,7 @@ export function VelocityDisplay({
               fontSize: isMobile ? "9px" : "10px", 
               whiteSpace: "nowrap" 
             }}>
-              Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsRight.peak.toFixed(1)} km/h</span>
+              Peak: <span style={{ color: "#FF9800", fontWeight: "bold" }}>{velocityStatsRight.peak.toFixed(0)} km/h</span>
             </Text>
           </Flex>
         </Box>

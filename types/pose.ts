@@ -303,6 +303,7 @@ export function drawAngle(
     currentVerticalOffset?: number;
     framesSinceChange?: number;
     stabilityFrames?: number;
+    isPlaying?: boolean;
   } = {}
 ): { bounds: LabelBounds; multiplier: number; verticalOffset: number } | null {
   const {
@@ -317,6 +318,7 @@ export function drawAngle(
     currentVerticalOffset,
     framesSinceChange = 0,
     stabilityFrames = 5,
+    isPlaying = true,
   } = options;
 
   const [idxA, idxB, idxC] = jointIndices;
@@ -386,7 +388,8 @@ export function drawAngle(
   // Place text on opposite side of arc (flip by 180 degrees)
   const textAngle = midAngle + Math.PI;
   
-  const angleText = `${angle.toFixed(1)}°`;
+  // Round to whole number when playing, 1 decimal when paused
+  const angleText = `${angle.toFixed(isPlaying ? 0 : 1)}°`;
   ctx.font = `bold ${fontSize}px sans-serif`;
   
   // Determine text alignment based on which side of the joint the text is positioned
