@@ -275,3 +275,6 @@ VideoPoseViewerCore.tsx
 
 This refactoring sets the foundation for adding flexible joint metrics and charting functionality, which was the original goal. The modular structure makes it trivial to add new hooks and components for tracking any joint's velocity, acceleration, position, or angle over time.
 
+
+
+

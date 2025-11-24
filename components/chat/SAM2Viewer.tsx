@@ -298,3 +298,6 @@ export function SAM2Viewer({ videoUrl, width = 640, height = 480 }: SAM2ViewerPr
 }
 
 
+
+
+

@@ -386,3 +386,6 @@ const detectionIntervals = {
 Ready to start? Let me know which approach you want to take and I'll help you implement it!
 
 
+
+
+

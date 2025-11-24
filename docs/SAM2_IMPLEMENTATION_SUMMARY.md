@@ -332,3 +332,6 @@ SAM 2 is now **fully integrated** into the SportAI platform! The implementation:
 **Ready to use**: Navigate to `/pose-demo`, switch to "SAM 2 Segmentation" tab, and start clicking! 🚀
 
 
+
+
+
