@@ -541,7 +541,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
                 <>
-                  <MarkdownWithSwings onAskForHelp={onAskForHelp}>
+                  <MarkdownWithSwings messageId={message.id} onAskForHelp={onAskForHelp}>
                     {message.content}
                   </MarkdownWithSwings>
                   {message.isStreaming && (
@@ -573,7 +573,6 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
               <Box mt="3">
                 <FeedbackButtons 
                   messageId={message.id}
-                  messageContent={message.content}
                   onFeedback={() => setShowFeedbackToast(true)}
                 />
               </Box>

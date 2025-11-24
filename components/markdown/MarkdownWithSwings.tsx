@@ -7,15 +7,39 @@ import rehypeRaw from "rehype-raw";
 import { createMarkdownComponents } from "./markdown-components";
 import { SwingExplanationModal } from "./SwingExplanationModal";
 import { MetricConversionModal, convertMetric, type MetricConversion } from "./MetricConversionModal";
+import { SectionSpeaker } from "./SectionSpeaker";
 import type { SwingExplanation } from "@/database";
 import { getHighlightingPreferences, type HighlightingPreferences } from "@/utils/storage";
 
 interface MarkdownWithSwingsProps {
   children: string;
+  messageId?: string;
   onAskForHelp?: (termName: string, swing?: any) => void;
 }
 
-export function MarkdownWithSwings({ children, onAskForHelp }: MarkdownWithSwingsProps) {
+/**
+ * Strip markdown from text for TTS (remove formatting but keep content)
+ */
+function stripMarkdownForTTS(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+    .replace(/`([^`]+)`/g, '$1') // Remove inline code
+    .replace(/^#{1,6}\s+/gm, '') // Remove headers
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
+    .replace(/\*([^*]+)\*/g, '$1') // Remove italic
+    .replace(/__([^_]+)__/g, '$1') // Remove bold
+    .replace(/_([^_]+)_/g, '$1') // Remove italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links (keep text)
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // Remove images
+    .replace(/^[-*_]{3,}$/gm, '') // Remove horizontal rules
+    .replace(/^>\s+/gm, '') // Remove blockquotes
+    .replace(/^[\s]*[-*+]\s+/gm, '') // Remove list markers
+    .replace(/^[\s]*\d+\.\s+/gm, '') // Remove ordered list markers
+    .replace(/<[^>]+>/g, '') // Remove HTML tags
+    .trim();
+}
+
+export function MarkdownWithSwings({ children, messageId, onAskForHelp }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -64,15 +88,76 @@ export function MarkdownWithSwings({ children, onAskForHelp }: MarkdownWithSwing
     [handleTermClick, handleMetricClick, highlightingPrefs]
   );
 
+  // Split content into sections by horizontal rules (---)
+  // Each section gets its own speaker button
+  const sections = useMemo(() => {
+    // Split by --- or *** or ___ (markdown horizontal rules)
+    const sectionParts = children.split(/\n(?:[-*_]){3,}\n/);
+    return sectionParts.map((section, index) => ({
+      id: index,
+      content: section.trim(),
+      plainText: stripMarkdownForTTS(section.trim()),
+    }));
+  }, [children]);
+
   return (
     <>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
-        components={markdownComponents}
-      >
-        {children}
-      </ReactMarkdown>
+      {sections.map((section, index) => (
+        <div key={section.id} style={{ position: 'relative' }}>
+          {/* Section content */}
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
+            {section.content}
+          </ReactMarkdown>
+          
+          {/* Add separator between sections (except after last section) */}
+          {index < sections.length - 1 && (
+            <div style={{ position: 'relative' }}>
+              <div className="markdown-divider" role="separator" aria-label="Section divider" style={{ marginTop: '24px', marginBottom: '24px' }}>
+                <div className="markdown-divider-line" />
+                <span className="markdown-divider-dots" aria-hidden="true">
+                  •••
+                </span>
+                <div className="markdown-divider-line" />
+              </div>
+              
+              {/* Section speaker button - positioned near separator */}
+              {messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
+                <div style={{ 
+                  position: 'absolute',
+                  right: '0',
+                  top: 0,
+                  transform: 'translateY(-100%)',
+                }}>
+                  <SectionSpeaker
+                    sectionText={section.plainText}
+                    sectionId={String(section.id)}
+                    messageId={messageId}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Last section speaker button (no separator after) */}
+          {index === sections.length - 1 && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              marginTop: '16px',
+            }}>
+              <SectionSpeaker
+                sectionText={section.plainText}
+                sectionId={String(section.id)}
+                messageId={messageId}
+              />
+            </div>
+          )}
+        </div>
+      ))}
       
       <SwingExplanationModal 
         open={swingModalOpen}
