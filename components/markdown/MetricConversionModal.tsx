@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Dialog, Flex, Text, Button, Heading, Box } from "@radix-ui/themes";
+import { Dialog, Flex, Text, Button, Box } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import styles from "@/styles/buttons.module.css";
 
@@ -49,10 +49,8 @@ export function MetricConversionModal({ open, onOpenChange, metric }: MetricConv
       >
         <Flex direction="column" gap="3">
           <Flex justify="between" align="center">
-            <Dialog.Title>
-              <Heading size="4" style={{ margin: 0 }}>
-                {metric.original}
-              </Heading>
+            <Dialog.Title style={{ margin: 0 }}>
+              {metric.original}
             </Dialog.Title>
             <Dialog.Close>
               <Button variant="ghost" color="gray" size="1" style={{ cursor: "pointer" }}>

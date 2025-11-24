@@ -9,4 +9,5 @@ export { DragOverlay } from "./DragOverlay";
 export { ScrollToBottom } from "./ScrollToBottom";
 export { ScrollToVideo } from "./ScrollToVideo";
 export { StreamingIndicator } from "./StreamingIndicator";
+export { FeedbackButtons } from "./FeedbackButtons";
 

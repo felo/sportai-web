@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Dialog, Flex, Text, Button, Heading } from "@radix-ui/themes";
+import { Dialog, Flex, Text, Button } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import type { SwingExplanation } from "@/database";
 import styles from "@/styles/buttons.module.css";
@@ -47,10 +47,8 @@ export function SwingExplanationModal({ open, onOpenChange, swing, onAskForHelp 
         <Flex direction="column" gap="4">
           <Flex justify="between" align="start">
             <Flex direction="column" gap="1">
-              <Dialog.Title>
-                <Heading size="5" style={{ margin: 0 }}>
-                  {swing.name}
-                </Heading>
+              <Dialog.Title style={{ margin: 0 }}>
+                {swing.name}
               </Dialog.Title>
               <Text size="2" color="gray" style={{ fontStyle: "italic" }}>
                 {swing.sport}
@@ -94,7 +92,7 @@ export function SwingExplanationModal({ open, onOpenChange, swing, onAskForHelp 
                   onOpenChange(false);
                 }}
               >
-                Ask AI for tips
+                Ask AI for help
               </Button>
             )}
             <Dialog.Close>

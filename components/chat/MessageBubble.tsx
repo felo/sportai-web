@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
+import { Avatar, Box, Button, Flex, Text } from "@radix-ui/themes";
 import { MarkdownWithSwings } from "@/components/markdown";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
@@ -9,6 +9,8 @@ import { calculatePricing, formatCost } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { VideoPoseViewer } from "./VideoPoseViewer";
 import { StreamingIndicator } from "./StreamingIndicator";
+import { FeedbackButtons } from "./FeedbackButtons";
+import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import buttonStyles from "@/styles/buttons.module.css";
 
 const THINKING_MESSAGES = [
@@ -86,6 +88,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
   const [theatreMode, setTheatreMode] = useState(true);
   const [showProUpsell, setShowProUpsell] = useState(false);
   const [videoContainerStyle, setVideoContainerStyle] = useState<React.CSSProperties>({});
+  const [showFeedbackToast, setShowFeedbackToast] = useState(false);
   const isMobile = useIsMobile();
 
   // Load developer mode and theatre mode on mount
@@ -550,11 +553,30 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                 </>
               ) : (
                 <Flex gap="2" align="center">
-                  <Spinner size="1" />
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    marginRight: "4px",
+                  }}>
+                    <span className="thinking-dot" style={{ animationDelay: "0s" }}></span>
+                    <span className="thinking-dot" style={{ animationDelay: "0.2s" }}></span>
+                    <span className="thinking-dot" style={{ animationDelay: "0.4s" }}></span>
+                  </div>
                   <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
                 </Flex>
               )}
             </Box>
+            
+            {/* Feedback Buttons - only show when message is complete (not streaming) */}
+            {message.content && !message.isStreaming && (
+              <Box mt="3">
+                <FeedbackButtons 
+                  messageId={message.id}
+                  onFeedback={() => setShowFeedbackToast(true)}
+                />
+              </Box>
+            )}
             
             {/* PRO Membership Upsell */}
             {showProUpsell && (
@@ -590,7 +612,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                     onClick={() => {
                       window.open("https://sportai.com/contact", "_blank", "noopener,noreferrer");
                     }}
-                    style={{ width: "fit-content", cursor: "pointer" }}
+                    style={{ width: "fit-content", cursor: "pointer", marginTop: "var(--space-2)" }}
                   >
                     Contact us for PRO
                   </Button>
@@ -607,6 +629,26 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                 to {
                   opacity: 1;
                   transform: translateY(0);
+                }
+              }
+
+              .thinking-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--accent-9);
+                animation: thinkingPulse 1.4s ease-in-out infinite;
+                display: block;
+              }
+
+              @keyframes thinkingPulse {
+                0%, 60%, 100% {
+                  opacity: 0.4;
+                  transform: scale(1);
+                }
+                30% {
+                  opacity: 1;
+                  transform: scale(1.2);
                 }
               }
             `}</style>
@@ -663,6 +705,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
           </Box>
         )}
       </Box>
+      
+      {/* Feedback Toast */}
+      <FeedbackToast 
+        open={showFeedbackToast}
+        onOpenChange={setShowFeedbackToast}
+      />
     </Flex>
   );
 }

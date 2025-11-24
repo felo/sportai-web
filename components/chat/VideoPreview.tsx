@@ -24,9 +24,10 @@ export function VideoPreview({
       gap="2"
       p="2"
       style={{
-        border: "1px solid var(--gray-6)",
-        borderRadius: "var(--radius-2)",
+        border: "1px solid #7ADB8F",
+        borderRadius: "var(--radius-3)",
         marginTop: "var(--space-2)",
+        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
       }}
       role="region"
       aria-label="Video preview"
@@ -54,7 +55,13 @@ export function VideoPreview({
       )}
       <Text
         color="gray"
-        style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        style={{ 
+          flex: 1, 
+          overflow: "hidden", 
+          textOverflow: "ellipsis", 
+          whiteSpace: "nowrap",
+          paddingLeft: "var(--space-2)",
+        }}
         aria-label={`File: ${videoFile.name}`}
       >
         {videoFile.name}
@@ -65,25 +72,33 @@ export function VideoPreview({
           onClick={onRemove}
           aria-label={`Remove ${videoFile.name}`}
           style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            backgroundColor: "var(--gray-3)",
+            width: "36px",
+            height: "36px",
+            borderRadius: "9999px",
+            backgroundColor: "#7ADB8F",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
-            transition: "background-color 0.2s",
-            border: "none",
+            transition: "all 0.3s ease-out",
+            border: "2px solid white",
+            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+            textTransform: "uppercase",
+            fontWeight: 600,
+            marginRight: "var(--space-1)",
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = "var(--gray-4)";
+            e.currentTarget.style.backgroundColor = "#95E5A6";
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = "var(--gray-3)";
+            e.currentTarget.style.backgroundColor = "#7ADB8F";
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
           }}
         >
-          <Cross2Icon width="16" height="16" color="var(--gray-11)" />
+          <Cross2Icon width="18" height="18" color="#1C1C1C" />
         </button>
       </Tooltip>
     </Flex>

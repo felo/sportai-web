@@ -68,7 +68,7 @@ function VideoPoseViewerLoading({ width = 640, height = 480 }: { width?: number;
             Loading Pose Detection
           </Text>
           <Text size="2" color="gray">
-            Initializing TensorFlow.js...
+            Analysing video...
           </Text>
         </Flex>
       </Flex>

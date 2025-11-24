@@ -128,11 +128,9 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
       />
       <Tooltip 
         content={
-          <Box className="api-version-tooltip">
-            <div style={{ fontSize: "12px"}}>
+          <span style={{ fontSize: "12px"}}>
             Stable v0.5.58 - Last updated 2025-10-01
-            </div>
-          </Box>
+          </span>
         }
         side="bottom"
       >

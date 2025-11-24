@@ -9,19 +9,7 @@ export const tennisTerminology: Record<string, SwingExplanation> = {
     keyPoints: [
       "Score tied at 40-40",
       "Must win by 2 points",
-      "Followed by advantage",
       "High-pressure situation"
-    ]
-  },
-  "advantage": {
-    name: "Advantage",
-    sport: "Tennis",
-    description: "The point after deuce. If the player with advantage wins the next point, they win the game. If they lose, it goes back to deuce.",
-    keyPoints: [
-      "One point ahead after deuce",
-      "Win next point = win game",
-      "Lose next point = back to deuce",
-      "Can be ad-in or ad-out"
     ]
   },
   "ace": {

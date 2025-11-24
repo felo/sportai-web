@@ -1087,7 +1087,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       {/* Settings Button - Row 3: Fixed at bottom */}
       <Box
         style={{
-          padding: isCollapsed ? "var(--space-5)" : "var(--space-4)",
+          paddingLeft: isCollapsed ? "var(--space-5)" : "var(--space-4)",
+          paddingRight: isCollapsed ? "var(--space-5)" : "var(--space-4)",
+          paddingBottom: isCollapsed ? "var(--space-5)" : "var(--space-4)",
           paddingTop: "var(--space-3)",
           borderTop: isCollapsed ? "none" : "1px solid var(--gray-6)",
           display: "flex",
