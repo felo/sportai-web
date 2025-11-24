@@ -6,6 +6,7 @@ import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, 
 import { useSidebar } from "./SidebarContext";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { NavigationLink, EmptyState } from "@/components/ui";
 import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat, getHighlightingPreferences, updateHighlightingPreference, getTTSSettings, updateTTSSetting, type HighlightingPreferences, type TTSSettings } from "@/utils/storage";
 import type { Chat } from "@/types/chat";
 
@@ -303,9 +304,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               {chatsExpanded && (
                 <Flex direction="column" gap="1" style={{ paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
                   {chats.length === 0 ? (
-                    <Text size="2" color="gray" style={{ padding: "var(--space-2) var(--space-3)" }}>
-                      No chats yet
-                    </Text>
+                    <EmptyState message="No chats yet" />
                   ) : (
                     chats.map((chat) => (
                       <Flex
@@ -446,82 +445,34 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             
             {/* Navigation Links */}
             <Flex direction="column" gap="2">
-              <Button
-                variant="ghost"
-                size="2"
-                asChild
-                style={{
-                  justifyContent: "flex-start",
-                  padding: "var(--space-2) var(--space-3)",
-                }}
-              >
-                <a
-                  href="https://sportai.com/platform"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => closeSidebar()}
-                >
-                  <GlobeIcon width="16" height="16" />
-                  <Text size="2" ml="2">SportAI Platform</Text>
-                </a>
-              </Button>
-              <Button
-                variant="ghost"
-                size="2"
-                asChild
-                style={{
-                  justifyContent: "flex-start",
-                  padding: "var(--space-2) var(--space-3)",
-                }}
-              >
-                <a
-                  href="https://sportai.mintlify.app/api-reference/introduction"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => closeSidebar()}
-                >
-                  <FileTextIcon width="16" height="16" />
-                  <Text size="2" ml="2">API Documentation</Text>
-                </a>
-              </Button>
-              <Button
-                variant="ghost"
-                size="2"
-                asChild
-                style={{
-                  justifyContent: "flex-start",
-                  padding: "var(--space-2) var(--space-3)",
-                }}
-              >
-                <a
-                  href="https://sportai.com/contact"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => closeSidebar()}
-                >
-                  <EnvelopeClosedIcon width="16" height="16" />
-                  <Text size="2" ml="2">Contact Us</Text>
-                </a>
-              </Button>
-              <Button
-                variant="ghost"
-                size="2"
-                asChild
-                style={{
-                  justifyContent: "flex-start",
-                  padding: "var(--space-2) var(--space-3)",
-                }}
-              >
-                <a
-                  href="https://sportai.com/about-us"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => closeSidebar()}
-                >
-                  <InfoCircledIcon width="16" height="16" />
-                  <Text size="2" ml="2">About Us</Text>
-                </a>
-              </Button>
+              <NavigationLink
+                href="https://sportai.com/platform"
+                label="SportAI Platform"
+                icon={<GlobeIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.mintlify.app/api-reference/introduction"
+                label="API Documentation"
+                icon={<FileTextIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.com/contact"
+                label="Contact Us"
+                icon={<EnvelopeClosedIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.com/about-us"
+                label="About Us"
+                icon={<InfoCircledIcon />}
+                onClick={closeSidebar}
+                external
+              />
             </Flex>
             </Flex>
           </Box>
@@ -903,9 +854,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 {chatsExpanded && (
                   <Flex direction="column" gap="1" style={{ paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}>
                     {chats.length === 0 ? (
-                      <Text size="2" color="gray" style={{ padding: "var(--space-2) var(--space-3)" }}>
-                        No chats yet
-                      </Text>
+                      <EmptyState message="No chats yet" />
                     ) : (
                       chats.map((chat) => (
                         <Box
@@ -1048,82 +997,34 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               
               <Separator size="4" />
               <Flex direction="column" gap="2">
-                <Button
-                  variant="ghost"
-                  size="2"
-                  asChild
-                  style={{
-                    justifyContent: "flex-start",
-                    padding: "var(--space-2) var(--space-3)",
-                  }}
-                >
-                  <a
-                    href="https://sportai.com/platform"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => closeSidebar()}
-                  >
-                    <GlobeIcon width="16" height="16" />
-                    <Text size="2" ml="2">SportAI Platform</Text>
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="2"
-                  asChild
-                  style={{
-                    justifyContent: "flex-start",
-                    padding: "var(--space-2) var(--space-3)",
-                  }}
-                >
-                  <a
-                    href="https://sportai.mintlify.app/api-reference/introduction"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => closeSidebar()}
-                  >
-                    <FileTextIcon width="16" height="16" />
-                    <Text size="2" ml="2">API Documentation</Text>
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="2"
-                  asChild
-                  style={{
-                    justifyContent: "flex-start",
-                    padding: "var(--space-2) var(--space-3)",
-                  }}
-                >
-                  <a
-                    href="https://sportai.com/contact"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => closeSidebar()}
-                  >
-                    <EnvelopeClosedIcon width="16" height="16" />
-                    <Text size="2" ml="2">Contact Us</Text>
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="2"
-                  asChild
-                  style={{
-                    justifyContent: "flex-start",
-                    padding: "var(--space-2) var(--space-3)",
-                  }}
-                >
-                  <a
-                    href="https://sportai.com/about-us"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => closeSidebar()}
-                  >
-                    <InfoCircledIcon width="16" height="16" />
-                    <Text size="2" ml="2">About Us</Text>
-                  </a>
-                </Button>
+                <NavigationLink
+                  href="https://sportai.com/platform"
+                  label="SportAI Platform"
+                  icon={<GlobeIcon />}
+                  onClick={closeSidebar}
+                  external
+                />
+                <NavigationLink
+                  href="https://sportai.mintlify.app/api-reference/introduction"
+                  label="API Documentation"
+                  icon={<FileTextIcon />}
+                  onClick={closeSidebar}
+                  external
+                />
+                <NavigationLink
+                  href="https://sportai.com/contact"
+                  label="Contact Us"
+                  icon={<EnvelopeClosedIcon />}
+                  onClick={closeSidebar}
+                  external
+                />
+                <NavigationLink
+                  href="https://sportai.com/about-us"
+                  label="About Us"
+                  icon={<InfoCircledIcon />}
+                  onClick={closeSidebar}
+                  external
+                />
               </Flex>
             </Flex>
           ))}

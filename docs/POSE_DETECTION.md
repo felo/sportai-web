@@ -43,7 +43,7 @@ The pose detection system uses TensorFlow.js with the MoveNet model to perform r
 ### Basic Example
 
 ```tsx
-import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
+import { VideoPoseViewer } from "@/components/chat/viewers/VideoPoseViewer";
 
 function MyComponent() {
   return (
@@ -182,8 +182,8 @@ Each keypoint includes:
 The pose detection can be integrated into the chat interface to analyze uploaded videos:
 
 ```tsx
-import { MessageBubble } from "@/components/chat/MessageBubble";
-import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
+import { MessageBubble } from "@/components/chat/messages/MessageBubble";
+import { VideoPoseViewer } from "@/components/chat/viewers/VideoPoseViewer";
 
 // In message rendering logic
 if (message.video && showPoseAnalysis) {

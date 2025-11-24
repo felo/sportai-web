@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Container, Heading, Text, Flex, Box, Button, Card, Code, Badge, Tabs } from "@radix-ui/themes";
-import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
-import { SAM2Viewer } from "@/components/chat/SAM2Viewer";
+import { VideoPoseViewer } from "@/components/chat/viewers/VideoPoseViewer";
+import { SAM2Viewer } from "@/components/chat/viewers/SAM2Viewer";
 import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
 import * as tf from "@tensorflow/tfjs";
 import { getCacheDiagnostics, type CacheDiagnostics } from "@/lib/model-cache-diagnostics";

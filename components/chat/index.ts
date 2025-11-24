@@ -1,14 +1,27 @@
-export { MessageList } from "./MessageList";
-export { MessageBubble } from "./MessageBubble";
-export { ProgressIndicator } from "./ProgressIndicator";
-export { VideoPreview } from "./VideoPreview";
-export { VideoPoseViewer } from "./VideoPoseViewer";
-export { ChatInput } from "./ChatInput";
-export { ChatHeader } from "./ChatHeader";
-export { DragOverlay } from "./DragOverlay";
-export { ScrollToBottom } from "./ScrollToBottom";
-export { ScrollToVideo } from "./ScrollToVideo";
-export { AudioStopButton } from "./AudioStopButton";
-export { StreamingIndicator } from "./StreamingIndicator";
-export { FeedbackButtons } from "./FeedbackButtons";
+// Messages
+export { MessageList } from "./messages/MessageList";
+export { MessageBubble } from "./messages/MessageBubble";
+
+// Input
+export { ChatInput } from "./input/ChatInput";
+export { AudioStopButton } from "./input/AudioStopButton";
+
+// Viewers
+export { VideoPoseViewer } from "./viewers/VideoPoseViewer";
+export { VideoPreview } from "./viewers/VideoPreview";
+
+// Feedback
+export { ProgressIndicator } from "./feedback/ProgressIndicator";
+export { StreamingIndicator } from "./feedback/StreamingIndicator";
+export { FeedbackButtons } from "./feedback/FeedbackButtons";
+
+// Navigation
+export { ScrollToBottom } from "./navigation/ScrollToBottom";
+export { ScrollToVideo } from "./navigation/ScrollToVideo";
+
+// Overlays
+export { DragOverlay } from "./overlays/DragOverlay";
+
+// Header
+export { ChatHeader } from "./header/ChatHeader";
 

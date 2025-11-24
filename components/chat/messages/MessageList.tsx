@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Text } from "@radix-ui/themes";
 import { MessageBubble } from "./MessageBubble";
-import { ProgressIndicator } from "./ProgressIndicator";
+import { ProgressIndicator } from "../feedback/ProgressIndicator";
 import { URLs } from "@/lib/config";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Message, ProgressStage } from "@/types/chat";

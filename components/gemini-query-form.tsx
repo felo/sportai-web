@@ -8,13 +8,13 @@ import { useGeminiChat } from "@/hooks/useGeminiChat";
 import { useGeminiApi } from "@/hooks/useGeminiApi";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useNavigationWarning } from "@/hooks/useNavigationWarning";
-import { MessageList } from "@/components/chat/MessageList";
-import { ChatInput } from "@/components/chat/ChatInput";
-import { ChatHeader } from "@/components/chat/ChatHeader";
-import { DragOverlay } from "@/components/chat/DragOverlay";
-import { ScrollToBottom } from "@/components/chat/ScrollToBottom";
-import { ScrollToVideo } from "@/components/chat/ScrollToVideo";
-import { AudioStopButton } from "@/components/chat/AudioStopButton";
+import { MessageList } from "@/components/chat/messages/MessageList";
+import { ChatInput } from "@/components/chat/input/ChatInput";
+import { ChatHeader } from "@/components/chat/header/ChatHeader";
+import { DragOverlay } from "@/components/chat/overlays/DragOverlay";
+import { ScrollToBottom } from "@/components/chat/navigation/ScrollToBottom";
+import { ScrollToVideo } from "@/components/chat/navigation/ScrollToVideo";
+import { AudioStopButton } from "@/components/chat/input/AudioStopButton";
 import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
 import { Sidebar } from "@/components/Sidebar";
@@ -134,8 +134,8 @@ export function GeminiQueryForm() {
   useEffect(() => {
     if (videoFile) {
       // Preload in background while user is reviewing the video or typing
-      import("@/components/chat/VideoPoseViewer");
-      import("@/components/chat/Pose3DViewer");
+      import("@/components/chat/viewers/VideoPoseViewer");
+      import("@/components/chat/viewers/Pose3DViewer");
     }
   }, [videoFile]);
 

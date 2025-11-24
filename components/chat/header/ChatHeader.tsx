@@ -1,10 +1,11 @@
 "use client";
 
-import { Flex, Box, Text, Badge, Tooltip, Button } from "@radix-ui/themes";
+import { Box } from "@radix-ui/themes";
 import { PlusIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { IconButton, BadgeWithTooltip } from "@/components/ui";
 
 interface ChatHeaderProps {
   messageCount: number;
@@ -45,22 +46,11 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
             transform: "translateY(-50%)",
           }}
         >
-          <Button
-            variant="ghost"
-            size="2"
+          <IconButton
+            icon={<HamburgerMenuIcon />}
             onClick={toggleSidebar}
-            style={{
-              minWidth: "32px",
-              width: "32px",
-              height: "32px",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <HamburgerMenuIcon width="20" height="20" />
-          </Button>
+            ariaLabel="Toggle sidebar"
+          />
         </Box>
 
         {/* Centered Logo */}
@@ -81,22 +71,11 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
             transform: "translateY(-50%)",
           }}
         >
-          <Button
-            variant="ghost"
-            size="2"
+          <IconButton
+            icon={<PlusIcon />}
             onClick={onNewChat}
-            style={{
-              minWidth: "32px",
-              width: "32px",
-              height: "32px",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <PlusIcon width="20" height="20" />
-          </Button>
+            ariaLabel="New chat"
+          />
         </Box>
       </Box>
     );
@@ -126,31 +105,21 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         height={38}
         style={{ objectFit: "contain", height: "auto" }}
       />
-      <Tooltip 
-        content={
-          <span style={{ fontSize: "12px"}}>
-            Stable v0.5.58 - Last updated 2025-10-01
-          </span>
-        }
-        side="bottom"
-      >
-        <Badge
-          variant="soft"
-          color="gray"
-          radius="full"
-          size="2"
-          style={{
-            fontFamily: "var(--font-mono, 'Courier New', monospace)",
-            fontSize: "12px",
-            fontWeight: "500",
-            letterSpacing: "0.02em",
-            padding: "4px 12px",
-            cursor: "help",
-          }}
-        >
-          API version 0.5.58
-        </Badge>
-      </Tooltip>
+      <BadgeWithTooltip
+        text="API version 0.5.58"
+        tooltip="Stable v0.5.58 - Last updated 2025-10-01"
+        variant="soft"
+        color="gray"
+        radius="full"
+        size="2"
+        style={{
+          fontFamily: "var(--font-mono, 'Courier New', monospace)",
+          fontSize: "12px",
+          fontWeight: "500",
+          letterSpacing: "0.02em",
+          padding: "4px 12px",
+        }}
+      />
     </Box>
   );
 }

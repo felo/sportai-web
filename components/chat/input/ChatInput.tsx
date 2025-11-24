@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { TextArea, Button, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
 import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
-import { VideoPreview } from "./VideoPreview";
+import { VideoPreview } from "../viewers/VideoPreview";
 import type { ProgressStage } from "@/types/chat";
 import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, getDomainExpertise, setDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";

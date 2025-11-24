@@ -1,9 +1,15 @@
 "use client";
 
-import { Box, Flex, Button, Text, Switch, Select, Grid } from "@radix-ui/themes";
+import { Box, Flex, Button, Text, Select, Grid } from "@radix-ui/themes";
 import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
+import {
+  ToggleSwitch,
+  RangeSlider,
+  SettingsSection,
+  SettingsSectionHeader,
+} from "@/components/ui";
 
 interface PoseSettingsPanelProps {
   // Loading states
@@ -131,105 +137,82 @@ export function PoseSettingsPanel({
         {/* Column 1: Main Feature Toggles */}
         <Flex direction="column" gap="3">
           {/* Skeleton Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showSkeleton}
-              onCheckedChange={setShowSkeleton}
-              disabled={isLoading}
-            />
-            <Text size="2" color="gray">
-              Show skeleton
-              {isDetecting && showSkeleton && (
-                <Text as="span" color="mint" ml="2">
-                  • Detecting
-                </Text>
-              )}
-            </Text>
-          </Flex>
+          <ToggleSwitch
+            checked={showSkeleton}
+            onCheckedChange={setShowSkeleton}
+            disabled={isLoading}
+            label="Show skeleton"
+            showStatus={isDetecting && showSkeleton}
+            statusText="• Detecting"
+          />
 
           {/* Joint Trajectory Tracking Toggle */}
           <Flex direction="column" gap="2">
-            <Flex gap="2" align="center">
-              <Switch
-                checked={showTrajectories}
-                onCheckedChange={(checked) => {
-                  setShowTrajectories(checked);
-                  if (!checked) {
-                    clearTrajectories(); // Clear trajectories when disabled
-                  }
-                }}
-                disabled={isLoading}
-              />
-              <Text size="2" color="gray">
-                Joint trajectories
-              </Text>
-            </Flex>
+            <ToggleSwitch
+              checked={showTrajectories}
+              onCheckedChange={(checked) => {
+                setShowTrajectories(checked);
+                if (!checked) {
+                  clearTrajectories(); // Clear trajectories when disabled
+                }
+              }}
+              disabled={isLoading}
+              label="Joint trajectories"
+            />
             {/* Trajectory Smoothing (nested) */}
             {showTrajectories && (
-              <Flex gap="2" align="center" pl="4">
-                <Switch
-                  checked={smoothTrajectories}
-                  onCheckedChange={setSmoothTrajectories}
-                  disabled={isLoading || !showTrajectories}
-                  size="1"
-                />
-                <Text size="1" color="gray">
-                  Smooth paths
-                </Text>
-              </Flex>
+              <ToggleSwitch
+                checked={smoothTrajectories}
+                onCheckedChange={setSmoothTrajectories}
+                disabled={isLoading || !showTrajectories}
+                label="Smooth paths"
+                size="1"
+                labelSize="1"
+                style={{ paddingLeft: "var(--space-4)" }}
+              />
             )}
           </Flex>
 
           {/* Angle Display Toggle */}
           <Flex direction="column" gap="2">
-            <Flex gap="2" align="center">
-              <Switch
-                checked={showAngles}
+            <ToggleSwitch
+              checked={showAngles}
+              onCheckedChange={(checked) => {
+                setShowAngles(checked);
+                if (!checked) {
+                  setEnableAngleClicking(false); // Disable clicking when hiding angles
+                }
+              }}
+              disabled={isLoading}
+              label="Show angles"
+            />
+            {/* Angle Clicking (nested) */}
+            {showAngles && (
+              <ToggleSwitch
+                checked={enableAngleClicking}
                 onCheckedChange={(checked) => {
-                  setShowAngles(checked);
+                  setEnableAngleClicking(checked);
                   if (!checked) {
-                    setEnableAngleClicking(false); // Disable clicking when hiding angles
+                    setSelectedAngleJoints([]); // Clear selection when disabling clicking
                   }
                 }}
                 disabled={isLoading}
+                label="Enable clicking"
+                size="1"
+                labelSize="1"
+                style={{ paddingLeft: "var(--space-4)" }}
               />
-              <Text size="2" color="gray">
-                Show angles
-              </Text>
-            </Flex>
-            {/* Angle Clicking (nested) */}
-            {showAngles && (
-              <Flex gap="2" align="center" pl="4">
-                <Switch
-                  checked={enableAngleClicking}
-                  onCheckedChange={(checked) => {
-                    setEnableAngleClicking(checked);
-                    if (!checked) {
-                      setSelectedAngleJoints([]); // Clear selection when disabling clicking
-                    }
-                  }}
-                  disabled={isLoading}
-                  size="1"
-                />
-                <Text size="1" color="gray">
-                  Enable clicking
-                </Text>
-              </Flex>
             )}
           </Flex>
 
           {/* Velocity Toggle */}
           <Flex direction="column" gap="2">
-            <Flex gap="2" align="center">
-              <Switch
-                checked={showVelocity}
-                onCheckedChange={setShowVelocity}
-                disabled={isLoading}
-              />
-              <Text size="2" color="gray">
-                Wrist Velocity
-              </Text>
-            </Flex>
+            <ToggleSwitch
+              checked={showVelocity}
+              onCheckedChange={setShowVelocity}
+              disabled={isLoading}
+              label="Wrist Velocity"
+            />
             {/* Wrist Selection (nested) */}
             {showVelocity && (
               <Flex gap="2" align="center" pl="4">
@@ -267,57 +250,45 @@ export function PoseSettingsPanel({
         {/* Column 2: Standalone Settings */}
         <Flex direction="column" gap="3">
           {/* Tracking ID Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showTrackingId}
-              onCheckedChange={setShowTrackingId}
-              disabled={isLoading}
-            />
-            <Text size="2" color="gray">
-              Show Tracking IDs
-            </Text>
-          </Flex>
+          <ToggleSwitch
+            checked={showTrackingId}
+            onCheckedChange={setShowTrackingId}
+            disabled={isLoading}
+            label="Show Tracking IDs"
+          />
 
           {/* Face Landmarks Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={showFaceLandmarks}
-              onCheckedChange={setShowFaceLandmarks}
-              disabled={isLoading || !showSkeleton}
-            />
-            <Text size="2" color="gray">
-              Face landmarks
-            </Text>
-          </Flex>
+          <ToggleSwitch
+            checked={showFaceLandmarks}
+            onCheckedChange={setShowFaceLandmarks}
+            disabled={isLoading || !showSkeleton}
+            label="Face landmarks"
+          />
 
           {/* Temporal Smoothing Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={enableSmoothing}
-              onCheckedChange={setEnableSmoothing}
-              disabled={isLoading || isDetecting}
-            />
-            <Text size="2" color="gray">
-              Temporal smoothing
-            </Text>
-          </Flex>
+          <ToggleSwitch
+            checked={enableSmoothing}
+            onCheckedChange={setEnableSmoothing}
+            disabled={isLoading || isDetecting}
+            label="Temporal smoothing"
+          />
 
           {/* Accurate Mode Toggle */}
-          <Flex gap="2" align="center">
-            <Switch
-              checked={useAccurateMode}
-              onCheckedChange={setUseAccurateMode}
-              disabled={isLoading || isDetecting || maxPoses > 1}
-            />
-            <Flex direction="column" gap="0">
-              <Text size="2" color="gray">
-                High accuracy
-              </Text>
-              <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-                {maxPoses === 1 ? (useAccurateMode ? "Thunder" : "Lightning") : "MultiPose"}
-              </Text>
-            </Flex>
-          </Flex>
+          <ToggleSwitch
+            checked={useAccurateMode}
+            onCheckedChange={setUseAccurateMode}
+            disabled={isLoading || isDetecting || maxPoses > 1}
+            label={
+              <Flex direction="column" gap="0">
+                <Text size="2" color="gray">
+                  High accuracy
+                </Text>
+                <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+                  {maxPoses === 1 ? (useAccurateMode ? "Thunder" : "Lightning") : "MultiPose"}
+                </Text>
+              </Flex>
+            }
+          />
         </Flex>
       </Grid>
 
@@ -571,56 +542,36 @@ export function PoseSettingsPanel({
       )}
 
       {/* Max Players Slider */}
-      <Flex direction="column" gap="1">
-        <Flex justify="between" align="center">
-          <Text size="2" color="gray" weight="medium">
-            Detect players
-          </Text>
-          <Text size="2" color="mint" weight="bold">
-            {maxPoses} {maxPoses === 1 ? "player" : "players"}
-          </Text>
-        </Flex>
-        <input
-          type="range"
-          min="1"
-          max="6"
-          value={maxPoses}
-          onChange={(e) => setMaxPoses(parseInt(e.target.value))}
-          disabled={isLoading || isDetecting}
-          style={{
-            width: "100%",
-            cursor: isLoading || isDetecting ? "not-allowed" : "pointer",
-          }}
-        />
-        <Text size="1" color="gray" style={{ opacity: 0.7 }}>
-          {maxPoses === 1 
+      <RangeSlider
+        value={maxPoses}
+        onChange={(v) => setMaxPoses(parseInt(v.toString()))}
+        min={1}
+        max={6}
+        step={1}
+        label="Detect players"
+        formatValue={(v) => `${v} ${v === 1 ? 'player' : 'players'}`}
+        description={
+          maxPoses === 1 
             ? "Single player mode (Lightning/Thunder)" 
-            : `Multi-player mode (up to ${maxPoses} players)`}
+            : `Multi-player mode (up to ${maxPoses} players)`
+        }
+        disabled={isLoading || isDetecting}
+      />
+      {maxPoses > 1 && (
+        <Text size="1" color="amber">
+          Note: MultiPose.Lightning is always used when detecting 2+ players
         </Text>
-        {maxPoses > 1 && (
-          <Text size="1" color="amber">
-            Note: MultiPose.Lightning is always used when detecting 2+ players
-          </Text>
-        )}
-      </Flex>
+      )}
 
       {/* Pose Detection Section Header with Toggle */}
-      <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
-        <Flex align="center" justify="between">
-          <Flex direction="column" gap="1">
-            <Text size="2" weight="bold">
-              Pose Detection
-            </Text>
-            <Text size="1" color="gray">
-              Track body movement and skeleton
-            </Text>
-          </Flex>
-          <Switch
-            checked={isPoseEnabled}
-            onCheckedChange={setIsPoseEnabled}
-            disabled={isLoading}
-          />
-        </Flex>
+      <SettingsSection>
+        <SettingsSectionHeader
+          title="Pose Detection"
+          description="Track body movement and skeleton"
+          enabled={isPoseEnabled}
+          onEnabledChange={setIsPoseEnabled}
+          disabled={isLoading}
+        />
 
         {isPoseEnabled && (
           <Flex direction="column" gap="3">
@@ -839,7 +790,7 @@ export function PoseSettingsPanel({
             </Flex>
           </Flex>
         )}
-      </Flex>
+      </SettingsSection>
     </>
   );
 }

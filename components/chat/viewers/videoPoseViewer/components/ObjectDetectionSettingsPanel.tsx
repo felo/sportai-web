@@ -1,7 +1,15 @@
 "use client";
 
-import { Flex, Text, Switch, Select, Spinner } from "@radix-ui/themes";
+import { Flex, Text, Select } from "@radix-ui/themes";
 import selectStyles from "@/styles/selects.module.css";
+import {
+  SettingsSection,
+  SettingsSectionHeader,
+  ToggleSwitch,
+  RangeSlider,
+  LoadingState,
+  ErrorDisplay,
+} from "@/components/ui";
 
 interface ObjectDetectionSettingsPanelProps {
   // Detection state
@@ -62,22 +70,14 @@ export function ObjectDetectionSettingsPanel({
   setEnableObjectTracking,
 }: ObjectDetectionSettingsPanelProps) {
   return (
-    <Flex direction="column" gap="2" pt="3" style={{ borderTop: "1px solid var(--gray-a5)" }}>
-      <Flex align="center" justify="between">
-        <Flex direction="column" gap="1">
-          <Text size="2" weight="bold">
-            Object Detection (YOLO)
-          </Text>
-          <Text size="1" color="gray">
-            Detect and track objects in the video
-          </Text>
-        </Flex>
-        <Switch
-          checked={isObjectDetectionEnabled}
-          onCheckedChange={setIsObjectDetectionEnabled}
-          disabled={isObjectDetectionLoading}
-        />
-      </Flex>
+    <SettingsSection>
+      <SettingsSectionHeader
+        title="Object Detection (YOLO)"
+        description="Detect and track objects in the video"
+        enabled={isObjectDetectionEnabled}
+        onEnabledChange={setIsObjectDetectionEnabled}
+        disabled={isObjectDetectionLoading}
+      />
 
       {isObjectDetectionEnabled && (
         <Flex direction="column" gap="3">
@@ -155,77 +155,54 @@ export function ObjectDetectionSettingsPanel({
             </Flex>
 
             {/* Confidence Threshold */}
-            <Flex direction="column" gap="1">
-              <Flex align="center" justify="between">
-                <Text size="2" weight="medium">Confidence</Text>
-                <Text size="2" color="gray">{(objectConfidenceThreshold * 100).toFixed(0)}%</Text>
-              </Flex>
-              <input
-                type="range"
-                min="0.1"
-                max="0.9"
-                step="0.05"
-                value={objectConfidenceThreshold}
-                onChange={(e) => setObjectConfidenceThreshold(parseFloat(e.target.value))}
-                style={{ width: "100%" }}
-              />
-              <Text size="1" color="gray">
-                Higher = fewer false positives, lower = more detections
-              </Text>
-            </Flex>
+            <RangeSlider
+              value={objectConfidenceThreshold}
+              onChange={setObjectConfidenceThreshold}
+              min={0.1}
+              max={0.9}
+              step={0.05}
+              label="Confidence"
+              formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+              description="Higher = fewer false positives, lower = more detections"
+              valueColor="gray"
+            />
 
             {/* IoU Threshold (NMS) */}
-            <Flex direction="column" gap="1">
-              <Flex align="center" justify="between">
-                <Text size="2" weight="medium">NMS Threshold</Text>
-                <Text size="2" color="gray">{(objectIoUThreshold * 100).toFixed(0)}%</Text>
-              </Flex>
-              <input
-                type="range"
-                min="0.1"
-                max="0.9"
-                step="0.05"
-                value={objectIoUThreshold}
-                onChange={(e) => setObjectIoUThreshold(parseFloat(e.target.value))}
-                style={{ width: "100%" }}
-              />
-              <Text size="1" color="gray">
-                Controls duplicate detection removal
-              </Text>
-            </Flex>
+            <RangeSlider
+              value={objectIoUThreshold}
+              onChange={setObjectIoUThreshold}
+              min={0.1}
+              max={0.9}
+              step={0.05}
+              label="NMS Threshold"
+              formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+              description="Controls duplicate detection removal"
+              valueColor="gray"
+            />
 
             {/* Display Options */}
-            <Flex align="center" justify="between">
-              <Text size="2">Show Labels</Text>
-              <Switch
-                checked={showObjectLabels}
-                onCheckedChange={setShowObjectLabels}
-              />
-            </Flex>
-            <Flex align="center" justify="between">
-              <Text size="2">Enable Tracking</Text>
-              <Switch
-                checked={enableObjectTracking}
-                onCheckedChange={setEnableObjectTracking}
-              />
-            </Flex>
+            <ToggleSwitch
+              checked={showObjectLabels}
+              onCheckedChange={setShowObjectLabels}
+              label="Show Labels"
+            />
+            <ToggleSwitch
+              checked={enableObjectTracking}
+              onCheckedChange={setEnableObjectTracking}
+              label="Enable Tracking"
+            />
           </Flex>
 
           {isObjectDetectionLoading && (
-            <Flex align="center" gap="2">
-              <Spinner />
-              <Text size="2" color="gray">Loading object detection model...</Text>
-            </Flex>
+            <LoadingState message="Loading object detection model..." />
           )}
 
           {objectDetectionError && (
-            <Text size="2" color="red">
-              Error: {objectDetectionError}
-            </Text>
+            <ErrorDisplay message={`Error: ${objectDetectionError}`} />
           )}
         </Flex>
       )}
-    </Flex>
+    </SettingsSection>
   );
 }
 

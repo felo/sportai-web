@@ -53,7 +53,7 @@ Components and hooks can be reused across the application.
 
 ### Importing the Main Component
 ```typescript
-import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
+import { VideoPoseViewer } from "@/components/chat/viewers/VideoPoseViewer";
 
 // Use it
 <VideoPoseViewer
@@ -66,7 +66,7 @@ import { VideoPoseViewer } from "@/components/chat/VideoPoseViewer";
 
 ### Using Individual Hooks
 ```typescript
-import { useVideoDimensions, useVideoFPS, useVelocityTracking } from "@/components/chat/videoPoseViewer/hooks";
+import { useVideoDimensions, useVideoFPS, useVelocityTracking } from "@/components/chat/viewers/videoPoseViewer/hooks";
 
 // In your component
 const { dimensions, isPortraitVideo } = useVideoDimensions({
@@ -91,7 +91,7 @@ const { velocityStatsLeft, velocityStatsRight } = useVelocityTracking({
 
 ### Using Components
 ```typescript
-import { VelocityDisplay } from "@/components/chat/videoPoseViewer/components";
+import { VelocityDisplay } from "@/components/chat/viewers/videoPoseViewer/components";
 
 <VelocityDisplay
   velocityStatsLeft={velocityStatsLeft}
