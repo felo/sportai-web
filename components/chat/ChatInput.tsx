@@ -708,7 +708,7 @@ export function ChatInput({
                     style={{ color: "inherit", textDecoration: "underline" }}
                   >
                     SportAI API
-                  </a>, and may contain errors. For enterprise-level precision, performance, and dedicated support, please{" "}
+                  </a>. For enterprise-level precision, performance, and dedicated support, please{" "}
                   <a 
                     href="https://sportai.com/contact" 
                     target="_blank" 
