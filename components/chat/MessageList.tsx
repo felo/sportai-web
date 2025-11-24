@@ -43,7 +43,6 @@ export function MessageList({
       style={{ 
         paddingTop: isMobile ? "calc(57px + env(safe-area-inset-top) + 1rem)" : "1.5rem", // Account for header + safe area
         paddingLeft: isMobile ? "1rem" : "1rem",
-        paddingRight: isMobile ? "1rem" : "1rem"
       }}
       role="log" 
       aria-label="Chat messages"
