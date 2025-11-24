@@ -67,7 +67,6 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           <div
             style={{
               position: "relative",
-              width: "100%",
               maxWidth: "256px",
               height: "auto",
             }}
@@ -75,10 +74,9 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
             <Image
               src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680386/sai-logo-green_nuuyat.svg"
               alt="SportAI"
-              width={356}
+              width={196}
               height={280}
               style={{
-                width: "100%",
                 height: "auto",
                 objectFit: "contain",
                 objectPosition: "center top",
@@ -163,7 +161,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
 
       {/* Instructions */}
       <Text size={isMobile ? "2" : "3"} color="gray" style={{ textAlign: "center", maxWidth: "600px" }}>
-        Drag and drop a video or click the upload button below
+        Drag and drop a video or click the plus button below
       </Text>
 
       <style jsx>{`
