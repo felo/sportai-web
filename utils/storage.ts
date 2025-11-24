@@ -344,6 +344,32 @@ export type MediaResolution = "low" | "medium" | "high";
 export type DomainExpertise = "all-sports" | "tennis" | "pickleball" | "padel";
 
 /**
+ * TTS voice quality type
+ */
+export type TTSVoiceQuality = "standard" | "wavenet" | "neural2" | "studio";
+
+/**
+ * TTS voice gender type
+ */
+export type TTSVoiceGender = "male" | "female" | "neutral";
+
+/**
+ * TTS language/accent type
+ */
+export type TTSLanguage = "en-US" | "en-GB" | "en-AU" | "en-IN";
+
+/**
+ * TTS settings interface
+ */
+export interface TTSSettings {
+  quality: TTSVoiceQuality;
+  gender: TTSVoiceGender;
+  language: TTSLanguage;
+  speakingRate: number; // 0.25 to 4.0
+  pitch: number; // -20.0 to 20.0
+}
+
+/**
  * Thinking mode storage key
  */
 const THINKING_MODE_KEY = "thinking-mode";
@@ -372,6 +398,11 @@ export interface HighlightingPreferences {
  * Highlighting preferences storage key
  */
 const HIGHLIGHTING_PREFERENCES_KEY = "highlighting-preferences";
+
+/**
+ * TTS settings storage key
+ */
+const TTS_SETTINGS_KEY = "tts-settings";
 
 /**
  * Get thinking mode setting from localStorage
@@ -942,5 +973,77 @@ export function updateHighlightingPreference(
   const preferences = getHighlightingPreferences();
   preferences[key] = value;
   setHighlightingPreferences(preferences);
+}
+
+/**
+ * Get TTS settings from localStorage
+ * @returns TTS settings object with defaults
+ */
+export function getTTSSettings(): TTSSettings {
+  if (typeof window === "undefined") {
+    return {
+      quality: "neural2",
+      gender: "female",
+      language: "en-US",
+      speakingRate: 1.0,
+      pitch: 0.0,
+    };
+  }
+
+  try {
+    const stored = localStorage.getItem(TTS_SETTINGS_KEY);
+    if (!stored) {
+      // Default: Neural2 female voice with normal speed and pitch
+      return {
+        quality: "neural2",
+        gender: "female",
+        language: "en-US",
+        speakingRate: 1.0,
+        pitch: 0.0,
+      };
+    }
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error("Failed to load TTS settings from storage:", error);
+    return {
+      quality: "neural2",
+      gender: "female",
+      language: "en-US",
+      speakingRate: 1.0,
+      pitch: 0.0,
+    };
+  }
+}
+
+/**
+ * Save TTS settings to localStorage
+ * @param settings - TTS settings to save
+ */
+export function setTTSSettings(settings: TTSSettings): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(settings));
+    // Dispatch custom event to notify components of TTS settings changes
+    window.dispatchEvent(new CustomEvent("tts-settings-change"));
+  } catch (error) {
+    console.error("Failed to save TTS settings to storage:", error);
+  }
+}
+
+/**
+ * Update a single TTS setting
+ * @param key - The setting key to update
+ * @param value - The new value for the setting
+ */
+export function updateTTSSetting<K extends keyof TTSSettings>(
+  key: K,
+  value: TTSSettings[K]
+): void {
+  const settings = getTTSSettings();
+  settings[key] = value;
+  setTTSSettings(settings);
 }
 

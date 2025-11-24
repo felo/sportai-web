@@ -6,7 +6,7 @@ import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, 
 import { useSidebar } from "./SidebarContext";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat, getHighlightingPreferences, updateHighlightingPreference, type HighlightingPreferences } from "@/utils/storage";
+import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat, getHighlightingPreferences, updateHighlightingPreference, getTTSSettings, updateTTSSetting, type HighlightingPreferences, type TTSSettings } from "@/utils/storage";
 import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
@@ -31,6 +31,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     technique: true,
     timestamps: true,
     swings: true,
+  });
+  const [ttsSettings, setTTSSettings] = useState<TTSSettings>({
+    quality: "neural2",
+    gender: "female",
+    language: "en-US",
+    speakingRate: 1.0,
+    pitch: 0.0,
   });
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined);
@@ -105,15 +112,25 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       setHighlightingPrefs(getHighlightingPreferences());
     };
     
+    // Load TTS settings
+    setTTSSettings(getTTSSettings());
+    
+    // Listen for TTS settings changes
+    const handleTTSSettingsChange = () => {
+      setTTSSettings(getTTSSettings());
+    };
+    
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("chat-storage-change", handleChatStorageChange);
     window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
+    window.addEventListener("tts-settings-change", handleTTSSettingsChange);
     
     return () => {
       window.removeEventListener("theme-change", handleThemeChange);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("chat-storage-change", handleChatStorageChange);
       window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
+      window.removeEventListener("tts-settings-change", handleTTSSettingsChange);
     };
   }, []);
 
@@ -150,6 +167,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
 
   const handleHighlightingToggle = (key: keyof HighlightingPreferences, checked: boolean) => {
     updateHighlightingPreference(key, checked);
+    // State will be updated via event handler
+  };
+
+  const handleTTSSettingChange = <K extends keyof TTSSettings>(key: K, value: TTSSettings[K]) => {
+    updateTTSSetting(key, value);
     // State will be updated via event handler
   };
 
@@ -1119,10 +1141,17 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             </Button>
           </DropdownMenu.Trigger>
             <DropdownMenu.Content align="start" side={isCollapsed ? "right" : "top"}>
+              {/* APPEARANCE & DISPLAY */}
+              <DropdownMenu.Label>
+                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+                  Appearance & Display
+                </Text>
+              </DropdownMenu.Label>
+              
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>
                   <SunIcon width="16" height="16" />
-                  <Text ml="2">Themes</Text>
+                  <Text ml="2">Theme</Text>
                 </DropdownMenu.SubTrigger>
                 <DropdownMenu.SubContent>
                   <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
@@ -1139,9 +1168,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   </DropdownMenu.Item>
                 </DropdownMenu.SubContent>
               </DropdownMenu.Sub>
-
-              <DropdownMenu.Separator />
-
+              
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>
                   <Text>Theatre mode</Text>
@@ -1164,27 +1191,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
 
               <DropdownMenu.Separator />
 
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Developer mode</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
-                    <Text>On</Text>
-                    {developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
-                    <Text>Off</Text>
-                    {!developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-
-              <DropdownMenu.Separator />
+              {/* CONTENT DISPLAY */}
+              <DropdownMenu.Label>
+                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+                  Content Display
+                </Text>
+              </DropdownMenu.Label>
 
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>
@@ -1219,6 +1231,217 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               </DropdownMenu.Sub>
 
               <DropdownMenu.Separator />
+
+              {/* AUDIO */}
+              <DropdownMenu.Label>
+                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+                  Audio
+                </Text>
+              </DropdownMenu.Label>
+
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>Text-to-Speech</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  {/* Voice Quality */}
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger>
+                      <Text>Voice quality</Text>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "standard")}>
+                        <Text>Standard</Text>
+                        {ttsSettings.quality === "standard" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "wavenet")}>
+                        <Text>WaveNet</Text>
+                        {ttsSettings.quality === "wavenet" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "neural2")}>
+                        <Text>Neural2 (High)</Text>
+                        {ttsSettings.quality === "neural2" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "studio")}>
+                        <Text>Studio (Premium)*</Text>
+                        {ttsSettings.quality === "studio" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Item disabled>
+                        <Text size="1" style={{ color: "var(--gray-10)", fontStyle: "italic" }}>
+                          *Limited availability
+                        </Text>
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  {/* Voice Gender */}
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger>
+                      <Text>Voice gender</Text>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "male")}>
+                        <Text>Male</Text>
+                        {ttsSettings.gender === "male" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "female")}>
+                        <Text>Female</Text>
+                        {ttsSettings.gender === "female" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "neutral")}>
+                        <Text>Neutral</Text>
+                        {ttsSettings.gender === "neutral" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  {/* Language/Accent */}
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger>
+                      <Text>Language/Accent</Text>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-US")}>
+                        <Text>English (US)</Text>
+                        {ttsSettings.language === "en-US" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-GB")}>
+                        <Text>English (UK)</Text>
+                        {ttsSettings.language === "en-GB" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-AU")}>
+                        <Text>English (AU)</Text>
+                        {ttsSettings.language === "en-AU" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-IN")}>
+                        <Text>English (India)</Text>
+                        {ttsSettings.language === "en-IN" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  {/* Speaking Rate */}
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger>
+                      <Text>Speaking rate</Text>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 0.75)}>
+                        <Text>Slower (0.75x)</Text>
+                        {ttsSettings.speakingRate === 0.75 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.0)}>
+                        <Text>Normal (1.0x)</Text>
+                        {ttsSettings.speakingRate === 1.0 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.25)}>
+                        <Text>Faster (1.25x)</Text>
+                        {ttsSettings.speakingRate === 1.25 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.5)}>
+                        <Text>Fast (1.5x)</Text>
+                        {ttsSettings.speakingRate === 1.5 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  {/* Pitch */}
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger>
+                      <Text>Pitch</Text>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", -5.0)}>
+                        <Text>Lower (-5)</Text>
+                        {ttsSettings.pitch === -5.0 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", 0.0)}>
+                        <Text>Normal (0)</Text>
+                        {ttsSettings.pitch === 0.0 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", 5.0)}>
+                        <Text>Higher (+5)</Text>
+                        {ttsSettings.pitch === 5.0 && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+
+              <DropdownMenu.Separator />
+
+              {/* ADVANCED */}
+              <DropdownMenu.Label>
+                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+                  Advanced
+                </Text>
+              </DropdownMenu.Label>
+
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>Developer mode</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
+                    <Text>On</Text>
+                    {developerMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
+                    <Text>Off</Text>
+                    {!developerMode && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+
+              <DropdownMenu.Separator />
+
+              {/* ACTIONS */}
+              <DropdownMenu.Label>
+                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+                  Actions
+                </Text>
+              </DropdownMenu.Label>
 
               <DropdownMenu.Item 
                 color="red"

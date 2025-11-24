@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
-import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip } from "@radix-ui/themes";
+import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
@@ -18,7 +18,7 @@ import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings } from "./hooks";
-import { VelocityDisplay, AnglePresetButton, CollapsibleSection, PlaybackControls, DescriptiveSelect } from "./components";
+import { VelocityDisplay, CollapsibleSection, PlaybackControls, DescriptiveSelect } from "./components";
 import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS } from "./constants";
 
 interface VideoPoseViewerProps {
@@ -96,6 +96,7 @@ export function VideoPoseViewer({
   const [enableAngleClicking, setEnableAngleClicking] = useState(false);
   const [selectedAngleJoints, setSelectedAngleJoints] = useState<number[]>([]);
   const [measuredAngles, setMeasuredAngles] = useState<Array<[number, number, number]>>(initialMeasuredAngles as [number, number, number][]);
+  const [angleMenuOpen, setAngleMenuOpen] = useState(false);
 
   // Velocity Measurement State
   const [showVelocity, setShowVelocity] = useState(initialShowVelocity);
@@ -1780,36 +1781,87 @@ export function VideoPoseViewer({
                     <ChevronRightIcon width="16" height="16" />
                   </Button>
                 </Tooltip>
-                <AnglePresetButton
-                  label="LE"
-                  jointIndices={[5, 7, 9]}
-                  tooltip="Toggle left elbow angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                  onActivate={() => setVelocityWrist('left')}
-                />
-                <AnglePresetButton
-                  label="RE"
-                  jointIndices={[6, 8, 10]}
-                  tooltip="Toggle right elbow angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                  onActivate={() => setVelocityWrist('right')}
-                />
-                <AnglePresetButton
-                  label="LK"
-                  jointIndices={[11, 13, 15]}
-                  tooltip="Toggle left knee angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                />
-                <AnglePresetButton
-                  label="RK"
-                  jointIndices={[12, 14, 16]}
-                  tooltip="Toggle right knee angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                />
+                
+                {/* Angles Dropdown Menu */}
+                <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
+                  <DropdownMenu.Trigger>
+                    <Button
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{
+                        opacity: measuredAngles.length > 0 ? 1 : 0.5
+                      }}
+                    >
+                      <Text size="1" weight="bold">Angles</Text>
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                          (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                        );
+                        if (!hasLeftElbow) {
+                          setVelocityWrist('left');
+                        }
+                        toggleAnglePreset([5, 7, 9]);
+                      }}
+                    >
+                      <Text>Left Elbow</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                          (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                        );
+                        if (!hasRightElbow) {
+                          setVelocityWrist('right');
+                        }
+                        toggleAnglePreset([6, 8, 10]);
+                      }}
+                    >
+                      <Text>Right Elbow</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleAnglePreset([11, 13, 15]);
+                      }}
+                    >
+                      <Text>Left Knee</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleAnglePreset([12, 14, 16]);
+                      }}
+                    >
+                      <Text>Right Knee</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
               </>
             )}
             {usePreprocessing && (
@@ -1846,36 +1898,87 @@ export function VideoPoseViewer({
                     <ChevronRightIcon width="16" height="16" />
                   </Button>
                 </Tooltip>
-                <AnglePresetButton
-                  label="LE"
-                  jointIndices={[5, 7, 9]}
-                  tooltip="Toggle left elbow angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                  onActivate={() => setVelocityWrist('left')}
-                />
-                <AnglePresetButton
-                  label="RE"
-                  jointIndices={[6, 8, 10]}
-                  tooltip="Toggle right elbow angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                  onActivate={() => setVelocityWrist('right')}
-                />
-                <AnglePresetButton
-                  label="LK"
-                  jointIndices={[11, 13, 15]}
-                  tooltip="Toggle left knee angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                />
-                <AnglePresetButton
-                  label="RK"
-                  jointIndices={[12, 14, 16]}
-                  tooltip="Toggle right knee angle"
-                  measuredAngles={measuredAngles}
-                  onToggle={toggleAnglePreset}
-                />
+                
+                {/* Angles Dropdown Menu */}
+                <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
+                  <DropdownMenu.Trigger>
+                    <Button
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{
+                        opacity: measuredAngles.length > 0 ? 1 : 0.5
+                      }}
+                    >
+                      <Text size="1" weight="bold">Angles</Text>
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        const hasLeftElbow = measuredAngles.some(([a, b, c]) => 
+                          (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                        );
+                        if (!hasLeftElbow) {
+                          setVelocityWrist('left');
+                        }
+                        toggleAnglePreset([5, 7, 9]);
+                      }}
+                    >
+                      <Text>Left Elbow</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 5 && b === 7 && c === 9) || (a === 9 && b === 7 && c === 5)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        const hasRightElbow = measuredAngles.some(([a, b, c]) => 
+                          (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                        );
+                        if (!hasRightElbow) {
+                          setVelocityWrist('right');
+                        }
+                        toggleAnglePreset([6, 8, 10]);
+                      }}
+                    >
+                      <Text>Right Elbow</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 6 && b === 8 && c === 10) || (a === 10 && b === 8 && c === 6)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleAnglePreset([11, 13, 15]);
+                      }}
+                    >
+                      <Text>Left Knee</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 11 && b === 13 && c === 15) || (a === 15 && b === 13 && c === 11)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleAnglePreset([12, 14, 16]);
+                      }}
+                    >
+                      <Text>Right Knee</Text>
+                      {measuredAngles.some(([a, b, c]) => 
+                        (a === 12 && b === 14 && c === 16) || (a === 16 && b === 14 && c === 12)
+                      ) && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
               </>
             )}
             </Flex>

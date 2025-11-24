@@ -14,7 +14,9 @@ import { ChatHeader } from "@/components/chat/ChatHeader";
 import { DragOverlay } from "@/components/chat/DragOverlay";
 import { ScrollToBottom } from "@/components/chat/ScrollToBottom";
 import { ScrollToVideo } from "@/components/chat/ScrollToVideo";
+import { AudioStopButton } from "@/components/chat/AudioStopButton";
 import { ErrorToast } from "@/components/ui/Toast";
+import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
 import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
@@ -23,6 +25,20 @@ import { getCurrentChatId, setCurrentChatId, createChat, updateChat, updateChatS
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
+import {
+  sharedSwings,
+  tennisSwings,
+  pickleballSwings,
+  padelSwings,
+  sharedTerminology,
+  tennisTerminology,
+  pickleballTerminology,
+  padelTerminology,
+  sharedTechnique,
+  tennisCourts,
+  pickleballCourts,
+  padelCourts,
+} from "@/database";
 
 export function GeminiQueryForm() {
   const [prompt, setPrompt] = useState("");
@@ -368,24 +384,72 @@ export function GeminiQueryForm() {
     setShowingVideoSizeError(false);
   };
 
-  const handleAskForHelp = (termName: string) => {
-    // Create a question about the term
-    const question = `How can I improve my ${termName.toLowerCase()}?`;
+  const handleAskForHelp = (termName: string, swing?: { name: string; sport: string; description: string }) => {
+    let question = '';
+    const lowerTermName = termName.toLowerCase();
+    
+    // Check if it's a swing
+    const isSwing = Object.keys({
+      ...sharedSwings,
+      ...tennisSwings,
+      ...pickleballSwings,
+      ...padelSwings,
+    }).some(key => key.toLowerCase() === lowerTermName);
+    
+    // Check if it's a technique term
+    const isTechnique = Object.keys(sharedTechnique).some(key => key.toLowerCase() === lowerTermName);
+    
+    // Check if it's a court
+    const isCourt = Object.keys({
+      ...tennisCourts,
+      ...pickleballCourts,
+      ...padelCourts,
+    }).some(key => key.toLowerCase() === lowerTermName);
+    
+    // Check if it's terminology (anything else)
+    const isTerminology = Object.keys({
+      ...sharedTerminology,
+      ...tennisTerminology,
+      ...pickleballTerminology,
+      ...padelTerminology,
+    }).some(key => key.toLowerCase() === lowerTermName);
+    
+    // Generate context-appropriate questions
+    if (isSwing) {
+      question = `Can you give me tips for improving my ${termName.toLowerCase()} swing?`;
+    } else if (isTechnique) {
+      question = `Can you explain how to improve my ${termName.toLowerCase()} technique?`;
+    } else if (isCourt) {
+      question = `What strategies should I use when playing on a ${termName.toLowerCase()}?`;
+    } else if (isTerminology) {
+      question = `Can you explain more about ${termName.toLowerCase()} and how to use it effectively in my game?`;
+    } else {
+      // Fallback for any unmatched terms
+      question = `Can you give me tips about ${termName.toLowerCase()} in game?`;
+    }
+    
+    // Update the prompt in the UI
     setPrompt(question);
-    // Auto-submit after a brief delay to allow state update
+    
+    // Submit with the question directly to avoid race conditions with state updates
+    // Use a small timeout to allow the UI to update first
     setTimeout(() => {
       const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as any;
-      handleSubmit(fakeEvent);
+      handleSubmit(fakeEvent, question);
     }, 100);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, overridePrompt?: string) => {
     e.preventDefault();
-    if ((!prompt.trim() && !videoFile) || loading) return;
+    
+    // Use override prompt if provided (e.g., from "Ask AI for help"), otherwise use state prompt
+    const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
+    
+    if ((!effectivePrompt.trim() && !videoFile) || loading) return;
 
     // Use prompt if provided, otherwise use default prompt for video-only submissions
     // Update prompt state if we're using the default so UI reflects what will be sent
-    let currentPrompt = prompt.trim();
+    let currentPrompt = effectivePrompt.trim();
     if (!currentPrompt && videoFile) {
       const mediaType = getMediaType(videoFile);
       currentPrompt = `Please analyse this ${mediaType} for me.`;
@@ -677,16 +741,17 @@ export function GeminiQueryForm() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header - visible on both mobile and desktop */}
-      <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
+    <AudioPlayerProvider>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {/* Header - visible on both mobile and desktop */}
+        <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
 
-      {/* Sidebar */}
-      <Sidebar 
-        onClearChat={handleClearConversation}
-        messageCount={messages.length}
-        onChatSwitchAttempt={confirmNavigation}
-      />
+        {/* Sidebar */}
+        <Sidebar 
+          onClearChat={handleClearConversation}
+          messageCount={messages.length}
+          onChatSwitchAttempt={confirmNavigation}
+        />
 
       {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
@@ -757,6 +822,12 @@ export function GeminiQueryForm() {
                 }}
               />
             )}
+            
+            {/* Audio stop button */}
+            <AudioStopButton 
+              scrollContainerRef={scrollContainerRef}
+              scrollButtonVisible={messages.length > 0}
+            />
             
             {/* Bottom fade overlay - fades content at bottom - only show when there are messages */}
             {messages.length > 0 && (
@@ -829,6 +900,7 @@ export function GeminiQueryForm() {
           </Flex>
         </AlertDialog.Content>
       </AlertDialog.Root>
-    </div>
+      </div>
+    </AudioPlayerProvider>
   );
 }

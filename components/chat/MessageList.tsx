@@ -15,7 +15,7 @@ interface MessageListProps {
   progressStage: ProgressStage;
   uploadProgress: number;
   messagesEndRef: React.RefObject<HTMLDivElement>;
-  onAskForHelp?: (termName: string) => void;
+  onAskForHelp?: (termName: string, swing?: any) => void;
 }
 
 export function MessageList({

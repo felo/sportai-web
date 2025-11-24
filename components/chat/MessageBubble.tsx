@@ -78,7 +78,7 @@ interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
   messageIndex?: number;
-  onAskForHelp?: (termName: string) => void;
+  onAskForHelp?: (termName: string, swing?: any) => void;
 }
 
 export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp }: MessageBubbleProps) {
@@ -573,6 +573,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
               <Box mt="3">
                 <FeedbackButtons 
                   messageId={message.id}
+                  messageContent={message.content}
                   onFeedback={() => setShowFeedbackToast(true)}
                 />
               </Box>
@@ -659,11 +660,19 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
                 mt="3"
                 pt="3"
                 style={{
-                  borderTop: "1px solid var(--gray-6)",
                   fontSize: "var(--font-size-1)",
                   color: "var(--gray-11)",
                 }}
               >
+                {/* Decorative separator matching markdown conventions */}
+                <div className="markdown-divider" role="separator" aria-label="Developer section divider">
+                  <div className="markdown-divider-line" />
+                  <span className="markdown-divider-dots" aria-hidden="true">
+                    •••
+                  </span>
+                  <div className="markdown-divider-line" />
+                </div>
+                
                 <Flex direction="column" gap="2">
                   <Text size="1" weight="medium" color="gray">
                     Developer Mode

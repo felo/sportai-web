@@ -8,6 +8,7 @@ export { ChatHeader } from "./ChatHeader";
 export { DragOverlay } from "./DragOverlay";
 export { ScrollToBottom } from "./ScrollToBottom";
 export { ScrollToVideo } from "./ScrollToVideo";
+export { AudioStopButton } from "./AudioStopButton";
 export { StreamingIndicator } from "./StreamingIndicator";
 export { FeedbackButtons } from "./FeedbackButtons";
 

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Tooltip } from "@radix-ui/themes";
 import styles from "@/styles/markdown.module.css";
 import { 
   swingExplanations, 
@@ -170,18 +171,18 @@ function processTextWithTimestamps(text: string): React.ReactNode[] {
     // Add the timestamp as a clickable link
     const timestamp = match[0];
     parts.push(
-      <a
-        key={`timestamp-${match.index}`}
-        href="#"
-        onClick={(e) => {
-          e.preventDefault();
-          jumpToTimestamp(timestamp);
-        }}
-        className={styles.timestampLink}
-        title="Click to jump to this timestamp in the video"
-      >
-        {timestamp}
-      </a>
+      <Tooltip key={`timestamp-${match.index}`} content="Click to jump to this timestamp in the video">
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            jumpToTimestamp(timestamp);
+          }}
+          className={styles.timestampLink}
+        >
+          {timestamp}
+        </a>
+      </Tooltip>
     );
     
     lastIndex = match.index + timestamp.length;
@@ -339,54 +340,54 @@ function processTextWithTimestampsAndMetrics(
     // Add the match based on type
     if (matchItem.type === 'timestamp') {
       parts.push(
-        <a
-          key={`timestamp-${matchItem.index}`}
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            jumpToTimestamp(matchItem.text);
-          }}
-          className={styles.timestampLink}
-          title="Click to jump to this timestamp in the video"
-        >
-          {matchItem.text}
-        </a>
+        <Tooltip key={`timestamp-${matchItem.index}`} content="Click to jump to this timestamp in the video">
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              jumpToTimestamp(matchItem.text);
+            }}
+            className={styles.timestampLink}
+          >
+            {matchItem.text}
+          </a>
+        </Tooltip>
       );
     } else if (matchItem.type === 'swing') {
       const swingKey = matchItem.text.toLowerCase();
       const swingInfo = swingExplanations[swingKey];
       parts.push(
-        <button
-          key={`swing-${matchItem.index}`}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onSwingClick?.(swingInfo);
-          }}
-          className={styles.swingHighlight}
-          title="Click to learn more about this technique"
-          type="button"
-        >
-          {matchItem.text}
-        </button>
+        <Tooltip key={`swing-${matchItem.index}`} content="Click to learn more about this technique">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSwingClick?.(swingInfo);
+            }}
+            className={styles.swingHighlight}
+            type="button"
+          >
+            {matchItem.text}
+          </button>
+        </Tooltip>
       );
     } else {
       // Metric with conversion support
       if (matchItem.value !== undefined && matchItem.unit && onMetricClick) {
         parts.push(
-          <button
-            key={`metric-${matchItem.index}`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onMetricClick(matchItem.value!, matchItem.unit!, matchItem.text);
-            }}
-            className={styles.metricHighlight}
-            title="Click to see conversions"
-            type="button"
-          >
-            {matchItem.text}
-          </button>
+          <Tooltip key={`metric-${matchItem.index}`} content="Click to see conversions">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onMetricClick(matchItem.value!, matchItem.unit!, matchItem.text);
+              }}
+              className={styles.metricHighlight}
+              type="button"
+            >
+              {matchItem.text}
+            </button>
+          </Tooltip>
         );
       } else {
         parts.push(

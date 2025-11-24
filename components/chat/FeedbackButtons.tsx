@@ -2,16 +2,21 @@
 
 import { useState } from "react";
 import { Flex, IconButton } from "@radix-ui/themes";
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Volume2, Loader2 } from "lucide-react";
+import { useAudioPlayer } from "@/components/AudioPlayerContext";
+import { getTTSSettings } from "@/utils/storage";
 
 interface FeedbackButtonsProps {
   messageId: string;
+  messageContent?: string;
   onFeedback?: (messageId: string, feedback: "up" | "down") => void;
 }
 
-export function FeedbackButtons({ messageId, onFeedback }: FeedbackButtonsProps) {
+export function FeedbackButtons({ messageId, messageContent, onFeedback }: FeedbackButtonsProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<"up" | "down" | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const { playAudio, isCurrentlyPlaying } = useAudioPlayer();
 
   const handleFeedback = (feedback: "up" | "down") => {
     setSelectedFeedback(feedback);
@@ -23,6 +28,47 @@ export function FeedbackButtons({ messageId, onFeedback }: FeedbackButtonsProps)
     
     onFeedback?.(messageId, feedback);
   };
+
+  const handlePlayAudio = async () => {
+    if (!messageContent || isLoadingAudio) return;
+    
+    setIsLoadingAudio(true);
+    
+    try {
+      // Get TTS settings from storage
+      const ttsSettings = getTTSSettings();
+      
+      // Request audio from API
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: messageContent,
+          messageId,
+          settings: ttsSettings,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate audio');
+      }
+      
+      const data = await response.json();
+      
+      // Play the audio
+      await playAudio(messageId, data.audioUrl);
+    } catch (error) {
+      console.error('[FeedbackButtons] Failed to play audio:', error);
+      // TODO: Show error toast
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
+
+  const isPlaying = isCurrentlyPlaying(messageId);
 
   return (
     <Flex gap="3" align="center">
@@ -68,6 +114,35 @@ export function FeedbackButtons({ messageId, onFeedback }: FeedbackButtonsProps)
         />
       </IconButton>
 
+      {messageContent && (
+        <IconButton
+          size="1"
+          variant="ghost"
+          color="gray"
+          onClick={handlePlayAudio}
+          disabled={isLoadingAudio || !messageContent}
+          style={{
+            cursor: isLoadingAudio || !messageContent ? "default" : "pointer",
+            color: isPlaying ? "var(--mint-11)" : undefined,
+            transition: "opacity 0.2s ease, color 0.2s ease",
+          }}
+          aria-label="Read message aloud"
+        >
+          {isLoadingAudio ? (
+            <Loader2 
+              size={15} 
+              strokeWidth={1.5}
+              className="audio-loading-spin"
+            />
+          ) : (
+            <Volume2 
+              size={15} 
+              strokeWidth={1.5}
+            />
+          )}
+        </IconButton>
+      )}
+
       <style jsx>{`
         @keyframes bounce {
           0%, 100% {
@@ -84,8 +159,21 @@ export function FeedbackButtons({ messageId, onFeedback }: FeedbackButtonsProps)
           }
         }
 
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
         :global(.feedback-bounce) {
           animation: bounce 0.6s ease;
+        }
+
+        :global(.audio-loading-spin) {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </Flex>

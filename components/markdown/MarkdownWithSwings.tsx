@@ -12,7 +12,7 @@ import { getHighlightingPreferences, type HighlightingPreferences } from "@/util
 
 interface MarkdownWithSwingsProps {
   children: string;
-  onAskForHelp?: (termName: string) => void;
+  onAskForHelp?: (termName: string, swing?: any) => void;
 }
 
 export function MarkdownWithSwings({ children, onAskForHelp }: MarkdownWithSwingsProps) {

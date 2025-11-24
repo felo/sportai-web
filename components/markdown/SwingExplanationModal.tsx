@@ -10,7 +10,7 @@ interface SwingExplanationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   swing: SwingExplanation | null;
-  onAskForHelp?: (termName: string) => void;
+  onAskForHelp?: (termName: string, swing?: SwingExplanation) => void;
 }
 
 export function SwingExplanationModal({ open, onOpenChange, swing, onAskForHelp }: SwingExplanationModalProps) {
@@ -88,7 +88,7 @@ export function SwingExplanationModal({ open, onOpenChange, swing, onAskForHelp 
                 className={styles.actionButtonSquare}
                 style={{ cursor: "pointer" }}
                 onClick={() => {
-                  onAskForHelp(swing.name);
+                  onAskForHelp(swing.name, swing);
                   onOpenChange(false);
                 }}
               >
