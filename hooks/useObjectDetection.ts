@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
 import type { YOLOModelType, ObjectDetectionResult } from "@/types/detection";
+import { initializeTensorFlow } from "@/lib/tensorflow-init";
 
 // Dynamic imports for heavy ML libraries (code-splitting)
 // These are only loaded when object detection is actually enabled
@@ -111,9 +112,11 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
 
   // Initialize the object detector
   useEffect(() => {
+    // Early return before doing ANYTHING if disabled
     if (!enabled) {
       setIsLoading(false);
       setDetector(null);
+      setError(null);
       return;
     }
 
@@ -124,9 +127,8 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         setIsLoading(true);
         setError(null);
 
-        // Set backend to webgl for better performance
-        await tf.setBackend("webgl");
-        await tf.ready();
+        // Use shared TensorFlow.js initialization
+        await initializeTensorFlow();
 
         console.log("🔧 TensorFlow.js backend ready for object detection:", tf.getBackend());
 

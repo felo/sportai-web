@@ -4,6 +4,7 @@ import "@tensorflow/tfjs-backend-webgl";
 import { BallTracker } from "@/utils/ball-tracker";
 import type { ProjectileModelType, BallType, ProjectileDetectionResult } from "@/types/detection";
 import type { ObjectDetectionResult } from "@/types/detection";
+import { initializeTensorFlow } from "@/lib/tensorflow-init";
 
 export interface ProjectileDetectionConfig {
   model?: ProjectileModelType;

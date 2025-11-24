@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
+import { initializeTensorFlow } from "@/lib/tensorflow-init";
 
 // Enable TensorFlow.js model caching
 // This ensures models are cached in the browser's Cache API
@@ -75,9 +76,11 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
 
   // Initialize the pose detector
   useEffect(() => {
+    // Early return before doing ANYTHING if disabled
     if (!enabled) {
       setIsLoading(false);
       setDetector(null);
+      setError(null);
       return;
     }
 
@@ -88,9 +91,8 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         setIsLoading(true);
         setError(null);
 
-        // Set backend to webgl for better performance
-        await tf.setBackend("webgl");
-        await tf.ready();
+        // Use shared TensorFlow.js initialization to prevent multiple inits
+        await initializeTensorFlow();
         
         // Enable model caching - this ensures models are saved to IndexedDB
         // TensorFlow.js should do this automatically, but we're being explicit

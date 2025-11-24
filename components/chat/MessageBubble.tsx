@@ -1,11 +1,10 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Avatar, Box, Button, Flex, Spinner, Text } from "@radix-ui/themes";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import { markdownComponents } from "@/components/markdown/markdown-components";
+import { Avatar, Box, Button, Flex, Text } from "@radix-ui/themes";
+import { MarkdownWithSwings } from "@/components/markdown/MarkdownWithSwings";
+import { StreamingIndicator } from "./StreamingIndicator";
+import { FeedbackButtons } from "./FeedbackButtons";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing, formatCost } from "@/lib/token-utils";
@@ -78,15 +77,19 @@ interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
   messageIndex?: number;
+  onAskForHelp?: (termName: string, swing?: any) => void;
+  onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage }: MessageBubbleProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
   const [showProUpsell, setShowProUpsell] = useState(false);
   const [videoContainerStyle, setVideoContainerStyle] = useState<React.CSSProperties>({});
+  const [ttsCharacters, setTtsCharacters] = useState(0);
+  const [ttsCost, setTtsCost] = useState(0);
   const isMobile = useIsMobile();
 
   // Load developer mode and theatre mode on mount
@@ -114,12 +117,6 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       window.removeEventListener("theatre-mode-change", handleTheatreModeChange);
     };
   }, []);
-
-  // Determine if we should show pose detection
-  // We now show VideoPoseViewer on mobile as well so users can toggle the AI overlay on/off.
-  // The overlay button will be visible, and users can control whether to enable pose detection.
-  // NOTE: We always render VideoPoseViewer (on both mobile and desktop) to show the toggle button.
-  const showPoseViewer = true;
 
   // Calculate cumulative tokens up to this message
   // Only count assistant messages for cumulative (they represent actual API calls)
@@ -189,17 +186,6 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
       return () => clearInterval(interval);
     }
   }, [message.content, message.role, userSentVideo]);
-
-  // Intelligent preloading: Load pose detection components when video is present
-  // This ensures components are ready by the time user wants to enable pose detection
-  useEffect(() => {
-    if (hasVideo) {
-      // Preload VideoPoseViewer and its TensorFlow dependencies
-      import("./VideoPoseViewer");
-      // Also preload Pose3DViewer (Three.js) for BlazePose 3D mode
-      import("./Pose3DViewer");
-    }
-  }, [hasVideo]);
 
   // Show PRO upsell after message is complete with a natural delay (only once per chat)
   useEffect(() => {
@@ -428,66 +414,24 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                         : videoContainerStyle
                     }
                   >
-                    {showPoseViewer ? (
-                      <VideoPoseViewer
-                        videoUrl={videoSrc}
-                        autoPlay
-                        initialModel={message.poseData?.model ?? "MoveNet"}
-                        initialShowSkeleton={message.poseData?.showSkeleton ?? true}
-                        initialShowAngles={message.poseData?.showAngles ?? false}
-                        initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
-                        initialPlaybackSpeed={message.videoPlaybackSpeed}
-                        initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
-                        initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
-                        initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
-                        initialShowTrackingId={message.poseData?.showTrackingId ?? false}
-                        initialShowTrajectories={message.poseData?.showTrajectories ?? false}
-                        initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
-                        initialShowVelocity={message.poseData?.showVelocity ?? false}
-                        initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
-                        initialPoseEnabled={message.poseData?.enabled ?? false}
-                      />
-                    ) : (
-                      <video
-                        ref={videoRef}
-                        src={videoSrc}
-                        controls
-                        autoPlay
-                        muted
-                        playsInline
-                        preload="metadata"
-                        onError={(e) => {
-                          const video = e.currentTarget;
-                          // Check if this is a blob URL error (revoked blob)
-                          // Revoked blob URLs typically result in network errors or src not supported errors
-                          if (video.src.startsWith("blob:")) {
-                            console.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
-                            // Don't log as error for revoked blob URLs - this is expected behavior
-                            // The video element will just fail to load, which is fine
-                          } else {
-                            console.error("Video playback error:", e);
-                            console.error("Video error details:", {
-                              error: video.error,
-                              networkState: video.networkState,
-                              readyState: video.readyState,
-                              src: video.src,
-                            });
-                          }
-                        }}
-                        onLoadStart={() => {
-                          console.log("Video load started:", videoSrc);
-                        }}
-                        onLoadedMetadata={() => {
-                          console.log("Video metadata loaded");
-                        }}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          display: "block",
-                        }}
-                      />
-                    )}
+                    <VideoPoseViewer
+                      videoUrl={videoSrc}
+                      autoPlay
+                      initialModel={message.poseData?.model ?? "MoveNet"}
+                      initialShowSkeleton={message.poseData?.showSkeleton ?? true}
+                      initialShowAngles={message.poseData?.showAngles ?? false}
+                      initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
+                      initialPlaybackSpeed={message.videoPlaybackSpeed}
+                      initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
+                      initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
+                      initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
+                      initialShowTrackingId={message.poseData?.showTrackingId ?? false}
+                      initialShowTrajectories={message.poseData?.showTrajectories ?? false}
+                      initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
+                      initialShowVelocity={message.poseData?.showVelocity ?? false}
+                      initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
+                      initialPoseEnabled={message.poseData?.enabled ?? false}
+                    />
                   </Box>
                 ) : (
                   <Box
@@ -538,18 +482,27 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
           <Box style={{ maxWidth: "none" }}>
             <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
               {message.content ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={markdownComponents}
+                <MarkdownWithSwings
+                  messageId={message.id}
+                  onAskForHelp={onAskForHelp}
+                  feedbackButtons={
+                    <FeedbackButtons
+                      messageId={message.id}
+                      onFeedback={(messageId, feedback) => {
+                        // Store feedback using onUpdateMessage if available
+                        onUpdateMessage?.(messageId, { feedback });
+                      }}
+                    />
+                  }
+                  onTTSUsage={(characters, cost, quality) => {
+                    setTtsCharacters(characters);
+                    setTtsCost(cost);
+                  }}
                 >
                   {message.content}
-                </ReactMarkdown>
+                </MarkdownWithSwings>
               ) : (
-                <Flex gap="2" align="center">
-                  <Spinner size="1" />
-                  <Text color="gray">{userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}</Text>
-                </Flex>
+                <StreamingIndicator />
               )}
             </Box>
             
@@ -644,6 +597,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0 }: M
                     {message.modelSettings && (
                       <Text size="1">
                         <strong>Settings:</strong> Thinking={message.modelSettings.thinkingMode}, Resolution={message.modelSettings.mediaResolution}
+                      </Text>
+                    )}
+                    {ttsCharacters > 0 && (
+                      <Text size="1">
+                        <strong>TTS usage:</strong> {ttsCharacters.toLocaleString()} characters (${ttsCost.toFixed(4)})
                       </Text>
                     )}
                   </Flex>

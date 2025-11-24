@@ -20,6 +20,7 @@ export type Message = {
   responseDuration?: number; // API response duration in milliseconds
   isVideoSizeLimitError?: boolean; // Flag to indicate this is a video size limitation message
   isStreaming?: boolean; // Flag to indicate the message is currently streaming
+  feedback?: "up" | "down"; // User feedback on assistant messages
   modelSettings?: {
     thinkingMode: string;
     mediaResolution: string;
