@@ -1,6 +1,7 @@
 "use client";
 
-import { Box } from "@radix-ui/themes";
+import { useState } from "react";
+import { Box, Flex, Text, Button } from "@radix-ui/themes";
 import { PlusIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import { useSidebar } from "@/components/SidebarContext";
@@ -16,6 +17,7 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const sidebarWidth = isCollapsed ? "64px" : "280px";
+  const [isHovered, setIsHovered] = useState(false);
 
   // Mobile layout: Hamburger menu (left), centered logo, + button (right)
   if (isMobile) {
@@ -90,7 +92,9 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         borderBottom: "1px solid var(--gray-6)",
         backgroundColor: "var(--color-background)",
         backdropFilter: "blur(8px)",
-        padding: "var(--space-3) var(--space-4)",
+        height: "57px",
+        paddingLeft: "var(--space-4)",
+        paddingRight: "var(--space-4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -98,13 +102,68 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         transition: "left 0.2s ease-in-out",
       }}
     >
-      <Image
-        src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg"
-        alt="SportAI"
-        width={120}
-        height={38}
-        style={{ objectFit: "contain", height: "auto" }}
-      />
+      {/* Logo with Morph to New Chat Button on Hover */}
+      <Box
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          position: "relative",
+          width: "120px",
+          height: "38px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: isCollapsed ? 1 : 0,
+          transition: "opacity 0.1s ease-in-out",
+          pointerEvents: isCollapsed ? "auto" : "none",
+        }}
+      >
+        {/* Logo */}
+        <Box
+          style={{
+            opacity: isHovered ? 0 : 1,
+            transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            position: "absolute",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: isHovered ? "none" : "auto",
+          }}
+        >
+          <Image
+            src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg"
+            alt="SportAI"
+            width={120}
+            height={38}
+            style={{ objectFit: "contain", height: "auto", display: "block" }}
+          />
+        </Box>
+
+        {/* New Chat Button */}
+        <Button
+          variant="ghost"
+          size="2"
+          onClick={onNewChat}
+          style={{
+            opacity: isHovered ? 1 : 0,
+            transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            position: "absolute",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "var(--space-2) var(--space-3)",
+            whiteSpace: "nowrap",
+            pointerEvents: isHovered ? "auto" : "none",
+            gap: "6px",
+          }}
+        >
+          <PlusIcon width="16" height="16" />
+          <Text size="2" style={{ fontSize: "14px", lineHeight: "1" }}>
+            New chat
+          </Text>
+        </Button>
+      </Box>
+
       <BadgeWithTooltip
         text="API version 0.5.58"
         tooltip="Stable v0.5.58 - Last updated 2025-10-01"

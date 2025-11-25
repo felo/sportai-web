@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog, Dialog, TextField } from "@radix-ui/themes";
 import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon, GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import Image from "next/image";
 import { useSidebar } from "./SidebarContext";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -668,12 +669,33 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: isCollapsed ? "center" : "flex-end",
+          justifyContent: isCollapsed ? "center" : "space-between",
           padding: isCollapsed ? "0" : "0 var(--space-4)",
           height: "57px",
           flexShrink: 0,
         }}
       >
+        {/* Logo - fades in when sidebar expands */}
+        <Box
+          style={{
+            opacity: isCollapsed ? 0 : 1,
+            transition: "opacity 0.2s ease-in-out",
+            display: "flex",
+            alignItems: "center",
+            pointerEvents: isCollapsed ? "none" : "auto",
+          }}
+        >
+          {!isCollapsed && (
+            <Image
+              src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg"
+              alt="SportAI"
+              width={120}
+              height={38}
+              style={{ objectFit: "contain", height: "auto", display: "block" }}
+            />
+          )}
+        </Box>
+
         <Button
           variant="ghost"
           size="2"
