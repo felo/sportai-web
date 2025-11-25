@@ -65,6 +65,7 @@ export function AIChatForm() {
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const [showingVideoSizeError, setShowingVideoSizeError] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -420,6 +421,196 @@ export function AIChatForm() {
     setProgressStage("idle");
     setUploadProgress(0);
     setShowingVideoSizeError(false);
+  };
+
+  /**
+   * Retry handler for incomplete/failed messages.
+   * Finds the previous user message and regenerates the assistant response.
+   */
+  const handleRetryMessage = async (assistantMessageId: string) => {
+    if (loading || retryingMessageId) return;
+    
+    // Find the assistant message to retry
+    const assistantMessageIndex = messages.findIndex(m => m.id === assistantMessageId);
+    if (assistantMessageIndex === -1) {
+      console.error("[AIChatForm] Cannot find assistant message to retry:", assistantMessageId);
+      return;
+    }
+    
+    // Find the previous user message(s) - look backwards until we find user messages
+    let userPrompt = "";
+    let userVideoUrl: string | null = null;
+    let userVideoS3Key: string | null = null;
+    
+    for (let i = assistantMessageIndex - 1; i >= 0; i--) {
+      const prevMessage = messages[i];
+      if (prevMessage.role === "assistant") {
+        break; // Stop at the previous assistant message
+      }
+      if (prevMessage.role === "user") {
+        // Collect user content (there might be multiple user messages: one for video, one for text)
+        if (prevMessage.content.trim()) {
+          userPrompt = prevMessage.content;
+        }
+        if (prevMessage.videoUrl || prevMessage.videoS3Key) {
+          userVideoUrl = prevMessage.videoUrl || null;
+          userVideoS3Key = prevMessage.videoS3Key || null;
+        }
+      }
+    }
+    
+    if (!userPrompt && !userVideoUrl) {
+      console.error("[AIChatForm] Cannot find user message to retry from");
+      return;
+    }
+    
+    console.log("[AIChatForm] Retrying message:", {
+      assistantMessageId,
+      userPrompt: userPrompt.substring(0, 50) + "...",
+      hasVideo: !!userVideoUrl,
+    });
+    
+    // Get conversation history BEFORE this exchange
+    const conversationHistory = messages.slice(0, assistantMessageIndex).filter((m, idx) => {
+      // Find user messages before the current exchange
+      for (let i = assistantMessageIndex - 1; i >= 0; i--) {
+        if (messages[i].id === m.id) {
+          return false; // Exclude messages that are part of the current exchange
+        }
+        if (messages[i].role === "assistant") {
+          return true; // Include if before the previous assistant message
+        }
+      }
+      return true;
+    });
+    
+    const requestChatId = getCurrentChatId();
+    if (!requestChatId) return;
+    
+    setRetryingMessageId(assistantMessageId);
+    setLoading(true);
+    setApiError(null);
+    
+    // Clear the incomplete message content and reset its flags
+    updateMessage(assistantMessageId, { 
+      content: "", 
+      isIncomplete: false, 
+      isStreaming: true 
+    });
+    
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    try {
+      if (!userVideoUrl) {
+        // Text-only retry
+        setProgressStage("generating");
+        await sendTextOnlyQuery(
+          userPrompt,
+          assistantMessageId,
+          (id, updates) => {
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) {
+              updateMessage(id, updates);
+            }
+          },
+          conversationHistory,
+          abortController,
+          thinkingMode,
+          mediaResolution,
+          domainExpertise
+        );
+      } else {
+        // Video retry - we need to re-send with the stored video URL
+        setProgressStage("processing");
+        
+        // For video retries, we need to call the API directly with the S3 URL
+        // The sendVideoQuery expects a File, but we have an S3 URL
+        // We'll use fetch directly to the API with the video URL
+        const formData = new FormData();
+        formData.append("prompt", userPrompt);
+        formData.append("videoUrl", userVideoUrl);
+        formData.append("thinkingMode", thinkingMode);
+        formData.append("mediaResolution", mediaResolution);
+        formData.append("domainExpertise", domainExpertise);
+        
+        if (conversationHistory.length > 0) {
+          const { getConversationContext } = await import("@/utils/context-utils");
+          const context = getConversationContext(conversationHistory);
+          if (context.length > 0) {
+            formData.append("history", JSON.stringify(context));
+          }
+        }
+        
+        const response = await fetch("/api/llm", {
+          method: "POST",
+          headers: { "x-stream": "true" },
+          body: formData,
+          signal: abortController.signal,
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to get response");
+        }
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = "";
+        
+        if (reader) {
+          setProgressStage("analyzing");
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) {
+              updateMessage(assistantMessageId, { 
+                content: accumulatedText,
+                isStreaming: true,
+              });
+            }
+          }
+          
+          // Mark as complete
+          const chatId = getCurrentChatId();
+          if (chatId === requestChatId) {
+            updateMessage(assistantMessageId, {
+              isStreaming: false,
+              isIncomplete: false,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      const currentChatId = getCurrentChatId();
+      if (currentChatId === requestChatId) {
+        if (err instanceof Error && err.name === "AbortError") {
+          console.log("[AIChatForm] Retry was cancelled");
+        } else {
+          const errorMessage = err instanceof Error ? err.message : "An error occurred";
+          setApiError(errorMessage);
+          // Mark as still incomplete so user can try again
+          updateMessage(assistantMessageId, {
+            isStreaming: false,
+            isIncomplete: true,
+          });
+        }
+      }
+    } finally {
+      const currentChatId = getCurrentChatId();
+      if (currentChatId === requestChatId) {
+        setLoading(false);
+        setProgressStage("idle");
+        setRetryingMessageId(null);
+      }
+      abortControllerRef.current = null;
+    }
   };
 
   const handleAskForHelp = (termName: string, swing?: { name: string; sport: string; description: string }) => {
@@ -843,6 +1034,8 @@ export function AIChatForm() {
                   messagesEndRef={messagesEndRef}
                   onAskForHelp={handleAskForHelp}
                   onUpdateMessage={updateMessage}
+                  onRetryMessage={handleRetryMessage}
+                  retryingMessageId={retryingMessageId}
                 />
               )}
             </div>

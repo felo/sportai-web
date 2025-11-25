@@ -346,10 +346,660 @@ html[data-theme="light"] .some-element {
 
 ---
 
-**Last Updated:** November 21, 2025
-**Version:** 1.1
+## Custom Components Library
+
+The SportAI Web project has a collection of reusable components. **Always check these before creating new components.**
+
+### Quick Reference: Import Paths
+
+```tsx
+// UI Components
+import { IconButton, ToggleSwitch, RangeSlider, LoadingState, ErrorDisplay, EmptyState } from "@/components/ui";
+
+// Chat Components  
+import { MessageList, ChatInput, VideoPoseViewer, ScrollToBottom, ChatHeader } from "@/components/chat";
+
+// Sidebar Components
+import { Sidebar, ChatList, ChatListItem, NewChatButton } from "@/components/sidebar";
+
+// Markdown Components
+import { MarkdownWithSwings, SwingExplanationModal, MetricConversionModal, SectionSpeaker } from "@/components/markdown";
+
+// Auth Components
+import { AuthModal } from "@/components/auth/AuthModal";
+import { UserMenu } from "@/components/auth/UserMenu";
+import { useAuth } from "@/components/auth/AuthProvider";
+```
+
+---
+
+### UI Components (`@/components/ui`)
+
+#### Buttons
+
+##### IconButton
+Square icon-only button with consistent sizing and optional tooltip.
+
+```tsx
+import { IconButton } from "@/components/ui";
+
+<IconButton
+  icon={<PlusIcon />}
+  onClick={handleClick}
+  tooltip="Add new item"
+  ariaLabel="Add item"
+  variant="ghost"        // "ghost" | "soft" | "solid" | "outline" | "surface"
+  size="2"               // "1" | "2" | "3" | "4"
+  color="gray"           // "gray" | "red" | "blue" | "green" | "mint"
+  disabled={false}
+/>
+```
+
+##### CircularIconButton
+Circular button with hover effects, perfect for audio controls or special actions.
+
+```tsx
+import { CircularIconButton } from "@/components/ui";
+
+<CircularIconButton
+  icon={<Volume2 size={16} />}
+  onClick={handlePlay}
+  ariaLabel="Play audio"
+  active={isPlaying}
+  loading={isLoading}
+/>
+```
+
+##### PresetButtonGroup
+Group of small preset buttons with labels.
+
+```tsx
+import { PresetButtonGroup } from "@/components/ui";
+
+<PresetButtonGroup
+  label="Arms"
+  buttons={[
+    { key: 'l-arm', label: 'L Arm', onClick: selectLeftArm },
+    { key: 'r-arm', label: 'R Arm', onClick: selectRightArm },
+  ]}
+/>
+```
+
+#### Inputs
+
+##### ToggleSwitch
+Switch with label, optional description, tooltip, and status indicator.
+
+```tsx
+import { ToggleSwitch } from "@/components/ui";
+
+<ToggleSwitch
+  checked={showSkeleton}
+  onCheckedChange={setShowSkeleton}
+  label="Show skeleton"
+  description="Display pose skeleton overlay"
+  tooltip="Toggle skeleton visibility"
+  size="2"               // "1" | "2" | "3"
+  labelSize="2"          // "1" | "2" | "3"
+  labelColor="gray"      // "gray" | "mint" | "red" | "blue" | "green"
+  showStatus={true}      // Shows "• Active" when checked
+  statusText="• Active"  // Custom status text
+/>
+```
+
+##### RangeSlider
+Range input with label and value display.
+
+```tsx
+import { RangeSlider } from "@/components/ui";
+
+<RangeSlider
+  value={maxPoses}
+  onChange={setMaxPoses}
+  min={1}
+  max={6}
+  label="Detect players"
+  formatValue={(v) => `${v} ${v === 1 ? 'player' : 'players'}`}
+  description="Single player mode"
+/>
+```
+
+#### Layout
+
+##### SettingsSectionHeader
+Header for settings sections with enable/disable toggle.
+
+```tsx
+import { SettingsSectionHeader } from "@/components/ui";
+
+<SettingsSectionHeader
+  title="Pose Detection"
+  description="Track body movement and skeleton"
+  enabled={isPoseEnabled}
+  onEnabledChange={setIsPoseEnabled}
+/>
+```
+
+##### SettingsSection
+Wrapper for settings sections with consistent styling.
+
+```tsx
+import { SettingsSection } from "@/components/ui";
+
+<SettingsSection showBorder pt="3" gap="2">
+  <SettingsSectionHeader ... />
+  <ToggleSwitch ... />
+  <RangeSlider ... />
+</SettingsSection>
+```
+
+#### Feedback
+
+##### LoadingState
+Loading spinner with message.
+
+```tsx
+import { LoadingState } from "@/components/ui";
+
+<LoadingState 
+  message="Loading model..." 
+  size="2"       // "1" | "2" | "3"
+  gap="2"        // "1" | "2" | "3" | "4"
+/>
+```
+
+##### ErrorDisplay
+Error message display.
+
+```tsx
+import { ErrorDisplay } from "@/components/ui";
+
+<ErrorDisplay message="Failed to load model" showIcon />
+```
+
+##### EmptyState
+Empty state message.
+
+```tsx
+import { EmptyState } from "@/components/ui";
+
+<EmptyState message="No chats yet" />
+```
+
+##### ErrorToast
+Error toast notification (auto-shows when error is set).
+
+```tsx
+import { ErrorToast } from "@/components/ui";
+
+<ErrorToast 
+  error={errorMessage}           // Shows toast when not null
+  onOpenChange={(open) => { }}   // Called when toast closes
+/>
+```
+
+##### FeedbackToast
+Thank you feedback toast.
+
+```tsx
+import { FeedbackToast } from "@/components/ui";
+
+<FeedbackToast 
+  open={showFeedbackToast}
+  onOpenChange={setShowFeedbackToast}
+/>
+```
+
+#### Navigation
+
+##### NavigationLink
+Link button with icon and text.
+
+```tsx
+import { NavigationLink } from "@/components/ui";
+
+<NavigationLink
+  href="https://sportai.com/platform"
+  label="SportAI Platform"
+  icon={<GlobeIcon />}
+  external              // Opens in new tab
+/>
+```
+
+#### Badges
+
+##### BadgeWithTooltip
+Badge with hover tooltip.
+
+```tsx
+import { BadgeWithTooltip } from "@/components/ui";
+
+<BadgeWithTooltip
+  text="API version 0.5.58"
+  tooltip="Stable v0.5.58 - Last updated 2025-10-01"
+  variant="soft"
+  color="gray"
+  radius="full"
+/>
+```
+
+---
+
+### Chat Components (`@/components/chat`)
+
+#### Messages
+
+##### MessageList
+Displays a scrollable list of chat messages with loading states.
+
+```tsx
+import { MessageList } from "@/components/chat";
+
+<MessageList
+  messages={messages}
+  loading={loading}
+  videoFile={videoFile}
+  progressStage={progressStage}
+  uploadProgress={uploadProgress}
+  messagesEndRef={messagesEndRef}
+  onAskForHelp={handleAskForHelp}
+  onUpdateMessage={handleUpdateMessage}
+/>
+```
+
+##### MessageBubble
+Individual message component with support for text, video, and pose detection.
+
+```tsx
+import { MessageBubble } from "@/components/chat";
+
+<MessageBubble
+  message={message}
+  allMessages={messages}
+  messageIndex={index}
+  onAskForHelp={handleAskForHelp}
+  onUpdateMessage={handleUpdateMessage}
+/>
+```
+
+#### Input
+
+##### ChatInput
+Main chat input with video upload, settings, and send functionality.
+
+```tsx
+import { ChatInput } from "@/components/chat";
+
+<ChatInput
+  prompt={prompt}
+  videoFile={videoFile}
+  videoPreview={videoPreview}
+  error={error}
+  loading={loading}
+  progressStage={progressStage}
+  onPromptChange={setPrompt}
+  onVideoSelect={handleVideoSelect}
+  onVideoRemove={handleVideoRemove}
+  onSubmit={handleSubmit}
+  onStop={handleStop}
+  disabled={disabled}
+/>
+```
+
+##### AudioStopButton
+Button to stop audio playback.
+
+```tsx
+import { AudioStopButton } from "@/components/chat";
+
+<AudioStopButton onClick={stopAudio} isVisible={isPlaying} />
+```
+
+#### Viewers
+
+##### VideoPoseViewer
+Lazy-loaded video player with pose detection, object detection, and projectile tracking.
+
+```tsx
+import { VideoPoseViewer } from "@/components/chat";
+
+<VideoPoseViewer
+  videoUrl={videoUrl}
+  width={640}
+  height={480}
+  initialModel="movenet-multipose"
+  initialShowSkeleton={true}
+  initialPoseEnabled={true}
+/>
+```
+
+##### VideoPreview
+Preview uploaded video before sending.
+
+```tsx
+import { VideoPreview } from "@/components/chat";
+
+<VideoPreview
+  videoUrl={videoPreview}
+  fileName={fileName}
+  onRemove={handleRemove}
+/>
+```
+
+##### SAM2Viewer
+Segment Anything Model 2 viewer for video segmentation.
+
+```tsx
+import { SAM2Viewer } from "@/components/chat/viewers/SAM2Viewer";
+
+<SAM2Viewer videoUrl={videoUrl} width={640} height={480} />
+```
+
+##### Pose3DViewer
+3D visualization of pose detection results using Three.js.
+
+```tsx
+import { Pose3DViewer } from "@/components/chat/viewers/Pose3DViewer";
+
+<Pose3DViewer pose={poseData} width={640} height={480} showFace={true} />
+```
+
+#### Feedback
+
+##### FeedbackButtons
+Thumbs up/down feedback buttons for messages.
+
+```tsx
+import { FeedbackButtons } from "@/components/chat";
+
+<FeedbackButtons
+  messageId={messageId}
+  currentFeedback={feedback}
+  onFeedback={handleFeedback}
+/>
+```
+
+##### StreamingIndicator
+Animated indicator shown during streaming responses.
+
+```tsx
+import { StreamingIndicator } from "@/components/chat";
+
+<StreamingIndicator />
+```
+
+##### ProgressIndicator
+Shows upload and processing progress with stages.
+
+```tsx
+import { ProgressIndicator } from "@/components/chat";
+
+<ProgressIndicator
+  progressStage="uploading"    // "uploading" | "processing" | "analyzing"
+  uploadProgress={75}
+  hasVideo={true}
+/>
+```
+
+#### Navigation
+
+##### ScrollToBottom
+Button to scroll to the bottom of the chat.
+
+```tsx
+import { ScrollToBottom } from "@/components/chat";
+
+<ScrollToBottom messagesEndRef={messagesEndRef} isVisible={!isAtBottom} />
+```
+
+##### ScrollToVideo
+Scrolls to video content in chat messages.
+
+```tsx
+import { ScrollToVideo } from "@/components/chat";
+
+<ScrollToVideo videoMessageId={videoMessageId} onScrollComplete={handleScrollComplete} />
+```
+
+#### Overlays
+
+##### DragOverlay
+Overlay shown during drag-and-drop operations.
+
+```tsx
+import { DragOverlay } from "@/components/chat";
+
+<DragOverlay isDragging={isDragging} onDrop={handleDrop} />
+```
+
+#### Header
+
+##### ChatHeader
+Chat header with title, actions, and sidebar toggle.
+
+```tsx
+import { ChatHeader } from "@/components/chat";
+
+<ChatHeader
+  onNewChat={handleNewChat}
+  onToggleSidebar={toggleSidebar}
+  isSidebarOpen={isSidebarOpen}
+/>
+```
+
+---
+
+### Sidebar Components (`@/components/sidebar`)
+
+##### Sidebar
+Main sidebar component with chat list, settings, and navigation.
+
+```tsx
+import { Sidebar } from "@/components/sidebar";
+
+<Sidebar
+  chats={chats}
+  currentChatId={currentChatId}
+  onSelectChat={handleSelectChat}
+  onNewChat={handleNewChat}
+  onDeleteChat={handleDeleteChat}
+  onRenameChat={handleRenameChat}
+/>
+```
+
+##### ChatList
+List of chat conversations.
+
+```tsx
+import { ChatList } from "@/components/sidebar";
+
+<ChatList
+  chats={chats}
+  currentChatId={currentChatId}
+  onSelectChat={handleSelectChat}
+/>
+```
+
+##### ChatListItem
+Individual chat item in the list.
+
+```tsx
+import { ChatListItem } from "@/components/sidebar";
+
+<ChatListItem
+  chat={chat}
+  isSelected={isSelected}
+  onSelect={handleSelect}
+  onDelete={handleDelete}
+  onRename={handleRename}
+/>
+```
+
+##### NewChatButton
+Button to create a new chat.
+
+```tsx
+import { NewChatButton } from "@/components/sidebar";
+
+<NewChatButton onClick={handleNewChat} />
+```
+
+---
+
+### Markdown Components (`@/components/markdown`)
+
+##### MarkdownWithSwings
+Renders markdown with interactive swing terminology links and section speakers.
+
+```tsx
+import { MarkdownWithSwings } from "@/components/markdown";
+
+<MarkdownWithSwings 
+  content={markdownContent}
+  onSwingClick={handleSwingClick}
+/>
+```
+
+##### SwingExplanationModal
+Modal that explains swing terminology (forehand, backhand, serve, etc.).
+
+```tsx
+import { SwingExplanationModal } from "@/components/markdown";
+
+<SwingExplanationModal
+  isOpen={isOpen}
+  onClose={handleClose}
+  swingType="forehand"
+  sport="tennis"
+/>
+```
+
+##### MetricConversionModal
+Modal for converting between metric and imperial units.
+
+```tsx
+import { MetricConversionModal, convertMetric } from "@/components/markdown";
+
+<MetricConversionModal
+  isOpen={isOpen}
+  onClose={handleClose}
+  value={100}
+  unit="km/h"
+/>
+```
+
+##### SectionSpeaker
+Text-to-speech button for reading sections aloud.
+
+```tsx
+import { SectionSpeaker } from "@/components/markdown";
+
+<SectionSpeaker text={sectionText} />
+```
+
+---
+
+### Auth Components (`@/components/auth`)
+
+##### AuthModal
+Sign-in modal with Google and Apple OAuth.
+
+```tsx
+import { AuthModal } from "@/components/auth/AuthModal";
+
+<AuthModal open={isOpen} onOpenChange={setIsOpen} />
+```
+
+##### UserMenu
+User dropdown menu with settings, theme toggle, and sign out.
+
+```tsx
+import { UserMenu } from "@/components/auth/UserMenu";
+
+<UserMenu
+  appearance="dark"
+  theatreMode={true}
+  developerMode={false}
+  onThemeSelect={(theme) => setTheme(theme)}
+  onTheatreModeToggle={(enabled) => setTheatreMode(enabled)}
+  onDeveloperModeToggle={(enabled) => setDeveloperMode(enabled)}
+  onClearChat={handleClearChat}
+/>
+```
+
+##### useAuth Hook
+Access authentication state and methods.
+
+```tsx
+import { useAuth } from "@/components/auth/AuthProvider";
+
+const { user, profile, loading, signOut } = useAuth();
+```
+
+---
+
+### Other Components
+
+##### StarterPrompts
+Landing page with demo prompt cards.
+
+```tsx
+import { StarterPrompts } from "@/components/StarterPrompts";
+
+<StarterPrompts
+  onPromptSelect={(prompt, videoUrl, settings) => {
+    // Handle prompt selection with optional settings
+    // settings?: { thinkingMode, mediaResolution, domainExpertise, playbackSpeed, poseSettings }
+  }}
+/>
+```
+
+---
+
+### VideoPoseViewer Sub-Components
+
+The `videoPoseViewer` module in `@/components/chat/viewers/videoPoseViewer/` has its own set of reusable components:
+
+#### Components (`videoPoseViewer/components`)
+- `PoseSettingsPanel` - Configure pose detection settings
+- `ObjectDetectionSettingsPanel` - Configure object detection
+- `ProjectileDetectionSettingsPanel` - Configure ball tracking
+- `PlaybackControls` - Video playback controls with speed/seek
+- `VelocityDisplay` - Display velocity measurements
+- `CollapsibleSection` - Collapsible settings sections
+- `DescriptiveSelect` - Select dropdown with descriptions
+- `AnglePresetButton` - Quick angle measurement presets
+
+#### Hooks (`videoPoseViewer/hooks`)
+
+```tsx
+import { 
+  usePoseSettings,
+  useDetectionSettings,
+  useDetectionState,
+  useVideoPlayback,
+  useVideoDimensions,
+  useVideoFPS,
+  useVelocityTracking,
+  useJointTrajectories,
+  useAngleMeasurement
+} from "@/components/chat/viewers/videoPoseViewer/hooks";
+```
+
+---
+
+**Last Updated:** November 25, 2025
+**Version:** 1.2
 
 ## Changelog
+
+### v1.2 (November 25, 2025)
+- Added comprehensive Custom Components Library documentation
+- Documented all UI components with props and examples
+- Documented all Chat components with props and examples
+- Documented Sidebar, Markdown, and Auth components
+- Added quick reference import paths for LLM prompting
+- Added VideoPoseViewer sub-components and hooks reference
 
 ### v1.1 (November 21, 2025)
 - Added centralized styling overrides documentation

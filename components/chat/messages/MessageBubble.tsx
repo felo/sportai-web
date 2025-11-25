@@ -16,9 +16,11 @@ interface MessageBubbleProps {
   messageIndex?: number;
   onAskForHelp?: (termName: string, swing?: any) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
+  onRetryMessage?: (messageId: string) => void;
+  isRetrying?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -274,10 +276,13 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
               messageId={message.id}
               content={message.content}
               isStreaming={message.isStreaming}
+              isIncomplete={message.isIncomplete}
               thinkingMessage={userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}
               onAskForHelp={onAskForHelp}
               onTTSUsage={handleTTSUsage}
               onFeedback={() => setShowFeedbackToast(true)}
+              onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
+              isRetrying={isRetrying}
             />
             
             {/* PRO Membership Upsell */}

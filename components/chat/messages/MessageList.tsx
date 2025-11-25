@@ -17,6 +17,8 @@ interface MessageListProps {
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onAskForHelp?: (termName: string, swing?: any) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
+  onRetryMessage?: (messageId: string) => void;
+  retryingMessageId?: string | null;
 }
 
 export function MessageList({
@@ -28,6 +30,8 @@ export function MessageList({
   messagesEndRef,
   onAskForHelp,
   onUpdateMessage,
+  onRetryMessage,
+  retryingMessageId,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -99,6 +103,8 @@ export function MessageList({
           messageIndex={index}
           onAskForHelp={onAskForHelp}
           onUpdateMessage={onUpdateMessage}
+          onRetryMessage={onRetryMessage}
+          isRetrying={retryingMessageId === message.id}
         />
       ))}
 

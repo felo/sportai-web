@@ -37,13 +37,17 @@ export function ThinkingIndicator({ message }: ThinkingIndicatorProps) {
         }
 
         @keyframes thinkingPulse {
-          0%, 60%, 100% {
+          0%, 100% {
             opacity: 0.4;
-            transform: scale(1);
+            transform: scale(1) translateY(0);
           }
           30% {
             opacity: 1;
-            transform: scale(1.2);
+            transform: scale(1.2) translateY(-6px);
+          }
+          60% {
+            opacity: 0.4;
+            transform: scale(1) translateY(0);
           }
         }
       `}</style>

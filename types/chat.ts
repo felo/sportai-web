@@ -21,6 +21,7 @@ export type Message = {
   timeToFirstToken?: number; // Time to first token in milliseconds (from request to first stream chunk)
   isVideoSizeLimitError?: boolean; // Flag to indicate this is a video size limitation message
   isStreaming?: boolean; // Flag to indicate the message is currently streaming
+  isIncomplete?: boolean; // Flag to indicate the response was interrupted or failed
   modelSettings?: {
     thinkingMode: string;
     mediaResolution: string;

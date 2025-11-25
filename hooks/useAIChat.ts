@@ -14,6 +14,38 @@ import {
   loadChat,
 } from "@/utils/storage-unified";
 
+/**
+ * Detects and marks incomplete assistant messages.
+ * A message is considered incomplete if:
+ * - It's an assistant message AND
+ * - It has isStreaming=true (was interrupted during generation) OR
+ * - It has no content and no isStreaming flag (failed before any content was generated)
+ */
+function markIncompleteMessages(messages: Message[]): Message[] {
+  return messages.map((msg, index) => {
+    if (msg.role === "assistant") {
+      // Already marked as incomplete - keep it
+      if (msg.isIncomplete) {
+        return msg;
+      }
+      
+      // Message was streaming when interrupted (isStreaming=true but we're loading from storage)
+      if (msg.isStreaming) {
+        console.log("[useAIChat] Detected interrupted streaming message:", msg.id);
+        return { ...msg, isStreaming: false, isIncomplete: true };
+      }
+      
+      // Message is the last one, has no content, and no streaming flag
+      // This means it failed before any response was generated
+      if (index === messages.length - 1 && !msg.content.trim() && msg.isStreaming === undefined) {
+        console.log("[useAIChat] Detected empty assistant message at end:", msg.id);
+        return { ...msg, isIncomplete: true };
+      }
+    }
+    return msg;
+  });
+}
+
 export function useAIChat() {
   // Start with empty array to avoid hydration mismatch
   // Load from localStorage only on client after hydration
@@ -39,7 +71,8 @@ export function useAIChat() {
         if (currentChatId) {
           const chat = await loadChat(currentChatId);
           if (chat) {
-            messagesToLoad = chat.messages;
+            // Mark any messages that were interrupted as incomplete
+            messagesToLoad = markIncompleteMessages(chat.messages);
           }
         }
         
@@ -161,11 +194,13 @@ export function useAIChat() {
             setMessages([]);
             clearMessagesFromStorage();
           } else {
+            // Mark any messages that were interrupted as incomplete
+            const markedMessages = markIncompleteMessages(chat.messages);
             // Load messages from the selected chat
-            const refreshed = await refreshVideoUrls(chat.messages);
+            const refreshed = await refreshVideoUrls(markedMessages);
             setMessages(refreshed);
             console.log("[useAIChat] Messages loaded:", refreshed.length);
-            // Update chat with refreshed URLs (silent to prevent event loop)
+            // Update chat with refreshed URLs and incomplete flags (silent to prevent event loop)
             updateExistingChat(currentChatId, { messages: refreshed }, true);
           }
         } else {
