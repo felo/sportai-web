@@ -9,3 +9,6 @@ export { useObjectDetection } from "./useObjectDetection";
 export { useProjectileDetection } from "./useProjectileDetection";
 export { useSAM2Detection } from "./useSAM2Detection";
 
+// Sidebar hooks
+export { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "./sidebar";
+

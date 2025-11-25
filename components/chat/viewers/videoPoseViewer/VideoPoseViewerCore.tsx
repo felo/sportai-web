@@ -131,7 +131,23 @@ export function VideoPoseViewer({
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
   const [localTheatreMode, setLocalTheatreMode] = useState(theatreMode);
+  const [isShortScreenView, setIsShortScreenView] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Responsive max height for short screens
+  const [videoMaxHeight, setVideoMaxHeight] = useState("720px");
+  
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      const isShortScreen = window.innerHeight <= 768;
+      setIsShortScreenView(isShortScreen);
+      setVideoMaxHeight(isShortScreen ? `${Math.min(window.innerHeight * 0.35, 400)}px` : "720px");
+    };
+    
+    updateMaxHeight();
+    window.addEventListener("resize", updateMaxHeight);
+    return () => window.removeEventListener("resize", updateMaxHeight);
+  }, []);
 
   // Use custom hooks for video dimensions and FPS
   const { dimensions, isPortraitVideo } = useVideoDimensions({
@@ -1494,32 +1510,38 @@ export function VideoPoseViewer({
         </Box>
       )}
 
-      {/* Video Container with Canvas Overlay */}
+      {/* Video Container with Canvas Overlay - Pure CSS layout */}
       <Box
         ref={containerRef}
         style={{
           position: "relative",
           width: "100%",
-          height: "auto",
-          aspectRatio: `${dimensions.width} / ${dimensions.height}`,
           maxWidth: "100%",
-          maxHeight: "720px",
+          maxHeight: videoMaxHeight,
           backgroundColor: "var(--gray-2)",
           borderRadius: "var(--radius-3)",
           overflow: "hidden",
           margin: "0 auto",
+          // Let the video drive the container's aspect ratio
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
         }}
       >
         <video
           ref={videoRef}
           src={videoUrl}
-          width={dimensions.width}
-          height={dimensions.height}
           autoPlay={autoPlay && !isLoading}
           crossOrigin="anonymous"
           onLoadedMetadata={() => {
             setIsVideoMetadataLoaded(true);
             console.log("Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight);
+            // Update canvas dimensions to match video
+            const video = videoRef.current;
+            if (video && canvasRef.current) {
+              canvasRef.current.width = video.videoWidth;
+              canvasRef.current.height = video.videoHeight;
+            }
           }}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
@@ -1528,7 +1550,8 @@ export function VideoPoseViewer({
           style={{
             display: "block",
             width: "100%",
-            height: "100%",
+            height: "auto",
+            maxHeight: videoMaxHeight,
             objectFit: "contain",
           }}
           playsInline
@@ -1545,7 +1568,7 @@ export function VideoPoseViewer({
             left: 0,
             width: "100%",
             height: "100%",
-            pointerEvents: enableAngleClicking ? "auto" : "none", // Enable clicks when angle clicking is active
+            pointerEvents: enableAngleClicking ? "auto" : "none",
             zIndex: 10,
             cursor: enableAngleClicking ? "crosshair" : "default",
           }}
@@ -1561,8 +1584,8 @@ export function VideoPoseViewer({
             zIndex: 30, // Higher than overlays
           }}
         >
-          {/* Theatre Mode Button - Hidden on mobile */}
-          {!isMobile && (
+          {/* Theatre Mode Button - Hidden on mobile and short screens */}
+          {!isMobile && !isShortScreenView && (
             <Tooltip content={localTheatreMode ? "Exit Theatre Mode" : "Enter Theatre Mode"}>
               <Button
                 className={buttonStyles.actionButtonSquare}

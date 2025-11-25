@@ -24,7 +24,18 @@ interface StarterPromptsProps {
 
 export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
   const [loadingVideoForCard, setLoadingVideoForCard] = React.useState<string | null>(null);
+  const [isTablet, setIsTablet] = React.useState(false);
   const isMobile = useIsMobile();
+
+  // Detect tablet breakpoint (< 1024px)
+  React.useEffect(() => {
+    const checkTablet = () => {
+      setIsTablet(window.innerWidth < 1024);
+    };
+    checkTablet();
+    window.addEventListener("resize", checkTablet);
+    return () => window.removeEventListener("resize", checkTablet);
+  }, []);
 
   const handleCardClick = async (config: StarterPromptConfig) => {
     try {
@@ -52,6 +63,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       align="center"
       justify="start"
       gap={isMobile ? "4" : "8"}
+      className="starter-prompts-container"
       style={{
         height: "100%",
         padding: isMobile ? "calc(57px + 1rem) 1rem 1rem" : "3rem 1rem 2rem",
@@ -61,10 +73,11 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       }}
     >
       {/* Logo and Subtitle */}
-      <Flex direction="column" align="center" gap={isMobile ? "2" : "4"} style={{ width: "100%", marginTop: isMobile ? "0.75rem" : "0" }}>
+      <Flex direction="column" align="center" gap={isMobile ? "2" : "4"} className="logo-section" style={{ width: "100%", marginTop: isMobile ? "0.75rem" : "0" }}>
         {/* Hide logo on mobile */}
         {!isMobile && (
           <div
+            className="logo-wrapper"
             style={{
               position: "relative",
               maxWidth: "256px",
@@ -89,6 +102,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           size={isMobile ? "4" : "5"}
           align="center"
           color="gray"
+          className="short-md:hidden"
           style={{
             margin: 0,
           }}
@@ -108,8 +122,8 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
         }}
       >
         {STARTER_PROMPTS.filter((starterPrompt) => {
-          // Hide quick-tips card on mobile
-          if (isMobile && starterPrompt.id === "quick-tips") {
+          // Hide quick-tips card on mobile and tablet
+          if (isTablet && starterPrompt.id === "quick-tips") {
             return false;
           }
           return true;
@@ -174,6 +188,37 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
             transform: translateY(-2px);
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             border-color: var(--accent-9) !important;
+          }
+        }
+
+        /* Reduce spacing on short screens */
+        @media (max-height: 768px) {
+          :global(.starter-prompts-container) {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            gap: 1rem !important;
+          }
+          :global(.logo-section) {
+            gap: 0.5rem !important;
+          }
+          :global(.logo-wrapper) {
+            max-width: 180px !important;
+          }
+          :global(.logo-wrapper img) {
+            max-height: 100px !important;
+          }
+        }
+
+        @media (max-height: 640px) {
+          :global(.starter-prompts-container) {
+            padding-top: 0.5rem !important;
+            gap: 0.75rem !important;
+          }
+          :global(.logo-wrapper) {
+            max-width: 140px !important;
+          }
+          :global(.logo-wrapper img) {
+            max-height: 70px !important;
           }
         }
       `}</style>

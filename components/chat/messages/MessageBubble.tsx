@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, Box, Flex } from "@radix-ui/themes";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
@@ -19,7 +19,6 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage }: MessageBubbleProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -198,69 +197,24 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
     }
   }, [message.content, message.role, message.isVideoSizeLimitError]);
 
-  // Handle video dimensions for theatre mode
+  // Set video container style - simplified, let VideoPoseViewer handle its own sizing
   useEffect(() => {
+    if (!hasVideo) return;
+    
     const isImage = message.videoFile?.type.startsWith("image/") || 
                     (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i));
     
-    if (videoRef.current && hasVideo && !isImage) {
-      const video = videoRef.current;
-      
-      const handleLoadedMetadata = () => {
-        if (theatreMode && video.videoWidth && video.videoHeight) {
-          // Calculate max height: 50vh for portrait videos in theatre mode
-          const maxHeight = window.innerHeight * 0.5;
-          
-          // Calculate dimensions respecting aspect ratio and max height
-          const aspectRatio = video.videoWidth / video.videoHeight;
-          
-          if (video.videoHeight > video.videoWidth) {
-            // Portrait video - height is the limiting factor
-            const constrainedHeight = Math.min(maxHeight, video.videoHeight);
-            const constrainedWidth = constrainedHeight * aspectRatio;
-            
-            setVideoContainerStyle({
-              position: "relative",
-              width: `${constrainedWidth}px`,
-              height: `${constrainedHeight}px`,
-              backgroundColor: "var(--gray-3)",
-              margin: "0 auto",
-              maxWidth: "100%",
-            });
-          } else {
-            // Landscape video - width is 100%, height auto-calculated with max constraint
-            setVideoContainerStyle({
-              position: "relative",
-              width: "100%",
-              maxHeight: `${maxHeight}px`,
-              aspectRatio: `${aspectRatio}`,
-              backgroundColor: "var(--gray-3)",
-            });
-          }
-        } else {
-          // Non-theatre mode: use standard 16:9
-          setVideoContainerStyle({
-            position: "relative",
-            width: "100%",
-            aspectRatio: "16 / 9",
-            backgroundColor: "var(--gray-3)",
-          });
-        }
-      };
-      
-      // Add event listener
-      video.addEventListener("loadedmetadata", handleLoadedMetadata);
-      
-      // Try to calculate dimensions if video is already loaded
-      if (video.readyState >= 1) {
-        handleLoadedMetadata();
-      }
+    if (isImage) return;
 
-      return () => {
-        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      };
-    }
-  }, [hasVideo, message.videoFile, message.videoUrl, theatreMode]);
+    // Simple container style - the video viewer handles aspect ratio internally
+    setVideoContainerStyle({
+      position: "relative",
+      width: "100%",
+      backgroundColor: "var(--gray-3)",
+      borderRadius: "var(--radius-3)",
+      overflow: "hidden",
+    });
+  }, [hasVideo, message.videoFile, message.videoUrl]);
 
   return (
     <Flex

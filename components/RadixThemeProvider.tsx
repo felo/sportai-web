@@ -2,6 +2,7 @@
 
 import { Theme } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
+import { initTheatreModeResizeListener } from "@/utils/storage";
 
 type Appearance = "light" | "dark";
 type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
@@ -13,6 +14,9 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
   useEffect(() => {
+    // Initialize theatre mode resize listener (handles height breakpoint)
+    initTheatreModeResizeListener();
+    
     // Load theme from localStorage, defaulting to dark if not set
     const stored = localStorage.getItem("radix-theme");
     if (stored) {

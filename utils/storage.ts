@@ -291,12 +291,33 @@ export function setDeveloperMode(enabled: boolean): void {
 }
 
 /**
+ * Height breakpoint below which theatre mode is force-disabled
+ */
+const THEATRE_MODE_HEIGHT_BREAKPOINT = 768;
+
+/**
+ * Check if screen height is below the theatre mode breakpoint
+ */
+export function isShortScreen(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return window.innerHeight <= THEATRE_MODE_HEIGHT_BREAKPOINT;
+}
+
+/**
  * Get theatre mode setting from localStorage
- * @returns true if theatre mode is enabled, false otherwise (defaults to true)
+ * Note: Returns false automatically on short screens (height <= 768px)
+ * @returns true if theatre mode is enabled AND screen is tall enough, false otherwise
  */
 export function getTheatreMode(): boolean {
   if (typeof window === "undefined") {
     return true;
+  }
+
+  // Force disable theatre mode on short screens
+  if (isShortScreen()) {
+    return false;
   }
 
   try {
@@ -314,10 +335,17 @@ export function getTheatreMode(): boolean {
 
 /**
  * Save theatre mode setting to localStorage
+ * Note: Cannot enable theatre mode on short screens (height <= 768px)
  * @param enabled - Whether theatre mode should be enabled
  */
 export function setTheatreMode(enabled: boolean): void {
   if (typeof window === "undefined") {
+    return;
+  }
+
+  // Prevent enabling theatre mode on short screens
+  if (enabled && isShortScreen()) {
+    console.log("[Storage] Theatre mode cannot be enabled on short screens");
     return;
   }
 
@@ -328,6 +356,33 @@ export function setTheatreMode(enabled: boolean): void {
   } catch (error) {
     console.error("Failed to save theatre mode to storage:", error);
   }
+}
+
+/**
+ * Initialize theatre mode resize listener
+ * Dispatches theatre-mode-change event when crossing the height breakpoint
+ * Call this once on app initialization
+ */
+let theatreModeResizeListenerInitialized = false;
+export function initTheatreModeResizeListener(): void {
+  if (typeof window === "undefined" || theatreModeResizeListenerInitialized) {
+    return;
+  }
+
+  let wasShortScreen = isShortScreen();
+
+  const handleResize = () => {
+    const nowShortScreen = isShortScreen();
+    
+    // If we crossed the breakpoint, dispatch the theatre mode change event
+    if (wasShortScreen !== nowShortScreen) {
+      wasShortScreen = nowShortScreen;
+      window.dispatchEvent(new CustomEvent("theatre-mode-change"));
+    }
+  };
+
+  window.addEventListener("resize", handleResize);
+  theatreModeResizeListenerInitialized = true;
 }
 
 /**

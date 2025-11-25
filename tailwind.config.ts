@@ -9,6 +9,17 @@ const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'], // Use data-attribute instead of prefers-color-scheme
   theme: {
     extend: {
+      // Height-based breakpoints (shortness)
+      screens: {
+        'short-xs': { 'raw': '(max-height: 568px)' },  // iPhone SE territory
+        'short-sm': { 'raw': '(max-height: 640px)' },  // Very short
+        'short': { 'raw': '(max-height: 700px)' },     // Short laptops w/ browser chrome
+        'short-md': { 'raw': '(max-height: 768px)' },  // Compact displays
+        'tall-sm': { 'raw': '(min-height: 640px)' },
+        'tall': { 'raw': '(min-height: 768px)' },
+        'tall-md': { 'raw': '(min-height: 900px)' },
+        'tall-lg': { 'raw': '(min-height: 1024px)' },
+      },
       // Use CSS variable for optimized font
       fontFamily: {
         sans: ["var(--font-poppins)", "sans-serif"],

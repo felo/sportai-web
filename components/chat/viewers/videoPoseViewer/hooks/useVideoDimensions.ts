@@ -8,6 +8,10 @@ interface UseVideoDimensionsProps {
   playbackSpeed: number;
 }
 
+/**
+ * Hook to get the video's intrinsic dimensions for canvas sizing.
+ * CSS handles the visual scaling - this provides pixel dimensions for drawing.
+ */
 export function useVideoDimensions({
   videoRef,
   containerRef,
@@ -15,6 +19,7 @@ export function useVideoDimensions({
   initialHeight,
   playbackSpeed,
 }: UseVideoDimensionsProps) {
+  // Use video's intrinsic dimensions for canvas, defaults to initial values
   const [dimensions, setDimensions] = useState({
     width: initialWidth,
     height: initialHeight,
@@ -26,30 +31,27 @@ export function useVideoDimensions({
     if (!video) return;
 
     const handleLoadedMetadata = () => {
-      const aspectRatio = video.videoWidth / video.videoHeight;
-      const containerWidth = containerRef.current?.clientWidth || initialWidth;
-
+      // Use the video's actual pixel dimensions for the canvas
+      // CSS will handle the visual scaling via width: 100%, height: 100%
+      const videoWidth = video.videoWidth || initialWidth;
+      const videoHeight = video.videoHeight || initialHeight;
+      
+      setDimensions({ 
+        width: videoWidth, 
+        height: videoHeight 
+      });
+      
       // Detect if video is portrait (vertical)
-      setIsPortraitVideo(video.videoHeight > video.videoWidth);
-
-      // Calculate max height: 720px for portrait videos in theatre mode
-      const maxHeight = 720;
-
-      let newWidth = containerWidth;
-      let newHeight = containerWidth / aspectRatio;
-
-      // Constrain height if needed
-      const effectiveMaxHeight = Math.min(initialHeight, maxHeight);
-      if (newHeight > effectiveMaxHeight) {
-        newHeight = effectiveMaxHeight;
-        newWidth = effectiveMaxHeight * aspectRatio;
-      }
-
-      setDimensions({ width: newWidth, height: newHeight });
+      setIsPortraitVideo(videoHeight > videoWidth);
 
       // Ensure playback speed is set when metadata loads
       video.playbackRate = playbackSpeed;
     };
+
+    // Also handle if metadata is already loaded
+    if (video.readyState >= 1) {
+      handleLoadedMetadata();
+    }
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
     return () => video.removeEventListener("loadedmetadata", handleLoadedMetadata);
@@ -57,7 +59,3 @@ export function useVideoDimensions({
 
   return { dimensions, isPortraitVideo };
 }
-
-
-
-
