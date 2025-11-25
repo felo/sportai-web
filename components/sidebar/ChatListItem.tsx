@@ -63,10 +63,10 @@ export function ChatListItem({
       </Button>
       {showEditButtons && (
         <Flex
-          gap="1"
+          gap="4"
           style={{
             position: "absolute",
-            right: "6px",
+            right: "13px",
             top: "50%",
             transform: "translateY(-50%)",
             alignItems: "center",
