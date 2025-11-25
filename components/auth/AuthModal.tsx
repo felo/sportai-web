@@ -134,7 +134,25 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         )}
 
         <Text size="1" color="gray" mt="4" align="center" as="p">
-          By signing in, you agree to our Terms of Service and Privacy Policy.
+          By signing in, you agree to our{" "}
+          <a
+            href="https://sportai.com/terms-of-use"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--mint-9)", textDecoration: "underline" }}
+          >
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://sportai.com/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--mint-9)", textDecoration: "underline" }}
+          >
+            Privacy Policy
+          </a>
+          .
         </Text>
 
         <Dialog.Close>
