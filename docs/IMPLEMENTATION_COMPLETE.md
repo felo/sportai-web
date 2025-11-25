@@ -208,3 +208,4 @@ For issues or questions:
 4. Refer to documentation files above
 5. Check Supabase documentation: https://supabase.com/docs
 
+

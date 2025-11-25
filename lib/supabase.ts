@@ -44,7 +44,10 @@ export async function getSession() {
 export async function getUser() {
   const { data, error } = await supabase.auth.getUser();
   if (error) {
-    console.error("Error getting user:", error);
+    // Suppress "Auth session missing" error - it's expected when not logged in
+    if (error.message !== "Auth session missing!") {
+      console.error("Error getting user:", error);
+    }
     return null;
   }
   return data.user;
@@ -58,6 +61,7 @@ export async function signInWithOAuth(provider: "google" | "apple") {
     provider,
     options: {
       redirectTo: `${window.location.origin}/`,
+      skipBrowserRedirect: false,
     },
   });
   

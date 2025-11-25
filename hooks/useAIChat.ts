@@ -5,7 +5,6 @@ import {
   saveMessagesToStorage,
   clearMessagesFromStorage,
   refreshVideoUrls,
-  getChatById,
 } from "@/utils/storage";
 import {
   getCurrentChatId,
@@ -30,52 +29,55 @@ export function useAIChat() {
   // Load messages from localStorage after hydration (client-side only)
   useEffect(() => {
     if (!isHydrated) {
-      // Try to load from current chat first, fallback to old storage
-      const currentChatId = getCurrentChatId();
-      activeChatIdRef.current = currentChatId;
-      let messagesToLoad: Message[] = [];
-      
-      if (currentChatId) {
-        const chat = getChatById(currentChatId);
-        if (chat) {
-          messagesToLoad = chat.messages;
+      // Async IIFE to handle await inside useEffect
+      (async () => {
+        // Try to load from current chat first, fallback to old storage
+        const currentChatId = getCurrentChatId();
+        activeChatIdRef.current = currentChatId;
+        let messagesToLoad: Message[] = [];
+        
+        if (currentChatId) {
+          const chat = await loadChat(currentChatId);
+          if (chat) {
+            messagesToLoad = chat.messages;
+          }
         }
-      }
-      
-      // If no chat messages found, try old storage for backward compatibility
-      if (messagesToLoad.length === 0) {
-        loadMessagesFromStorage().then((storedMessages) => {
-          setMessages(storedMessages);
+        
+        // If no chat messages found, try old storage for backward compatibility
+        if (messagesToLoad.length === 0) {
+          loadMessagesFromStorage().then((storedMessages) => {
+            setMessages(storedMessages);
+            setIsHydrated(true);
+            
+            // Refresh video URLs in the background
+            refreshVideoUrls(storedMessages).then((refreshed) => {
+              setMessages(refreshed);
+              // Save refreshed URLs back to storage
+              saveMessagesToStorage(refreshed);
+              // Also update chat if it exists (silent during initial hydration)
+              if (currentChatId) {
+                updateExistingChat(currentChatId, { messages: refreshed }, true);
+              }
+            }).catch((error) => {
+              console.error("Failed to refresh video URLs:", error);
+            });
+          });
+        } else {
+          setMessages(messagesToLoad);
           setIsHydrated(true);
           
-          // Refresh video URLs in the background
-          refreshVideoUrls(storedMessages).then((refreshed) => {
-            setMessages(refreshed);
-            // Save refreshed URLs back to storage
-            saveMessagesToStorage(refreshed);
-            // Also update chat if it exists (silent during initial hydration)
-            if (currentChatId) {
-              updateExistingChat(currentChatId, { messages: refreshed }, true);
-            }
-          }).catch((error) => {
-            console.error("Failed to refresh video URLs:", error);
-          });
-        });
-      } else {
-        setMessages(messagesToLoad);
-        setIsHydrated(true);
-        
-          // Refresh video URLs in the background
-          refreshVideoUrls(messagesToLoad).then((refreshed) => {
-            setMessages(refreshed);
-            // Update chat with refreshed URLs (silent to prevent event loop)
-            if (currentChatId) {
-              updateExistingChat(currentChatId, { messages: refreshed }, true);
-            }
-          }).catch((error) => {
-            console.error("Failed to refresh video URLs:", error);
-          });
-      }
+            // Refresh video URLs in the background
+            refreshVideoUrls(messagesToLoad).then((refreshed) => {
+              setMessages(refreshed);
+              // Update chat with refreshed URLs (silent to prevent event loop)
+              if (currentChatId) {
+                updateExistingChat(currentChatId, { messages: refreshed }, true);
+              }
+            }).catch((error) => {
+              console.error("Failed to refresh video URLs:", error);
+            });
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrated]);
@@ -109,7 +111,7 @@ export function useAIChat() {
       // only keep messages if we're switching to an empty chat during submission
       // Otherwise, we should switch chats normally
       if (loading && isSwitchingToDifferentChat) {
-        const chat = currentChatId ? getChatById(currentChatId) : null;
+        const chat = currentChatId ? await loadChat(currentChatId) : null;
         // Only keep messages if the new chat is empty AND we're actively submitting
         // This prevents losing messages mid-submission
         if (chat && chat.messages.length === 0 && messages.length > 0) {
@@ -145,7 +147,7 @@ export function useAIChat() {
       setUploadProgress(0);
       
       if (currentChatId) {
-        const chat = getChatById(currentChatId);
+        const chat = await loadChat(currentChatId);
         if (chat) {
           console.log("[useAIChat] Loading messages from chat:", {
             chatId: currentChatId,

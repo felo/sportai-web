@@ -2,7 +2,7 @@
  * Unified storage interface that routes to localStorage or Supabase based on auth state
  */
 
-import { getUser } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import type { Chat, Message } from "@/types/chat";
 
 // LocalStorage functions
@@ -28,31 +28,75 @@ import {
 
 /**
  * Check if user is authenticated
+ * Uses getSession() which reads from localStorage synchronously
+ * This is more reliable immediately after OAuth compared to getUser()
  */
 async function isAuthenticated(): Promise<{ authenticated: boolean; userId?: string }> {
-  const user = await getUser();
-  return {
-    authenticated: !!user,
-    userId: user?.id,
-  };
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      authenticated: !!session,
+      userId: session?.user?.id,
+    };
+  } catch (error) {
+    console.error("[storage-unified] Error checking auth:", error);
+    return {
+      authenticated: false,
+      userId: undefined,
+    };
+  }
 }
 
 /**
  * Load all chats (from Supabase if authenticated, localStorage otherwise)
+ * When authenticated, merges localStorage chats with Supabase chats to include empty chats
  */
 export async function loadChats(): Promise<Chat[]> {
   const { authenticated } = await isAuthenticated();
   
+  console.log("[storage-unified] loadChats - authenticated:", authenticated);
+  
   if (authenticated) {
     try {
-      return await loadChatsFromSupabase();
+      const supabaseChats = await loadChatsFromSupabase();
+      const localChats = loadChatsFromLocal();
+      
+      console.log("[storage-unified] loadChats - raw data:", {
+        supabaseChats: supabaseChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+        localChats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+      });
+      
+      // Merge chats: prefer Supabase version for chats that exist in both
+      // but include localStorage-only chats (empty chats that haven't been synced)
+      const supabaseChatIds = new Set(supabaseChats.map(c => c.id));
+      const localOnlyChats = localChats.filter(c => !supabaseChatIds.has(c.id));
+      
+      console.log("[storage-unified] localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
+      
+      // Combine and sort by updatedAt
+      const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.updatedAt - a.updatedAt);
+      
+      console.log("[storage-unified] loadChats result:", {
+        supabase: supabaseChats.length,
+        localOnly: localOnlyChats.length,
+        total: allChats.length,
+        chats: allChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+      });
+      
+      return allChats;
     } catch (error) {
       console.error("Failed to load from Supabase, falling back to localStorage:", error);
       return loadChatsFromLocal();
     }
   }
   
-  return loadChatsFromLocal();
+  const localChats = loadChatsFromLocal();
+  console.log("[storage-unified] loadChats (not authenticated):", {
+    total: localChats.length,
+    chats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+  });
+  
+  return localChats;
 }
 
 /**
@@ -82,6 +126,13 @@ export async function saveChat(chat: Chat): Promise<boolean> {
   const { authenticated, userId } = await isAuthenticated();
   const hasMessages = chat.messages && chat.messages.length > 0;
   
+  console.log("[storage-unified] saveChat:", {
+    chatId: chat.id,
+    authenticated,
+    hasMessages,
+    userId: userId?.substring(0, 8) + "...",
+  });
+  
   // Always save to localStorage first
   const chats = loadChatsFromLocal();
   const existingIndex = chats.findIndex((c) => c.id === chat.id);
@@ -95,11 +146,14 @@ export async function saveChat(chat: Chat): Promise<boolean> {
   // Only sync to Supabase if authenticated AND chat has messages
   if (authenticated && userId && hasMessages) {
     try {
+      console.log("[storage-unified] Syncing chat to Supabase:", chat.id);
       await saveChatToSupabase(chat, userId);
     } catch (error) {
-      console.error("Failed to save to Supabase:", error);
+      console.error("[storage-unified] Failed to save to Supabase:", error);
       // Already saved to localStorage, so return true
     }
+  } else {
+    console.log("[storage-unified] Not syncing to Supabase (auth:", authenticated, "hasMessages:", hasMessages, ")");
   }
   
   return true;
@@ -120,17 +174,42 @@ export async function createNewChat(
 ): Promise<Chat> {
   const { authenticated, userId } = await isAuthenticated();
   
+  console.log("[storage-unified] createNewChat:", {
+    authenticated,
+    userId: userId?.substring(0, 8) + "...",
+    hasMessages: messages.length > 0,
+    messageCount: messages.length,
+  });
+  
   // Create chat using localStorage function (it generates the chat object)
   const chat = createChatLocal(messages, title, settings);
+  
+  console.log("[storage-unified] Chat created in localStorage:", {
+    id: chat.id,
+    title: chat.title,
+    messages: chat.messages.length,
+  });
+  
+  // Verify it was saved
+  const localChats = loadChatsFromLocal();
+  const savedChat = localChats.find(c => c.id === chat.id);
+  console.log("[storage-unified] Verification - chat in localStorage:", {
+    found: !!savedChat,
+    totalChats: localChats.length,
+    chatIds: localChats.map(c => c.id),
+  });
   
   // Only sync to Supabase if authenticated AND chat has messages
   if (authenticated && userId && messages.length > 0) {
     try {
+      console.log("[storage-unified] Syncing new chat to Supabase:", chat.id);
       await saveChatToSupabase(chat, userId);
     } catch (error) {
-      console.error("Failed to save new chat to Supabase:", error);
+      console.error("[storage-unified] Failed to save new chat to Supabase:", error);
       // Chat is already saved to localStorage by createChatLocal
     }
+  } else {
+    console.log("[storage-unified] Not syncing new chat to Supabase (auth:", authenticated, "hasMessages:", messages.length > 0, ")");
   }
   
   return chat;
@@ -226,6 +305,11 @@ export async function deleteExistingChat(chatId: string): Promise<boolean> {
   deleteChatLocal(chatId);
   return true;
 }
+
+/**
+ * Export getChatById as an alias to loadChat for backward compatibility
+ */
+export const getChatById = loadChat;
 
 /**
  * Export existing chat ID functions (these don't need auth routing)

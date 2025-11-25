@@ -21,8 +21,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
-import { getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById, updateChatSettings } from "@/utils/storage";
-import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat } from "@/utils/storage-unified";
+import { getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, updateChatSettings } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat, loadChat } from "@/utils/storage-unified";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
@@ -56,6 +56,7 @@ function generateMessageId(): string {
 }
 
 export function AIChatForm() {
+  const [authKey, setAuthKey] = useState(0);
   const [prompt, setPrompt] = useState("");
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>("fast");
@@ -126,21 +127,23 @@ export function AIChatForm() {
   // Load settings from current chat after hydration
   useEffect(() => {
     if (isHydrated) {
-      const currentChatId = getCurrentChatId();
-      if (currentChatId) {
-        const chatData = getChatById(currentChatId);
-        if (chatData) {
-          // Restore settings from chat, fallback to defaults
-          setThinkingMode(chatData.thinkingMode || "fast");
-          setMediaResolution(chatData.mediaResolution || "medium");
-          setDomainExpertise(chatData.domainExpertise || "all-sports");
-          return;
+      (async () => {
+        const currentChatId = getCurrentChatId();
+        if (currentChatId) {
+          const chatData = await loadChat(currentChatId);
+          if (chatData) {
+            // Restore settings from chat, fallback to defaults
+            setThinkingMode(chatData.thinkingMode || "fast");
+            setMediaResolution(chatData.mediaResolution || "medium");
+            setDomainExpertise(chatData.domainExpertise || "all-sports");
+            return;
+          }
         }
-      }
-      // No chat found, use global settings
-      setThinkingMode(getThinkingMode());
-      setMediaResolution(getMediaResolution());
-      setDomainExpertise(getDomainExpertise());
+        // No chat found, use global settings
+        setThinkingMode(getThinkingMode());
+        setMediaResolution(getMediaResolution());
+        setDomainExpertise(getDomainExpertise());
+      })();
     }
   }, [isHydrated]);
 
@@ -178,10 +181,10 @@ export function AIChatForm() {
   useEffect(() => {
     if (!isHydrated) return;
 
-    const handleChatChange = () => {
+    const handleChatChange = async () => {
       const currentChatId = getCurrentChatId();
       if (currentChatId) {
-        const chatData = getChatById(currentChatId);
+        const chatData = await loadChat(currentChatId);
         if (chatData) {
           console.log("[AIChatForm] Chat changed, restoring settings:", {
             chatId: currentChatId,
@@ -197,11 +200,18 @@ export function AIChatForm() {
       }
     };
 
+    const handleAuthChange = () => {
+      console.log("[AIChatForm] Auth state changed, forcing re-render");
+      setAuthKey(prev => prev + 1);
+    };
+
     // Listen for chat changes (triggered when new chat is created or chat is switched)
     window.addEventListener("chat-storage-change", handleChatChange);
+    window.addEventListener("auth-state-change", handleAuthChange);
     
     return () => {
       window.removeEventListener("chat-storage-change", handleChatChange);
+      window.removeEventListener("auth-state-change", handleAuthChange);
     };
   }, [isHydrated]);
 
@@ -266,22 +276,24 @@ export function AIChatForm() {
       const currentChatId = getCurrentChatId();
       if (currentChatId) {
         // Check if title is still the default/generated one (not manually edited)
-        const chat = getChatById(currentChatId);
-        const firstUserContent = userMessages[0].content.trim().slice(0, 50);
-        
-        // Only regenerate if title looks auto-generated (matches "New Chat", "Video Analysis", or starts with user content)
-        if (chat && (chat.title === "New Chat" || chat.title === "Video Analysis" || (firstUserContent && chat.title.startsWith(firstUserContent)))) {
-          // Generate title asynchronously (don't block UI)
-          generateAIChatTitle(messages).then(title => {
-            // Double-check chat hasn't changed
-            const stillCurrentChatId = getCurrentChatId();
-            if (stillCurrentChatId === currentChatId) {
-              updateExistingChat(currentChatId, { title }, false);
-            }
-          }).catch(error => {
-            console.error("Failed to generate AI title:", error);
-          });
-        }
+        (async () => {
+          const chat = await loadChat(currentChatId);
+          const firstUserContent = userMessages[0].content.trim().slice(0, 50);
+          
+          // Only regenerate if title looks auto-generated (matches "New Chat", "Video Analysis", or starts with user content)
+          if (chat && (chat.title === "New Chat" || chat.title === "Video Analysis" || (firstUserContent && chat.title.startsWith(firstUserContent)))) {
+            // Generate title asynchronously (don't block UI)
+            generateAIChatTitle(messages).then(title => {
+              // Double-check chat hasn't changed
+              const stillCurrentChatId = getCurrentChatId();
+              if (stillCurrentChatId === currentChatId) {
+                updateExistingChat(currentChatId, { title }, false);
+              }
+            }).catch(error => {
+              console.error("Failed to generate AI title:", error);
+            });
+          }
+        })();
       }
     }
   }, [messages, isHydrated, loading]);
