@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import { AlertDialog, Flex, Text, Button, Box, Progress, Callout, IconButton } from "@radix-ui/themes";
+import { Cross2Icon, ExclamationTriangleIcon, CheckCircledIcon, UploadIcon } from "@radix-ui/react-icons";
+import buttonStyles from "@/styles/buttons.module.css";
 import { useAuth } from "./AuthProvider";
 import {
   hasLocalChatsToMigrate,
@@ -63,96 +65,108 @@ export function MigrationPrompt() {
 
   return (
     <AlertDialog.Root open={open} onOpenChange={setOpen}>
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-50" />
-        <AlertDialog.Content className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-          <AlertDialog.Title className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
-            {isSuccess ? "Migration Complete! 🎉" : "Sync Your Chats to Cloud"}
-          </AlertDialog.Title>
-
-          <AlertDialog.Description className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            {isSuccess ? (
-              <span>
-                Your chats have been successfully synced to the cloud. You can now access them
-                from any device!
-              </span>
-            ) : (
-              <span>
-                We found chats saved on this device. Would you like to sync them to your account
-                so you can access them from anywhere?
-              </span>
-            )}
-          </AlertDialog.Description>
-
-          {isMigrating && (
-            <div className="mb-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600 dark:text-gray-400">
-                  Migrating {migrationStatus.migratedChats} of {migrationStatus.totalChats} chats
-                </span>
-                <span className="text-gray-600 dark:text-gray-400">
-                  {migrationStatus.progress}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-blue-600 h-full transition-all duration-300 ease-in-out"
-                  style={{ width: `${migrationStatus.progress}%` }}
-                />
-              </div>
-            </div>
+      <AlertDialog.Content maxWidth="450px">
+        <AlertDialog.Title>
+          {isSuccess ? "Migration Complete! 🎉" : "Sync Your Chats to Cloud"}
+        </AlertDialog.Title>
+        
+        <AlertDialog.Description size="2" mb="4">
+          {isSuccess ? (
+            <>
+              Your chats have been successfully synced to the cloud. You can now access them
+              from any device!
+            </>
+          ) : (
+            <>
+              We found chats saved on this device. Would you like to sync them to your account
+              so you can access them from anywhere?
+            </>
           )}
+        </AlertDialog.Description>
 
-          {isError && (
-            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {migrationStatus.error || "Migration failed. Please try again."}
-              </p>
-            </div>
-          )}
+        {isMigrating && (
+          <Box mb="4">
+            <Flex justify="between" mb="2">
+              <Text size="2" color="gray">
+                Migrating {migrationStatus.migratedChats} of {migrationStatus.totalChats} chats
+              </Text>
+              <Text size="2" color="gray">
+                {migrationStatus.progress}%
+              </Text>
+            </Flex>
+            <Progress value={migrationStatus.progress} size="2" />
+          </Box>
+        )}
 
+        {isError && (
+          <Callout.Root color="red" mb="4">
+            <Callout.Icon>
+              <ExclamationTriangleIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              {migrationStatus.error || "Migration failed. Please try again."}
+            </Callout.Text>
+          </Callout.Root>
+        )}
+
+        {isSuccess && (
+          <Callout.Root color="green" mb="4">
+            <Callout.Icon>
+              <CheckCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              All your chats are now safely stored in the cloud!
+            </Callout.Text>
+          </Callout.Root>
+        )}
+
+        <Flex gap="3" justify="end">
           {!isSuccess && !isMigrating && (
-            <div className="flex gap-3 justify-end">
-              <AlertDialog.Cancel asChild>
-                <button
-                  onClick={handleSkip}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-                  disabled={isMigrating}
-                >
+            <>
+              <AlertDialog.Cancel>
+                <Button className={buttonStyles.actionButtonSquareSecondary} onClick={handleSkip}>
                   Skip for Now
-                </button>
+                </Button>
               </AlertDialog.Cancel>
-
-              <AlertDialog.Action asChild>
-                <button
-                  onClick={handleMigrate}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isMigrating}
-                >
-                  {isMigrating ? "Migrating..." : "Sync to Cloud"}
-                </button>
+              <AlertDialog.Action>
+                <Button className={buttonStyles.actionButtonSquare} onClick={handleMigrate}>
+                  <UploadIcon />
+                  Sync to Cloud
+                </Button>
               </AlertDialog.Action>
-            </div>
+            </>
           )}
 
           {isSuccess && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  window.location.reload();
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-              >
-                Continue
-              </button>
-            </div>
+            <Button
+              className={buttonStyles.actionButtonSquare}
+              onClick={() => {
+                setOpen(false);
+                window.location.reload();
+              }}
+            >
+              Continue
+            </Button>
           )}
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
+        </Flex>
+
+        {!isMigrating && (
+          <IconButton
+            variant="ghost"
+            color="gray"
+            size="1"
+            style={{
+              position: "absolute",
+              top: "var(--space-3)",
+              right: "var(--space-3)",
+            }}
+            aria-label="Close"
+            onClick={handleSkip}
+          >
+            <Cross2Icon />
+          </IconButton>
+        )}
+      </AlertDialog.Content>
     </AlertDialog.Root>
   );
 }
-
-
-

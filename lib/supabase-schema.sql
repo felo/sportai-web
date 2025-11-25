@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS messages (
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  sequence_number INTEGER NOT NULL DEFAULT 0, -- Preserves message order within a chat
   
   -- Video-related fields
   video_url TEXT,
@@ -134,6 +135,12 @@ CREATE TABLE IF NOT EXISTS messages (
   -- Pose detection data
   pose_data JSONB
 );
+
+-- =============================================
+-- MIGRATION: Add sequence_number if it doesn't exist
+-- Run this if you already have the messages table
+-- =============================================
+-- ALTER TABLE messages ADD COLUMN IF NOT EXISTS sequence_number INTEGER NOT NULL DEFAULT 0;
 
 -- Create index on chat_id for faster message retrieval
 CREATE INDEX IF NOT EXISTS messages_chat_id_idx ON messages(chat_id);

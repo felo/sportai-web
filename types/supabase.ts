@@ -89,6 +89,7 @@ export interface Database {
           role: "user" | "assistant";
           content: string;
           created_at: string;
+          sequence_number: number;
           video_url: string | null;
           video_s3_key: string | null;
           video_playback_speed: number | null;
@@ -107,6 +108,7 @@ export interface Database {
           role: "user" | "assistant";
           content: string;
           created_at?: string;
+          sequence_number: number;
           video_url?: string | null;
           video_s3_key?: string | null;
           video_playback_speed?: number | null;
@@ -125,6 +127,7 @@ export interface Database {
           role?: "user" | "assistant";
           content?: string;
           created_at?: string;
+          sequence_number?: number;
           video_url?: string | null;
           video_s3_key?: string | null;
           video_playback_speed?: number | null;

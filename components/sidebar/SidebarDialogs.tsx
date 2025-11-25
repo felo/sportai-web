@@ -44,14 +44,13 @@ export function SidebarDialogs({
             </AlertDialog.Description>
             <Flex gap="3" mt="4" justify="end">
               <AlertDialog.Cancel>
-                <Button variant="soft" color="gray">
+                <Button className={buttonStyles.actionButtonSquareSecondary}>
                   Cancel
                 </Button>
               </AlertDialog.Cancel>
               <AlertDialog.Action>
                 <Button
-                  variant="solid"
-                  color="red"
+                  className={buttonStyles.actionButtonSquareRed}
                   onClick={() => {
                     onClearChat();
                     setAlertOpen(false);
@@ -89,12 +88,12 @@ export function SidebarDialogs({
 
             <Flex gap="3" justify="end" mt="2">
               <Dialog.Close>
-                <Button variant="soft" color="gray">
+                <Button className={buttonStyles.actionButtonSquareSecondary}>
                   Cancel
                 </Button>
               </Dialog.Close>
               <Button
-                className={buttonStyles.actionButton}
+                className={buttonStyles.actionButtonSquare}
                 onClick={handleSaveEdit}
                 disabled={!editTitle.trim()}
               >
@@ -118,7 +117,7 @@ export function SidebarDialogs({
             </Box>
             <Flex gap="3" justify="end" mt="4">
               <Dialog.Close>
-                <Button variant="soft" color="gray">
+                <Button className={buttonStyles.actionButtonSquareSecondary}>
                   Close
                 </Button>
               </Dialog.Close>

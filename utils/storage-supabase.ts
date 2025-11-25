@@ -65,13 +65,17 @@ function chatToDbInsert(chat: Chat, userId: string): DbChatInsert {
 
 /**
  * Convert Message to database message insert
+ * @param message - The message to convert
+ * @param chatId - The chat ID this message belongs to
+ * @param sequenceNumber - The position of this message in the chat (0-indexed)
  */
-function messageToDbInsert(message: Message, chatId: string): DbMessageInsert {
+function messageToDbInsert(message: Message, chatId: string, sequenceNumber: number): DbMessageInsert {
   return {
     id: message.id,
     chat_id: chatId,
     role: message.role,
     content: message.content,
+    sequence_number: sequenceNumber,
     video_url: message.videoUrl || null,
     video_s3_key: message.videoS3Key || null,
     video_playback_speed: message.videoPlaybackSpeed || null,
@@ -129,7 +133,7 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
         .from("messages")
         .select("*")
         .eq("chat_id", chatData.id)
-        .order("created_at", { ascending: true });
+        .order("sequence_number", { ascending: true });
 
       if (messagesError) {
         console.error(`Error loading messages for chat ${chatData.id}:`, messagesError);
@@ -176,7 +180,7 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
       .from("messages")
       .select("*")
       .eq("chat_id", chatId)
-      .order("created_at", { ascending: true });
+      .order("sequence_number", { ascending: true });
 
     if (messagesError) {
       console.error("Error loading messages from Supabase:", messagesError);
@@ -266,7 +270,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
     // This is safer than delete + insert and handles race conditions
     if (chat.messages && chat.messages.length > 0) {
       console.log("[Supabase] Upserting", chat.messages.length, "messages");
-      const messageInserts = chat.messages.map((msg) => messageToDbInsert(msg, chat.id));
+      const messageInserts = chat.messages.map((msg, index) => messageToDbInsert(msg, chat.id, index));
       
       const { error: messagesError } = await supabase
         .from("messages")
@@ -396,7 +400,17 @@ export async function updateChatInSupabase(
  */
 export async function addMessageToSupabase(message: Message, chatId: string): Promise<boolean> {
   try {
-    const messageInsert = messageToDbInsert(message, chatId);
+    // Get the current max sequence number for this chat
+    const { data: maxSeqData } = await supabase
+      .from("messages")
+      .select("sequence_number")
+      .eq("chat_id", chatId)
+      .order("sequence_number", { ascending: false })
+      .limit(1)
+      .single();
+    
+    const nextSequence = (maxSeqData?.sequence_number ?? -1) + 1;
+    const messageInsert = messageToDbInsert(message, chatId, nextSequence);
     const { error } = await supabase.from("messages").insert(messageInsert);
 
     if (error) {
