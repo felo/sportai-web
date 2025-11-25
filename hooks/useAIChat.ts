@@ -5,12 +5,15 @@ import {
   saveMessagesToStorage,
   clearMessagesFromStorage,
   refreshVideoUrls,
-  getCurrentChatId,
-  setCurrentChatId,
-  createChat,
-  updateChat,
   getChatById,
 } from "@/utils/storage";
+import {
+  getCurrentChatId,
+  setCurrentChatId,
+  createNewChat,
+  updateExistingChat,
+  loadChat,
+} from "@/utils/storage-unified";
 
 export function useAIChat() {
   // Start with empty array to avoid hydration mismatch
@@ -52,7 +55,7 @@ export function useAIChat() {
             saveMessagesToStorage(refreshed);
             // Also update chat if it exists (silent during initial hydration)
             if (currentChatId) {
-              updateChat(currentChatId, { messages: refreshed }, true);
+              updateExistingChat(currentChatId, { messages: refreshed }, true);
             }
           }).catch((error) => {
             console.error("Failed to refresh video URLs:", error);
@@ -67,7 +70,7 @@ export function useAIChat() {
             setMessages(refreshed);
             // Update chat with refreshed URLs (silent to prevent event loop)
             if (currentChatId) {
-              updateChat(currentChatId, { messages: refreshed }, true);
+              updateExistingChat(currentChatId, { messages: refreshed }, true);
             }
           }).catch((error) => {
             console.error("Failed to refresh video URLs:", error);
@@ -161,7 +164,7 @@ export function useAIChat() {
             setMessages(refreshed);
             console.log("[useAIChat] Messages loaded:", refreshed.length);
             // Update chat with refreshed URLs (silent to prevent event loop)
-            updateChat(currentChatId, { messages: refreshed }, true);
+            updateExistingChat(currentChatId, { messages: refreshed }, true);
           }
         } else {
           // Chat not found, clear messages
@@ -224,7 +227,7 @@ export function useAIChat() {
         // Update current chat with messages
         if (currentChatId) {
           console.log("[useAIChat] Updating chat with messages:", currentChatId);
-          updateChat(currentChatId, { messages }, true);
+          updateExistingChat(currentChatId, { messages }, true);
           console.log("[useAIChat] Chat updated successfully");
         } else {
           console.warn("[useAIChat] No current chat ID, cannot update chat");
@@ -237,7 +240,7 @@ export function useAIChat() {
         // Also update current chat to have empty messages (if we're on a chat)
         if (currentChatId) {
           console.log("[useAIChat] Updating chat to have empty messages:", currentChatId);
-          updateChat(currentChatId, { messages: [] }, true);
+          updateExistingChat(currentChatId, { messages: [] }, true);
         }
       }
     } else {

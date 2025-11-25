@@ -40,7 +40,7 @@ export type { NavigationLinkProps } from "./navigation/NavigationLink";
 export { BadgeWithTooltip } from "./badges/BadgeWithTooltip";
 export type { BadgeWithTooltipProps } from "./badges/BadgeWithTooltip";
 
-// Toast (already exists)
-export { Toast } from "./Toast";
+// Toast
+export { ErrorToast } from "./Toast";
 export { FeedbackToast } from "./FeedbackToast";
 

@@ -517,10 +517,19 @@ type SerializableChat = Omit<Chat, "messages"> & {
 };
 
 /**
- * Generate a unique chat ID
+ * Generate a unique chat ID (UUID v4 format for Supabase compatibility)
  */
 function generateChatId(): string {
-  return `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Use crypto.randomUUID() if available (modern browsers), otherwise fallback
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback UUID v4 generation
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 /**
@@ -904,6 +913,34 @@ export function clearChatsFromStorage(): void {
     localStorage.removeItem(CURRENT_CHAT_ID_KEY);
   } catch (error) {
     console.error("Failed to clear chats from storage:", error);
+  }
+}
+
+/**
+ * Clear all user data from storage (on sign out)
+ * This removes chats, messages, and migration status but keeps user preferences
+ */
+export function clearUserDataFromStorage(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    // Clear chat data
+    localStorage.removeItem(STORAGE_KEY); // sportai-chat-messages
+    localStorage.removeItem(CHATS_STORAGE_KEY); // sportai-chats
+    localStorage.removeItem(CURRENT_CHAT_ID_KEY); // sportai-current-chat-id
+    
+    // Clear migration status
+    localStorage.removeItem("sportai-migration-completed");
+    localStorage.removeItem("sportai-migration-prompt-dismissed");
+    
+    console.log("[Storage] Cleared all user data on sign out");
+    
+    // Dispatch event to notify components
+    window.dispatchEvent(new Event("chat-storage-change"));
+  } catch (error) {
+    console.error("Failed to clear user data from storage:", error);
   }
 }
 

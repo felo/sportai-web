@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Box, Flex, Button, Text, Separator, DropdownMenu, AlertDialog, Dialog, TextField } from "@radix-ui/themes";
 import { Cross2Icon, HamburgerMenuIcon, GearIcon, TrashIcon, SunIcon, PlusIcon, ChevronDownIcon, ChevronRightIcon, Pencil1Icon, GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "./SidebarContext";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { NavigationLink, EmptyState } from "@/components/ui";
-import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, loadChatsFromStorage, getCurrentChatId, setCurrentChatId as saveCurrentChatId, createChat, deleteChat, updateChat, getHighlightingPreferences, updateHighlightingPreference, getTTSSettings, updateTTSSetting, type HighlightingPreferences, type TTSSettings } from "@/utils/storage";
+import { UserMenu } from "@/components/auth/UserMenu";
+import { SupabaseDebug } from "@/components/auth/SupabaseDebug";
+import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, getHighlightingPreferences, updateHighlightingPreference, getTTSSettings, updateTTSSetting, type HighlightingPreferences, type TTSSettings } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId as saveCurrentChatId, createNewChat, deleteExistingChat, updateExistingChat, loadChats } from "@/utils/storage-unified";
 import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
@@ -47,7 +50,14 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingChat, setEditingChat] = useState<Chat | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [storageDebugOpen, setStorageDebugOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Helper to load chats from the appropriate source
+  const refreshChats = useCallback(async () => {
+    const loadedChats = await loadChats();
+    setChats(loadedChats);
+  }, []);
 
   useEffect(() => {
     // Load current appearance from localStorage
@@ -70,8 +80,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     // Load highlighting preferences from localStorage
     setHighlightingPrefs(getHighlightingPreferences());
 
-    // Load chats from localStorage
-    setChats(loadChatsFromStorage());
+    // Load chats (from Supabase if authenticated, localStorage otherwise)
+    refreshChats();
     setCurrentChatId(getCurrentChatId());
 
     // Listen for theme changes
@@ -92,7 +102,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     // Listen for chat storage changes (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "sportai-chats" || e.key === "sportai-current-chat-id" || !e.key) {
-        setChats(loadChatsFromStorage());
+        refreshChats();
         setCurrentChatId(getCurrentChatId());
       }
     };
@@ -102,10 +112,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       // Use requestAnimationFrame to ensure React processes the state update
       // This ensures the UI updates even if the event fires synchronously
       requestAnimationFrame(() => {
-        const updatedChats = loadChatsFromStorage();
-        const updatedCurrentChatId = getCurrentChatId();
-        setChats(updatedChats);
-        setCurrentChatId(updatedCurrentChatId);
+        refreshChats();
+        setCurrentChatId(getCurrentChatId());
       });
     };
 
@@ -122,10 +130,17 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       setTTSSettings(getTTSSettings());
     };
     
+    // Listen for auth state changes (sign in/out)
+    const handleAuthStateChange = () => {
+      console.log("[Sidebar] Auth state changed, refreshing chats...");
+      refreshChats();
+    };
+    
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("chat-storage-change", handleChatStorageChange);
     window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
     window.addEventListener("tts-settings-change", handleTTSSettingsChange);
+    window.addEventListener("auth-state-change", handleAuthStateChange);
     
     return () => {
       window.removeEventListener("theme-change", handleThemeChange);
@@ -133,8 +148,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       window.removeEventListener("chat-storage-change", handleChatStorageChange);
       window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
       window.removeEventListener("tts-settings-change", handleTTSSettingsChange);
+      window.removeEventListener("auth-state-change", handleAuthStateChange);
     };
-  }, []);
+  }, [refreshChats]);
 
   const handleThemeSelect = (newAppearance: Appearance) => {
     const stored = localStorage.getItem("radix-theme");
@@ -265,7 +281,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                     return; // User cancelled
                   }
                 }
-                const newChat = createChat();
+                const newChat = await createNewChat();
                 saveCurrentChatId(newChat.id);
                 closeSidebar(); // Close sidebar after creating new chat
                 // State will be updated via event handler
@@ -400,25 +416,23 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               }
                               
                               // Check if this is the last chat - if so, clear it instead of deleting
-                              const allChats = loadChatsFromStorage();
-                              if (allChats.length === 1) {
+                              if (chats.length === 1) {
                                 // Last chat - clear messages instead of deleting
                                 console.log("[Sidebar] Last chat - clearing messages instead of deleting");
-                                updateChat(chat.id, { messages: [] }, false);
+                                await updateExistingChat(chat.id, { messages: [] }, false);
                                 // Refresh chat list
-                                const updatedChats = loadChatsFromStorage();
-                                setChats(updatedChats);
+                                await refreshChats();
                                 // Also clear the chat in the UI state
                                 if (currentChatId === chat.id && onClearChat) {
                                   onClearChat();
                                 }
                               } else {
                                 // Not the last chat - delete normally
-                                deleteChat(chat.id);
-                                const updatedChats = loadChatsFromStorage();
-                                setChats(updatedChats);
+                                await deleteExistingChat(chat.id);
+                                await refreshChats();
                                 if (currentChatId === chat.id) {
-                                  const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
+                                  // Switch to the first available chat
+                                  const newCurrentChatId = chats.find(c => c.id !== chat.id)?.id;
                                   setCurrentChatId(newCurrentChatId);
                                   saveCurrentChatId(newCurrentChatId);
                                 }
@@ -477,174 +491,35 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             </Flex>
           </Box>
 
-          {/* Settings - Docked to bottom */}
+          {/* User Menu & Settings - Docked to bottom */}
           <Box
             style={{
               borderTop: "1px solid var(--gray-6)",
               padding: "var(--space-4)",
             }}
           >
-            <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
-              <DropdownMenu.Trigger>
-                <Button
-                  variant="ghost"
-                  size="2"
-                  style={{
-                    width: "100%",
-                    justifyContent: "flex-start",
-                    padding: "var(--space-2) var(--space-3)",
-                  }}
-                >
-                  <GearIcon width="20" height="20" />
-                  <Text size="2" ml="2">
-                    Settings
-                  </Text>
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="start">
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger>
-                    <SunIcon width="16" height="16" />
-                    <Text ml="2">Themes</Text>
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
-                    <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
-                      <Text>Light</Text>
-                      {appearance === "light" && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
-                      <Text>Dark</Text>
-                      {appearance === "dark" && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Sub>
-
-                <DropdownMenu.Separator />
-
-                {/* Theatre mode setting - hidden on mobile as it's always on */}
-                {!isMobile && (
-                  <>
-                    <DropdownMenu.Sub>
-                      <DropdownMenu.SubTrigger>
-                        <Text>Theatre mode</Text>
-                      </DropdownMenu.SubTrigger>
-                      <DropdownMenu.SubContent>
-                        <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
-                          <Text>On</Text>
-                          {theatreMode && (
-                            <Text ml="auto" size="1" color="gray">✓</Text>
-                          )}
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
-                          <Text>Off</Text>
-                          {!theatreMode && (
-                            <Text ml="auto" size="1" color="gray">✓</Text>
-                          )}
-                        </DropdownMenu.Item>
-                      </DropdownMenu.SubContent>
-                    </DropdownMenu.Sub>
-
-                    <DropdownMenu.Separator />
-                  </>
-                )}
-
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger>
-                    <Text>Developer mode</Text>
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
-                    <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
-                      <Text>On</Text>
-                      {developerMode && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
-                      <Text>Off</Text>
-                      {!developerMode && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Sub>
-
-                <DropdownMenu.Separator />
-
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger>
-                    <Text>Highlighting</Text>
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
-                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("terminology", !highlightingPrefs.terminology)}>
-                      <Text>Terminology</Text>
-                      {highlightingPrefs.terminology && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("technique", !highlightingPrefs.technique)}>
-                      <Text>Technique terms</Text>
-                      {highlightingPrefs.technique && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("timestamps", !highlightingPrefs.timestamps)}>
-                      <Text>Timestamps</Text>
-                      {highlightingPrefs.timestamps && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleHighlightingToggle("swings", !highlightingPrefs.swings)}>
-                      <Text>Swings</Text>
-                      {highlightingPrefs.swings && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Sub>
-
-                <DropdownMenu.Separator />
-
-                <DropdownMenu.Sub>
-                  <DropdownMenu.SubTrigger>
-                    <Text>Text-to-Speech</Text>
-                  </DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
-                    <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", true)}>
-                      <Text>On</Text>
-                      {ttsSettings.enabled && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", false)}>
-                      <Text>Off</Text>
-                      {!ttsSettings.enabled && (
-                        <Text ml="auto" size="1" color="gray">✓</Text>
-                      )}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Sub>
-
-                <DropdownMenu.Separator />
-
-                <DropdownMenu.Item 
-                  color="red"
-                  disabled={messageCount === 0 || !onClearChat}
-                  onSelect={(e) => {
-                    if (messageCount > 0 && onClearChat) {
-                      e.preventDefault();
-                      setAlertOpen(true);
-                    }
-                  }}
-                >
-                  <TrashIcon width="16" height="16" />
-                  <Text ml="2">Clear chat history</Text>
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
+            <Flex direction="column" gap="3">
+              <UserMenu 
+                appearance={appearance}
+                theatreMode={theatreMode}
+                developerMode={developerMode}
+                highlightingPrefs={highlightingPrefs}
+                ttsSettings={ttsSettings}
+                messageCount={messageCount}
+                isMobile={isMobile}
+                onThemeSelect={handleThemeSelect}
+                onTheatreModeToggle={handleTheatreModeToggle}
+                onDeveloperModeToggle={handleDeveloperModeToggle}
+                onHighlightingToggle={handleHighlightingToggle}
+                onTTSSettingChange={handleTTSSettingChange}
+                onClearChat={onClearChat}
+                onOpenStorageDebug={() => {
+                  setDropdownOpen(false);
+                  setStorageDebugOpen(true);
+                }}
+                onSetAlertOpen={setAlertOpen}
+              />
+            </Flex>
           </Box>
         </Box>
 
@@ -694,11 +569,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Chat name"
-                onKeyDown={(e) => {
+                onKeyDown={async (e) => {
                   if (e.key === "Enter" && editTitle.trim() && editingChat) {
                     e.preventDefault();
-                    updateChat(editingChat.id, { title: editTitle.trim() }, false);
-                    setChats(loadChatsFromStorage());
+                    await updateExistingChat(editingChat.id, { title: editTitle.trim() }, false);
+                    await refreshChats();
                     setEditDialogOpen(false);
                     setEditingChat(null);
                     setEditTitle("");
@@ -714,17 +589,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 </Dialog.Close>
                 <Button
                   className={buttonStyles.actionButton}
-                  onClick={() => {
+                  onClick={async () => {
                     if (editTitle.trim() && editingChat) {
-                      console.log("[Sidebar] Updating chat title:", editingChat.id, "from:", editingChat.title, "to:", editTitle.trim());
-                      updateChat(editingChat.id, { title: editTitle.trim() }, false);
-                      // Small delay to ensure storage write completes before reloading
-                      setTimeout(() => {
-                        const updatedChats = loadChatsFromStorage();
-                        const updatedChat = updatedChats.find(c => c.id === editingChat.id);
-                        console.log("[Sidebar] After update - chat title:", updatedChat?.title);
-                        setChats(updatedChats);
-                      }, 10);
+                      await updateExistingChat(editingChat.id, { title: editTitle.trim() }, false);
+                      await refreshChats();
                       setEditDialogOpen(false);
                       setEditingChat(null);
                       setEditTitle("");
@@ -738,6 +606,28 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             </Flex>
           </Dialog.Content>
         </Dialog.Root>
+
+        {/* Storage Debug Dialog */}
+        {developerMode && (
+          <Dialog.Root open={storageDebugOpen} onOpenChange={setStorageDebugOpen}>
+            <Dialog.Content maxWidth="600px">
+              <Dialog.Title>Storage Debug</Dialog.Title>
+              <Dialog.Description size="2" mb="4">
+                View and debug local storage and Supabase data.
+              </Dialog.Description>
+              <Box style={{ maxHeight: "500px", overflowY: "auto" }}>
+                <SupabaseDebug />
+              </Box>
+              <Flex gap="3" justify="end" mt="4">
+                <Dialog.Close>
+                  <Button variant="soft" color="gray">
+                    Close
+                  </Button>
+                </Dialog.Close>
+              </Flex>
+            </Dialog.Content>
+          </Dialog.Root>
+        )}
       </>
     );
   }
@@ -815,9 +705,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                       return; // User cancelled
                     }
                   }
-                  const newChat = createChat();
+                  const newChat = await createNewChat();
                   saveCurrentChatId(newChat.id);
-                  closeSidebar(); // Close sidebar after creating new chat
                   // State will be updated via event handler
                 }}
                 style={{
@@ -830,7 +719,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   New chat
                 </Text>
               </Button>
-              
+
               {/* Chats Section */}
               <Flex direction="column" gap="2">
                 <Button
@@ -857,30 +746,55 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                       <EmptyState message="No chats yet" />
                     ) : (
                       chats.map((chat) => (
-                        <Box
+                        <Flex
                           key={chat.id}
+                          position="relative"
                           onMouseEnter={() => setHoveredChatId(chat.id)}
                           onMouseLeave={() => setHoveredChatId(null)}
-                          style={{
-                            position: "relative",
-                          }}
                         >
                           <Button
                             variant={currentChatId === chat.id ? "soft" : "ghost"}
                             size="2"
                             onClick={async () => {
-                              // Don't warn if clicking on the same chat
-                              if (currentChatId !== chat.id) {
-                                // Check if chat is thinking before switching
-                                if (onChatSwitchAttempt) {
-                                  const result = await Promise.resolve(onChatSwitchAttempt());
-                                  if (!result) {
-                                    return; // User cancelled
+                              // Don't switch if already on this chat
+                              if (currentChatId === chat.id) {
+                                return;
+                              }
+                              
+                              // Check if current chat is thinking before switching
+                              if (onChatSwitchAttempt) {
+                                const result = await Promise.resolve(onChatSwitchAttempt());
+                                if (!result) {
+                                  return; // User cancelled
+                                }
+                              }
+                              
+                              // If switching from a chat with no messages, delete it
+                              if (currentChatId) {
+                                const allChats = await loadChats();
+                                const currentChat = allChats.find(c => c.id === currentChatId);
+                                if (currentChat && currentChat.messages.length === 0) {
+                                  // Check if this is not the last chat
+                                  if (allChats.length > 1) {
+                                    await deleteExistingChat(currentChatId);
+                                    await refreshChats();
+                                  } else {
+                                    // If it's the last chat, just clear it instead
+                                    if (onClearChat) {
+                                      onClearChat();
+                                    }
+                                  }
+                                } else if (currentChat && currentChat.messages.length > 0) {
+                                  // Only check onChatSwitchAttempt if there are messages
+                                  if (onChatSwitchAttempt) {
+                                    const result = await Promise.resolve(onChatSwitchAttempt());
+                                    if (!result) {
+                                      return; // User cancelled
+                                    }
                                   }
                                 }
                               }
                               saveCurrentChatId(chat.id);
-                              closeSidebar(); // Close sidebar after selecting chat
                               // State will be updated via event handler
                             }}
                             style={{
@@ -914,7 +828,6 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               style={{
                                 position: "absolute",
                                 right: "var(--space-2)",
-                                top: "var(--space-2)",
                                 alignItems: "center",
                               }}
                             >
@@ -926,7 +839,6 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                                   setEditingChat(chat);
                                   setEditTitle(chat.title);
                                   setEditDialogOpen(true);
-                                  setHoveredChatId(null);
                                 }}
                                 style={{
                                   padding: "var(--space-1)",
@@ -952,30 +864,27 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                                   }
                                   
                                   // Check if this is the last chat - if so, clear it instead of deleting
-                                  const allChats = loadChatsFromStorage();
-                                  if (allChats.length === 1) {
+                                  if (chats.length === 1) {
                                     // Last chat - clear messages instead of deleting
                                     console.log("[Sidebar] Last chat - clearing messages instead of deleting");
-                                    updateChat(chat.id, { messages: [] }, false);
+                                    await updateExistingChat(chat.id, { messages: [] }, false);
                                     // Refresh chat list
-                                    const updatedChats = loadChatsFromStorage();
-                                    setChats(updatedChats);
+                                    await refreshChats();
                                     // Also clear the chat in the UI state
                                     if (currentChatId === chat.id && onClearChat) {
                                       onClearChat();
                                     }
                                   } else {
                                     // Not the last chat - delete normally
-                                    deleteChat(chat.id);
-                                    const updatedChats = loadChatsFromStorage();
-                                    setChats(updatedChats);
+                                    await deleteExistingChat(chat.id);
+                                    await refreshChats();
                                     if (currentChatId === chat.id) {
-                                      const newCurrentChatId = updatedChats.length > 0 ? updatedChats[0].id : undefined;
+                                      // Switch to the first available chat
+                                      const newCurrentChatId = chats.find(c => c.id !== chat.id)?.id;
                                       setCurrentChatId(newCurrentChatId);
                                       saveCurrentChatId(newCurrentChatId);
                                     }
                                   }
-                                  setHoveredChatId(null);
                                 }}
                                 style={{
                                   padding: "var(--space-1)",
@@ -988,444 +897,136 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               </Button>
                             </Flex>
                           )}
-                        </Box>
+                        </Flex>
                       ))
                     )}
-                  </Flex>
-                )}
-              </Flex>
-              
-              <Separator size="4" />
-              <Flex direction="column" gap="2">
-                <NavigationLink
-                  href="https://sportai.com/platform"
-                  label="SportAI Platform"
-                  icon={<GlobeIcon />}
-                  onClick={closeSidebar}
-                  external
-                />
-                <NavigationLink
-                  href="https://sportai.mintlify.app/api-reference/introduction"
-                  label="API Documentation"
-                  icon={<FileTextIcon />}
-                  onClick={closeSidebar}
-                  external
-                />
-                <NavigationLink
-                  href="https://sportai.com/contact"
-                  label="Contact Us"
-                  icon={<EnvelopeClosedIcon />}
-                  onClick={closeSidebar}
-                  external
-                />
-                <NavigationLink
-                  href="https://sportai.com/about-us"
-                  label="About Us"
-                  icon={<InfoCircledIcon />}
-                  onClick={closeSidebar}
-                  external
-                />
-              </Flex>
+                    </Flex>
+                  )}
+                </Flex>
+            
+            <Separator size="4" />
+            
+            {/* Navigation Links */}
+            <Flex direction="column" gap="2">
+              <NavigationLink
+                href="https://sportai.com/platform"
+                label="SportAI Platform"
+                icon={<GlobeIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.mintlify.app/api-reference/introduction"
+                label="API Documentation"
+                icon={<FileTextIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.com/contact"
+                label="Contact Us"
+                icon={<EnvelopeClosedIcon />}
+                onClick={closeSidebar}
+                external
+              />
+              <NavigationLink
+                href="https://sportai.com/about-us"
+                label="About Us"
+                icon={<InfoCircledIcon />}
+                onClick={closeSidebar}
+                external
+              />
             </Flex>
-          ))}
-        </Box>
+          </Flex>
+        ))}
+      </Box>
 
-      {/* Settings Button - Row 3: Fixed at bottom */}
+      {/* User Menu & Settings - Row 3: Fixed at bottom */}
       <Box
         style={{
-          paddingLeft: isCollapsed ? "var(--space-5)" : "var(--space-4)",
-          paddingRight: isCollapsed ? "var(--space-5)" : "var(--space-4)",
-          paddingBottom: isCollapsed ? "var(--space-5)" : "var(--space-4)",
-          paddingTop: "var(--space-3)",
+          padding: isCollapsed ? "var(--space-5)" : "var(--space-4)",
           borderTop: isCollapsed ? "none" : "1px solid var(--gray-6)",
           display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-3)",
           justifyContent: isCollapsed ? "center" : "flex-start",
           flexShrink: 0,
         }}
       >
-        <DropdownMenu.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenu.Trigger>
-            <Button
-              variant="ghost"
-              size="2"
-              style={{
-                width: isCollapsed ? "32px" : "100%",
-                justifyContent: isCollapsed ? "center" : "flex-start",
-                padding: isCollapsed ? "0" : "var(--space-2) var(--space-3)",
-                minWidth: isCollapsed ? "32px" : "auto",
-                height: "32px",
-              }}
-            >
-              <GearIcon width="20" height="20" />
-              {!isCollapsed && (
-                <Text size="2" ml="2">
-                  Settings
-                </Text>
-              )}
-            </Button>
-          </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="start" side={isCollapsed ? "right" : "top"}>
-              {/* APPEARANCE & DISPLAY */}
-              <DropdownMenu.Label>
-                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-                  Appearance & Display
-                </Text>
-              </DropdownMenu.Label>
-              
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <SunIcon width="16" height="16" />
-                  <Text ml="2">Theme</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => handleThemeSelect("light")}>
-                    <Text>Light</Text>
-                    {appearance === "light" && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleThemeSelect("dark")}>
-                    <Text>Dark</Text>
-                    {appearance === "dark" && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-              
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Theatre mode</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(true)}>
-                    <Text>On</Text>
-                    {theatreMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleTheatreModeToggle(false)}>
-                    <Text>Off</Text>
-                    {!theatreMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
+        {!isCollapsed && <UserMenu 
+          appearance={appearance}
+          theatreMode={theatreMode}
+          developerMode={developerMode}
+          highlightingPrefs={highlightingPrefs}
+          ttsSettings={ttsSettings}
+          messageCount={messageCount}
+          isMobile={isMobile}
+          onThemeSelect={handleThemeSelect}
+          onTheatreModeToggle={handleTheatreModeToggle}
+          onDeveloperModeToggle={handleDeveloperModeToggle}
+          onHighlightingToggle={handleHighlightingToggle}
+          onTTSSettingChange={handleTTSSettingChange}
+          onClearChat={onClearChat}
+          onOpenStorageDebug={() => {
+            setDropdownOpen(false);
+            setStorageDebugOpen(true);
+          }}
+          onSetAlertOpen={setAlertOpen}
+        />}
+      </Box>
 
-              <DropdownMenu.Separator />
+      {/* Alert Dialog for clearing chat */}
+      {messageCount > 0 && onClearChat && (
+        <AlertDialog.Root open={alertOpen} onOpenChange={setAlertOpen}>
+          <AlertDialog.Content maxWidth="450px">
+            <AlertDialog.Title>Clear chat history?</AlertDialog.Title>
+            <AlertDialog.Description size="2">
+              This will permanently delete all messages in this conversation. This action cannot be undone.
+            </AlertDialog.Description>
+            <Flex gap="3" mt="4" justify="end">
+              <AlertDialog.Cancel>
+                <Button variant="soft" color="gray">
+                  Cancel
+                </Button>
+              </AlertDialog.Cancel>
+              <AlertDialog.Action>
+                <Button 
+                  variant="solid" 
+                  color="red"
+                  onClick={() => {
+                    onClearChat();
+                    setAlertOpen(false);
+                  }}
+                >
+                  Clear
+                </Button>
+              </AlertDialog.Action>
+            </Flex>
+          </AlertDialog.Content>
+        </AlertDialog.Root>
+      )}
 
-              {/* CONTENT DISPLAY */}
-              <DropdownMenu.Label>
-                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-                  Content Display
-                </Text>
-              </DropdownMenu.Label>
-
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Highlighting</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("terminology", !highlightingPrefs.terminology)}>
-                    <Text>Terminology</Text>
-                    {highlightingPrefs.terminology && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("technique", !highlightingPrefs.technique)}>
-                    <Text>Technique terms</Text>
-                    {highlightingPrefs.technique && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("timestamps", !highlightingPrefs.timestamps)}>
-                    <Text>Timestamps</Text>
-                    {highlightingPrefs.timestamps && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleHighlightingToggle("swings", !highlightingPrefs.swings)}>
-                    <Text>Swings</Text>
-                    {highlightingPrefs.swings && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-
-              <DropdownMenu.Separator />
-
-              {/* AUDIO */}
-              <DropdownMenu.Label>
-                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-                  Audio
-                </Text>
-              </DropdownMenu.Label>
-
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Text-to-Speech</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  {/* TTS Enable/Disable */}
-                  <DropdownMenu.Item onSelect={() => handleTTSSettingChange("enabled", !ttsSettings.enabled)}>
-                    <Text>{ttsSettings.enabled ? "Enabled" : "Disabled"}</Text>
-                    {ttsSettings.enabled && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  
-                  <DropdownMenu.Separator />
-                  
-                  {/* Voice Quality */}
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger>
-                      <Text>Voice quality</Text>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "standard")}>
-                        <Text>Standard</Text>
-                        {ttsSettings.quality === "standard" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "wavenet")}>
-                        <Text>WaveNet</Text>
-                        {ttsSettings.quality === "wavenet" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "neural2")}>
-                        <Text>Neural2 (High)</Text>
-                        {ttsSettings.quality === "neural2" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("quality", "studio")}>
-                        <Text>Studio (Premium)*</Text>
-                        {ttsSettings.quality === "studio" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item disabled>
-                        <Text size="1" style={{ color: "var(--gray-10)", fontStyle: "italic" }}>
-                          *Limited availability
-                        </Text>
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  {/* Voice Gender */}
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger>
-                      <Text>Voice gender</Text>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "male")}>
-                        <Text>Male</Text>
-                        {ttsSettings.gender === "male" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "female")}>
-                        <Text>Female</Text>
-                        {ttsSettings.gender === "female" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("gender", "neutral")}>
-                        <Text>Neutral</Text>
-                        {ttsSettings.gender === "neutral" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  {/* Language/Accent */}
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger>
-                      <Text>Language/Accent</Text>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-US")}>
-                        <Text>English (US)</Text>
-                        {ttsSettings.language === "en-US" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-GB")}>
-                        <Text>English (UK)</Text>
-                        {ttsSettings.language === "en-GB" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-AU")}>
-                        <Text>English (AU)</Text>
-                        {ttsSettings.language === "en-AU" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("language", "en-IN")}>
-                        <Text>English (India)</Text>
-                        {ttsSettings.language === "en-IN" && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  {/* Speaking Rate */}
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger>
-                      <Text>Speaking rate</Text>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 0.75)}>
-                        <Text>Slower (0.75x)</Text>
-                        {ttsSettings.speakingRate === 0.75 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.0)}>
-                        <Text>Normal (1.0x)</Text>
-                        {ttsSettings.speakingRate === 1.0 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.25)}>
-                        <Text>Faster (1.25x)</Text>
-                        {ttsSettings.speakingRate === 1.25 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("speakingRate", 1.5)}>
-                        <Text>Fast (1.5x)</Text>
-                        {ttsSettings.speakingRate === 1.5 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  {/* Pitch */}
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger>
-                      <Text>Pitch</Text>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", -5.0)}>
-                        <Text>Lower (-5)</Text>
-                        {ttsSettings.pitch === -5.0 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", 0.0)}>
-                        <Text>Normal (0)</Text>
-                        {ttsSettings.pitch === 0.0 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => handleTTSSettingChange("pitch", 5.0)}>
-                        <Text>Higher (+5)</Text>
-                        {ttsSettings.pitch === 5.0 && (
-                          <Text ml="auto" size="1" color="gray">✓</Text>
-                        )}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-
-              <DropdownMenu.Separator />
-
-              {/* ADVANCED */}
-              <DropdownMenu.Label>
-                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-                  Advanced
-                </Text>
-              </DropdownMenu.Label>
-
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Developer mode</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(true)}>
-                    <Text>On</Text>
-                    {developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => handleDeveloperModeToggle(false)}>
-                    <Text>Off</Text>
-                    {!developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-
-              <DropdownMenu.Separator />
-
-              {/* ACTIONS */}
-              <DropdownMenu.Label>
-                <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-                  Actions
-                </Text>
-              </DropdownMenu.Label>
-
-              <DropdownMenu.Item 
-                color="red"
-                disabled={messageCount === 0 || !onClearChat}
-                onSelect={(e) => {
-                  if (messageCount > 0 && onClearChat) {
-                    e.preventDefault();
-                    setAlertOpen(true);
-                  }
-                }}
-              >
-                <TrashIcon width="16" height="16" />
-                <Text ml="2">Clear chat history</Text>
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-
-          {/* Alert Dialog for clearing chat */}
-          {messageCount > 0 && onClearChat && (
-            <AlertDialog.Root open={alertOpen} onOpenChange={setAlertOpen}>
-              <AlertDialog.Content maxWidth="450px">
-                <AlertDialog.Title>Clear chat history?</AlertDialog.Title>
-                <AlertDialog.Description size="2">
-                  This will permanently delete all messages in this conversation. This action cannot be undone.
-                </AlertDialog.Description>
-                <Flex gap="3" mt="4" justify="end">
-                  <AlertDialog.Cancel>
-                    <Button variant="soft" color="gray">
-                      Cancel
-                    </Button>
-                  </AlertDialog.Cancel>
-                  <AlertDialog.Action>
-                    <Button 
-                      variant="solid" 
-                      color="red"
-                      onClick={() => {
-                        onClearChat();
-                        setAlertOpen(false);
-                        setDropdownOpen(false);
-                        closeSidebar();
-                      }}
-                    >
-                      Clear
-                    </Button>
-                  </AlertDialog.Action>
-                </Flex>
-              </AlertDialog.Content>
-            </AlertDialog.Root>
-          )}
-        </Box>
+      {/* Storage Debug Dialog */}
+      {developerMode && (
+        <Dialog.Root open={storageDebugOpen} onOpenChange={setStorageDebugOpen}>
+          <Dialog.Content maxWidth="600px">
+            <Dialog.Title>Storage Debug</Dialog.Title>
+            <Dialog.Description size="2" mb="4">
+              View and debug local storage and Supabase data.
+            </Dialog.Description>
+            <Box style={{ maxHeight: "500px", overflowY: "auto" }}>
+              <SupabaseDebug />
+            </Box>
+            <Flex gap="3" justify="end" mt="4">
+              <Dialog.Close>
+                <Button variant="soft" color="gray">
+                  Close
+                </Button>
+              </Dialog.Close>
+            </Flex>
+          </Dialog.Content>
+        </Dialog.Root>
+      )}
 
       {/* Edit Chat Dialog - Outside grid flow as it's a modal */}
       <Dialog.Root open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -1440,11 +1041,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder="Chat name"
-              onKeyDown={(e) => {
+              onKeyDown={async (e) => {
                 if (e.key === "Enter" && editTitle.trim() && editingChat) {
                   e.preventDefault();
-                  updateChat(editingChat.id, { title: editTitle.trim() }, false);
-                  setChats(loadChatsFromStorage());
+                  await updateExistingChat(editingChat.id, { title: editTitle.trim() }, false);
+                  await refreshChats();
                   setEditDialogOpen(false);
                   setEditingChat(null);
                   setEditTitle("");
@@ -1460,17 +1061,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               </Dialog.Close>
               <Button
                 className={buttonStyles.actionButton}
-                onClick={() => {
+                onClick={async () => {
                   if (editTitle.trim() && editingChat) {
-                    console.log("[Sidebar] Updating chat title:", editingChat.id, "from:", editingChat.title, "to:", editTitle.trim());
-                    updateChat(editingChat.id, { title: editTitle.trim() }, false);
-                    // Small delay to ensure storage write completes before reloading
-                    setTimeout(() => {
-                      const updatedChats = loadChatsFromStorage();
-                      const updatedChat = updatedChats.find(c => c.id === editingChat.id);
-                      console.log("[Sidebar] After update - chat title:", updatedChat?.title);
-                      setChats(updatedChats);
-                    }, 10);
+                    await updateExistingChat(editingChat.id, { title: editTitle.trim() }, false);
+                    await refreshChats();
                     setEditDialogOpen(false);
                     setEditingChat(null);
                     setEditTitle("");
@@ -1484,7 +1078,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           </Flex>
         </Dialog.Content>
       </Dialog.Root>
+
+      {/* Storage Debug Dialog (controlled) */}
+      <SupabaseDebug open={storageDebugOpen} onOpenChange={setStorageDebugOpen} />
     </Box>
   );
 }
-

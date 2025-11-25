@@ -21,7 +21,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
-import { getCurrentChatId, setCurrentChatId, createChat, updateChat, updateChatSettings, getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById } from "@/utils/storage";
+import { getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, getChatById, updateChatSettings } from "@/utils/storage";
+import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat } from "@/utils/storage-unified";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
@@ -39,6 +40,20 @@ import {
   pickleballCourts,
   padelCourts,
 } from "@/database";
+
+/**
+ * Generate a UUID v4 for message IDs (Supabase compatible)
+ */
+function generateMessageId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export function AIChatForm() {
   const [prompt, setPrompt] = useState("");
@@ -145,13 +160,14 @@ export function AIChatForm() {
       const currentChatId = getCurrentChatId();
       if (!currentChatId) {
         console.log("[AIChatForm] No chat exists, creating default chat");
-        const newChat = createChat([], undefined);
-        setCurrentChatId(newChat.id);
-        console.log("[AIChatForm] Created default chat:", newChat.id);
-        // Reset settings to defaults for new chat
-        setThinkingMode("fast");
-        setMediaResolution("medium");
-        setDomainExpertise("all-sports");
+        createNewChat([], undefined).then((newChat) => {
+          setCurrentChatId(newChat.id);
+          console.log("[AIChatForm] Created default chat:", newChat.id);
+          // Reset settings to defaults for new chat
+          setThinkingMode("fast");
+          setMediaResolution("medium");
+          setDomainExpertise("all-sports");
+        });
       } else {
         console.log("[AIChatForm] Using existing chat:", currentChatId);
       }
@@ -260,7 +276,7 @@ export function AIChatForm() {
             // Double-check chat hasn't changed
             const stillCurrentChatId = getCurrentChatId();
             if (stillCurrentChatId === currentChatId) {
-              updateChat(currentChatId, { title }, false);
+              updateExistingChat(currentChatId, { title }, false);
             }
           }).catch(error => {
             console.error("Failed to generate AI title:", error);
@@ -477,7 +493,6 @@ export function AIChatForm() {
     setUploadProgress(0);
     setProgressStage(currentVideoFile ? "uploading" : "processing");
 
-    const timestamp = Date.now();
     let videoMessageId: string | null = null;
     
     // Calculate input tokens for user messages
@@ -504,7 +519,7 @@ export function AIChatForm() {
     if (currentVideoFile && currentPrompt.trim()) {
       console.log("[AIChatForm] Creating two messages: video + text");
       // First message: video only
-      videoMessageId = `user-video-${timestamp}`;
+      videoMessageId = generateMessageId();
       const videoTokens = calculateUserMessageTokens("", currentVideoFile);
       const videoMessage: Message = {
         id: videoMessageId,
@@ -520,7 +535,7 @@ export function AIChatForm() {
       addMessage(videoMessage);
       
       // Second message: text only
-      const textMessageId = `user-text-${timestamp}`;
+      const textMessageId = generateMessageId();
       const textTokens = calculateUserMessageTokens(currentPrompt, null);
       const textMessage: Message = {
         id: textMessageId,
@@ -535,7 +550,7 @@ export function AIChatForm() {
     } else {
       // Single message: either video or text
       console.log("[AIChatForm] Creating single message");
-      const userMessageId = `user-${timestamp}`;
+      const userMessageId = generateMessageId();
       if (currentVideoFile) {
         videoMessageId = userMessageId;
       }
@@ -575,7 +590,7 @@ export function AIChatForm() {
     abortControllerRef.current = abortController;
 
     // Add placeholder assistant message
-    const assistantMessageId = `assistant-${Date.now()}`;
+    const assistantMessageId = generateMessageId();
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
@@ -734,7 +749,7 @@ export function AIChatForm() {
     if (!result) {
       return; // User cancelled
     }
-    const newChat = createChat();
+    const newChat = await createNewChat();
     setCurrentChatId(newChat.id);
     setShowingVideoSizeError(false);
     // State will be updated via event handler
