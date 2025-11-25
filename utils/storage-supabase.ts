@@ -109,7 +109,7 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
     const { data: chatsData, error: chatsError } = await supabase
       .from("chats")
       .select("*")
-      .order("updated_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (chatsError) {
       console.error("[Supabase] Error loading chats:", chatsError.message, chatsError.code, chatsError.details);
@@ -198,51 +198,118 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
   try {
     console.log("[Supabase] Saving chat:", chat.id, "for user:", userId);
     
-    // Upsert chat
-    const chatInsert = chatToDbInsert(chat, userId);
-    console.log("[Supabase] Chat insert data:", JSON.stringify(chatInsert, null, 2));
-    
-    const { error: chatError } = await supabase
+    // Check if chat already exists
+    const { data: existingChat } = await supabase
       .from("chats")
-      .upsert(chatInsert, { onConflict: "id" });
-
-    if (chatError) {
-      console.error("[Supabase] Error upserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
-      
-      // Check if it's a foreign key error (profile doesn't exist)
-      if (chatError.code === "23503") {
-        console.error("[Supabase] Foreign key error - profile may not exist for user:", userId);
-      }
-      return false;
-    }
+      .select("id")
+      .eq("id", chat.id)
+      .single();
     
-    console.log("[Supabase] Chat upserted successfully");
+    if (existingChat) {
+      // Chat exists - UPDATE without changing created_at
+      console.log("[Supabase] Chat exists, updating without changing created_at");
+      const updateData = {
+        user_id: userId,
+        title: chat.title,
+        updated_at: new Date(chat.updatedAt).toISOString(),
+        thinking_mode: chat.thinkingMode || "fast",
+        media_resolution: chat.mediaResolution || "medium",
+        domain_expertise: chat.domainExpertise || "all-sports",
+      };
+      
+      const { error: chatError } = await supabase
+        .from("chats")
+        .update(updateData)
+        .eq("id", chat.id);
 
-    // Delete existing messages for this chat and insert new ones
-    // This ensures we have a clean slate
-    const { error: deleteError } = await supabase
-      .from("messages")
-      .delete()
-      .eq("chat_id", chat.id);
-
-    if (deleteError) {
-      console.error("[Supabase] Error deleting old messages:", deleteError.message);
-      // Continue anyway, insert might still work
-    }
-
-    // Insert messages
-    if (chat.messages && chat.messages.length > 0) {
-      console.log("[Supabase] Inserting", chat.messages.length, "messages");
-      const messageInserts = chat.messages.map((msg) => messageToDbInsert(msg, chat.id));
-      const { error: messagesError } = await supabase
-        .from("messages")
-        .insert(messageInserts);
-
-      if (messagesError) {
-        console.error("[Supabase] Error inserting messages:", messagesError.message, messagesError.code);
+      if (chatError) {
+        console.error("[Supabase] Error updating chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
         return false;
       }
-      console.log("[Supabase] Messages inserted successfully");
+      
+      console.log("[Supabase] Chat updated successfully");
+    } else {
+      // Chat doesn't exist - INSERT with created_at
+      console.log("[Supabase] Chat doesn't exist, inserting new chat");
+      const chatInsert = chatToDbInsert(chat, userId);
+      console.log("[Supabase] Chat insert data:", JSON.stringify(chatInsert, null, 2));
+      
+      const { error: chatError } = await supabase
+        .from("chats")
+        .insert(chatInsert);
+
+      if (chatError) {
+        console.error("[Supabase] Error inserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
+        
+        // Check if it's a foreign key error (profile doesn't exist)
+        if (chatError.code === "23503") {
+          console.error("[Supabase] Foreign key error - profile does not exist for user:", userId);
+          console.error("[Supabase] This usually happens if the sync happens too quickly after sign-in.");
+          console.error("[Supabase] The profile should be created by a database trigger.");
+        }
+        
+        // Log detailed error information
+        console.error("[Supabase] Chat save failed for:", {
+          chatId: chat.id,
+          userId,
+          errorCode: chatError.code,
+          errorMessage: chatError.message,
+        });
+        
+        return false;
+      }
+      
+      console.log("[Supabase] Chat inserted successfully");
+    }
+
+    // Upsert messages (insert or update if they already exist)
+    // This is safer than delete + insert and handles race conditions
+    if (chat.messages && chat.messages.length > 0) {
+      console.log("[Supabase] Upserting", chat.messages.length, "messages");
+      const messageInserts = chat.messages.map((msg) => messageToDbInsert(msg, chat.id));
+      
+      const { error: messagesError } = await supabase
+        .from("messages")
+        .upsert(messageInserts, { 
+          onConflict: "id",
+          ignoreDuplicates: false // Update existing messages instead of ignoring
+        });
+
+      if (messagesError) {
+        console.error("[Supabase] Error upserting messages:", messagesError.message, messagesError.code);
+        return false;
+      }
+      console.log("[Supabase] Messages upserted successfully");
+      
+      // Now delete any messages that are in the database but not in our current set
+      // This handles the case where messages were removed from the chat
+      const currentMessageIds = chat.messages.map(m => m.id);
+      
+      // Only delete if we have message IDs to keep (prevent deleting all messages)
+      if (currentMessageIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("messages")
+          .delete()
+          .eq("chat_id", chat.id)
+          .not("id", "in", `(${currentMessageIds.map(id => `'${id}'`).join(",")})`);
+
+        if (deleteError) {
+          console.warn("[Supabase] Warning: Could not clean up old messages:", deleteError.message);
+          // Don't fail the whole operation for this
+        }
+      }
+    } else {
+      // If chat has no messages, delete all messages for this chat
+      console.log("[Supabase] Chat has no messages, deleting all messages for chat:", chat.id);
+      const { error: deleteError } = await supabase
+        .from("messages")
+        .delete()
+        .eq("chat_id", chat.id);
+
+      if (deleteError) {
+        console.warn("[Supabase] Warning: Could not delete messages:", deleteError.message);
+        // Don't fail for this
+      }
     }
 
     return true;

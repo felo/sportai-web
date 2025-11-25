@@ -138,6 +138,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   initialShowVelocity={message.poseData?.showVelocity ?? false}
                   initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
                   initialPoseEnabled={message.poseData?.enabled ?? false}
+                  theatreMode={theatreMode}
                 />
               ) : (
                 <video
@@ -200,7 +201,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       {message.content.trim() && (
         <Box
           style={{
-            ...(isMobile && theatreMode && hasVideo && Object.keys(videoContainerStyle).length > 0
+            ...((isMobile || theatreMode) && hasVideo && Object.keys(videoContainerStyle).length > 0
               ? {
                   width: videoContainerStyle.width,
                   margin: "0 auto",

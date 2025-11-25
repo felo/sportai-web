@@ -31,6 +31,7 @@ interface VideoPoseViewerProps {
   initialShowVelocity?: boolean;
   initialVelocityWrist?: "left" | "right";
   initialPoseEnabled?: boolean;
+  theatreMode?: boolean;
 }
 
 // Loading placeholder that matches video dimensions

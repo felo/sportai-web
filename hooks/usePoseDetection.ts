@@ -318,6 +318,25 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         throw new Error("Detector not initialized");
       }
 
+      // CRITICAL: Validate element dimensions before detection
+      // This prevents the "Requested texture size [0x0] is invalid" error
+      if (element instanceof HTMLVideoElement) {
+        if (!element.videoWidth || !element.videoHeight || element.videoWidth === 0 || element.videoHeight === 0) {
+          console.warn("Video element has invalid dimensions, skipping pose detection");
+          return [];
+        }
+      } else if (element instanceof HTMLImageElement) {
+        if (!element.naturalWidth || !element.naturalHeight || element.naturalWidth === 0 || element.naturalHeight === 0) {
+          console.warn("Image element has invalid dimensions, skipping pose detection");
+          return [];
+        }
+      } else if (element instanceof HTMLCanvasElement) {
+        if (!element.width || !element.height || element.width === 0 || element.height === 0) {
+          console.warn("Canvas element has invalid dimensions, skipping pose detection");
+          return [];
+        }
+      }
+
       try {
         const poses = await detector.estimatePoses(element);
         return poses.map((pose) => {
@@ -370,11 +389,14 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
 
       const detect = async () => {
         if (!videoElement.paused && !videoElement.ended) {
-          try {
-            const poses = await detectPose(videoElement);
-            onPoses(poses);
-          } catch (err) {
-            console.error("Detection error:", err);
+          // Additional safety check: verify video has valid dimensions
+          if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+            try {
+              const poses = await detectPose(videoElement);
+              onPoses(poses);
+            } catch (err) {
+              console.error("Detection error:", err);
+            }
           }
         }
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -41,6 +41,7 @@ interface VideoPoseViewerProps {
   initialShowVelocity?: boolean;
   initialVelocityWrist?: "left" | "right";
   initialPoseEnabled?: boolean;
+  theatreMode?: boolean;
 }
 
 export function VideoPoseViewer({
@@ -63,12 +64,14 @@ export function VideoPoseViewer({
   initialShowVelocity = false,
   initialVelocityWrist = "right",
   initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
+  theatreMode = true,
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isVideoMetadataLoaded, setIsVideoMetadataLoaded] = useState(false);
   const [isPoseEnabled, setIsPoseEnabled] = useState(initialPoseEnabled);
   const [selectedModel, setSelectedModel] = useState<SupportedModel>(initialModel);
   const [blazePoseModelType, setBlazePoseModelType] = useState<"lite" | "full" | "heavy">("full");
@@ -127,6 +130,7 @@ export function VideoPoseViewer({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [localTheatreMode, setLocalTheatreMode] = useState(theatreMode);
   const isMobile = useIsMobile();
 
   // Use custom hooks for video dimensions and FPS
@@ -165,18 +169,29 @@ export function VideoPoseViewer({
 
   useEffect(() => {
     // Dynamic import to avoid SSR issues with storage utility
-    import("@/utils/storage").then(({ getDeveloperMode }) => {
+    import("@/utils/storage").then(({ getDeveloperMode, getTheatreMode }) => {
       setDeveloperMode(getDeveloperMode());
+      setLocalTheatreMode(getTheatreMode());
     });
 
-    const handleStorageChange = () => {
+    const handleDeveloperModeChange = () => {
       import("@/utils/storage").then(({ getDeveloperMode }) => {
         setDeveloperMode(getDeveloperMode());
       });
     };
 
-    window.addEventListener("developer-mode-change", handleStorageChange);
-    return () => window.removeEventListener("developer-mode-change", handleStorageChange);
+    const handleTheatreModeChange = () => {
+      import("@/utils/storage").then(({ getTheatreMode }) => {
+        setLocalTheatreMode(getTheatreMode());
+      });
+    };
+
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    window.addEventListener("theatre-mode-change", handleTheatreModeChange);
+    return () => {
+      window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+      window.removeEventListener("theatre-mode-change", handleTheatreModeChange);
+    };
   }, []);
 
   // Velocity tracking is now handled by useVelocityTracking hook
@@ -283,6 +298,12 @@ export function VideoPoseViewer({
 
   // Video dimensions and FPS detection are now handled by custom hooks
 
+  // Reset metadata loaded state when video URL changes
+  useEffect(() => {
+    setIsVideoMetadataLoaded(false);
+    console.log("Video URL changed, waiting for new video metadata to load...");
+  }, [videoUrl]);
+
   // Memoized callback for pose detection
   const handlePosesDetected = useCallback((poses: PoseDetectionResult[]) => {
     setCurrentPoses(poses);
@@ -298,7 +319,16 @@ export function VideoPoseViewer({
       return;
     }
     
-    if (!video || !showSkeleton || !isPlaying || isLoading || !isPoseEnabled) {
+    // CRITICAL: Check video metadata is loaded before attempting detection
+    if (!video || !showSkeleton || !isPlaying || isLoading || !isPoseEnabled || !isVideoMetadataLoaded) {
+      stopDetection();
+      return;
+    }
+
+    // CRITICAL: Verify video has valid dimensions before starting detection
+    // This prevents the "Requested texture size [0x0] is invalid" error
+    if (!video.videoWidth || !video.videoHeight || video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn("Video dimensions not ready for pose detection, waiting for metadata...");
       stopDetection();
       return;
     }
@@ -308,7 +338,7 @@ export function VideoPoseViewer({
     return () => {
       stopDetection();
     };
-  }, [isPlaying, showSkeleton, isLoading, usePreprocessing, isPoseEnabled, startDetection, stopDetection, handlePosesDetected]);
+  }, [isPlaying, showSkeleton, isLoading, usePreprocessing, isPoseEnabled, isVideoMetadataLoaded, startDetection, stopDetection, handlePosesDetected]);
 
   // Handle continuous object detection while playing (also handles ball tracking)
   useEffect(() => {
@@ -1487,6 +1517,10 @@ export function VideoPoseViewer({
           height={dimensions.height}
           autoPlay={autoPlay && !isLoading}
           crossOrigin="anonymous"
+          onLoadedMetadata={() => {
+            setIsVideoMetadataLoaded(true);
+            console.log("Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight);
+          }}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onEnded={handleVideoEnded}
@@ -1527,41 +1561,74 @@ export function VideoPoseViewer({
             zIndex: 30, // Higher than overlays
           }}
         >
-          <Button
-            className={buttonStyles.actionButtonSquare}
-            onClick={handleTogglePose}
-            style={{
-              height: isPortraitVideo || isMobile ? "24px" : "28px",
-              padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
-              fontSize: isMobile ? "10px" : "11px",
-              opacity: isPoseEnabled ? 1 : 0.7,
-            }}
-          >
-            <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
-              <MagicWandIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
-              <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
-                {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
-              </Text>
-            </Flex>
-          </Button>
+          {/* Theatre Mode Button - Hidden on mobile */}
+          {!isMobile && (
+            <Tooltip content={localTheatreMode ? "Exit Theatre Mode" : "Enter Theatre Mode"}>
+              <Button
+                className={buttonStyles.actionButtonSquare}
+                onClick={async () => {
+                  const { setTheatreMode } = await import("@/utils/storage");
+                  setTheatreMode(!localTheatreMode);
+                }}
+                style={{
+                  height: isPortraitVideo ? "24px" : "28px",
+                  width: isPortraitVideo ? "24px" : "28px",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: localTheatreMode ? 1 : 0.7,
+                }}
+              >
+                {localTheatreMode ? (
+                  <ExitFullScreenIcon width={isPortraitVideo ? 12 : 14} height={isPortraitVideo ? 12 : 14} />
+                ) : (
+                  <EnterFullScreenIcon width={isPortraitVideo ? 12 : 14} height={isPortraitVideo ? 12 : 14} />
+                )}
+              </Button>
+            </Tooltip>
+          )}
+
+          {/* AI Overlay Toggle Button */}
+          <Tooltip content={isPoseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"}>
+            <Button
+              className={buttonStyles.actionButtonSquare}
+              onClick={handleTogglePose}
+              style={{
+                height: isPortraitVideo || isMobile ? "24px" : "28px",
+                padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
+                fontSize: isMobile ? "10px" : "11px",
+                opacity: isPoseEnabled ? 1 : 0.7,
+              }}
+            >
+              <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
+                <MagicWandIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+                <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
+                  {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
+                </Text>
+              </Flex>
+            </Button>
+          </Tooltip>
 
           {/* Config Button - Only show when AI overlay is enabled */}
           {isPoseEnabled && (
-            <Button
-              className={buttonStyles.actionButtonSquare}
-              onClick={() => setIsExpanded(!isExpanded)}
-              style={{
-                height: isPortraitVideo || isMobile ? "24px" : "28px",
-                width: isPortraitVideo || isMobile ? "24px" : "28px",
-                padding: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: isExpanded ? 1 : 0.7,
-              }}
-            >
-              <GearIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
-            </Button>
+            <Tooltip content={isExpanded ? "Hide Video Player Controls" : "Show Video Player Controls"}>
+              <Button
+                className={buttonStyles.actionButtonSquare}
+                onClick={() => setIsExpanded(!isExpanded)}
+                style={{
+                  height: isPortraitVideo || isMobile ? "24px" : "28px",
+                  width: isPortraitVideo || isMobile ? "24px" : "28px",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: isExpanded ? 1 : 0.7,
+                }}
+              >
+                <GearIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+              </Button>
+            </Tooltip>
           )}
         </Flex>
 
@@ -1782,17 +1849,19 @@ export function VideoPoseViewer({
                 {/* Angles Dropdown Menu */}
                 <Box style={{ marginLeft: 'auto' }}>
                   <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
-                    <DropdownMenu.Trigger>
-                      <Button
-                        className={buttonStyles.actionButtonSquare}
-                        size="2"
-                        style={{
-                          opacity: measuredAngles.length > 0 ? 1 : 0.5
-                        }}
-                      >
-                        <Text size="1" weight="bold">Angles</Text>
-                      </Button>
-                    </DropdownMenu.Trigger>
+                    <Tooltip content="Add or remove joint angle measurements">
+                      <DropdownMenu.Trigger>
+                        <Button
+                          className={buttonStyles.actionButtonSquare}
+                          size="2"
+                          style={{
+                            opacity: measuredAngles.length > 0 ? 1 : 0.5
+                          }}
+                        >
+                          <Text size="1" weight="bold">Angles</Text>
+                        </Button>
+                      </DropdownMenu.Trigger>
+                    </Tooltip>
                     <DropdownMenu.Content>
                       <DropdownMenu.Item 
                         onSelect={(e) => {
@@ -1901,17 +1970,19 @@ export function VideoPoseViewer({
                 {/* Angles Dropdown Menu */}
                 <Box style={{ marginLeft: 'auto' }}>
                   <DropdownMenu.Root open={angleMenuOpen} onOpenChange={setAngleMenuOpen}>
-                    <DropdownMenu.Trigger>
-                      <Button
-                        className={buttonStyles.actionButtonSquare}
-                        size="2"
-                        style={{
-                          opacity: measuredAngles.length > 0 ? 1 : 0.5
-                        }}
-                      >
-                        <Text size="1" weight="bold">Angles</Text>
-                      </Button>
-                    </DropdownMenu.Trigger>
+                    <Tooltip content="Add or remove joint angle measurements">
+                      <DropdownMenu.Trigger>
+                        <Button
+                          className={buttonStyles.actionButtonSquare}
+                          size="2"
+                          style={{
+                            opacity: measuredAngles.length > 0 ? 1 : 0.5
+                          }}
+                        >
+                          <Text size="1" weight="bold">Angles</Text>
+                        </Button>
+                      </DropdownMenu.Trigger>
+                    </Tooltip>
                     <DropdownMenu.Content>
                       <DropdownMenu.Item 
                         onSelect={(e) => {

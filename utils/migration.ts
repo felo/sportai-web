@@ -1,5 +1,6 @@
 import { loadChatsFromStorage } from "./storage";
 import { saveChatsToSupabase, loadChatsFromSupabase } from "./storage-supabase";
+import { supabase } from "@/lib/supabase";
 import type { Chat } from "@/types/chat";
 
 export interface MigrationStatus {
@@ -8,6 +9,52 @@ export interface MigrationStatus {
   totalChats: number;
   migratedChats: number;
   error?: string;
+}
+
+/**
+ * Check if user's profile exists in the database
+ * This is necessary before syncing chats because of foreign key constraints
+ */
+async function waitForProfile(
+  userId: string,
+  maxRetries: number = 10,
+  delayMs: number = 500
+): Promise<boolean> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      console.log(`[Migration] Checking for profile (attempt ${i + 1}/${maxRetries})...`);
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .single();
+
+      if (data && !error) {
+        console.log("[Migration] Profile found, ready to migrate");
+        return true;
+      }
+
+      // If profile not found, wait and retry
+      if (error?.code === "PGRST116") {
+        console.log(`[Migration] Profile not found yet, retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      // Other errors
+      if (error) {
+        console.error("[Migration] Error checking for profile:", error);
+        return false;
+      }
+    } catch (error) {
+      console.error("[Migration] Exception checking for profile:", error);
+      return false;
+    }
+  }
+
+  console.error("[Migration] Profile not found after", maxRetries, "attempts");
+  return false;
 }
 
 /**
@@ -37,6 +84,18 @@ export async function syncLocalToSupabase(
   };
 
   try {
+    // First, ensure the user's profile exists in the database
+    // This is required because chats table has a foreign key to profiles
+    console.log("[Migration] Waiting for user profile to be created...");
+    const profileExists = await waitForProfile(userId);
+    
+    if (!profileExists) {
+      status.status = "error";
+      status.error = "Profile not found. Please try signing out and signing in again.";
+      onProgress?.(status);
+      return status;
+    }
+
     // Load local chats and filter out empty ones
     const localChats = loadChatsFromStorage().filter((chat) => chat.messages.length > 0);
     

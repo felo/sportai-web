@@ -73,8 +73,8 @@ export async function loadChats(): Promise<Chat[]> {
       
       console.log("[storage-unified] localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
       
-      // Combine and sort by updatedAt
-      const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.updatedAt - a.updatedAt);
+      // Combine and sort by createdAt (descending) for stable chronological order
+      const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.createdAt - a.createdAt);
       
       console.log("[storage-unified] loadChats result:", {
         supabase: supabaseChats.length,
@@ -204,12 +204,18 @@ export async function createNewChat(
     try {
       console.log("[storage-unified] Syncing new chat to Supabase:", chat.id);
       await saveChatToSupabase(chat, userId);
+      console.log("[storage-unified] ✅ New chat synced to Supabase successfully:", chat.id);
     } catch (error) {
-      console.error("[storage-unified] Failed to save new chat to Supabase:", error);
+      console.error("[storage-unified] ❌ Failed to save new chat to Supabase:", error);
       // Chat is already saved to localStorage by createChatLocal
     }
   } else {
-    console.log("[storage-unified] Not syncing new chat to Supabase (auth:", authenticated, "hasMessages:", messages.length > 0, ")");
+    console.log("[storage-unified] Not syncing new chat to Supabase:", {
+      authenticated,
+      hasUserId: !!userId,
+      hasMessages: messages.length > 0,
+      reason: !authenticated ? "not authenticated" : !userId ? "no userId" : "no messages",
+    });
   }
   
   return chat;
@@ -226,6 +232,14 @@ export async function updateExistingChat(
 ): Promise<boolean> {
   const { authenticated, userId } = await isAuthenticated();
   
+  console.log("[storage-unified] updateExistingChat:", {
+    chatId,
+    authenticated,
+    userId: userId?.substring(0, 8) + "...",
+    hasMessagesUpdate: !!updates.messages,
+    messageCount: updates.messages?.length,
+  });
+  
   // Always update localStorage first
   updateChatLocal(chatId, updates, silent);
   
@@ -233,11 +247,25 @@ export async function updateExistingChat(
     try {
       // Get the updated local chat to check if it has messages
       const localChat = getChatByIdLocal(chatId);
-      const updatedMessages = updates.messages ?? localChat?.messages ?? [];
+      
+      // If we can't find the chat, something is wrong - don't delete it!
+      if (!localChat) {
+        console.warn("[storage-unified] Could not find chat in localStorage:", chatId);
+        return true; // Already updated in localStorage (updateChatLocal above)
+      }
+      
+      const updatedMessages = updates.messages ?? localChat.messages ?? [];
       const hasMessages = updatedMessages.length > 0;
+      
+      console.log("[storage-unified] Auth check passed:", {
+        hasMessages,
+        updatedMessagesCount: updatedMessages.length,
+        chatFound: !!localChat,
+      });
       
       // Only sync to Supabase if chat has messages
       if (!hasMessages) {
+        console.log("[storage-unified] Chat has no messages, deleting from Supabase:", chatId);
         // If chat is now empty, delete it from Supabase (if it exists)
         await deleteChatFromSupabase(chatId).catch(() => {
           // Ignore errors - chat might not exist in Supabase
@@ -247,36 +275,53 @@ export async function updateExistingChat(
       
       // Update in Supabase
       if (updates.messages) {
+        console.log("[storage-unified] Updating messages in Supabase for chat:", chatId);
         // If messages are being updated, we need to save the whole chat
         const supabaseChat = await loadChatFromSupabase(chatId);
         
         if (supabaseChat) {
+          console.log("[storage-unified] Chat exists in Supabase, updating:", chatId);
           // Chat exists in Supabase, update it
           const updatedChat = { ...supabaseChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
+          console.log("[storage-unified] ✅ Chat updated in Supabase successfully:", chatId);
         } else if (localChat) {
+          console.log("[storage-unified] Chat doesn't exist in Supabase, creating:", chatId);
           // Chat doesn't exist in Supabase yet, create it
           const updatedChat = { ...localChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
+          console.log("[storage-unified] ✅ Chat created in Supabase successfully:", chatId);
         }
       } else {
+        console.log("[storage-unified] Updating metadata only for chat:", chatId);
         // Just update metadata - but only if chat exists in Supabase
         const supabaseChat = await loadChatFromSupabase(chatId);
         if (supabaseChat) {
+          console.log("[storage-unified] Chat exists, updating metadata:", chatId);
           await updateChatInSupabase(chatId, updates);
+          console.log("[storage-unified] ✅ Metadata updated in Supabase successfully:", chatId);
         } else if (localChat && localChat.messages.length > 0) {
+          console.log("[storage-unified] Chat doesn't exist but has messages, creating:", chatId);
           // Chat doesn't exist in Supabase but has messages, create it
           const updatedChat = { ...localChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
+          console.log("[storage-unified] ✅ Chat created in Supabase successfully:", chatId);
+        } else {
+          console.log("[storage-unified] Skipping Supabase update - chat doesn't exist or has no messages");
         }
       }
       
       return true;
     } catch (error) {
-      console.error("Failed to update in Supabase:", error);
+      console.error("[storage-unified] ❌ Failed to update in Supabase:", error);
       // Already updated localStorage
       return true;
     }
+  } else {
+    console.log("[storage-unified] Not syncing to Supabase:", {
+      authenticated,
+      reason: !authenticated ? "not authenticated" : "no userId",
+    });
   }
   
   return true;

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { clearUserDataFromStorage } from "@/utils/storage";
+import { migrateChatIds } from "@/utils/chat-id-migration";
 
 export interface UserProfile {
   id: string;
@@ -224,6 +225,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     let subscription: any = null;
 
+    // Run chat ID migration on mount (for users already signed in)
+    // This is a one-time migration that converts old chat IDs to UUID format
+    const runMigrationOnMount = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log("[AuthProvider] Running chat ID migration on mount...");
+          const stats = migrateChatIds();
+          if (stats.migrated > 0) {
+            console.log(`[AuthProvider] ✅ Migrated ${stats.migrated} chat(s) on mount`);
+          }
+        }
+      } catch (error) {
+        console.error("[AuthProvider] Failed to run migration on mount:", error);
+      }
+    };
+    runMigrationOnMount();
+
     // Set up auth state change listener - this will catch OAuth callbacks
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("[AuthProvider] Auth state changed:", _event, session?.user?.email);
@@ -234,8 +253,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       
       // Handle different auth events
-      // TOKEN_RECOVERED is fired when Supabase successfully processes OAuth callback
-      if ((_event === "SIGNED_IN" || _event === "TOKEN_RECOVERED") && session?.user) {
+      // SIGNED_IN is fired when Supabase successfully processes OAuth callback
+      if (_event === "SIGNED_IN" && session?.user) {
         console.log("[AuthProvider] User signed in");
         
         // Clean up OAuth parameters from URL
@@ -263,6 +282,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[AuthProvider] Setting temporary profile from OAuth data");
         setProfile(tempProfile);
         setLoading(false);
+        
+        // Migrate old chat IDs to UUID format before syncing
+        console.log("[AuthProvider] Checking for chat ID migration...");
+        try {
+          const migrationStats = migrateChatIds();
+          if (migrationStats.migrated > 0) {
+            console.log(`[AuthProvider] ✅ Migrated ${migrationStats.migrated} chat(s) to UUID format`);
+          }
+        } catch (error) {
+          console.error("[AuthProvider] ❌ Chat ID migration failed:", error);
+          // Continue anyway - this won't block sign-in
+        }
         
         // Dispatch event immediately so UI updates
         window.dispatchEvent(new CustomEvent("auth-state-change", { detail: { event: _event } }));

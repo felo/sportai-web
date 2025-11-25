@@ -289,9 +289,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
             : theatreMode && hasVideo
             ? "100%"
             : "80%",
-          width: isMobile && message.role === "user"
-            ? "100%"
+          width: (isMobile || (theatreMode && hasVideo)) && message.role === "user"
+            ? videoContainerStyle.width || "100%"
             : "auto",
+          margin: (isMobile || (theatreMode && hasVideo)) && message.role === "user" && hasVideo
+            ? "0 auto"
+            : "0",
           borderRadius: message.role === "user" && !hasVideo
             ? "24px 8px 24px 24px" 
             : "var(--radius-3)",

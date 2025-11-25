@@ -20,6 +20,7 @@ export interface VideoPoseViewerProps {
   initialShowVelocity?: boolean;
   initialVelocityWrist?: "left" | "right";
   initialPoseEnabled?: boolean;
+  theatreMode?: boolean;
 }
 
 

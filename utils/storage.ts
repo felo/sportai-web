@@ -323,6 +323,8 @@ export function setTheatreMode(enabled: boolean): void {
 
   try {
     localStorage.setItem(THEATRE_MODE_KEY, enabled ? "true" : "false");
+    // Dispatch custom event to notify components of theatre mode changes
+    window.dispatchEvent(new CustomEvent("theatre-mode-change"));
   } catch (error) {
     console.error("Failed to save theatre mode to storage:", error);
   }
@@ -671,7 +673,7 @@ export function loadChatsFromStorage(): Chat[] {
     }
 
     const parsed = JSON.parse(stored) as SerializableChat[];
-    return parsed.map(deserializeChat).sort((a, b) => b.updatedAt - a.updatedAt);
+    return parsed.map(deserializeChat).sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
     console.error("Failed to load chats from storage:", error);
     return [];
