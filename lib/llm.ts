@@ -41,17 +41,18 @@ export async function queryLLM(
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   // Get system prompt with domain-specific enhancement
+  // Use systemInstruction parameter instead of prepending to prompt
   const systemPrompt = getSystemPromptWithDomain(domainExpertise);
-  const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
   logger.info(`[${requestId}] Starting LLM query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
-  logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
+  logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   
-  // Estimate input tokens (using full prompt with system prompt)
-  let estimatedInputTokens = estimateTextTokens(fullPrompt);
+  // Estimate input tokens (system instruction + user prompt + history)
+  // Note: systemInstruction is sent separately but still counts toward input
+  let estimatedInputTokens = estimateTextTokens(systemPrompt) + estimateTextTokens(prompt);
   
   // Add tokens from conversation history
   if (conversationHistory && conversationHistory.length > 0) {
@@ -95,19 +96,33 @@ export async function queryLLM(
     // Gemini 3 API parameters: thinking_level and media_resolution
     const generationConfig: any = {};
     
-    // Map thinking mode to thinkingConfig with thinkingBudget
-    // Note: gemini-3-pro-preview requires thinking mode (budget > 0)
-    // "fast" = lower thinking budget, "deep" = higher thinking budget
-    // thinkingBudget is in tokens - minimum is 1, higher values allow more reasoning
+    // Smart thinking budget based on query complexity
+    let thinkingBudget: number;
+    
     if (thinkingMode === "deep") {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: 8192, // Higher budget for deep thinking
-      };
+      thinkingBudget = 8192; // Always high for deep mode
     } else {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: 1024, // Lower budget for fast mode (model requires > 0)
-      };
+      // In fast mode, adapt based on query complexity
+      const hasVideo = !!videoData;
+      const promptTokens = estimateTextTokens(prompt);
+      const hasHistory = conversationHistory && conversationHistory.length > 5;
+      
+      if (hasVideo) {
+        // Video analysis needs more thinking even in fast mode
+        thinkingBudget = 1024;
+      } else if (promptTokens > 50 || hasHistory) {
+        // Complex text queries benefit from moderate thinking
+        // 50 tokens ≈ a detailed question or paragraph
+        thinkingBudget = 256;
+      } else {
+        // Simple queries need minimal thinking
+        // <50 tokens = greetings, short questions
+        thinkingBudget = 64;
+      }
     }
+    
+    generationConfig.thinkingConfig = { thinkingBudget };
+    logger.debug(`[${requestId}] Thinking budget: ${thinkingBudget} tokens (prompt: ${estimateTextTokens(prompt)} tokens)`);
     
     // Map media resolution to API parameter (snake_case for API)
     // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
@@ -120,14 +135,16 @@ export async function queryLLM(
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
-    // Using Gemini 3 Pro with generation config
+    // Using Gemini 3 Pro with generation config and system instruction
+    // systemInstruction keeps system context without repeating it in every message
     const model = getGenAI().getGenerativeModel({ 
       model: MODEL_NAME,
       generationConfig,
+      systemInstruction: systemPrompt,
     });
     
-    // Build current message parts (using full prompt with system prompt)
-    const parts: any[] = [{ text: fullPrompt }];
+    // Build current message parts (user prompt only - system instruction is separate)
+    const parts: any[] = [{ text: prompt }];
     
     // Add media (video or image) if provided
     if (videoData) {
@@ -231,10 +248,11 @@ export async function queryLLM(
               thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
             },
           } as any,
+          systemInstruction: systemPrompt,
         });
         
-        // Rebuild parts
-        const parts: any[] = [{ text: fullPrompt }];
+        // Rebuild parts (user prompt only)
+        const parts: any[] = [{ text: prompt }];
         if (videoData) {
           parts.push({
             inlineData: {
@@ -316,13 +334,13 @@ export async function* streamLLM(
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   // Get system prompt with domain-specific enhancement
+  // Use systemInstruction parameter instead of prepending to prompt
   const systemPrompt = getSystemPromptWithDomain(domainExpertise);
-  const fullPrompt = `${systemPrompt}\n\n---\n\nUser Query: ${prompt}`;
   
   logger.info(`[${requestId}] Starting LLM stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
-  logger.debug(`[${requestId}] Full prompt length: ${fullPrompt.length} characters`);
+  logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   logger.debug(`[${requestId}] Thinking mode: ${thinkingMode}`);
   logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
@@ -339,19 +357,33 @@ export async function* streamLLM(
     // Gemini 3 API parameters: thinking_level and media_resolution
     const generationConfig: any = {};
     
-    // Map thinking mode to thinkingConfig with thinkingBudget
-    // Note: gemini-3-pro-preview requires thinking mode (budget > 0)
-    // "fast" = lower thinking budget, "deep" = higher thinking budget
-    // thinkingBudget is in tokens - minimum is 1, higher values allow more reasoning
+    // Smart thinking budget based on query complexity
+    let thinkingBudget: number;
+    
     if (thinkingMode === "deep") {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: 8192, // Higher budget for deep thinking
-      };
+      thinkingBudget = 8192; // Always high for deep mode
     } else {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: 1024, // Lower budget for fast mode (model requires > 0)
-      };
+      // In fast mode, adapt based on query complexity
+      const hasVideo = !!videoData;
+      const promptTokens = estimateTextTokens(prompt);
+      const hasHistory = conversationHistory && conversationHistory.length > 5;
+      
+      if (hasVideo) {
+        // Video analysis needs more thinking even in fast mode
+        thinkingBudget = 1024;
+      } else if (promptTokens > 50 || hasHistory) {
+        // Complex text queries benefit from moderate thinking
+        // 50 tokens ≈ a detailed question or paragraph
+        thinkingBudget = 256;
+      } else {
+        // Simple queries need minimal thinking
+        // <50 tokens = greetings, short questions
+        thinkingBudget = 64;
+      }
     }
+    
+    generationConfig.thinkingConfig = { thinkingBudget };
+    logger.debug(`[${requestId}] Thinking budget: ${thinkingBudget} tokens (prompt: ${estimateTextTokens(prompt)} tokens)`);
     
     // Map media resolution to API parameter (snake_case for API)
     // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
@@ -364,13 +396,16 @@ export async function* streamLLM(
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
+    // Using Gemini 3 Pro with generation config and system instruction
+    // systemInstruction keeps system context without repeating it in every message
     const model = getGenAI().getGenerativeModel({ 
       model: MODEL_NAME,
       generationConfig,
+      systemInstruction: systemPrompt,
     });
     
-    // Build current message parts (using full prompt with system prompt)
-    const parts: any[] = [{ text: fullPrompt }];
+    // Build current message parts (user prompt only - system instruction is separate)
+    const parts: any[] = [{ text: prompt }];
     
     // Add media (video or image) if provided
     if (videoData) {
@@ -435,10 +470,11 @@ export async function* streamLLM(
             thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
           },
         } as any,
+        systemInstruction: systemPrompt,
       });
       
-      // Rebuild parts
-      const parts: any[] = [{ text: fullPrompt }];
+      // Rebuild parts (user prompt only)
+      const parts: any[] = [{ text: prompt }];
       if (videoData) {
         parts.push({
           inlineData: {

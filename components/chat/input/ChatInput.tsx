@@ -5,7 +5,7 @@ import { TextArea, Button, Tooltip, Box, Flex, Callout, Text, Select } from "@ra
 import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "../viewers/VideoPreview";
 import type { ProgressStage } from "@/types/chat";
-import { getThinkingMode, setThinkingMode, getMediaResolution, setMediaResolution, getDomainExpertise, setDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
+import { type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface ChatInputProps {
@@ -67,9 +67,10 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>(() => thinkingModeProp || getThinkingMode());
-  const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>(() => mediaResolutionProp || getMediaResolution());
-  const [domainExpertise, setDomainExpertiseState] = useState<DomainExpertise>(() => domainExpertiseProp || getDomainExpertise());
+  // Use props from parent (which come from current chat), fallback to hardcoded defaults
+  const [thinkingMode, setThinkingModeState] = useState<ThinkingMode>(() => thinkingModeProp || "fast");
+  const [mediaResolution, setMediaResolutionState] = useState<MediaResolution>(() => mediaResolutionProp || "medium");
+  const [domainExpertise, setDomainExpertiseState] = useState<DomainExpertise>(() => domainExpertiseProp || "all-sports");
   const [thinkingModeOpen, setThinkingModeOpen] = useState(false);
   const [mediaResolutionOpen, setMediaResolutionOpen] = useState(false);
   const [domainExpertiseOpen, setDomainExpertiseOpen] = useState(false);
@@ -204,7 +205,6 @@ export function ChatInput({
       if (regex.test(lowerText) && domainExpertise !== expertise) {
         // Switch to detected sport
         setDomainExpertiseState(expertise);
-        setDomainExpertise(expertise);
         onDomainExpertiseChange?.(expertise);
         
         // Trigger glow effect
@@ -231,7 +231,6 @@ export function ChatInput({
       if (regex.test(lowerText) && domainExpertise !== 'all-sports') {
         // Switch to all-sports
         setDomainExpertiseState('all-sports');
-        setDomainExpertise('all-sports');
         onDomainExpertiseChange?.('all-sports');
         
         // Trigger glow effect
@@ -462,7 +461,6 @@ export function ChatInput({
                       onValueChange={(value) => {
                         const mode = value as ThinkingMode;
                         setThinkingModeState(mode);
-                        setThinkingMode(mode);
                         onThinkingModeChange?.(mode);
                       }}
                     >
@@ -501,7 +499,6 @@ export function ChatInput({
                       onValueChange={(value) => {
                         const resolution = value as MediaResolution;
                         setMediaResolutionState(resolution);
-                        setMediaResolution(resolution);
                         onMediaResolutionChange?.(resolution);
                       }}
                     >
@@ -552,7 +549,6 @@ export function ChatInput({
                       onValueChange={(value) => {
                         const expertise = value as DomainExpertise;
                         setDomainExpertiseState(expertise);
-                        setDomainExpertise(expertise);
                         onDomainExpertiseChange?.(expertise);
                         // Clear glow effect when manually changed
                         setIsGlowing(false);

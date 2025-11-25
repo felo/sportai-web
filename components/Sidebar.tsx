@@ -10,7 +10,7 @@ import { NavigationLink, EmptyState } from "@/components/ui";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { SupabaseDebug } from "@/components/auth/SupabaseDebug";
 import { getDeveloperMode, setDeveloperMode as saveDeveloperMode, getTheatreMode, setTheatreMode as saveTheatreMode, getHighlightingPreferences, updateHighlightingPreference, getTTSSettings, updateTTSSetting, type HighlightingPreferences, type TTSSettings } from "@/utils/storage";
-import { getCurrentChatId, setCurrentChatId as saveCurrentChatId, createNewChat, deleteExistingChat, updateExistingChat, loadChats } from "@/utils/storage-unified";
+import { getCurrentChatId, setCurrentChatId as saveCurrentChatId, createNewChat, deleteExistingChat, updateExistingChat, loadChats, syncChatsFromSupabase } from "@/utils/storage-unified";
 import type { Chat } from "@/types/chat";
 
 type Appearance = "light" | "dark";
@@ -80,8 +80,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     // Load highlighting preferences from localStorage
     setHighlightingPrefs(getHighlightingPreferences());
 
-    // Load chats (from Supabase if authenticated, localStorage otherwise)
-    refreshChats();
+    // Initial load: Sync from Supabase, then load chats
+    // This is the ONLY time we hit the network on mount
+    syncChatsFromSupabase().then(() => {
+      refreshChats(); // Fast: reads from localStorage
+    });
     setCurrentChatId(getCurrentChatId());
 
     // Listen for theme changes
@@ -102,7 +105,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     // Listen for chat storage changes (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "sportai-chats" || e.key === "sportai-current-chat-id" || !e.key) {
-        refreshChats();
+        refreshChats(); // Fast: reads from localStorage only
         setCurrentChatId(getCurrentChatId());
       }
     };
@@ -112,7 +115,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       // Use requestAnimationFrame to ensure React processes the state update
       // This ensures the UI updates even if the event fires synchronously
       requestAnimationFrame(() => {
-        refreshChats();
+        refreshChats(); // Fast: reads from localStorage only
         setCurrentChatId(getCurrentChatId());
       });
     };
@@ -132,8 +135,11 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     
     // Listen for auth state changes (sign in/out)
     const handleAuthStateChange = () => {
-      console.log("[Sidebar] Auth state changed, refreshing chats...");
-      refreshChats();
+      console.log("[Sidebar] Auth state changed, syncing from Supabase...");
+      // Re-sync from Supabase when auth state changes
+      syncChatsFromSupabase().then(() => {
+        refreshChats(); // Fast: reads from localStorage
+      });
     };
     
     window.addEventListener("storage", handleStorageChange);
@@ -329,6 +335,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                         gap="2"
                         style={{
                           position: "relative",
+                          width: "100%",
                         }}
                       >
                         <Button
@@ -351,11 +358,13 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           }}
                           style={{
                             justifyContent: "flex-start",
-                            padding: "var(--space-2) var(--space-3)",
-                            paddingRight: "var(--space-8)",
+                            alignItems: "center",
+                            padding: "8px 12px",
+                            paddingRight: "64px",
                             flex: 1,
+                            width: "100%",
                             height: "auto",
-                            minHeight: "32px",
+                            minHeight: "40px",
                             whiteSpace: "normal",
                             wordWrap: "break-word",
                           }}
@@ -363,12 +372,15 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           <Text 
                             size="2" 
                             color={currentChatId === chat.id ? undefined : "gray"} 
+                            weight={currentChatId === chat.id ? "medium" : "regular"}
                             style={{ 
                               textAlign: "left",
                               wordBreak: "break-word",
                               overflowWrap: "break-word",
                               whiteSpace: "normal",
-                              lineHeight: "1.4",
+                              lineHeight: "1.5",
+                              display: "block",
+                              width: "100%",
                             }}
                           >
                             {chat.title}
@@ -376,10 +388,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                         </Button>
                         {/* Always show edit/delete on mobile - right aligned */}
                         <Flex
-                          gap="3"
+                          gap="2"
                           style={{
                             position: "absolute",
                             right: "var(--space-2)",
+                            top: "50%",
+                            transform: "translateY(-50%)",
                             alignItems: "center",
                           }}
                         >
@@ -751,6 +765,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           position="relative"
                           onMouseEnter={() => setHoveredChatId(chat.id)}
                           onMouseLeave={() => setHoveredChatId(null)}
+                          style={{
+                            width: "100%",
+                          }}
                         >
                           <Button
                             variant={currentChatId === chat.id ? "soft" : "ghost"}
@@ -771,6 +788,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                               
                               // If switching from a chat with no messages, delete it
                               if (currentChatId) {
+                                // Fast: read from localStorage only
                                 const allChats = await loadChats();
                                 const currentChat = allChats.find(c => c.id === currentChatId);
                                 if (currentChat && currentChat.messages.length === 0) {
@@ -799,10 +817,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                             }}
                             style={{
                               justifyContent: "flex-start",
-                              padding: "var(--space-2) var(--space-3)",
+                              alignItems: "center",
+                              padding: "8px 12px",
+                              paddingRight: "64px",
                               width: "100%",
                               height: "auto",
-                              minHeight: "32px",
+                              minHeight: "40px",
                               whiteSpace: "normal",
                               wordWrap: "break-word",
                             }}
@@ -810,13 +830,15 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                             <Text 
                               size="2" 
                               color={currentChatId === chat.id ? undefined : "gray"} 
+                              weight={currentChatId === chat.id ? "medium" : "regular"}
                               style={{ 
-                                flex: 1, 
                                 textAlign: "left",
                                 wordBreak: "break-word",
                                 overflowWrap: "break-word",
                                 whiteSpace: "normal",
-                                lineHeight: "1.4",
+                                lineHeight: "1.5",
+                                display: "block",
+                                width: "100%",
                               }}
                             >
                               {chat.title}
@@ -824,10 +846,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                           </Button>
                           {hoveredChatId === chat.id && (
                             <Flex
-                              gap="3"
+                              gap="2"
                               style={{
                                 position: "absolute",
                                 right: "var(--space-2)",
+                                top: "50%",
+                                transform: "translateY(-50%)",
                                 alignItems: "center",
                               }}
                             >

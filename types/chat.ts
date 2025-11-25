@@ -17,13 +17,15 @@ export type Message = {
   videoPlaybackSpeed?: number; // Video playback speed (0.25, 0.5, 1.0, 1.5, 2.0, etc.)
   inputTokens?: number; // Input tokens used for this message
   outputTokens?: number; // Output tokens used for this message (assistant messages only)
-  responseDuration?: number; // API response duration in milliseconds
+  responseDuration?: number; // Total response duration in milliseconds (from request to stream complete)
+  timeToFirstToken?: number; // Time to first token in milliseconds (from request to first stream chunk)
   isVideoSizeLimitError?: boolean; // Flag to indicate this is a video size limitation message
   isStreaming?: boolean; // Flag to indicate the message is currently streaming
   modelSettings?: {
     thinkingMode: string;
     mediaResolution: string;
     domainExpertise?: string;
+    thinkingBudget?: number; // Thinking budget in tokens
   };
   ttsUsage?: {
     totalCharacters: number; // Total characters converted to speech

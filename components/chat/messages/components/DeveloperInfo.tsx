@@ -18,6 +18,8 @@ interface TTSUsage {
 interface ModelSettings {
   thinkingMode?: string;
   mediaResolution?: string;
+  domainExpertise?: string;
+  thinkingBudget?: number;
 }
 
 interface Pricing {
@@ -37,6 +39,7 @@ interface DeveloperInfoProps {
     requests: number;
   };
   responseDuration?: number;
+  timeToFirstToken?: number;
   modelSettings?: ModelSettings;
 }
 
@@ -52,6 +55,7 @@ export function DeveloperInfo({
   ttsUsage,
   totalTTSUsage,
   responseDuration,
+  timeToFirstToken,
   modelSettings,
 }: DeveloperInfoProps) {
   if (!show) return null;
@@ -99,14 +103,38 @@ export function DeveloperInfo({
             </>
           )}
           {responseDuration !== undefined && (
-            <Text size="1">
-              <strong>Response time:</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
-            </Text>
+            <>
+              <Text size="1">
+                <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
+              </Text>
+              {timeToFirstToken !== undefined && (
+                <Text size="1" pl="2">
+                  <strong>Time to first token:</strong> {timeToFirstToken.toLocaleString()}ms ({(timeToFirstToken / 1000).toFixed(2)}s)
+                  {responseDuration > 0 && (
+                    <span style={{ color: "var(--gray-10)" }}>
+                      {" "}• Streaming: {(responseDuration - timeToFirstToken).toLocaleString()}ms
+                    </span>
+                  )}
+                </Text>
+              )}
+            </>
           )}
           {modelSettings && (
-            <Text size="1">
-              <strong>Settings:</strong> Thinking={modelSettings.thinkingMode}, Resolution={modelSettings.mediaResolution}
-            </Text>
+            <>
+              <Text size="1">
+                <strong>Settings:</strong> Thinking={modelSettings.thinkingMode}
+                {modelSettings.thinkingBudget && ` (budget: ${modelSettings.thinkingBudget} tokens)`}, Resolution={modelSettings.mediaResolution}
+              </Text>
+              {modelSettings.domainExpertise && (
+                <Text size="1" pl="2">
+                  <strong>Domain knowledge:</strong> {
+                    modelSettings.domainExpertise === "all-sports" 
+                      ? "All Sports (General coaching knowledge)" 
+                      : `${modelSettings.domainExpertise.charAt(0).toUpperCase() + modelSettings.domainExpertise.slice(1)} (Specialized: courts, swings, terminology)`
+                  }
+                </Text>
+              )}
+            </>
           )}
           {ttsUsage.requestCount > 0 && (
             <>

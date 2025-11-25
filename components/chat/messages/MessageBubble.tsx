@@ -339,6 +339,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
               ttsUsage={ttsUsage}
               totalTTSUsage={totalTTSUsage}
               responseDuration={message.responseDuration}
+              timeToFirstToken={message.timeToFirstToken}
               modelSettings={message.modelSettings}
             />
           </Box>

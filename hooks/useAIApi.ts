@@ -9,6 +9,35 @@ import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/sto
 // This includes base system prompt + potential domain expertise enhancement
 const ESTIMATED_SYSTEM_PROMPT_TOKENS = 500;
 
+/**
+ * Calculate thinking budget based on query complexity
+ * Matches the server-side logic in lib/llm.ts
+ */
+function calculateThinkingBudget(
+  thinkingMode: ThinkingMode,
+  hasVideo: boolean,
+  promptTokens: number,
+  historyLength: number
+): number {
+  if (thinkingMode === "deep") {
+    return 8192; // Always high for deep mode
+  }
+  
+  // In fast mode, adapt based on query complexity
+  if (hasVideo) {
+    // Video analysis needs more thinking even in fast mode
+    return 1024;
+  } else if (promptTokens > 50 || historyLength > 5) {
+    // Complex text queries benefit from moderate thinking
+    // 50 tokens ≈ a detailed question or paragraph
+    return 256;
+  } else {
+    // Simple queries need minimal thinking
+    // <50 tokens = greetings, short questions
+    return 64;
+  }
+}
+
 interface UseAIApiOptions {
   onProgressUpdate?: (stage: ProgressStage, progress: number) => void;
 }
@@ -97,6 +126,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedText = "";
+      let timeToFirstToken: number | undefined;
 
       if (reader) {
         try {
@@ -108,6 +138,12 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
+            
+            // Capture time to first token on first chunk
+            if (!timeToFirstToken && chunk.length > 0) {
+              timeToFirstToken = Date.now() - requestStartTime;
+            }
+            
             accumulatedText += chunk;
             // Estimate output tokens as we accumulate text
             const outputTokens = estimateTextTokens(accumulatedText);
@@ -121,13 +157,19 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           
           // Calculate duration and add settings after streaming completes
           const duration = Date.now() - requestStartTime;
+          const promptTokens = estimateTextTokens(prompt);
+          const historyLength = conversationHistory?.length || 0;
+          const thinkingBudget = calculateThinkingBudget(thinkingMode, false, promptTokens, historyLength);
+          
           updateMessage(assistantMessageId, {
             responseDuration: duration,
+            timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
             modelSettings: {
               thinkingMode,
               mediaResolution,
               domainExpertise,
+              thinkingBudget,
             },
           });
         } catch (error) {
@@ -244,6 +286,10 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           
           // Final update with complete metadata
           const outputTokens = estimateTextTokens(naturalResponse);
+          const promptTokens = estimateTextTokens(prompt);
+          const historyLength = conversationHistory?.length || 0;
+          const thinkingBudget = calculateThinkingBudget(thinkingMode, true, promptTokens, historyLength);
+          
           updateMessage(assistantMessageId, { 
             content: naturalResponse,
             inputTokens: 0, // No API call made
@@ -254,6 +300,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               thinkingMode,
               mediaResolution,
               domainExpertise,
+              thinkingBudget,
             },
           });
           
@@ -416,6 +463,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
         let accumulatedText = "";
+        let timeToFirstToken: number | undefined;
 
         if (!reader) {
           console.error("[AI API] ❌ Response body is null or undefined");
@@ -435,6 +483,12 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             }
 
             const chunk = decoder.decode(value, { stream: true });
+            
+            // Capture time to first token on first chunk
+            if (!timeToFirstToken && chunk.length > 0) {
+              timeToFirstToken = Date.now() - requestStartTime;
+            }
+            
             accumulatedText += chunk;
             console.log("[AI API] Received chunk:", {
               chunkLength: chunk.length,
@@ -453,13 +507,19 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             
           // Calculate duration and add settings after streaming completes
           const duration = Date.now() - requestStartTime;
+          const promptTokens = estimateTextTokens(prompt);
+          const historyLength = conversationHistory?.length || 0;
+          const thinkingBudget = calculateThinkingBudget(thinkingMode, true, promptTokens, historyLength);
+          
           updateMessage(assistantMessageId, {
             responseDuration: duration,
+            timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
             modelSettings: {
               thinkingMode,
               mediaResolution,
               domainExpertise,
+              thinkingBudget,
             },
           });
         } catch (error) {
@@ -551,6 +611,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
         let accumulatedText = "";
+        let timeToFirstToken: number | undefined;
 
         if (reader) {
           try {
@@ -562,6 +623,12 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               if (done) break;
 
               const chunk = decoder.decode(value, { stream: true });
+              
+              // Capture time to first token on first chunk
+              if (!timeToFirstToken && chunk.length > 0) {
+                timeToFirstToken = Date.now() - requestStartTime;
+              }
+              
               accumulatedText += chunk;
               // Estimate output tokens as we accumulate text
               const outputTokens = estimateTextTokens(accumulatedText);
@@ -575,13 +642,19 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             
             // Calculate duration and add settings after streaming completes (fallback path)
             const duration = Date.now() - requestStartTime;
+            const promptTokens = estimateTextTokens(prompt);
+            const historyLength = conversationHistory?.length || 0;
+            const thinkingBudget = calculateThinkingBudget(thinkingMode, true, promptTokens, historyLength);
+            
             updateMessage(assistantMessageId, {
               responseDuration: duration,
+              timeToFirstToken: timeToFirstToken,
               isStreaming: false, // Mark as complete
               modelSettings: {
                 thinkingMode,
                 mediaResolution,
                 domainExpertise,
+                thinkingBudget,
               },
             });
           } catch (error) {

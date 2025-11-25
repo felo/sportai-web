@@ -1,5 +1,12 @@
 /**
- * Unified storage interface that routes to localStorage or Supabase based on auth state
+ * Unified storage interface - FAST, LOCAL-FIRST
+ * 
+ * Architecture:
+ * - localStorage is the PRIMARY CACHE and source of truth for reads (instant, no network)
+ * - Supabase is used for persistence and sync across devices (background only)
+ * - All reads (loadChats, loadChat) are FAST: they always use localStorage
+ * - Writes update localStorage immediately, then sync to Supabase in background
+ * - Use syncChatsFromSupabase() only on mount and auth changes to sync from cloud
  */
 
 import { supabase } from "@/lib/supabase";
@@ -48,50 +55,15 @@ async function isAuthenticated(): Promise<{ authenticated: boolean; userId?: str
 }
 
 /**
- * Load all chats (from Supabase if authenticated, localStorage otherwise)
- * When authenticated, merges localStorage chats with Supabase chats to include empty chats
+ * Load all chats - FAST: Always reads from localStorage first
+ * localStorage is the source of truth for immediate reads
+ * Supabase is used only for initial sync and background updates
  */
 export async function loadChats(): Promise<Chat[]> {
-  const { authenticated } = await isAuthenticated();
-  
-  console.log("[storage-unified] loadChats - authenticated:", authenticated);
-  
-  if (authenticated) {
-    try {
-      const supabaseChats = await loadChatsFromSupabase();
-      const localChats = loadChatsFromLocal();
-      
-      console.log("[storage-unified] loadChats - raw data:", {
-        supabaseChats: supabaseChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
-        localChats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
-      });
-      
-      // Merge chats: prefer Supabase version for chats that exist in both
-      // but include localStorage-only chats (empty chats that haven't been synced)
-      const supabaseChatIds = new Set(supabaseChats.map(c => c.id));
-      const localOnlyChats = localChats.filter(c => !supabaseChatIds.has(c.id));
-      
-      console.log("[storage-unified] localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
-      
-      // Combine and sort by createdAt (descending) for stable chronological order
-      const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.createdAt - a.createdAt);
-      
-      console.log("[storage-unified] loadChats result:", {
-        supabase: supabaseChats.length,
-        localOnly: localOnlyChats.length,
-        total: allChats.length,
-        chats: allChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
-      });
-      
-      return allChats;
-    } catch (error) {
-      console.error("Failed to load from Supabase, falling back to localStorage:", error);
-      return loadChatsFromLocal();
-    }
-  }
-  
+  // FAST PATH: Always read from localStorage (instant, no network)
   const localChats = loadChatsFromLocal();
-  console.log("[storage-unified] loadChats (not authenticated):", {
+  
+  console.log("[storage-unified] loadChats - fast path (localStorage):", {
     total: localChats.length,
     chats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
   });
@@ -100,21 +72,59 @@ export async function loadChats(): Promise<Chat[]> {
 }
 
 /**
- * Load a single chat by ID
+ * Sync chats from Supabase to localStorage (background operation)
+ * Call this on mount, auth changes, or explicit refresh
  */
-export async function loadChat(chatId: string): Promise<Chat | undefined> {
+export async function syncChatsFromSupabase(): Promise<Chat[]> {
   const { authenticated } = await isAuthenticated();
   
-  if (authenticated) {
-    try {
-      const chat = await loadChatFromSupabase(chatId);
-      return chat || undefined;
-    } catch (error) {
-      console.error("Failed to load from Supabase, falling back to localStorage:", error);
-      return getChatByIdLocal(chatId);
-    }
+  if (!authenticated) {
+    console.log("[storage-unified] syncChatsFromSupabase - not authenticated, skipping");
+    return loadChatsFromLocal();
   }
   
+  try {
+    console.log("[storage-unified] syncChatsFromSupabase - fetching from Supabase...");
+    const supabaseChats = await loadChatsFromSupabase();
+    const localChats = loadChatsFromLocal();
+    
+    console.log("[storage-unified] syncChatsFromSupabase - raw data:", {
+      supabaseChats: supabaseChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+      localChats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
+    });
+    
+    // Merge chats: prefer Supabase version for chats that exist in both
+    // but include localStorage-only chats (empty chats that haven't been synced)
+    const supabaseChatIds = new Set(supabaseChats.map(c => c.id));
+    const localOnlyChats = localChats.filter(c => !supabaseChatIds.has(c.id));
+    
+    console.log("[storage-unified] localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
+    
+    // Combine and sort by createdAt (descending)
+    const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.createdAt - a.createdAt);
+    
+    // Update localStorage with merged chats
+    saveChatsToLocal(allChats);
+    
+    console.log("[storage-unified] ✅ syncChatsFromSupabase complete:", {
+      supabase: supabaseChats.length,
+      localOnly: localOnlyChats.length,
+      total: allChats.length,
+    });
+    
+    return allChats;
+  } catch (error) {
+    console.error("[storage-unified] ❌ Failed to sync from Supabase:", error);
+    return loadChatsFromLocal();
+  }
+}
+
+/**
+ * Load a single chat by ID - FAST: Always reads from localStorage
+ * localStorage is the source of truth for immediate reads
+ */
+export async function loadChat(chatId: string): Promise<Chat | undefined> {
+  // FAST PATH: Always read from localStorage (instant, no network)
   return getChatByIdLocal(chatId);
 }
 

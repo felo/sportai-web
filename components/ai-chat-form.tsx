@@ -21,7 +21,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
-import { getThinkingMode, getMediaResolution, getDomainExpertise, type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, updateChatSettings } from "@/utils/storage";
+import { type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat, loadChat } from "@/utils/storage-unified";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
@@ -132,17 +132,17 @@ export function AIChatForm() {
         if (currentChatId) {
           const chatData = await loadChat(currentChatId);
           if (chatData) {
-            // Restore settings from chat, fallback to defaults
-            setThinkingMode(chatData.thinkingMode || "fast");
-            setMediaResolution(chatData.mediaResolution || "medium");
-            setDomainExpertise(chatData.domainExpertise || "all-sports");
+            // Restore settings from chat, fallback to hardcoded defaults
+            setThinkingMode(chatData.thinkingMode ?? "fast");
+            setMediaResolution(chatData.mediaResolution ?? "medium");
+            setDomainExpertise(chatData.domainExpertise ?? "all-sports");
             return;
           }
         }
-        // No chat found, use global settings
-        setThinkingMode(getThinkingMode());
-        setMediaResolution(getMediaResolution());
-        setDomainExpertise(getDomainExpertise());
+        // No chat found, use hardcoded defaults (no global settings)
+        setThinkingMode("fast");
+        setMediaResolution("medium");
+        setDomainExpertise("all-sports");
       })();
     }
   }, [isHydrated]);
@@ -165,11 +165,15 @@ export function AIChatForm() {
         console.log("[AIChatForm] No chat exists, creating default chat");
         createNewChat([], undefined).then((newChat) => {
           setCurrentChatId(newChat.id);
-          console.log("[AIChatForm] Created default chat:", newChat.id);
-          // Reset settings to defaults for new chat
-          setThinkingMode("fast");
-          setMediaResolution("medium");
-          setDomainExpertise("all-sports");
+          console.log("[AIChatForm] Created default chat:", newChat.id, "with settings:", {
+            thinkingMode: newChat.thinkingMode,
+            mediaResolution: newChat.mediaResolution,
+            domainExpertise: newChat.domainExpertise,
+          });
+          // Explicitly set settings from the new chat (which has hardcoded defaults)
+          setThinkingMode(newChat.thinkingMode ?? "fast");
+          setMediaResolution(newChat.mediaResolution ?? "medium");
+          setDomainExpertise(newChat.domainExpertise ?? "all-sports");
         });
       } else {
         console.log("[AIChatForm] Using existing chat:", currentChatId);
@@ -192,10 +196,16 @@ export function AIChatForm() {
             mediaResolution: chatData.mediaResolution,
             domainExpertise: chatData.domainExpertise,
           });
-          // Restore settings from the chat
-          setThinkingMode(chatData.thinkingMode || "fast");
-          setMediaResolution(chatData.mediaResolution || "medium");
-          setDomainExpertise(chatData.domainExpertise || "all-sports");
+          // Restore settings from the chat (with hardcoded defaults as fallback)
+          setThinkingMode(chatData.thinkingMode ?? "fast");
+          setMediaResolution(chatData.mediaResolution ?? "medium");
+          setDomainExpertise(chatData.domainExpertise ?? "all-sports");
+        } else {
+          // Chat not found, reset to defaults
+          console.log("[AIChatForm] Chat not found, resetting to defaults");
+          setThinkingMode("fast");
+          setMediaResolution("medium");
+          setDomainExpertise("all-sports");
         }
       }
     };
@@ -764,7 +774,10 @@ export function AIChatForm() {
     const newChat = await createNewChat();
     setCurrentChatId(newChat.id);
     setShowingVideoSizeError(false);
-    // State will be updated via event handler
+    // Explicitly set settings from the new chat (which has defaults)
+    setThinkingMode(newChat.thinkingMode ?? "fast");
+    setMediaResolution(newChat.mediaResolution ?? "medium");
+    setDomainExpertise(newChat.domainExpertise ?? "all-sports");
   };
 
   return (

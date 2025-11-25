@@ -409,6 +409,7 @@ const TTS_SETTINGS_KEY = "tts-settings";
 
 /**
  * Get thinking mode setting from localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @returns "fast" or "deep", defaults to "fast"
  */
 export function getThinkingMode(): ThinkingMode {
@@ -427,6 +428,7 @@ export function getThinkingMode(): ThinkingMode {
 
 /**
  * Save thinking mode setting to localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @param mode - "fast" or "deep"
  */
 export function setThinkingMode(mode: ThinkingMode): void {
@@ -443,6 +445,7 @@ export function setThinkingMode(mode: ThinkingMode): void {
 
 /**
  * Get media resolution setting from localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @returns "low", "medium", or "high", defaults to "medium"
  */
 export function getMediaResolution(): MediaResolution {
@@ -461,6 +464,7 @@ export function getMediaResolution(): MediaResolution {
 
 /**
  * Save media resolution setting to localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @param resolution - "low", "medium", or "high"
  */
 export function setMediaResolution(resolution: MediaResolution): void {
@@ -477,6 +481,7 @@ export function setMediaResolution(resolution: MediaResolution): void {
 
 /**
  * Get domain expertise setting from localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @returns "all-sports", "tennis", "pickleball", or "padel", defaults to "all-sports"
  */
 export function getDomainExpertise(): DomainExpertise {
@@ -497,6 +502,7 @@ export function getDomainExpertise(): DomainExpertise {
 
 /**
  * Save domain expertise setting to localStorage
+ * @deprecated Global settings are deprecated. Use per-chat settings instead.
  * @param expertise - "all-sports", "tennis", "pickleball", or "padel"
  */
 export function setDomainExpertise(expertise: DomainExpertise): void {
@@ -716,7 +722,7 @@ export function saveChatsToStorage(chats: Chat[]): void {
  * Create a new chat and save it to storage
  * @param messages - Initial messages for the chat
  * @param title - Optional custom title for the chat (defaults to generated title from messages)
- * @param settings - Optional settings for the chat (defaults to current global settings)
+ * @param settings - Optional settings for the chat (defaults to "all-sports", "fast", "medium")
  * @returns The created chat
  */
 export function createChat(
@@ -735,10 +741,10 @@ export function createChat(
     createdAt: now,
     updatedAt: now,
     messages,
-    // Initialize with provided settings or current global settings
-    thinkingMode: settings?.thinkingMode || getThinkingMode(),
-    mediaResolution: settings?.mediaResolution || getMediaResolution(),
-    domainExpertise: settings?.domainExpertise || getDomainExpertise(),
+    // Initialize with provided settings or hardcoded defaults (all-sports, fast, medium)
+    thinkingMode: settings?.thinkingMode ?? "fast",
+    mediaResolution: settings?.mediaResolution ?? "medium",
+    domainExpertise: settings?.domainExpertise ?? "all-sports",
   };
 
   const chats = loadChatsFromStorage();
