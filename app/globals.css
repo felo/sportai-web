@@ -346,3 +346,20 @@ html[data-theme="dark"] .markdown-divider-dots,
 [data-radix-theme][data-radix-theme-appearance="dark"] .markdown-divider-dots {
   color: #7ADB8F;
 }
+
+/* Dropdown menu highlight overrides for light mode */
+/* Use subtle green background instead of solid dark green */
+.radix-themes [data-radix-collection-item][data-highlighted],
+.radix-themes [data-radix-menu-content] [data-highlighted] {
+  background-color: rgba(2, 89, 64, 0.1) !important;
+  color: var(--gray-12) !important;
+}
+
+/* Dark mode dropdown highlights - subtle light green */
+html[data-theme="dark"] .radix-themes [data-radix-collection-item][data-highlighted],
+html[data-theme="dark"] .radix-themes [data-radix-menu-content] [data-highlighted],
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-collection-item][data-highlighted],
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-menu-content] [data-highlighted] {
+  background-color: rgba(122, 219, 143, 0.15) !important;
+  color: var(--gray-12) !important;
+}

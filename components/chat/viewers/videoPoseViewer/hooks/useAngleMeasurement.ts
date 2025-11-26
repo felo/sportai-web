@@ -16,8 +16,8 @@ interface UseAngleMeasurementProps {
  * - Angle menu state
  */
 export function useAngleMeasurement({
-  initialShowAngles = false,
-  initialMeasuredAngles = [],
+  initialShowAngles = true,
+  initialMeasuredAngles = [[6, 8, 10], [12, 14, 16]], // Right elbow and right knee angles by default
 }: UseAngleMeasurementProps = {}) {
   // Display State
   const [showAngles, setShowAngles] = useState(initialShowAngles);

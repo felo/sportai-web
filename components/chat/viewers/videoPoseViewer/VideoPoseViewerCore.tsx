@@ -52,8 +52,8 @@ export function VideoPoseViewer({
   showControls = true,
   initialModel = "MoveNet",
   initialShowSkeleton = true,
-  initialShowAngles = false,
-  initialMeasuredAngles = [],
+  initialShowAngles = true,
+  initialMeasuredAngles = [[6, 8, 10], [12, 14, 16]], // Right elbow and right knee angles by default
   initialPlaybackSpeed = 1.0,
   initialUseAccurateMode = false,
   initialConfidenceMode = "standard",
