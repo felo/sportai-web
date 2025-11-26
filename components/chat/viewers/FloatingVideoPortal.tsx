@@ -16,12 +16,21 @@ const STANDARD_HEIGHT = 180;
 const THEATRE_WIDTH = 448;
 const THEATRE_HEIGHT = 252;
 
+// Size constraints
+const MIN_WIDTH = 240;
+const MIN_HEIGHT = 135;
+const MAX_WIDTH = 800;
+const MAX_HEIGHT = 450;
+const ASPECT_RATIO = 16 / 9;
+
 // Minimized size
 const MINIMIZED_SIZE = 56;
 
 const EDGE_PADDING = 16;
 const HEADER_OFFSET = 80;
 const BOTTOM_OFFSET = 100;
+
+type ResizeHandle = "nw" | "ne" | "sw" | "se" | null;
 
 const getCornerPosition = (
   corner: DockCorner,
@@ -61,23 +70,46 @@ export function FloatingVideoPortal() {
     dockedCorner,
     isMinimized,
     registeredVideos,
+    setFloatingContainer,
     setPosition,
     setIsDragging,
     setDockedCorner,
     setIsMinimized,
     closeFloating,
   } = useFloatingVideoContext();
+  
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   const [mounted, setMounted] = useState(false);
   const [theatreMode, setTheatreMode] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [customSize, setCustomSize] = useState<{ width: number; height: number } | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [activeResizeHandle, setActiveResizeHandle] = useState<ResizeHandle>(null);
+  
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
+  const resizeStartRef = useRef<{ 
+    x: number; 
+    y: number; 
+    width: number; 
+    height: number;
+    posX: number;
+    posY: number;
+  } | null>(null);
   const hasInitializedRef = useRef(false);
 
   // Get current dimensions based on state
-  const getWidth = () => isMinimized ? MINIMIZED_SIZE : (theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH);
-  const getHeight = () => isMinimized ? MINIMIZED_SIZE : (theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT);
+  const getWidth = () => {
+    if (isMinimized) return MINIMIZED_SIZE;
+    if (customSize) return customSize.width;
+    return theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH;
+  };
+  const getHeight = () => {
+    if (isMinimized) return MINIMIZED_SIZE;
+    if (customSize) return customSize.height;
+    return theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT;
+  };
 
   // Handle client-side mounting for portal
   useEffect(() => {
@@ -90,6 +122,16 @@ export function FloatingVideoPortal() {
     window.addEventListener("theatre-mode-change", handleTheatreModeChange);
     return () => window.removeEventListener("theatre-mode-change", handleTheatreModeChange);
   }, []);
+
+  // Set the floating container ref for portal rendering
+  useEffect(() => {
+    if (videoContainerRef.current && isFloating && !isMinimized) {
+      setFloatingContainer(videoContainerRef.current);
+    } else {
+      setFloatingContainer(null);
+    }
+    return () => setFloatingContainer(null);
+  }, [isFloating, isMinimized, setFloatingContainer, mounted]);
 
   // Initialize position when floating starts
   useEffect(() => {
@@ -181,7 +223,96 @@ export function FloatingVideoPortal() {
     }
     setIsDragging(false);
     dragStartRef.current = null;
-  }, [isDragging, isMinimized, theatreMode, position, setDockedCorner, setPosition, setIsDragging]);
+  }, [isDragging, isMinimized, theatreMode, position, setDockedCorner, setPosition, setIsDragging, customSize]);
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    
+    resizeStartRef.current = {
+      x: clientX,
+      y: clientY,
+      width: getWidth(),
+      height: getHeight(),
+      posX: position.x,
+      posY: position.y,
+    };
+    setActiveResizeHandle(handle);
+    setIsResizing(true);
+  }, [position, customSize, theatreMode, isMinimized]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!resizeStartRef.current || !isResizing || !activeResizeHandle) return;
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    
+    const deltaX = clientX - resizeStartRef.current.x;
+    const deltaY = clientY - resizeStartRef.current.y;
+    
+    let newWidth = resizeStartRef.current.width;
+    let newHeight = resizeStartRef.current.height;
+    let newX = resizeStartRef.current.posX;
+    let newY = resizeStartRef.current.posY;
+    
+    // Calculate new size based on which handle is being dragged
+    switch (activeResizeHandle) {
+      case "se": // Bottom-right
+        newWidth = resizeStartRef.current.width + deltaX;
+        newHeight = newWidth / ASPECT_RATIO;
+        break;
+      case "sw": // Bottom-left
+        newWidth = resizeStartRef.current.width - deltaX;
+        newHeight = newWidth / ASPECT_RATIO;
+        newX = resizeStartRef.current.posX + (resizeStartRef.current.width - newWidth);
+        break;
+      case "ne": // Top-right
+        newWidth = resizeStartRef.current.width + deltaX;
+        newHeight = newWidth / ASPECT_RATIO;
+        newY = resizeStartRef.current.posY + (resizeStartRef.current.height - newHeight);
+        break;
+      case "nw": // Top-left
+        newWidth = resizeStartRef.current.width - deltaX;
+        newHeight = newWidth / ASPECT_RATIO;
+        newX = resizeStartRef.current.posX + (resizeStartRef.current.width - newWidth);
+        newY = resizeStartRef.current.posY + (resizeStartRef.current.height - newHeight);
+        break;
+    }
+    
+    // Clamp to min/max sizes
+    newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+    
+    // Recalculate position if size was clamped
+    if (activeResizeHandle === "sw" || activeResizeHandle === "nw") {
+      newX = resizeStartRef.current.posX + resizeStartRef.current.width - newWidth;
+    }
+    if (activeResizeHandle === "ne" || activeResizeHandle === "nw") {
+      newY = resizeStartRef.current.posY + resizeStartRef.current.height - newHeight;
+    }
+    
+    // Constrain position to viewport
+    newX = Math.max(0, Math.min(window.innerWidth - newWidth, newX));
+    newY = Math.max(HEADER_OFFSET, Math.min(window.innerHeight - newHeight - BOTTOM_OFFSET, newY));
+    
+    setCustomSize({ width: newWidth, height: newHeight });
+    setPosition({ x: newX, y: newY });
+  }, [isResizing, activeResizeHandle, setPosition]);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+    setActiveResizeHandle(null);
+    resizeStartRef.current = null;
+  }, []);
+
+  // Reset custom size when theatre mode changes
+  useEffect(() => {
+    setCustomSize(null);
+  }, [theatreMode]);
 
   useEffect(() => {
     if (isDragging) {
@@ -198,18 +329,31 @@ export function FloatingVideoPortal() {
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
+  // Resize event listeners
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", handleResizeMove);
+      window.addEventListener("mouseup", handleResizeEnd);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", handleResizeEnd);
+    };
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+
   const handleMinimizeToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const newMinimized = !isMinimized;
     setIsMinimized(newMinimized);
     
     setTimeout(() => {
-      const newWidth = newMinimized ? MINIMIZED_SIZE : (theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH);
-      const newHeight = newMinimized ? MINIMIZED_SIZE : (theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT);
+      // Use custom size if available, otherwise default
+      const newWidth = newMinimized ? MINIMIZED_SIZE : (customSize?.width ?? (theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH));
+      const newHeight = newMinimized ? MINIMIZED_SIZE : (customSize?.height ?? (theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT));
       const pos = getCornerPosition(dockedCorner, newWidth, newHeight);
       setPosition(pos);
     }, 0);
-  }, [isMinimized, theatreMode, dockedCorner, setIsMinimized, setPosition]);
+  }, [isMinimized, theatreMode, dockedCorner, customSize, setIsMinimized, setPosition]);
 
   if (!mounted || !isFloating || !activeVideoId) {
     return null;
@@ -346,21 +490,65 @@ export function FloatingVideoPortal() {
             </Box>
           </Box>
 
-          <video
-            src={registration.videoUrl}
-            controls
-            autoPlay
-            muted
-            playsInline
+          {/* Container for the portaled VideoPoseViewer - fills entire space, drag zone overlays it */}
+          <Box
+            ref={videoContainerRef}
             style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               backgroundColor: "#000",
+              overflow: "hidden",
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           />
+
+          {/* Resize handles at corners - triangular */}
+          {(["nw", "ne", "sw", "se"] as const).map((handle) => {
+            // SVG path for triangle pointing towards corner (14x14)
+            const trianglePaths: Record<string, string> = {
+              nw: "M 0 0 L 14 0 L 0 14 Z",
+              ne: "M 0 0 L 14 0 L 14 14 Z",
+              sw: "M 0 0 L 0 14 L 14 14 Z",
+              se: "M 14 0 L 14 14 L 0 14 Z",
+            };
+            
+            return (
+              <Box
+                key={handle}
+                onMouseDown={(e) => handleResizeStart(e, handle)}
+                style={{
+                  position: "absolute",
+                  width: 14,
+                  height: 14,
+                  ...(handle.includes("n") ? { top: 0 } : { bottom: 0 }),
+                  ...(handle.includes("w") ? { left: 0 } : { right: 0 }),
+                  cursor: handle === "nw" || handle === "se" ? "nwse-resize" : "nesw-resize",
+                  zIndex: 30,
+                  opacity: showControls || isResizing ? 1 : 0,
+                  transition: "opacity 0.2s ease",
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                  }}
+                >
+                  <path
+                    d={trianglePaths[handle]}
+                    fill="rgba(122, 219, 143, 0.8)"
+                  />
+                </svg>
+              </Box>
+            );
+          })}
         </>
       )}
 

@@ -22,6 +22,10 @@ interface FloatingVideoContextValue {
   // Registered videos
   registeredVideos: Map<string, VideoRegistration>;
   
+  // Floating container ref - for portal rendering
+  floatingContainerRef: React.RefObject<HTMLDivElement>;
+  setFloatingContainer: (element: HTMLDivElement | null) => void;
+  
   // Actions
   registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode) => void;
   unregisterVideo: (id: string) => void;
@@ -53,6 +57,14 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   const registeredVideosRef = useRef<Map<string, VideoRegistration>>(new Map());
   // Track version to trigger re-renders only when needed
   const [registrationVersion, setRegistrationVersion] = useState(0);
+  
+  // Ref to the floating container element for portal rendering
+  const floatingContainerRef = useRef<HTMLDivElement>(null);
+  const [floatingContainerElement, setFloatingContainerElement] = useState<HTMLDivElement | null>(null);
+  
+  const setFloatingContainer = useCallback((element: HTMLDivElement | null) => {
+    setFloatingContainerElement(element);
+  }, []);
 
   const registerVideo = useCallback((
     id: string,
@@ -108,6 +120,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     }, 100);
   }, [scrollToVideo]);
 
+  // Create a stable ref object that points to the current floating container
+  const stableFloatingContainerRef = useRef<HTMLDivElement>(null);
+  // Keep the stable ref updated
+  if (floatingContainerElement) {
+    (stableFloatingContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = floatingContainerElement;
+  }
+
   const value = useMemo<FloatingVideoContextValue>(() => ({
     activeVideoId,
     isFloating,
@@ -116,6 +135,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     dockedCorner,
     isMinimized,
     registeredVideos: registeredVideosRef.current,
+    floatingContainerRef: stableFloatingContainerRef,
+    setFloatingContainer,
     registerVideo,
     unregisterVideo,
     setActiveVideo,
@@ -133,6 +154,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     isDragging,
     dockedCorner,
     isMinimized,
+    floatingContainerElement,
+    setFloatingContainer,
     registerVideo,
     unregisterVideo,
     setActiveVideo,

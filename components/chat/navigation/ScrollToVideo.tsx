@@ -112,7 +112,7 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
   if (!isVisible) return null;
 
   return (
-    <Tooltip content="Jump to video">
+    <Tooltip content="Scroll to video">
       <button
         onClick={scrollToNearestVideo}
         aria-label="Scroll to nearest video"

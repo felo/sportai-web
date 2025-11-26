@@ -42,6 +42,7 @@ interface VideoPoseViewerProps {
   initialVelocityWrist?: "left" | "right";
   initialPoseEnabled?: boolean;
   theatreMode?: boolean;
+  hideTheatreToggle?: boolean;
 }
 
 export function VideoPoseViewer({
@@ -65,6 +66,7 @@ export function VideoPoseViewer({
   initialVelocityWrist = "right",
   initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
   theatreMode = true,
+  hideTheatreToggle = false,
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1585,8 +1587,8 @@ export function VideoPoseViewer({
             zIndex: 30, // Higher than overlays
           }}
         >
-          {/* Theatre Mode Button - Hidden on mobile and short screens */}
-          {!isMobile && !isShortScreenView && (
+          {/* Theatre Mode Button - Hidden on mobile, short screens, and when floating */}
+          {!isMobile && !isShortScreenView && !hideTheatreToggle && (
             <Tooltip content={localTheatreMode ? "Exit Theatre Mode" : "Enter Theatre Mode"}>
               <Button
                 className={buttonStyles.actionButtonSquare}
@@ -1634,8 +1636,8 @@ export function VideoPoseViewer({
             </Button>
           </Tooltip>
 
-          {/* Config Button - Only show when AI overlay is enabled */}
-          {isPoseEnabled && (
+          {/* Config Button - Only show when AI overlay is enabled and not in floating mode */}
+          {isPoseEnabled && !hideTheatreToggle && (
             <Tooltip content={isExpanded ? "Hide Video Player Controls" : "Show Video Player Controls"}>
               <Button
                 className={buttonStyles.actionButtonSquare}

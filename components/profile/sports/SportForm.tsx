@@ -13,28 +13,26 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useProfileContext } from "../ProfileContext";
 import { FormField } from "../shared/FormField";
-import { racketSportOptions, otherSportOptions, skillLevelOptions } from "@/lib/profile-options";
-import type { Sport, SkillLevel } from "@/types/profile";
+import { racketSportOptions, skillLevelOptions } from "@/lib/profile-options";
+import type { RacketSport, SkillLevel } from "@/types/profile";
 
 interface SportFormProps {
-  existingSports: Sport[];
+  existingSports: RacketSport[];
   onClose: () => void;
   onAdded?: (sportId: string) => void;
 }
 
 export function SportForm({ existingSports, onClose, onAdded }: SportFormProps) {
   const { addSport, saving } = useProfileContext();
-  const [selectedSport, setSelectedSport] = useState<Sport | "">("");
+  const [selectedSport, setSelectedSport] = useState<RacketSport | "">("");
   const [skillLevel, setSkillLevel] = useState<SkillLevel | "">("");
   const [error, setError] = useState<string | null>(null);
   
+  // Currently only racket sports are supported in the database
   const availableRacketSports = racketSportOptions.filter(
-    (s) => !existingSports.includes(s.value)
+    (s) => !existingSports.includes(s.value as RacketSport)
   );
-  const availableOtherSports = otherSportOptions.filter(
-    (s) => !existingSports.includes(s.value)
-  );
-  const hasAvailableSports = availableRacketSports.length > 0 || availableOtherSports.length > 0;
+  const hasAvailableSports = availableRacketSports.length > 0;
   
   const handleSubmit = useCallback(async () => {
     if (!selectedSport || !skillLevel) {
@@ -80,33 +78,15 @@ export function SportForm({ existingSports, onClose, onAdded }: SportFormProps) 
             <FormField label="Sport" required>
               <Select.Root
                 value={selectedSport}
-                onValueChange={(v) => setSelectedSport(v as Sport)}
+                onValueChange={(v) => setSelectedSport(v as RacketSport)}
               >
                 <Select.Trigger placeholder="Select sport" style={{ width: "100%" }} />
                 <Select.Content>
-                  {availableRacketSports.length > 0 && (
-                    <Select.Group>
-                      <Select.Label>Racket Sports</Select.Label>
-                      {availableRacketSports.map((s) => (
-                        <Select.Item key={s.value} value={s.value}>
-                          {s.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Group>
-                  )}
-                  {availableRacketSports.length > 0 && availableOtherSports.length > 0 && (
-                    <Select.Separator />
-                  )}
-                  {availableOtherSports.length > 0 && (
-                    <Select.Group>
-                      <Select.Label>Other Sports</Select.Label>
-                      {availableOtherSports.map((s) => (
-                        <Select.Item key={s.value} value={s.value}>
-                          {s.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Group>
-                  )}
+                  {availableRacketSports.map((s) => (
+                    <Select.Item key={s.value} value={s.value}>
+                      {s.label}
+                    </Select.Item>
+                  ))}
                 </Select.Content>
               </Select.Root>
             </FormField>

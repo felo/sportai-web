@@ -32,7 +32,8 @@ import {
   timezones,
   fieldHelperText,
 } from "@/lib/profile-options";
-import type { Gender, Handedness, UnitsPreference, ReferralSource } from "@/types/profile";
+import type { Gender, Handedness, UnitsPreference, ReferralSource, RacketSport } from "@/types/profile";
+import { isRacketSport } from "@/types/profile";
 
 export function PlayerTab() {
   const { profile, updatePlayerProfile } = useProfileContext();
@@ -304,7 +305,7 @@ export function PlayerTab() {
         {showAddSport && (
           <Box mt="3">
             <SportForm
-              existingSports={profile.sports.map(s => s.sport)}
+              existingSports={profile.sports.map(s => s.sport).filter(isRacketSport)}
               onClose={() => setShowAddSport(false)}
               onAdded={(sportId) => setNewlyAddedSportId(sportId)}
             />

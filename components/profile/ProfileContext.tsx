@@ -228,11 +228,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (addError) {
-        console.error("Error adding sport:", addError);
+        console.error("Error adding sport:", {
+          message: addError.message,
+          code: addError.code,
+          details: addError.details,
+          hint: addError.hint,
+        });
         if (addError.code === "23505") {
           setError("You already have this sport in your profile");
+        } else if (addError.code === "23514") {
+          // CHECK constraint violation - sport not in allowed list
+          setError("This sport is not yet supported. Currently only Tennis, Padel, and Pickleball are available.");
         } else {
-          setError(addError.message);
+          setError(addError.message || "Failed to add sport");
         }
         setSaving(false);
         return null;

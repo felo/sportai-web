@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useState, type ReactNode } from "react";
+import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Box, Text, Button } from "@radix-ui/themes";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
 import { useFloatingVideoContextOptional } from "../../viewers/FloatingVideoContext";
@@ -35,46 +36,6 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   // Track if this video should be floating
   const isThisVideoFloating = floatingContext?.activeVideoId === message.id && floatingContext?.isFloating;
 
-  // Store render function in a ref to avoid re-registration on every render
-  const renderFloatingContentRef = useRef<() => ReactNode>(() => null);
-  
-  // Update the render function ref when dependencies change
-  useEffect(() => {
-    renderFloatingContentRef.current = () => {
-      if (!videoSrc) return null;
-      
-      return (
-        <Box
-          style={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: "var(--gray-3)",
-          }}
-        >
-          <VideoPoseViewer
-            videoUrl={videoSrc}
-            autoPlay
-            initialModel={message.poseData?.model ?? "MoveNet"}
-            initialShowSkeleton={message.poseData?.showSkeleton ?? true}
-            initialShowAngles={message.poseData?.showAngles ?? false}
-            initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
-            initialPlaybackSpeed={message.videoPlaybackSpeed}
-            initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
-            initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
-            initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
-            initialShowTrackingId={message.poseData?.showTrackingId ?? false}
-            initialShowTrajectories={message.poseData?.showTrajectories ?? false}
-            initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
-            initialShowVelocity={message.poseData?.showVelocity ?? false}
-            initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
-            initialPoseEnabled={message.poseData?.enabled ?? false}
-            theatreMode={false} // Always use compact mode in floating
-          />
-        </Box>
-      );
-    };
-  }, [videoSrc, message.poseData, message.videoPlaybackSpeed]);
-
   // Track floating state in refs to avoid stale closures in IntersectionObserver
   const isFloatingRef = useRef(false);
   const activeVideoIdRef = useRef<string | null>(null);
@@ -93,13 +54,11 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     const ctx = floatingContextRef.current;
     if (!ctx || !videoContainerRef.current || !videoSrc || isImage) return;
     
-    const renderFn = () => renderFloatingContentRef.current();
-    
     ctx.registerVideo(
       message.id,
       videoContainerRef as React.RefObject<HTMLElement>,
       videoSrc,
-      renderFn
+      () => null // renderContent not used with portal approach
     );
     
     return () => {
@@ -287,34 +246,44 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   : videoContainerStyle
               }
             >
-              {/* Show placeholder overlay when this video is floating */}
+              {/* Show placeholder when this video is floating */}
               {isThisVideoFloating && renderFloatingPlaceholder()}
               
-              {/* Always render VideoPoseViewer but hide when floating to prevent unmount */}
+              {/* Render VideoPoseViewer - portal to floating container when floating */}
               {showPoseViewer ? (
-                <Box style={{ 
-                  display: isThisVideoFloating ? 'none' : 'block',
-                }}>
-                  <VideoPoseViewer
-                    videoUrl={videoSrc}
-                    autoPlay
-                    initialModel={message.poseData?.model ?? "MoveNet"}
-                    initialShowSkeleton={message.poseData?.showSkeleton ?? true}
-                    initialShowAngles={message.poseData?.showAngles ?? false}
-                    initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
-                    initialPlaybackSpeed={message.videoPlaybackSpeed}
-                    initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
-                    initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
-                    initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
-                    initialShowTrackingId={message.poseData?.showTrackingId ?? false}
-                    initialShowTrajectories={message.poseData?.showTrajectories ?? false}
-                    initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
-                    initialShowVelocity={message.poseData?.showVelocity ?? false}
-                    initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
-                    initialPoseEnabled={message.poseData?.enabled ?? false}
-                    theatreMode={theatreMode}
-                  />
-                </Box>
+                (() => {
+                  const floatingContainer = floatingContext?.floatingContainerRef?.current;
+                  const shouldPortal = isThisVideoFloating && floatingContainer;
+                  
+                  const videoPoseViewer = (
+                    <VideoPoseViewer
+                      videoUrl={videoSrc}
+                      autoPlay
+                      initialModel={message.poseData?.model ?? "MoveNet"}
+                      initialShowSkeleton={message.poseData?.showSkeleton ?? true}
+                      initialShowAngles={message.poseData?.showAngles ?? false}
+                      initialMeasuredAngles={message.poseData?.defaultAngles ?? []}
+                      initialPlaybackSpeed={message.videoPlaybackSpeed}
+                      initialUseAccurateMode={message.poseData?.useAccurateMode ?? false}
+                      initialConfidenceMode={message.poseData?.confidenceMode ?? "standard"}
+                      initialResolutionMode={message.poseData?.resolutionMode ?? "balanced"}
+                      initialShowTrackingId={message.poseData?.showTrackingId ?? false}
+                      initialShowTrajectories={message.poseData?.showTrajectories ?? false}
+                      initialSelectedJoints={message.poseData?.selectedJoints ?? [9, 10]}
+                      initialShowVelocity={message.poseData?.showVelocity ?? false}
+                      initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
+                      initialPoseEnabled={message.poseData?.enabled ?? false}
+                      theatreMode={shouldPortal ? false : theatreMode}
+                      hideTheatreToggle={shouldPortal}
+                    />
+                  );
+                  
+                  if (shouldPortal) {
+                    return createPortal(videoPoseViewer, floatingContainer);
+                  }
+                  
+                  return videoPoseViewer;
+                })()
               ) : (
                 <video
                   ref={videoRef}
