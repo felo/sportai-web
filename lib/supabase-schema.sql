@@ -62,6 +62,265 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- =============================================
+-- PROFILES TABLE - EXTENDED FIELDS
+-- Run these migrations if you already have the profiles table
+-- =============================================
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gender TEXT CHECK (gender IN ('male', 'female', 'non-binary', 'prefer-not-to-say'));
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS handedness TEXT CHECK (handedness IN ('left', 'right', 'ambidextrous'));
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS height NUMERIC;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weight NUMERIC;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS physical_limitations TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS units_preference TEXT CHECK (units_preference IN ('metric', 'imperial')) DEFAULT 'metric';
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS country TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS timezone TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en';
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_parent_of_junior BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS referral_source TEXT;
+
+-- =============================================
+-- PLAYER_SPORTS TABLE
+-- Sports that a player participates in
+-- =============================================
+CREATE TABLE IF NOT EXISTS player_sports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  sport TEXT NOT NULL CHECK (sport IN ('tennis', 'padel', 'pickleball')),
+  skill_level TEXT NOT NULL CHECK (skill_level IN ('beginner', 'novice', 'intermediate', 'advanced', 'expert')),
+  years_playing TEXT CHECK (years_playing IN ('less-than-1', '1-3', '3-5', '5-10', '10-plus')),
+  club_name TEXT,
+  playing_style TEXT,
+  preferred_surfaces TEXT[] DEFAULT '{}',
+  goals TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Ensure a player can only have one entry per sport
+  UNIQUE(profile_id, sport)
+);
+
+-- Create index on profile_id for faster queries
+CREATE INDEX IF NOT EXISTS player_sports_profile_id_idx ON player_sports(profile_id);
+
+-- Enable RLS on player_sports
+ALTER TABLE player_sports ENABLE ROW LEVEL SECURITY;
+
+-- Player sports policies
+CREATE POLICY "Users can view their own sports"
+  ON player_sports FOR SELECT
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own sports"
+  ON player_sports FOR INSERT
+  WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own sports"
+  ON player_sports FOR UPDATE
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own sports"
+  ON player_sports FOR DELETE
+  USING (auth.uid() = profile_id);
+
+-- Trigger to update player_sports.updated_at
+CREATE TRIGGER update_player_sports_updated_at
+  BEFORE UPDATE ON player_sports
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- PLAYER_EQUIPMENT TABLE
+-- Equipment owned by a player
+-- =============================================
+CREATE TABLE IF NOT EXISTS player_equipment (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  sport TEXT NOT NULL CHECK (sport IN ('tennis', 'padel', 'pickleball')),
+  equipment_type TEXT NOT NULL,
+  brand TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index on profile_id for faster queries
+CREATE INDEX IF NOT EXISTS player_equipment_profile_id_idx ON player_equipment(profile_id);
+
+-- Enable RLS on player_equipment
+ALTER TABLE player_equipment ENABLE ROW LEVEL SECURITY;
+
+-- Player equipment policies
+CREATE POLICY "Users can view their own equipment"
+  ON player_equipment FOR SELECT
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own equipment"
+  ON player_equipment FOR INSERT
+  WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own equipment"
+  ON player_equipment FOR UPDATE
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own equipment"
+  ON player_equipment FOR DELETE
+  USING (auth.uid() = profile_id);
+
+-- =============================================
+-- COACH_PROFILES TABLE
+-- Optional coach extension for profiles
+-- =============================================
+CREATE TABLE IF NOT EXISTS coach_profiles (
+  profile_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  is_active BOOLEAN DEFAULT TRUE,
+  years_experience TEXT CHECK (years_experience IN ('less-than-1', '1-3', '3-5', '5-10', '10-plus')),
+  coaching_level TEXT CHECK (coaching_level IN ('assistant', 'club', 'performance', 'high-performance', 'master')),
+  employment_type TEXT CHECK (employment_type IN ('full-time', 'part-time', 'freelance')),
+  client_count TEXT CHECK (client_count IN ('1-10', '11-25', '26-50', '50-100', '100-plus')),
+  specialties TEXT[] DEFAULT '{}',
+  affiliation TEXT,
+  uses_video_analysis BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on coach_profiles
+ALTER TABLE coach_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Coach profiles policies
+CREATE POLICY "Users can view their own coach profile"
+  ON coach_profiles FOR SELECT
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own coach profile"
+  ON coach_profiles FOR INSERT
+  WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own coach profile"
+  ON coach_profiles FOR UPDATE
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own coach profile"
+  ON coach_profiles FOR DELETE
+  USING (auth.uid() = profile_id);
+
+-- Trigger to update coach_profiles.updated_at
+CREATE TRIGGER update_coach_profiles_updated_at
+  BEFORE UPDATE ON coach_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- COACH_SPORTS TABLE
+-- Sports and certifications for coaches
+-- =============================================
+CREATE TABLE IF NOT EXISTS coach_sports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  coach_profile_id UUID NOT NULL REFERENCES coach_profiles(profile_id) ON DELETE CASCADE,
+  sport TEXT NOT NULL CHECK (sport IN ('tennis', 'padel', 'pickleball')),
+  certifications TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Ensure a coach can only have one entry per sport
+  UNIQUE(coach_profile_id, sport)
+);
+
+-- Create index on coach_profile_id for faster queries
+CREATE INDEX IF NOT EXISTS coach_sports_coach_profile_id_idx ON coach_sports(coach_profile_id);
+
+-- Enable RLS on coach_sports
+ALTER TABLE coach_sports ENABLE ROW LEVEL SECURITY;
+
+-- Coach sports policies
+CREATE POLICY "Users can view their own coach sports"
+  ON coach_sports FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM coach_profiles
+      WHERE coach_profiles.profile_id = coach_sports.coach_profile_id
+      AND auth.uid() = coach_profiles.profile_id
+    )
+  );
+
+CREATE POLICY "Users can insert their own coach sports"
+  ON coach_sports FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM coach_profiles
+      WHERE coach_profiles.profile_id = coach_sports.coach_profile_id
+      AND auth.uid() = coach_profiles.profile_id
+    )
+  );
+
+CREATE POLICY "Users can update their own coach sports"
+  ON coach_sports FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM coach_profiles
+      WHERE coach_profiles.profile_id = coach_sports.coach_profile_id
+      AND auth.uid() = coach_profiles.profile_id
+    )
+  );
+
+CREATE POLICY "Users can delete their own coach sports"
+  ON coach_sports FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM coach_profiles
+      WHERE coach_profiles.profile_id = coach_sports.coach_profile_id
+      AND auth.uid() = coach_profiles.profile_id
+    )
+  );
+
+-- =============================================
+-- BUSINESS_PROFILES TABLE
+-- Optional business extension for profiles
+-- =============================================
+CREATE TABLE IF NOT EXISTS business_profiles (
+  profile_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  company_name TEXT NOT NULL,
+  website TEXT,
+  role TEXT CHECK (role IN ('owner', 'coach', 'marketing', 'technology', 'content', 'operations', 'other')),
+  company_size TEXT CHECK (company_size IN ('1-10', '11-50', '51-200', '200-plus')),
+  country TEXT,
+  business_type TEXT CHECK (business_type IN (
+    'tennis-club', 'padel-club', 'pickleball-club', 'multi-sport-academy',
+    'private-coaching', 'federation', 'broadcast-media', 'streaming-platform',
+    'equipment-brand', 'retail-proshop', 'app-developer', 'content-creator',
+    'tournament-organizer', 'fitness-wellness', 'sports-analytics', 'other'
+  )),
+  use_cases TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on business_profiles
+ALTER TABLE business_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Business profiles policies
+CREATE POLICY "Users can view their own business profile"
+  ON business_profiles FOR SELECT
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own business profile"
+  ON business_profiles FOR INSERT
+  WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own business profile"
+  ON business_profiles FOR UPDATE
+  USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own business profile"
+  ON business_profiles FOR DELETE
+  USING (auth.uid() = profile_id);
+
+-- Trigger to update business_profiles.updated_at
+CREATE TRIGGER update_business_profiles_updated_at
+  BEFORE UPDATE ON business_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
 -- CHATS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS chats (

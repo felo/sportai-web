@@ -11,6 +11,24 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+// Type aliases for database enums
+type GenderType = "male" | "female" | "non-binary" | "prefer-not-to-say";
+type HandednessType = "left" | "right" | "ambidextrous";
+type UnitsPreferenceType = "metric" | "imperial";
+type SportType = "tennis" | "padel" | "pickleball";
+type SkillLevelType = "beginner" | "novice" | "intermediate" | "advanced" | "expert";
+type YearsPlayingType = "less-than-1" | "1-3" | "3-5" | "5-10" | "10-plus";
+type CoachingLevelType = "assistant" | "club" | "performance" | "high-performance" | "master";
+type EmploymentTypeType = "full-time" | "part-time" | "freelance";
+type ClientCountType = "1-10" | "11-25" | "26-50" | "50-100" | "100-plus";
+type CompanySizeType = "1-10" | "11-50" | "51-200" | "200-plus";
+type BusinessRoleType = "owner" | "coach" | "marketing" | "technology" | "content" | "operations" | "other";
+type BusinessTypeType = 
+  | "tennis-club" | "padel-club" | "pickleball-club" | "multi-sport-academy"
+  | "private-coaching" | "federation" | "broadcast-media" | "streaming-platform"
+  | "equipment-brand" | "retail-proshop" | "app-developer" | "content-creator"
+  | "tournament-organizer" | "fitness-wellness" | "sports-analytics" | "other";
+
 export interface Database {
   public: {
     Tables: {
@@ -20,6 +38,19 @@ export interface Database {
           email: string | null;
           full_name: string | null;
           avatar_url: string | null;
+          // Extended profile fields
+          date_of_birth: string | null;
+          gender: GenderType | null;
+          handedness: HandednessType | null;
+          height: number | null;
+          weight: number | null;
+          physical_limitations: string | null;
+          units_preference: UnitsPreferenceType;
+          country: string | null;
+          timezone: string | null;
+          language: string;
+          is_parent_of_junior: boolean;
+          referral_source: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -28,6 +59,18 @@ export interface Database {
           email?: string | null;
           full_name?: string | null;
           avatar_url?: string | null;
+          date_of_birth?: string | null;
+          gender?: GenderType | null;
+          handedness?: HandednessType | null;
+          height?: number | null;
+          weight?: number | null;
+          physical_limitations?: string | null;
+          units_preference?: UnitsPreferenceType;
+          country?: string | null;
+          timezone?: string | null;
+          language?: string;
+          is_parent_of_junior?: boolean;
+          referral_source?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -36,10 +79,242 @@ export interface Database {
           email?: string | null;
           full_name?: string | null;
           avatar_url?: string | null;
+          date_of_birth?: string | null;
+          gender?: GenderType | null;
+          handedness?: HandednessType | null;
+          height?: number | null;
+          weight?: number | null;
+          physical_limitations?: string | null;
+          units_preference?: UnitsPreferenceType;
+          country?: string | null;
+          timezone?: string | null;
+          language?: string;
+          is_parent_of_junior?: boolean;
+          referral_source?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      player_sports: {
+        Row: {
+          id: string;
+          profile_id: string;
+          sport: SportType;
+          skill_level: SkillLevelType;
+          years_playing: YearsPlayingType | null;
+          club_name: string | null;
+          playing_style: string | null;
+          preferred_surfaces: string[];
+          goals: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          sport: SportType;
+          skill_level: SkillLevelType;
+          years_playing?: YearsPlayingType | null;
+          club_name?: string | null;
+          playing_style?: string | null;
+          preferred_surfaces?: string[];
+          goals?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          sport?: SportType;
+          skill_level?: SkillLevelType;
+          years_playing?: YearsPlayingType | null;
+          club_name?: string | null;
+          playing_style?: string | null;
+          preferred_surfaces?: string[];
+          goals?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_sports_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      player_equipment: {
+        Row: {
+          id: string;
+          profile_id: string;
+          sport: SportType;
+          equipment_type: string;
+          brand: string;
+          model_name: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          sport: SportType;
+          equipment_type: string;
+          brand: string;
+          model_name: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          sport?: SportType;
+          equipment_type?: string;
+          brand?: string;
+          model_name?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_equipment_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      coach_profiles: {
+        Row: {
+          profile_id: string;
+          is_active: boolean;
+          years_experience: YearsPlayingType | null;
+          coaching_level: CoachingLevelType | null;
+          employment_type: EmploymentTypeType | null;
+          client_count: ClientCountType | null;
+          specialties: string[];
+          affiliation: string | null;
+          uses_video_analysis: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          is_active?: boolean;
+          years_experience?: YearsPlayingType | null;
+          coaching_level?: CoachingLevelType | null;
+          employment_type?: EmploymentTypeType | null;
+          client_count?: ClientCountType | null;
+          specialties?: string[];
+          affiliation?: string | null;
+          uses_video_analysis?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          is_active?: boolean;
+          years_experience?: YearsPlayingType | null;
+          coaching_level?: CoachingLevelType | null;
+          employment_type?: EmploymentTypeType | null;
+          client_count?: ClientCountType | null;
+          specialties?: string[];
+          affiliation?: string | null;
+          uses_video_analysis?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "coach_profiles_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      coach_sports: {
+        Row: {
+          id: string;
+          coach_profile_id: string;
+          sport: SportType;
+          certifications: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          coach_profile_id: string;
+          sport: SportType;
+          certifications?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          coach_profile_id?: string;
+          sport?: SportType;
+          certifications?: string[];
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "coach_sports_coach_profile_id_fkey";
+            columns: ["coach_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "coach_profiles";
+            referencedColumns: ["profile_id"];
+          }
+        ];
+      };
+      business_profiles: {
+        Row: {
+          profile_id: string;
+          company_name: string;
+          website: string | null;
+          role: BusinessRoleType | null;
+          company_size: CompanySizeType | null;
+          country: string | null;
+          business_type: BusinessTypeType | null;
+          use_cases: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          company_name: string;
+          website?: string | null;
+          role?: BusinessRoleType | null;
+          company_size?: CompanySizeType | null;
+          country?: string | null;
+          business_type?: BusinessTypeType | null;
+          use_cases?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          company_name?: string;
+          website?: string | null;
+          role?: BusinessRoleType | null;
+          company_size?: CompanySizeType | null;
+          country?: string | null;
+          business_type?: BusinessTypeType | null;
+          use_cases?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_profiles_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       chats: {
         Row: {

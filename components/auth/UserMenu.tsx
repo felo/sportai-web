@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button, Text, DropdownMenu, Flex, Box, Separator } from "@radix-ui/themes";
 import { ExitIcon, PersonIcon, SunIcon, TrashIcon, GearIcon } from "@radix-ui/react-icons";
@@ -45,6 +46,7 @@ export function UserMenu({
   onOpenStorageDebug,
   onSetAlertOpen,
 }: UserMenuProps = {}) {
+  const router = useRouter();
   const { user, profile, loading, signOut } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -506,9 +508,9 @@ export function UserMenu({
           <DropdownMenu.Separator />
 
           {/* Profile Menu Item */}
-          <DropdownMenu.Item disabled>
+          <DropdownMenu.Item onSelect={() => router.push("/profile")}>
             <PersonIcon width="16" height="16" />
-            <Text ml="2">Profile (Coming Soon)</Text>
+            <Text ml="2">Profile</Text>
           </DropdownMenu.Item>
 
           <DropdownMenu.Separator />

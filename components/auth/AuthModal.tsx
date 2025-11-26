@@ -64,9 +64,13 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content maxWidth="400px">
         <Dialog.Title>Sign in to SportAI</Dialog.Title>
-        <Dialog.Description size="2" mb="4">
-          Sign in to sync your chats across devices and access them anywhere.
-        </Dialog.Description>
+        <Box mb="4">
+          <Flex direction="column" gap="1" pl="2">
+            <Text size="2" color="gray">• Sync your chats across devices</Text>
+            <Text size="2" color="gray">• Tailor the AI to your preferences</Text>
+            <Text size="2" color="gray">• Try out more features</Text>
+          </Flex>
+        </Box>
 
         <Flex direction="column" gap="3">
           {/* Google Sign In Button */}
