@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { Cross2Icon, EnterFullScreenIcon, ExitFullScreenIcon, ArrowLeftIcon } from "@radix-ui/react-icons";
+import { EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { getTheatreMode } from "@/utils/storage";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
@@ -79,7 +79,6 @@ export function FloatingVideoPortal() {
     setIsDragging,
     setDockedCorner,
     setIsMinimized,
-    closeFloating,
   } = useFloatingVideoContext();
   
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -390,14 +389,44 @@ export function FloatingVideoPortal() {
     const newMinimized = !isMinimized;
     setIsMinimized(newMinimized);
     
-    setTimeout(() => {
-      // Calculate dimensions - getDimensions() handles minimized state, custom size, and aspect ratio
-      const { width, height } = newMinimized 
-        ? { width: MINIMIZED_SIZE, height: MINIMIZED_SIZE }
-        : (customSize ?? getDimensions());
-      const pos = getCornerPosition(dockedCorner, width, height);
-      setPosition(pos);
-    }, 0);
+    // Calculate dimensions immediately (not in setTimeout) to avoid stale closure issues
+    let newWidth: number;
+    let newHeight: number;
+    
+    if (newMinimized) {
+      newWidth = MINIMIZED_SIZE;
+      newHeight = MINIMIZED_SIZE;
+    } else if (customSize) {
+      newWidth = customSize.width;
+      newHeight = customSize.height;
+    } else {
+      // Calculate expanded dimensions based on aspect ratio
+      const aspectRatio = getAspectRatio();
+      const isPortrait = aspectRatio < 1;
+      
+      if (isPortrait) {
+        const baseHeight = theatreMode ? THEATRE_BASE_HEIGHT : STANDARD_BASE_HEIGHT;
+        newHeight = Math.min(MAX_HEIGHT, baseHeight);
+        newWidth = newHeight * aspectRatio;
+        if (newWidth < MIN_WIDTH) {
+          newWidth = MIN_WIDTH;
+          newHeight = newWidth / aspectRatio;
+        }
+      } else {
+        const baseWidth = theatreMode ? THEATRE_BASE_WIDTH : STANDARD_BASE_WIDTH;
+        newWidth = Math.min(MAX_WIDTH, baseWidth);
+        newHeight = newWidth / aspectRatio;
+        if (newHeight > MAX_HEIGHT) {
+          newHeight = MAX_HEIGHT;
+          newWidth = newHeight * aspectRatio;
+        }
+      }
+      newWidth = Math.round(newWidth);
+      newHeight = Math.round(newHeight);
+    }
+    
+    const pos = getCornerPosition(dockedCorner, newWidth, newHeight);
+    setPosition(pos);
   }, [isMinimized, theatreMode, dockedCorner, customSize, setIsMinimized, setPosition, activeVideoId, registeredVideos]);
 
   if (!mounted || !isFloating || !activeVideoId) {
@@ -456,14 +485,11 @@ export function FloatingVideoPortal() {
               background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "center",
               padding: "0 8px",
             }}
           >
-            {/* Left spacer for balance */}
-            <Box style={{ width: 80 }} />
-            
-            {/* Drag handle indicator - always visible, centered */}
+            {/* Drag handle indicator - centered */}
             <Box
               style={{
                 width: isDragging ? 96 : 48,
@@ -474,62 +500,32 @@ export function FloatingVideoPortal() {
               }}
             />
             
-            {/* Control buttons - in the drag zone */}
+            {/* Minimize button - positioned absolutely on the right, styled like magic wand button */}
             <Box
               style={{
-                display: "flex",
-                gap: 4,
+                position: "absolute",
+                right: 4,
+                top: 4,
                 opacity: showControls || isDragging ? 1 : 0,
                 transition: "opacity 0.2s ease",
                 pointerEvents: showControls ? "auto" : "none",
               }}
             >
-              <Tooltip content="Return to inline video">
-                <IconButton
-                  size="1"
-                  variant="solid"
-                  style={{ 
-                    backgroundColor: "rgba(122, 219, 143, 0.9)",
-                    color: "#1a1a1a",
-                    backdropFilter: "blur(4px)",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeFloating();
-                  }}
-                >
-                  <ArrowLeftIcon />
-                </IconButton>
-              </Tooltip>
               <Tooltip content="Minimize">
                 <IconButton
                   size="1"
                   variant="solid"
                   style={{ 
-                    backgroundColor: "rgba(0, 0, 0, 0.7)",
-                    color: "white",
-                    backdropFilter: "blur(4px)",
+                    backgroundColor: "#7ADB8F",
+                    color: "#1C1C1C",
+                    border: "2px solid white",
+                    borderRadius: "var(--radius-3)",
+                    width: 24,
+                    height: 24,
                   }}
                   onClick={handleMinimizeToggle}
                 >
-                  <ExitFullScreenIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip content="Close">
-                <IconButton
-                  size="1"
-                  variant="solid"
-                  style={{ 
-                    backgroundColor: "rgba(0, 0, 0, 0.7)",
-                    color: "white",
-                    backdropFilter: "blur(4px)",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeFloating();
-                  }}
-                >
-                  <Cross2Icon />
+                  <ExitFullScreenIcon width={12} height={12} />
                 </IconButton>
               </Tooltip>
             </Box>

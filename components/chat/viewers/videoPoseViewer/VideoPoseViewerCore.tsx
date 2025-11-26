@@ -1615,9 +1615,9 @@ export function VideoPoseViewer({
           gap={isPortraitVideo || isMobile ? "1" : "2"}
           style={{
             position: "absolute",
-            top: isPortraitVideo ? "8px" : "12px",
-            left: isPortraitVideo ? "8px" : "12px",
-            zIndex: 30, // Higher than overlays
+            top: compactMode ? "4px" : (isPortraitVideo ? "8px" : "12px"),
+            left: compactMode ? "4px" : (isPortraitVideo ? "8px" : "12px"),
+            zIndex: 30, // Higher than overlays (and drag zone in compact mode)
           }}
         >
           {/* Theatre Mode Button - Hidden on mobile, short screens, and when floating */}
