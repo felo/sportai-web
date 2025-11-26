@@ -15,6 +15,7 @@ import { DragOverlay } from "@/components/chat/overlays/DragOverlay";
 import { ScrollToBottom } from "@/components/chat/navigation/ScrollToBottom";
 import { ScrollToVideo } from "@/components/chat/navigation/ScrollToVideo";
 import { AudioStopButton } from "@/components/chat/input/AudioStopButton";
+// VideoCompatibilityModal removed - now auto-converting HEVC videos
 import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
 import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoContext";
@@ -82,6 +83,9 @@ export function AIChatForm() {
     processVideoFile,
     clearVideo,
     handleVideoChange,
+    // Transcoding state (for HEVC auto-conversion)
+    isTranscoding,
+    transcodeProgress,
   } = useVideoUpload();
 
   const {
@@ -1106,6 +1110,8 @@ export function AIChatForm() {
             onDomainExpertiseChange={handleDomainExpertiseChange}
             disableTooltips={hasJustDropped}
             hideDisclaimer={showingVideoSizeError}
+            isTranscoding={isTranscoding}
+            transcodeProgress={transcodeProgress}
           />
         </div>
       </div>

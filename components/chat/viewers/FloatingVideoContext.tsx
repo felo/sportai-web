@@ -19,6 +19,10 @@ interface FloatingVideoContextValue {
   dockedCorner: DockCorner;
   isMinimized: boolean;
   
+  // Pose overlay state - persisted across docked/floating transitions
+  poseEnabled: boolean;
+  setPoseEnabled: (enabled: boolean) => void;
+  
   // Registered videos
   registeredVideos: Map<string, VideoRegistration>;
   
@@ -53,6 +57,9 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   const [isDragging, setIsDragging] = useState(false);
   const [dockedCorner, setDockedCorner] = useState<DockCorner>("top-right");
   const [isMinimized, setIsMinimized] = useState(false);
+  
+  // Pose overlay state - persisted across docked/floating transitions
+  const [poseEnabled, setPoseEnabled] = useState(false);
   
   const registeredVideosRef = useRef<Map<string, VideoRegistration>>(new Map());
   // Track version to trigger re-renders only when needed
@@ -134,6 +141,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     isDragging,
     dockedCorner,
     isMinimized,
+    poseEnabled,
+    setPoseEnabled,
     registeredVideos: registeredVideosRef.current,
     floatingContainerRef: stableFloatingContainerRef,
     setFloatingContainer,
@@ -154,6 +163,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     isDragging,
     dockedCorner,
     isMinimized,
+    poseEnabled,
     floatingContainerElement,
     setFloatingContainer,
     registerVideo,

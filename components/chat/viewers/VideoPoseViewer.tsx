@@ -33,6 +33,9 @@ interface VideoPoseViewerProps {
   initialPoseEnabled?: boolean;
   theatreMode?: boolean;
   hideTheatreToggle?: boolean;
+  // Controlled pose enabled state - when provided, component operates in controlled mode
+  poseEnabled?: boolean;
+  onPoseEnabledChange?: (enabled: boolean) => void;
 }
 
 // Loading placeholder that matches video dimensions

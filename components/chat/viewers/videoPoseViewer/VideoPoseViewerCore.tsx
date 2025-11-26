@@ -43,6 +43,9 @@ interface VideoPoseViewerProps {
   initialPoseEnabled?: boolean;
   theatreMode?: boolean;
   hideTheatreToggle?: boolean;
+  // Controlled pose enabled state - when provided, component operates in controlled mode
+  poseEnabled?: boolean;
+  onPoseEnabledChange?: (enabled: boolean) => void;
 }
 
 export function VideoPoseViewer({
@@ -67,6 +70,9 @@ export function VideoPoseViewer({
   initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
   theatreMode = true,
   hideTheatreToggle = false,
+  // Controlled mode props
+  poseEnabled: controlledPoseEnabled,
+  onPoseEnabledChange,
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -74,7 +80,19 @@ export function VideoPoseViewer({
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVideoMetadataLoaded, setIsVideoMetadataLoaded] = useState(false);
-  const [isPoseEnabled, setIsPoseEnabled] = useState(initialPoseEnabled);
+  
+  // Pose enabled state - supports both controlled and uncontrolled modes
+  const isControlled = controlledPoseEnabled !== undefined;
+  const [internalPoseEnabled, setInternalPoseEnabled] = useState(initialPoseEnabled);
+  const isPoseEnabled = isControlled ? controlledPoseEnabled : internalPoseEnabled;
+  
+  // Unified setter that handles both modes
+  const setIsPoseEnabled = useCallback((enabled: boolean) => {
+    if (!isControlled) {
+      setInternalPoseEnabled(enabled);
+    }
+    onPoseEnabledChange?.(enabled);
+  }, [isControlled, onPoseEnabledChange]);
   const [selectedModel, setSelectedModel] = useState<SupportedModel>(initialModel);
   const [blazePoseModelType, setBlazePoseModelType] = useState<"lite" | "full" | "heavy">("full");
   const [showSkeleton, setShowSkeleton] = useState(initialShowSkeleton);
@@ -1427,8 +1445,8 @@ export function VideoPoseViewer({
         setConfidenceMode("low"); // Challenging conditions
         setResolutionMode("accurate"); // 384x384
         setShowTrackingId(true);
-        setShowAngles(false); // Don't show angles by default
-        setMeasuredAngles([]); // No default angles
+        setShowAngles(true); // Show angles by default
+        setMeasuredAngles([[6, 8, 10], [12, 14, 16]]); // Right elbow and right knee angles by default
         setShowVelocity(false); // Don't show velocity by default
         setVelocityWrist("right");
         setSelectedJoints([10]); // Right Wrist

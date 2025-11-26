@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Avatar, Box, Flex } from "@radix-ui/themes";
+import { useEffect, useState, useCallback } from "react";
+import { Avatar, Box, Flex, Text } from "@radix-ui/themes";
 import type { Message } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing } from "@/lib/token-utils";
@@ -9,6 +9,30 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES } from "./utils";
+
+// CSS keyframes for avatar poke animation
+const avatarPokeKeyframes = `
+  @keyframes avatarBounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    15% { transform: translateY(-6px) scale(1.1); }
+    30% { transform: translateY(0) scale(0.9); }
+    45% { transform: translateY(-3px) scale(1.05); }
+    60% { transform: translateY(0) scale(0.95); }
+    75% { transform: translateY(-1px) scale(1.02); }
+    90% { transform: translateY(0) scale(1); }
+  }
+  
+  @keyframes avatarBubblePop {
+    0% { opacity: 0; transform: scale(0.5) translateX(-50%) translateY(5px); }
+    50% { opacity: 1; transform: scale(1.1) translateX(-50%) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1) translateX(-50%) translateY(0); }
+  }
+  
+  @keyframes avatarBubbleFade {
+    0% { opacity: 1; transform: scale(1) translateX(-50%); }
+    100% { opacity: 0; transform: scale(0.8) translateX(-50%); }
+  }
+`;
 
 interface MessageBubbleProps {
   message: Message;
@@ -35,6 +59,35 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     voiceQuality: '',
   });
   const isMobile = useIsMobile();
+  
+  // Avatar poke interaction state
+  const [isPoked, setIsPoked] = useState(false);
+  const [showPokeBubble, setShowPokeBubble] = useState(false);
+  const [pokeBubbleFading, setPokeBubbleFading] = useState(false);
+  
+  const handleAvatarPoke = useCallback(() => {
+    if (isPoked) return;
+    
+    setIsPoked(true);
+    setShowPokeBubble(true);
+    setPokeBubbleFading(false);
+    
+    // Reset bounce after animation completes
+    setTimeout(() => {
+      setIsPoked(false);
+    }, 500);
+    
+    // Start fading the bubble
+    setTimeout(() => {
+      setPokeBubbleFading(true);
+    }, 1500);
+    
+    // Hide bubble completely
+    setTimeout(() => {
+      setShowPokeBubble(false);
+      setPokeBubbleFading(false);
+    }, 1800);
+  }, [isPoked]);
 
   // Callback to track TTS usage
   const handleTTSUsage = (characters: number, cost: number, quality: string) => {
@@ -220,98 +273,173 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   }, [hasVideo, message.videoFile, message.videoUrl]);
 
   return (
-    <Flex
-      gap={isMobile && message.role === "assistant" ? "0" : "4"}
-      justify={message.role === "user" ? "end" : "start"}
-      role="article"
-      aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
-    >
-      {message.role === "assistant" && !isMobile && (
-        <Avatar
-          size="3"
-          radius="full"
-          src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763679890/sai-logo-dark-green_ovhgj3.svg"
-          fallback="AI"
-          style={{
-            backgroundColor: "white",
-            border: "1px solid var(--mint-6)",
-          }}
-        />
-      )}
-
-      <Box
-        style={{
-          maxWidth: isMobile 
-            ? "100%"
-            : theatreMode && hasVideo
-            ? "100%"
-            : "80%",
-          width: (isMobile || (theatreMode && hasVideo)) && message.role === "user"
-            ? videoContainerStyle.width || "100%"
-            : "auto",
-          margin: (isMobile || (theatreMode && hasVideo)) && message.role === "user" && hasVideo
-            ? "0 auto"
-            : "0",
-          borderRadius: message.role === "user" && !hasVideo
-            ? "24px 8px 24px 24px" 
-            : "var(--radius-3)",
-          padding: message.role === "user" && hasVideo ? "0" : "var(--space-3) var(--space-4)",
-          backgroundColor: "transparent",
-          color: "var(--gray-12)",
-          border: message.role === "user" ? "1px solid var(--mint-6)" : "none",
-        }}
-        role={message.role === "user" ? "user-message" : "assistant-message"}
+    <>
+      {/* Inject keyframes for avatar poke animation */}
+      <style>{avatarPokeKeyframes}</style>
+      
+      <Flex
+        gap={isMobile && message.role === "assistant" ? "0" : "4"}
+        justify={message.role === "user" ? "end" : "start"}
+        role="article"
+        aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
       >
-        {message.role === "user" && (
-          <UserMessage
-            message={message}
-            videoContainerStyle={videoContainerStyle}
-            theatreMode={theatreMode}
-            isMobile={isMobile}
-            scrollContainerRef={scrollContainerRef}
-          />
-        )}
-
-        {message.role === "assistant" && (
-          <Box style={{ maxWidth: "none" }}>
-            <AssistantMessage
-              messageId={message.id}
-              content={message.content}
-              isStreaming={message.isStreaming}
-              isIncomplete={message.isIncomplete}
-              thinkingMessage={userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}
-              onAskForHelp={onAskForHelp}
-              onTTSUsage={handleTTSUsage}
-              onFeedback={() => setShowFeedbackToast(true)}
-              onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
-              isRetrying={isRetrying}
-            />
+        {message.role === "assistant" && !isMobile && (
+          <Box style={{ position: "relative", flexShrink: 0 }}>
+            <Box
+              onClick={handleAvatarPoke}
+              style={{
+                cursor: "pointer",
+                animation: isPoked ? "avatarBounce 0.5s cubic-bezier(0.36, 0, 0.66, -0.56)" : "none",
+              }}
+            >
+              <Avatar
+                size="3"
+                radius="full"
+                src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763679890/sai-logo-dark-green_ovhgj3.svg"
+                fallback="AI"
+                style={{
+                  backgroundColor: "white",
+                  border: "1px solid var(--mint-6)",
+                }}
+              />
+            </Box>
             
-            {/* PRO Membership Upsell */}
-            <ProUpsellBanner show={showProUpsell} />
-            
-            {/* Developer mode token information */}
-            <DeveloperInfo
-              show={developerMode && !!message.content}
-              messageTokens={messageTokens}
-              cumulativeTokens={cumulativeTokens}
-              messagePricing={messagePricing}
-              cumulativePricing={cumulativePricing}
-              ttsUsage={ttsUsage}
-              totalTTSUsage={totalTTSUsage}
-              responseDuration={message.responseDuration}
-              timeToFirstToken={message.timeToFirstToken}
-              modelSettings={message.modelSettings}
-            />
+            {/* "Stop poking me!" speech bubble */}
+            {showPokeBubble && (
+              <Box
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: "50%",
+                  backgroundColor: "var(--color-background)",
+                  border: "2px solid var(--mint-9)",
+                  borderRadius: "12px",
+                  padding: "6px 12px",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 4px 12px rgba(34, 197, 94, 0.25)",
+                  zIndex: 100,
+                  animation: pokeBubbleFading 
+                    ? "avatarBubbleFade 0.3s ease-out forwards" 
+                    : "avatarBubblePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+                }}
+              >
+                {/* Speech bubble pointer */}
+                <Box
+                  style={{
+                    position: "absolute",
+                    top: "-8px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 0,
+                    height: 0,
+                    borderLeft: "8px solid transparent",
+                    borderRight: "8px solid transparent",
+                    borderBottom: "8px solid var(--mint-9)",
+                  }}
+                />
+                <Box
+                  style={{
+                    position: "absolute",
+                    top: "-5px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 0,
+                    height: 0,
+                    borderLeft: "6px solid transparent",
+                    borderRight: "6px solid transparent",
+                    borderBottom: "6px solid var(--color-background)",
+                  }}
+                />
+                <Text 
+                  size="1" 
+                  style={{ 
+                    color: "var(--mint-11)",
+                    fontWeight: 600,
+                    fontSize: "12px",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  Stop poking me!
+                </Text>
+              </Box>
+            )}
           </Box>
         )}
-      </Box>
-      
-      {/* Feedback Toast */}
-      <FeedbackToast 
-        open={showFeedbackToast}
-        onOpenChange={setShowFeedbackToast}
-      />
-    </Flex>
+
+        <Box
+          style={{
+            maxWidth: isMobile 
+              ? "100%"
+              : theatreMode && hasVideo
+              ? "100%"
+              : "80%",
+            width: (isMobile || (theatreMode && hasVideo)) && message.role === "user"
+              ? videoContainerStyle.width || "100%"
+              : "auto",
+            margin: (isMobile || (theatreMode && hasVideo)) && message.role === "user" && hasVideo
+              ? "0 auto"
+              : "0",
+            borderRadius: message.role === "user" && !hasVideo
+              ? "24px 8px 24px 24px" 
+              : "var(--radius-3)",
+            padding: message.role === "user" && hasVideo ? "0" : "var(--space-3) var(--space-4)",
+            backgroundColor: "transparent",
+            color: "var(--gray-12)",
+            border: message.role === "user" ? "1px solid var(--mint-6)" : "none",
+          }}
+          role={message.role === "user" ? "user-message" : "assistant-message"}
+        >
+          {message.role === "user" && (
+            <UserMessage
+              message={message}
+              videoContainerStyle={videoContainerStyle}
+              theatreMode={theatreMode}
+              isMobile={isMobile}
+              scrollContainerRef={scrollContainerRef}
+            />
+          )}
+
+          {message.role === "assistant" && (
+            <Box style={{ maxWidth: "none" }}>
+              <AssistantMessage
+                messageId={message.id}
+                content={message.content}
+                isStreaming={message.isStreaming}
+                isIncomplete={message.isIncomplete}
+                thinkingMessage={userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}
+                onAskForHelp={onAskForHelp}
+                onTTSUsage={handleTTSUsage}
+                onFeedback={() => setShowFeedbackToast(true)}
+                onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
+                isRetrying={isRetrying}
+              />
+              
+              {/* PRO Membership Upsell */}
+              <ProUpsellBanner show={showProUpsell} />
+              
+              {/* Developer mode token information */}
+              <DeveloperInfo
+                show={developerMode && !!message.content}
+                messageTokens={messageTokens}
+                cumulativeTokens={cumulativeTokens}
+                messagePricing={messagePricing}
+                cumulativePricing={cumulativePricing}
+                ttsUsage={ttsUsage}
+                totalTTSUsage={totalTTSUsage}
+                responseDuration={message.responseDuration}
+                timeToFirstToken={message.timeToFirstToken}
+                modelSettings={message.modelSettings}
+              />
+            </Box>
+          )}
+        </Box>
+        
+        {/* Feedback Toast */}
+        <FeedbackToast 
+          open={showFeedbackToast}
+          onOpenChange={setShowFeedbackToast}
+        />
+      </Flex>
+    </>
   );
 }

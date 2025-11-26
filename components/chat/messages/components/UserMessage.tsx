@@ -255,6 +255,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   const floatingContainer = floatingContext?.floatingContainerRef?.current;
                   const shouldPortal = isThisVideoFloating && floatingContainer;
                   
+                  // Use controlled pose state from context to persist across docked/floating transitions
                   const videoPoseViewer = (
                     <VideoPoseViewer
                       videoUrl={videoSrc}
@@ -275,6 +276,9 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                       initialPoseEnabled={message.poseData?.enabled ?? false}
                       theatreMode={shouldPortal ? false : theatreMode}
                       hideTheatreToggle={shouldPortal}
+                      // Controlled pose state from context - persists across docked/floating transitions
+                      poseEnabled={floatingContext?.poseEnabled}
+                      onPoseEnabledChange={floatingContext?.setPoseEnabled}
                     />
                   );
                   

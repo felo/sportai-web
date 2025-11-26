@@ -21,6 +21,10 @@ export interface VideoPoseViewerProps {
   initialVelocityWrist?: "left" | "right";
   initialPoseEnabled?: boolean;
   theatreMode?: boolean;
+  hideTheatreToggle?: boolean;
+  // Controlled pose enabled state - when provided, component operates in controlled mode
+  poseEnabled?: boolean;
+  onPoseEnabledChange?: (enabled: boolean) => void;
 }
 
 
