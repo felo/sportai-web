@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Box, Text, Button } from "@radix-ui/themes";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
 import { useFloatingVideoContextOptional } from "../../viewers/FloatingVideoContext";
 import type { Message } from "@/types/chat";
+
+// Default aspect ratio fallback
+const DEFAULT_ASPECT_RATIO = 16 / 9;
 
 interface UserMessageProps {
   message: Message;
@@ -26,12 +29,25 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   const showPoseViewer = true; // Always show viewer so users can toggle AI overlay on/off
   
+  // Track video aspect ratio (width / height)
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(DEFAULT_ASPECT_RATIO);
+  
   // Check if this is an image (not a video)
   const isImage = message.videoFile?.type.startsWith("image/") || 
                   (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i));
   
   // Floating video context (optional - won't error if not in provider)
   const floatingContext = useFloatingVideoContextOptional();
+  
+  // Callback to handle video metadata loaded - get actual aspect ratio
+  const handleVideoMetadataLoaded = useCallback((videoWidth: number, videoHeight: number) => {
+    if (videoWidth && videoHeight) {
+      const aspectRatio = videoWidth / videoHeight;
+      setVideoAspectRatio(aspectRatio);
+      // Update the context with the actual aspect ratio
+      floatingContext?.updateVideoAspectRatio(message.id, aspectRatio);
+    }
+  }, [floatingContext, message.id]);
   
   // Track if this video should be floating
   const isThisVideoFloating = floatingContext?.activeVideoId === message.id && floatingContext?.isFloating;
@@ -159,13 +175,14 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     }
   }, [hasVideo, isImage, message.videoFile, message.videoUrl, message.videoPlaybackSpeed]);
 
-  // Render floating placeholder
+  // Render floating placeholder - uses actual video aspect ratio
   const renderFloatingPlaceholder = () => (
     <Box
       style={{
         position: "relative",
         width: "100%",
-        aspectRatio: "16 / 9",
+        aspectRatio: String(videoAspectRatio),
+        maxHeight: videoAspectRatio < 1 ? "min(450px, 50vh)" : undefined, // Limit height for portrait videos
         backgroundColor: "var(--gray-3)",
         borderRadius: "var(--radius-3)",
         display: "flex",
@@ -231,6 +248,10 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
               }}
             />
           ) : videoSrc ? (
+            (() => {
+              // Portrait videos get constrained width - no full-width container
+              const isPortraitVideo = videoAspectRatio < 1;
+              return (
             <Box
               ref={videoContainerRef}
               data-video-container="true"
@@ -239,9 +260,11 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   ? {
                       position: "relative",
                       width: "100%",
-                      backgroundColor: "var(--gray-3)",
+                      maxWidth: "100%",
+                      backgroundColor: "transparent",
                       overflow: "hidden",
                       borderRadius: "var(--radius-3)",
+                      margin: "0 auto",
                     }
                   : videoContainerStyle
               }
@@ -256,6 +279,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   const shouldPortal = isThisVideoFloating && floatingContainer;
                   
                   // Use controlled pose state from context to persist across docked/floating transitions
+                  // Portrait videos (aspect ratio < 1) ignore theatre mode entirely - no zoom, no toggle
+                  const effectiveTheatreMode = isPortraitVideo ? false : (shouldPortal ? false : theatreMode);
                   const videoPoseViewer = (
                     <VideoPoseViewer
                       videoUrl={videoSrc}
@@ -274,11 +299,15 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                       initialShowVelocity={message.poseData?.showVelocity ?? false}
                       initialVelocityWrist={message.poseData?.velocityWrist ?? "right"}
                       initialPoseEnabled={message.poseData?.enabled ?? false}
-                      theatreMode={shouldPortal ? false : theatreMode}
-                      hideTheatreToggle={shouldPortal}
+                      theatreMode={effectiveTheatreMode}
+                      hideTheatreToggle={!!shouldPortal || isPortraitVideo}
                       // Controlled pose state from context - persists across docked/floating transitions
                       poseEnabled={floatingContext?.poseEnabled}
                       onPoseEnabledChange={floatingContext?.setPoseEnabled}
+                      // Report video dimensions for proper aspect ratio handling
+                      onVideoMetadataLoaded={handleVideoMetadataLoaded}
+                      // Compact mode when floating - hide button text
+                      compactMode={!!shouldPortal}
                     />
                   );
                   
@@ -327,12 +356,15 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 />
               )}
             </Box>
+              );
+            })()
           ) : (
             <Box
               style={{
                 position: "relative",
                 width: "100%",
-                aspectRatio: "16 / 9",
+                aspectRatio: String(videoAspectRatio),
+                maxHeight: videoAspectRatio < 1 ? "min(450px, 50vh)" : undefined,
                 backgroundColor: "var(--gray-3)",
                 display: "flex",
                 alignItems: "center",

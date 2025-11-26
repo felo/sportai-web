@@ -8,6 +8,7 @@ interface VideoRegistration {
   ref: React.RefObject<HTMLElement>;
   videoUrl: string;
   renderContent: () => ReactNode;
+  aspectRatio?: number; // width / height (e.g., 16/9 for landscape, 9/16 for portrait)
 }
 
 interface FloatingVideoContextValue {
@@ -31,7 +32,8 @@ interface FloatingVideoContextValue {
   setFloatingContainer: (element: HTMLDivElement | null) => void;
   
   // Actions
-  registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode) => void;
+  registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode, aspectRatio?: number) => void;
+  updateVideoAspectRatio: (id: string, aspectRatio: number) => void;
   unregisterVideo: (id: string) => void;
   setActiveVideo: (id: string | null) => void;
   setFloating: (floating: boolean) => void;
@@ -77,12 +79,21 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     id: string,
     ref: React.RefObject<HTMLElement>,
     videoUrl: string,
-    renderContent: () => ReactNode
+    renderContent: () => ReactNode,
+    aspectRatio?: number
   ) => {
     // Only update if this is actually a new registration
     const existing = registeredVideosRef.current.get(id);
     if (!existing || existing.videoUrl !== videoUrl) {
-      registeredVideosRef.current.set(id, { id, ref, videoUrl, renderContent });
+      registeredVideosRef.current.set(id, { id, ref, videoUrl, renderContent, aspectRatio });
+      setRegistrationVersion(v => v + 1);
+    }
+  }, []);
+
+  const updateVideoAspectRatio = useCallback((id: string, aspectRatio: number) => {
+    const existing = registeredVideosRef.current.get(id);
+    if (existing && existing.aspectRatio !== aspectRatio) {
+      registeredVideosRef.current.set(id, { ...existing, aspectRatio });
       setRegistrationVersion(v => v + 1);
     }
   }, []);
@@ -147,6 +158,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     floatingContainerRef: stableFloatingContainerRef,
     setFloatingContainer,
     registerVideo,
+    updateVideoAspectRatio,
     unregisterVideo,
     setActiveVideo,
     setFloating,
@@ -167,11 +179,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     floatingContainerElement,
     setFloatingContainer,
     registerVideo,
+    updateVideoAspectRatio,
     unregisterVideo,
     setActiveVideo,
     setFloating,
     scrollToVideo,
     closeFloating,
+    registrationVersion, // Trigger re-render when registrations (including aspectRatio) change
   ]);
 
   return (

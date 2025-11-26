@@ -8,20 +8,24 @@ import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { getTheatreMode } from "@/utils/storage";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
 
-// Standard size (16:9 aspect ratio)
-const STANDARD_WIDTH = 320;
-const STANDARD_HEIGHT = 180;
+// Default aspect ratio fallback
+const DEFAULT_ASPECT_RATIO = 16 / 9;
 
-// Theatre mode size (~2x diagonal = ~1.4x each dimension)
-const THEATRE_WIDTH = 448;
-const THEATRE_HEIGHT = 252;
+// Theatre mode ALWAYS respects the video's actual aspect ratio
+// Standard mode: smaller floating window
+// Theatre mode: larger floating window (~1.4x scale)
+const STANDARD_BASE_WIDTH = 320;
+const STANDARD_BASE_HEIGHT = 300; // For portrait videos
+
+// Theatre mode is ~1.4x larger (same diagonal increase as 2x area)
+const THEATRE_SCALE = 1.4;
+const THEATRE_BASE_WIDTH = Math.round(STANDARD_BASE_WIDTH * THEATRE_SCALE);
+const THEATRE_BASE_HEIGHT = Math.round(STANDARD_BASE_HEIGHT * THEATRE_SCALE);
 
 // Size constraints
-const MIN_WIDTH = 240;
-const MIN_HEIGHT = 135;
+const MIN_WIDTH = 200;
 const MAX_WIDTH = 800;
-const MAX_HEIGHT = 450;
-const ASPECT_RATIO = 16 / 9;
+const MAX_HEIGHT = 700; // Accommodate tall portrait videos in theatre mode
 
 // Minimized size
 const MINIMIZED_SIZE = 56;
@@ -99,17 +103,52 @@ export function FloatingVideoPortal() {
   } | null>(null);
   const hasInitializedRef = useRef(false);
 
-  // Get current dimensions based on state
-  const getWidth = () => {
-    if (isMinimized) return MINIMIZED_SIZE;
-    if (customSize) return customSize.width;
-    return theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH;
+  // Get the aspect ratio for the active video
+  const getAspectRatio = () => {
+    if (!activeVideoId) return DEFAULT_ASPECT_RATIO;
+    const registration = registeredVideos.get(activeVideoId);
+    return registration?.aspectRatio ?? DEFAULT_ASPECT_RATIO;
   };
-  const getHeight = () => {
-    if (isMinimized) return MINIMIZED_SIZE;
-    if (customSize) return customSize.height;
-    return theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT;
+
+  // Calculate dimensions that ALWAYS respect the video's aspect ratio
+  // Theatre mode scales up proportionally while maintaining the same aspect ratio
+  const getDimensions = (): { width: number; height: number } => {
+    if (isMinimized) return { width: MINIMIZED_SIZE, height: MINIMIZED_SIZE };
+    if (customSize) return customSize;
+    
+    const aspectRatio = getAspectRatio();
+    const isPortrait = aspectRatio < 1;
+    
+    let width: number;
+    let height: number;
+    
+    if (isPortrait) {
+      // Portrait videos: calculate from base height to ensure reasonable sizing
+      const baseHeight = theatreMode ? THEATRE_BASE_HEIGHT : STANDARD_BASE_HEIGHT;
+      height = Math.min(MAX_HEIGHT, baseHeight);
+      width = height * aspectRatio;
+      // Ensure minimum width
+      if (width < MIN_WIDTH) {
+        width = MIN_WIDTH;
+        height = width / aspectRatio;
+      }
+    } else {
+      // Landscape/square videos: calculate from base width
+      const baseWidth = theatreMode ? THEATRE_BASE_WIDTH : STANDARD_BASE_WIDTH;
+      width = Math.min(MAX_WIDTH, baseWidth);
+      height = width / aspectRatio;
+      // Ensure height doesn't exceed max
+      if (height > MAX_HEIGHT) {
+        height = MAX_HEIGHT;
+        width = height * aspectRatio;
+      }
+    }
+    
+    return { width: Math.round(width), height: Math.round(height) };
   };
+
+  const getWidth = () => getDimensions().width;
+  const getHeight = () => getDimensions().height;
 
   // Handle client-side mounting for portal
   useEffect(() => {
@@ -254,6 +293,9 @@ export function FloatingVideoPortal() {
     const deltaX = clientX - resizeStartRef.current.x;
     const deltaY = clientY - resizeStartRef.current.y;
     
+    const aspectRatio = getAspectRatio();
+    const minHeight = MIN_WIDTH / aspectRatio;
+    
     let newWidth = resizeStartRef.current.width;
     let newHeight = resizeStartRef.current.height;
     let newX = resizeStartRef.current.posX;
@@ -263,29 +305,31 @@ export function FloatingVideoPortal() {
     switch (activeResizeHandle) {
       case "se": // Bottom-right
         newWidth = resizeStartRef.current.width + deltaX;
-        newHeight = newWidth / ASPECT_RATIO;
+        newHeight = newWidth / aspectRatio;
         break;
       case "sw": // Bottom-left
         newWidth = resizeStartRef.current.width - deltaX;
-        newHeight = newWidth / ASPECT_RATIO;
+        newHeight = newWidth / aspectRatio;
         newX = resizeStartRef.current.posX + (resizeStartRef.current.width - newWidth);
         break;
       case "ne": // Top-right
         newWidth = resizeStartRef.current.width + deltaX;
-        newHeight = newWidth / ASPECT_RATIO;
+        newHeight = newWidth / aspectRatio;
         newY = resizeStartRef.current.posY + (resizeStartRef.current.height - newHeight);
         break;
       case "nw": // Top-left
         newWidth = resizeStartRef.current.width - deltaX;
-        newHeight = newWidth / ASPECT_RATIO;
+        newHeight = newWidth / aspectRatio;
         newX = resizeStartRef.current.posX + (resizeStartRef.current.width - newWidth);
         newY = resizeStartRef.current.posY + (resizeStartRef.current.height - newHeight);
         break;
     }
     
-    // Clamp to min/max sizes
+    // Clamp to min/max sizes while maintaining aspect ratio
     newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+    newHeight = Math.max(minHeight, Math.min(MAX_HEIGHT, newHeight));
+    // Re-calculate to maintain aspect ratio after clamping
+    newHeight = newWidth / aspectRatio;
     
     // Recalculate position if size was clamped
     if (activeResizeHandle === "sw" || activeResizeHandle === "nw") {
@@ -301,7 +345,7 @@ export function FloatingVideoPortal() {
     
     setCustomSize({ width: newWidth, height: newHeight });
     setPosition({ x: newX, y: newY });
-  }, [isResizing, activeResizeHandle, setPosition]);
+  }, [isResizing, activeResizeHandle, setPosition, activeVideoId, registeredVideos]);
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
@@ -347,13 +391,14 @@ export function FloatingVideoPortal() {
     setIsMinimized(newMinimized);
     
     setTimeout(() => {
-      // Use custom size if available, otherwise default
-      const newWidth = newMinimized ? MINIMIZED_SIZE : (customSize?.width ?? (theatreMode ? THEATRE_WIDTH : STANDARD_WIDTH));
-      const newHeight = newMinimized ? MINIMIZED_SIZE : (customSize?.height ?? (theatreMode ? THEATRE_HEIGHT : STANDARD_HEIGHT));
-      const pos = getCornerPosition(dockedCorner, newWidth, newHeight);
+      // Calculate dimensions - getDimensions() handles minimized state, custom size, and aspect ratio
+      const { width, height } = newMinimized 
+        ? { width: MINIMIZED_SIZE, height: MINIMIZED_SIZE }
+        : (customSize ?? getDimensions());
+      const pos = getCornerPosition(dockedCorner, width, height);
       setPosition(pos);
     }, 0);
-  }, [isMinimized, theatreMode, dockedCorner, customSize, setIsMinimized, setPosition]);
+  }, [isMinimized, theatreMode, dockedCorner, customSize, setIsMinimized, setPosition, activeVideoId, registeredVideos]);
 
   if (!mounted || !isFloating || !activeVideoId) {
     return null;

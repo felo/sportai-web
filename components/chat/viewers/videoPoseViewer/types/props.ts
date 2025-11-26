@@ -25,6 +25,10 @@ export interface VideoPoseViewerProps {
   // Controlled pose enabled state - when provided, component operates in controlled mode
   poseEnabled?: boolean;
   onPoseEnabledChange?: (enabled: boolean) => void;
+  // Callback when video metadata is loaded - provides actual video dimensions
+  onVideoMetadataLoaded?: (width: number, height: number) => void;
+  // Compact mode - hides button text, used when video is floating/docked
+  compactMode?: boolean;
 }
 
 

@@ -46,6 +46,10 @@ interface VideoPoseViewerProps {
   // Controlled pose enabled state - when provided, component operates in controlled mode
   poseEnabled?: boolean;
   onPoseEnabledChange?: (enabled: boolean) => void;
+  // Callback when video metadata is loaded - provides actual video dimensions
+  onVideoMetadataLoaded?: (width: number, height: number) => void;
+  // Compact mode - hides button text, used when video is floating/docked
+  compactMode?: boolean;
 }
 
 export function VideoPoseViewer({
@@ -73,6 +77,8 @@ export function VideoPoseViewer({
   // Controlled mode props
   poseEnabled: controlledPoseEnabled,
   onPoseEnabledChange,
+  onVideoMetadataLoaded,
+  compactMode = false,
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -155,13 +161,13 @@ export function VideoPoseViewer({
   const isMobile = useIsMobile();
   
   // Responsive max height for short screens
-  const [videoMaxHeight, setVideoMaxHeight] = useState("720px");
+  const [baseMaxHeight, setBaseMaxHeight] = useState("720px");
   
   useEffect(() => {
     const updateMaxHeight = () => {
       const isShortScreen = window.innerHeight <= 768;
       setIsShortScreenView(isShortScreen);
-      setVideoMaxHeight(isShortScreen ? `${Math.min(window.innerHeight * 0.35, 400)}px` : "720px");
+      setBaseMaxHeight(isShortScreen ? `${Math.min(window.innerHeight * 0.35, 400)}px` : "720px");
     };
     
     updateMaxHeight();
@@ -178,6 +184,10 @@ export function VideoPoseViewer({
     playbackSpeed,
   });
   const videoFPS = useVideoFPS(videoRef);
+  
+  // Portrait videos get a shorter max height by default to avoid taking too much vertical space
+  // In compact mode (floating), let the container control the size instead
+  const videoMaxHeight = compactMode ? "100%" : (isPortraitVideo ? "min(450px, 50vh)" : baseMaxHeight);
 
   // Use velocity tracking hook
   const { 
@@ -1472,7 +1482,7 @@ export function VideoPoseViewer({
   };
 
   return (
-    <Flex direction="column" gap="0">
+    <Flex direction="column" gap="0" style={compactMode ? { height: "100%", width: "100%" } : undefined}>
       {/* 3D Pose Viewer (shown when BlazePose is selected and 3D data is available) */}
       {isPoseEnabled && selectedModel === "BlazePose" && (
         <Box style={{ 
@@ -1532,15 +1542,17 @@ export function VideoPoseViewer({
       )}
 
       {/* Video Container with Canvas Overlay - Pure CSS layout */}
+      {/* In compact mode (floating), fill the container completely */}
       <Box
         ref={containerRef}
         style={{
           position: "relative",
           width: "100%",
+          height: compactMode ? "100%" : "auto",
           maxWidth: "100%",
           maxHeight: videoMaxHeight,
-          backgroundColor: "var(--gray-2)",
-          borderRadius: "var(--radius-3)",
+          backgroundColor: compactMode ? "transparent" : "var(--gray-2)",
+          borderRadius: compactMode ? 0 : "var(--radius-3)",
           overflow: "hidden",
           margin: "0 auto",
           // Let the video drive the container's aspect ratio
@@ -1556,12 +1568,14 @@ export function VideoPoseViewer({
           crossOrigin="anonymous"
           onLoadedMetadata={() => {
             setIsVideoMetadataLoaded(true);
-            console.log("Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight);
-            // Update canvas dimensions to match video
             const video = videoRef.current;
+            console.log("Video metadata loaded, dimensions:", video?.videoWidth, "x", video?.videoHeight);
+            // Update canvas dimensions to match video
             if (video && canvasRef.current) {
               canvasRef.current.width = video.videoWidth;
               canvasRef.current.height = video.videoHeight;
+              // Notify parent of video dimensions for aspect ratio handling
+              onVideoMetadataLoaded?.(video.videoWidth, video.videoHeight);
             }
           }}
           onPlay={() => setIsPlaying(true)}
@@ -1570,8 +1584,9 @@ export function VideoPoseViewer({
           controls
           style={{
             display: "block",
-            width: "100%",
-            height: "auto",
+            width: compactMode ? "100%" : (isPortraitVideo ? "auto" : "100%"),
+            height: compactMode ? "100%" : (isPortraitVideo ? "100%" : "auto"),
+            maxWidth: "100%",
             maxHeight: videoMaxHeight,
             objectFit: "contain",
           }}
@@ -1639,30 +1654,33 @@ export function VideoPoseViewer({
               className={buttonStyles.actionButtonSquare}
               onClick={handleTogglePose}
               style={{
-                height: isPortraitVideo || isMobile ? "24px" : "28px",
-                padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
+                height: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
+                padding: compactMode ? "0 6px" : (isPortraitVideo || isMobile ? "0 8px" : "0 10px"),
                 fontSize: isMobile ? "10px" : "11px",
                 opacity: isPoseEnabled ? 1 : 0.7,
+                minWidth: compactMode ? "24px" : undefined,
               }}
             >
               <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
-                <MagicWandIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
-                <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
-                  {isPoseEnabled ? "AI Overlay" : "AI Overlay"}
-                </Text>
+                <MagicWandIcon width={isPortraitVideo || isMobile || compactMode ? 12 : 14} height={isPortraitVideo || isMobile || compactMode ? 12 : 14} />
+                {!compactMode && (
+                  <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
+                    AI Overlay
+                  </Text>
+                )}
               </Flex>
             </Button>
           </Tooltip>
 
-          {/* Config Button - Only show when AI overlay is enabled and not in floating mode */}
-          {isPoseEnabled && !hideTheatreToggle && (
+          {/* Config Button - Show when AI overlay is enabled, but hide when docked/floating */}
+          {isPoseEnabled && !compactMode && (
             <Tooltip content={isExpanded ? "Hide Video Player Controls" : "Show Video Player Controls"}>
               <Button
                 className={buttonStyles.actionButtonSquare}
                 onClick={() => setIsExpanded(!isExpanded)}
                 style={{
-                  height: isPortraitVideo || isMobile ? "24px" : "28px",
-                  width: isPortraitVideo || isMobile ? "24px" : "28px",
+                  height: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
+                  width: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
                   padding: 0,
                   display: "flex",
                   alignItems: "center",
@@ -1670,7 +1688,7 @@ export function VideoPoseViewer({
                   opacity: isExpanded ? 1 : 0.7,
                 }}
               >
-                <GearIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+                <GearIcon width={isPortraitVideo || isMobile || compactMode ? 12 : 14} height={isPortraitVideo || isMobile || compactMode ? 12 : 14} />
               </Button>
             </Tooltip>
           )}
