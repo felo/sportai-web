@@ -16,6 +16,7 @@ interface UserMenuProps {
   ttsSettings?: TTSSettings;
   messageCount?: number;
   isMobile?: boolean;
+  collapsed?: boolean;
   onThemeSelect?: (theme: "light" | "dark") => void;
   onTheatreModeToggle?: (enabled: boolean) => void;
   onDeveloperModeToggle?: (enabled: boolean) => void;
@@ -34,6 +35,7 @@ export function UserMenu({
   ttsSettings = { enabled: false, quality: "studio", gender: "male", language: "en-GB", speakingRate: 0.75, pitch: 0.0 },
   messageCount = 0,
   isMobile = false,
+  collapsed = false,
   onThemeSelect,
   onTheatreModeToggle,
   onDeveloperModeToggle,
@@ -62,7 +64,7 @@ export function UserMenu({
   // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center">
         <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
       </div>
     );
@@ -77,14 +79,20 @@ export function UserMenu({
           size="2"
           onClick={() => setAuthModalOpen(true)}
           style={{
-            justifyContent: "flex-start",
-            padding: "var(--space-2) var(--space-3)",
+            justifyContent: collapsed ? "center" : "flex-start",
+            padding: collapsed ? "var(--space-2)" : "var(--space-2) var(--space-3)",
+            minWidth: collapsed ? "40px" : undefined,
+            width: collapsed ? "40px" : undefined,
+            height: collapsed ? "40px" : undefined,
           }}
+          title={collapsed ? "Sign In" : undefined}
         >
           <PersonIcon width="20" height="20" />
-          <Text size="2" ml="2">
-            Sign In
-          </Text>
+          {!collapsed && (
+            <Text size="2" ml="2">
+              Sign In
+            </Text>
+          )}
         </Button>
         <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
       </>
@@ -121,7 +129,13 @@ export function UserMenu({
     }
     
     return (
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+      <div 
+        className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
+        style={{ 
+          backgroundColor: "#7ADB8F",
+          color: "#1C1C1C"
+        }}
+      >
         {initials}
       </div>
     );
@@ -134,37 +148,43 @@ export function UserMenu({
           variant="ghost"
           size="2"
           style={{
-            justifyContent: "flex-start",
-            padding: "var(--space-2) var(--space-3)",
+            justifyContent: collapsed ? "center" : "flex-start",
+            padding: collapsed ? "var(--space-2)" : "var(--space-2) var(--space-3)",
             gap: "var(--space-1)",
+            minWidth: collapsed ? "40px" : undefined,
+            width: collapsed ? "40px" : undefined,
+            height: collapsed ? "40px" : undefined,
           }}
+          title={collapsed ? displayName : undefined}
         >
           <Avatar />
-          <div style={{ 
-            display: "flex", 
-            flexDirection: "column", 
-            alignItems: "flex-start",
-            minWidth: 0,
-            gap: "0",
-            paddingLeft: "var(--space-2)",
-          }}>
-            {profile?.full_name && (
-              <Text size="2" weight="medium" style={{ 
+          {!collapsed && (
+            <div style={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              alignItems: "flex-start",
+              minWidth: 0,
+              gap: "0",
+              paddingLeft: "var(--space-2)",
+            }}>
+              {profile?.full_name && (
+                <Text size="2" weight="medium" style={{ 
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                  {profile.full_name}
+                </Text>
+              )}
+              <Text size="1" color="gray" style={{ 
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
-                {profile.full_name}
+                {email}
               </Text>
-            )}
-            <Text size="1" color="gray" style={{ 
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>
-              {email}
-            </Text>
-          </div>
+            </div>
+          )}
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start">

@@ -282,37 +282,37 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       {/* User Menu & Settings - Row 3: Fixed at bottom */}
       <Box
         style={{
-          padding: isCollapsed ? "var(--space-5)" : "var(--space-4)",
+          padding: isCollapsed ? "var(--space-3)" : "var(--space-4)",
           borderTop: isCollapsed ? "none" : "1px solid var(--gray-6)",
           display: "flex",
           flexDirection: "column",
+          alignItems: isCollapsed ? "center" : "stretch",
           gap: "var(--space-3)",
           justifyContent: isCollapsed ? "center" : "flex-start",
           flexShrink: 0,
         }}
       >
-        {!isCollapsed && (
-          <UserMenu
-            appearance={settingsState.appearance}
-            theatreMode={settingsState.theatreMode}
-            developerMode={settingsState.developerMode}
-            highlightingPrefs={settingsState.highlightingPrefs}
-            ttsSettings={settingsState.ttsSettings}
-            messageCount={messageCount}
-            isMobile={isMobile}
-            onThemeSelect={settingsState.handleThemeSelect}
-            onTheatreModeToggle={settingsState.handleTheatreModeToggle}
-            onDeveloperModeToggle={settingsState.handleDeveloperModeToggle}
-            onHighlightingToggle={settingsState.handleHighlightingToggle}
-            onTTSSettingChange={settingsState.handleTTSSettingChange}
-            onClearChat={onClearChat}
-            onOpenStorageDebug={() => {
-              dialogsState.setDropdownOpen(false);
-              dialogsState.setStorageDebugOpen(true);
-            }}
-            onSetAlertOpen={dialogsState.setAlertOpen}
-          />
-        )}
+        <UserMenu
+          appearance={settingsState.appearance}
+          theatreMode={settingsState.theatreMode}
+          developerMode={settingsState.developerMode}
+          highlightingPrefs={settingsState.highlightingPrefs}
+          ttsSettings={settingsState.ttsSettings}
+          messageCount={messageCount}
+          isMobile={isMobile}
+          collapsed={isCollapsed}
+          onThemeSelect={settingsState.handleThemeSelect}
+          onTheatreModeToggle={settingsState.handleTheatreModeToggle}
+          onDeveloperModeToggle={settingsState.handleDeveloperModeToggle}
+          onHighlightingToggle={settingsState.handleHighlightingToggle}
+          onTTSSettingChange={settingsState.handleTTSSettingChange}
+          onClearChat={onClearChat}
+          onOpenStorageDebug={() => {
+            dialogsState.setDropdownOpen(false);
+            dialogsState.setStorageDebugOpen(true);
+          }}
+          onSetAlertOpen={dialogsState.setAlertOpen}
+        />
       </Box>
 
       {/* Dialogs */}

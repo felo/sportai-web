@@ -61,7 +61,7 @@ export function ChatInput({
       console.log("[ChatInput] Loading state:", { loading, hasOnStop: !!onStop, progressStage });
     }
   }, [loading, onStop, progressStage]);
-  // Base height for textarea (in pixels) - adjust this to test different heights
+  // Base height for textarea (in pixels) - single line height with padding
   const BASE_TEXTAREA_HEIGHT = isMobile ? 40 : 0;
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -372,6 +372,7 @@ export function ChatInput({
               resize="none"
               size="3"
               style={{
+                minHeight: "60px",
                 maxHeight: "300px",
                 paddingTop: isMobile ? "var(--space-2)" : "var(--space-3)",
                 paddingLeft: isMobile ? "var(--space-2)" : "var(--space-3)",
@@ -383,6 +384,7 @@ export function ChatInput({
                 borderRadius: 0,
                 outline: "none",
                 boxShadow: "none",
+                height: "auto",
               }}
             />
             
