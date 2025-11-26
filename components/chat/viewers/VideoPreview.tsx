@@ -2,6 +2,7 @@
 
 import { Box, Flex, Text, Tooltip } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
+import Image from "next/image";
 
 interface VideoPreviewProps {
   videoFile: File;
@@ -33,15 +34,18 @@ export function VideoPreview({
       aria-label="Video preview"
     >
       {isImage ? (
-        <img 
-          src={videoPreview || undefined} 
+        <Image 
+          src={videoPreview || ""} 
           alt={videoFile.name}
+          width={48}
+          height={48}
           style={{
             height: "48px",
             width: "auto",
             borderRadius: "var(--radius-2)",
             objectFit: "cover",
           }}
+          unoptimized
         />
       ) : (
         <video

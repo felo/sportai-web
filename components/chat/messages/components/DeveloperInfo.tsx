@@ -108,7 +108,7 @@ export function DeveloperInfo({
                 <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
               </Text>
               {timeToFirstToken !== undefined && (
-                <Text size="1" pl="2">
+                <Text size="1" style={{ paddingLeft: "var(--space-2)" }}>
                   <strong>Time to first token:</strong> {timeToFirstToken.toLocaleString()}ms ({(timeToFirstToken / 1000).toFixed(2)}s)
                   {responseDuration > 0 && (
                     <span style={{ color: "var(--gray-10)" }}>
@@ -126,7 +126,7 @@ export function DeveloperInfo({
                 {modelSettings.thinkingBudget && ` (budget: ${modelSettings.thinkingBudget} tokens)`}, Resolution={modelSettings.mediaResolution}
               </Text>
               {modelSettings.domainExpertise && (
-                <Text size="1" pl="2">
+                <Text size="1" style={{ paddingLeft: "var(--space-2)" }}>
                   <strong>Domain knowledge:</strong> {
                     modelSettings.domainExpertise === "all-sports" 
                       ? "All Sports (General coaching knowledge)" 

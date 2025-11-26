@@ -1067,7 +1067,8 @@ export function VideoPoseViewer({
         showVelocity: true,
       });
     }
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId, isObjectDetectionEnabled, currentObjects, showObjectLabels, isProjectileDetectionEnabled, currentProjectile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId, isObjectDetectionEnabled, currentObjects, showObjectLabels, isProjectileDetectionEnabled, currentProjectile, isPlaying]);
 
   // Catmull-Rom spline interpolation for smooth trajectories
   // Creates smooth curves through points, simulating higher FPS

@@ -127,7 +127,8 @@ export function Pose3DViewer({ pose, width, height, showFace = true }: Pose3DVie
         }
       }
     };
-  }, []); // Run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount - dimensions handled separately
 
   // Handle manual controls
   const handleZoom = (factor: number) => {
@@ -293,7 +294,7 @@ export function Pose3DViewer({ pose, width, height, showFace = true }: Pose3DVie
     if (rendererRef.current && sceneRef.current && cameraRef.current) {
       rendererRef.current.render(sceneRef.current, cameraRef.current);
     }
-  }, [pose, isMirrored]); // React will detect changes in pose object
+  }, [pose, isMirrored, showFace]); // React will detect changes in pose object
 
   return (
     <div style={{ position: "relative", width: `${width}px`, height: `${height}px` }}>
