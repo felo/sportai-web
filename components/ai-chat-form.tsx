@@ -17,6 +17,8 @@ import { ScrollToVideo } from "@/components/chat/navigation/ScrollToVideo";
 import { AudioStopButton } from "@/components/chat/input/AudioStopButton";
 import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
+import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoContext";
+import { FloatingVideoPortal } from "@/components/chat/viewers/FloatingVideoPortal";
 import { Sidebar } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
@@ -973,6 +975,7 @@ export function AIChatForm() {
 
   return (
     <AudioPlayerProvider>
+      <FloatingVideoProvider scrollContainerRef={scrollContainerRef}>
       <div className="h-screen flex flex-col overflow-hidden">
         {/* Header - visible on both mobile and desktop */}
         <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
@@ -1032,6 +1035,7 @@ export function AIChatForm() {
                   progressStage={progressStage}
                   uploadProgress={uploadProgress}
                   messagesEndRef={messagesEndRef}
+                  scrollContainerRef={scrollContainerRef}
                   onAskForHelp={handleAskForHelp}
                   onUpdateMessage={updateMessage}
                   onRetryMessage={handleRetryMessage}
@@ -1134,7 +1138,11 @@ export function AIChatForm() {
           </Flex>
         </AlertDialog.Content>
       </AlertDialog.Root>
+
+      {/* Floating video portal - renders at document root */}
+      <FloatingVideoPortal />
       </div>
+      </FloatingVideoProvider>
     </AudioPlayerProvider>
   );
 }

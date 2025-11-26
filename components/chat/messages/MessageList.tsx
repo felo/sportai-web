@@ -15,6 +15,7 @@ interface MessageListProps {
   progressStage: ProgressStage;
   uploadProgress: number;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
   onAskForHelp?: (termName: string, swing?: any) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
   onRetryMessage?: (messageId: string) => void;
@@ -28,6 +29,7 @@ export function MessageList({
   progressStage,
   uploadProgress,
   messagesEndRef,
+  scrollContainerRef,
   onAskForHelp,
   onUpdateMessage,
   onRetryMessage,
@@ -101,6 +103,7 @@ export function MessageList({
           message={message} 
           allMessages={messages} 
           messageIndex={index}
+          scrollContainerRef={scrollContainerRef}
           onAskForHelp={onAskForHelp}
           onUpdateMessage={onUpdateMessage}
           onRetryMessage={onRetryMessage}

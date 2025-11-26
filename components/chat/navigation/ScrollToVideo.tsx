@@ -26,21 +26,20 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
 
       // Debounce the check
       checkTimeoutRef.current = setTimeout(() => {
-        // Find all video elements in the chat
-        const videos = Array.from(scrollContainer.querySelectorAll('video'));
+        // Find all video containers in the chat (works even when video is floating/hidden)
+        const videoContainers = Array.from(scrollContainer.querySelectorAll('[data-video-container="true"]'));
         
-        if (videos.length === 0) {
+        if (videoContainers.length === 0) {
           setIsVisible(false);
           return;
         }
 
-        // Check if any video is currently in view (at least partially)
+        // Check if any video container is currently in view (at least partially)
         const containerRect = scrollContainer.getBoundingClientRect();
-        const isAnyVideoVisible = videos.some((video) => {
-          const videoRect = video.getBoundingClientRect();
+        const isAnyVideoVisible = videoContainers.some((container) => {
+          const videoRect = container.getBoundingClientRect();
           
-          // Check if video is at least partially visible in the viewport
-          // A video is visible if any part of it overlaps with the container
+          // Check if container is at least partially visible in the viewport
           const isInView = 
             videoRect.bottom > containerRect.top &&
             videoRect.top < containerRect.bottom &&
@@ -48,22 +47,21 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
             videoRect.left < containerRect.right;
           
           // Only consider it "visible" if a significant portion is in view
-          // Calculate how much of the video is visible
           if (isInView) {
             const visibleTop = Math.max(videoRect.top, containerRect.top);
             const visibleBottom = Math.min(videoRect.bottom, containerRect.bottom);
             const visibleHeight = visibleBottom - visibleTop;
             const videoHeight = videoRect.height;
             
-            // Consider visible if at least 30% of the video is showing
-            return visibleHeight / videoHeight > 0.3;
+            // Consider visible if at least 30% of the container is showing
+            return videoHeight > 0 && visibleHeight / videoHeight > 0.3;
           }
           
           return false;
         });
 
         // Show button only if there are videos but none are currently visible
-        setIsVisible(videos.length > 0 && !isAnyVideoVisible);
+        setIsVisible(videoContainers.length > 0 && !isAnyVideoVisible);
       }, 100);
     };
 
@@ -97,14 +95,14 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
 
-    // Find all video elements in the chat
-    const videos = Array.from(scrollContainer.querySelectorAll('video'));
-    if (videos.length === 0) return;
+    // Find all video containers in the chat
+    const videoContainers = Array.from(scrollContainer.querySelectorAll('[data-video-container="true"]'));
+    if (videoContainers.length === 0) return;
 
-    // Simply scroll to the first video (or nearest video)
-    const firstVideo = videos[0] as HTMLVideoElement;
-    if (firstVideo) {
-      firstVideo.scrollIntoView({ 
+    // Scroll to the first video container
+    const firstContainer = videoContainers[0] as HTMLElement;
+    if (firstContainer) {
+      firstContainer.scrollIntoView({ 
         behavior: "smooth", 
         block: "center" 
       });
@@ -120,9 +118,9 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
         aria-label="Scroll to nearest video"
         style={{
           position: "absolute",
-          // On mobile, add extra spacing to clear the fixed header (57px header + safe area + 20px spacing)
-          top: isMobile ? "calc(77px + env(safe-area-inset-top))" : "20px",
-          right: isMobile ? "calc(16px + var(--space-4))" : "calc(16px + var(--space-4))",
+          // Position above the scroll-to-bottom button (36px button + 8px gap = 44px offset)
+          bottom: isMobile ? "calc(64px + env(safe-area-inset-bottom))" : "64px",
+          right: isMobile ? "calc(16px + var(--space-3))" : "calc(16px + var(--space-3))",
           width: "36px",
           height: "36px",
           borderRadius: "9999px",
@@ -135,7 +133,7 @@ export function ScrollToVideo({ scrollContainerRef }: ScrollToVideoProps) {
           border: "2px solid white",
           boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
           zIndex: 1001, // Above the fade overlay (which is 1000)
-          animation: "fadeInDown 0.3s ease-out",
+          animation: "fadeInUp 0.3s ease-out",
         }}
         onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
           e.currentTarget.style.backgroundColor = "#95E5A6";

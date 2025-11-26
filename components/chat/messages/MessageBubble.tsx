@@ -14,13 +14,14 @@ interface MessageBubbleProps {
   message: Message;
   allMessages?: Message[];
   messageIndex?: number;
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
   onAskForHelp?: (termName: string, swing?: any) => void;
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
   onRetryMessage?: (messageId: string) => void;
   isRetrying?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -267,6 +268,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, onA
             videoContainerStyle={videoContainerStyle}
             theatreMode={theatreMode}
             isMobile={isMobile}
+            scrollContainerRef={scrollContainerRef}
           />
         )}
 
