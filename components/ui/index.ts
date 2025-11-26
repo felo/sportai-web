@@ -44,3 +44,7 @@ export type { BadgeWithTooltipProps } from "./badges/BadgeWithTooltip";
 export { ErrorToast } from "./Toast";
 export { FeedbackToast } from "./FeedbackToast";
 
+// Brand
+export { LogoNewChatButton } from "./brand/LogoNewChatButton";
+export type { LogoNewChatButtonProps } from "./brand/LogoNewChatButton";
+
