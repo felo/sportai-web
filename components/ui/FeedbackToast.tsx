@@ -56,7 +56,7 @@ export function FeedbackToast({ open, onOpenChange }: FeedbackToastProps) {
           flex-direction: column;
           gap: var(--space-2);
           width: auto;
-          max-width: 320px;
+          max-width: 368px;
           padding: 0;
           margin: 0;
           list-style: none;
