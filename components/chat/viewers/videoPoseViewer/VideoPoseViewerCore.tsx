@@ -7,6 +7,8 @@ import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, Magi
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
+import { useFrameAnalysis } from "@/hooks/useFrameAnalysis";
+import type { CourtCorners } from "@/types/frame-analysis";
 import { drawPose, drawAngle, calculateAngle, POSE_KEYPOINTS, BLAZEPOSE_CONNECTIONS_2D } from "@/types/pose";
 import { drawDetectedObjects } from "@/types/object-detection";
 import { drawProjectile } from "@/types/projectile-detection";
@@ -18,7 +20,7 @@ import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings } from "./hooks";
-import { VelocityDisplay, CollapsibleSection, PlaybackControls, DescriptiveSelect, PoseSettingsPanel, ObjectDetectionSettingsPanel, ProjectileDetectionSettingsPanel } from "./components";
+import { VelocityDisplay, CollapsibleSection, PlaybackControls, DescriptiveSelect, PoseSettingsPanel, ObjectDetectionSettingsPanel, ProjectileDetectionSettingsPanel, FrameAnalysisSettingsPanel } from "./components";
 import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS } from "./constants";
 
 interface VideoPoseViewerProps {
@@ -118,7 +120,8 @@ export function VideoPoseViewer({
   const [preprocessProgress, setPreprocessProgress] = useState(0);
   const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
   const [usePreprocessing, setUsePreprocessing] = useState(false);
-  const [maxPoses, setMaxPoses] = useState(1);
+  const [maxPoses, setMaxPoses] = useState(1); // Default to 1 player
+  const [selectedPoseIndex, setSelectedPoseIndex] = useState(0); // Which person to analyze
   
   // Angle Measurement State
   const [showAngles, setShowAngles] = useState(initialShowAngles);
@@ -136,7 +139,7 @@ export function VideoPoseViewer({
   const [selectedObjectModel, setSelectedObjectModel] = useState<"YOLOv8n" | "YOLOv8s" | "YOLOv8m">("YOLOv8n");
   const [objectConfidenceThreshold, setObjectConfidenceThreshold] = useState(0.5);
   const [objectIoUThreshold, setObjectIoUThreshold] = useState(0.45);
-  const [sportFilter, setSportFilter] = useState<"all" | "tennis" | "pickleball" | "basketball" | "baseball" | "skating">("all");
+  const [sportFilter, setSportFilter] = useState<"all" | "tennis" | "pickleball" | "basketball" | "baseball" | "skating">("pickleball"); // Default to pickleball (person + ball)
   const [showObjectLabels, setShowObjectLabels] = useState(true);
   const [enableObjectTracking, setEnableObjectTracking] = useState(true);
   const [currentObjects, setCurrentObjects] = useState<any[]>([]);
@@ -148,6 +151,13 @@ export function VideoPoseViewer({
   const [showProjectileTrajectory, setShowProjectileTrajectory] = useState(true);
   const [showProjectilePrediction, setShowProjectilePrediction] = useState(false);
   const [currentProjectile, setCurrentProjectile] = useState<any | null>(null);
+
+  // Frame Analysis State (Gemini)
+  const [showCourtOverlay, setShowCourtOverlay] = useState(true);
+  
+  // Image Insight State
+  const [isImageInsightLoading, setIsImageInsightLoading] = useState(false);
+  const [imageInsightError, setImageInsightError] = useState<string | null>(null);
 
   // Label stability - prevents jitter by locking position for N frames after a change
   const labelPositionStateRef = useRef<Map<string, { multiplier: number; verticalOffset: number; framesSinceChange: number }>>(new Map());
@@ -213,6 +223,84 @@ export function VideoPoseViewer({
     dimensions,
   });
 
+  // Use frame analysis hook (Gemini)
+  // Pass sport filter to improve detection accuracy
+  const {
+    analyzeFrame,
+    analyzeFrameMultiple,
+    isAnalyzing: isFrameAnalyzing,
+    analyzingTypes,
+    courtResult,
+    cameraAngleResult,
+    error: frameAnalysisError,
+    clearResults: clearFrameAnalysisResults,
+  } = useFrameAnalysis({
+    sport: sportFilter !== "all" ? sportFilter : undefined,
+  });
+
+  // Frame analysis handlers
+  const handleAnalyzeCourt = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    await analyzeFrame(video, "court");
+  }, [analyzeFrame]);
+
+  const handleAnalyzeCameraAngle = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    await analyzeFrame(video, "camera-angle");
+  }, [analyzeFrame]);
+
+  const handleAnalyzeBoth = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    await analyzeFrameMultiple(video, ["court", "camera-angle"]);
+  }, [analyzeFrameMultiple]);
+
+  // All 4 angle presets: both elbows and both knees
+  const ALL_ANGLE_PRESETS: Array<[number, number, number]> = [
+    [5, 7, 9],   // Left elbow (shoulder-elbow-wrist)
+    [6, 8, 10],  // Right elbow (shoulder-elbow-wrist)
+    [11, 13, 15], // Left knee (hip-knee-ankle)
+    [12, 14, 16], // Right knee (hip-knee-ankle)
+  ];
+
+  // Capture current frame with pose overlay and all angles drawn
+  const captureAnnotatedFrame = useCallback((): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      const poseCanvas = canvasRef.current;
+      if (!video || !poseCanvas) {
+        resolve(null);
+        return;
+      }
+
+      // Create a new canvas to composite video + overlay
+      const compositeCanvas = document.createElement("canvas");
+      compositeCanvas.width = video.videoWidth;
+      compositeCanvas.height = video.videoHeight;
+      const ctx = compositeCanvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+
+      // Draw the video frame first
+      ctx.drawImage(video, 0, 0);
+
+      // Draw the pose overlay on top (from the existing canvas)
+      // Scale the pose canvas to match video dimensions
+      ctx.drawImage(poseCanvas, 0, 0, video.videoWidth, video.videoHeight);
+
+      // Convert to blob
+      compositeCanvas.toBlob(
+        (blob) => resolve(blob),
+        "image/jpeg",
+        0.9
+      );
+    });
+  }, []);
+
   useEffect(() => {
     // Dynamic import to avoid SSR issues with storage utility
     import("@/utils/storage").then(({ getDeveloperMode, getTheatreMode }) => {
@@ -275,6 +363,81 @@ export function VideoPoseViewer({
       }
     });
   }, [currentPoses]);
+
+  // Keep selectedPoseIndex in bounds when number of detected poses changes
+  useEffect(() => {
+    if (currentPoses.length > 0 && selectedPoseIndex >= currentPoses.length) {
+      setSelectedPoseIndex(currentPoses.length - 1);
+    }
+  }, [currentPoses.length, selectedPoseIndex]);
+
+  // Get the currently selected pose (with bounds checking)
+  const selectedPose = currentPoses.length > 0 
+    ? currentPoses[Math.min(selectedPoseIndex, currentPoses.length - 1)] 
+    : null;
+
+  // Handle Image Insight - capture frame and dispatch event for chat integration
+  const handleImageInsight = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || !selectedPose) {
+      setImageInsightError("No pose detected. Enable AI Overlay and ensure a player is visible.");
+      return;
+    }
+
+    setIsImageInsightLoading(true);
+    setImageInsightError(null);
+
+    try {
+      // Temporarily set all angle presets for the capture
+      const previousAngles = [...measuredAngles];
+      setMeasuredAngles(ALL_ANGLE_PRESETS);
+      
+      // Wait for next frame to render the angles
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // Capture the annotated frame
+      const frameBlob = await captureAnnotatedFrame();
+      if (!frameBlob) {
+        throw new Error("Failed to capture frame");
+      }
+
+      // Restore previous angles
+      setMeasuredAngles(previousAngles);
+
+      console.log("📸 Frame captured with pose overlay and angles");
+      console.log("📐 Angles:", ALL_ANGLE_PRESETS.map(a => `[${a.join("-")}]`).join(", "));
+
+      // Dispatch event to trigger chat integration
+      // AIChatForm will listen for this and handle adding messages
+      window.dispatchEvent(new CustomEvent("image-insight-request", {
+        detail: {
+          imageBlob: frameBlob,
+          domainExpertise: sportFilter !== "all" ? sportFilter : "all-sports",
+          timestamp: Date.now(),
+        }
+      }));
+
+      // Scroll to bottom to show the new messages
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }, 100);
+
+    } catch (error) {
+      console.error("❌ Image Insight error:", error);
+      setImageInsightError(error instanceof Error ? error.message : "Failed to analyze frame");
+    } finally {
+      setIsImageInsightLoading(false);
+    }
+  }, [selectedPose, measuredAngles, setMeasuredAngles, captureAnnotatedFrame, sportFilter, ALL_ANGLE_PRESETS]);
+
+  // Navigation handlers for pose selection
+  const handlePrevPose = useCallback(() => {
+    setSelectedPoseIndex(prev => prev > 0 ? prev - 1 : currentPoses.length - 1);
+  }, [currentPoses.length]);
+
+  const handleNextPose = useCallback(() => {
+    setSelectedPoseIndex(prev => prev < currentPoses.length - 1 ? prev + 1 : 0);
+  }, [currentPoses.length]);
 
   // Confidence and resolution presets imported from constants
   const currentConfidence = CONFIDENCE_PRESETS[confidenceMode];
@@ -446,6 +609,30 @@ export function VideoPoseViewer({
     };
   }, [isPlaying, isObjectDetectionEnabled, isObjectDetectionLoading, isProjectileDetectionEnabled, objectDetector, detectObjects, detectProjectile, videoFPS]);
 
+  // Run object detection once when paused (for static frame analysis)
+  useEffect(() => {
+    const video = videoRef.current;
+    
+    if (!video || isPlaying || !isObjectDetectionEnabled || isObjectDetectionLoading || !detectObjects) {
+      return;
+    }
+
+    // Run detection once on the paused frame
+    const runDetection = async () => {
+      try {
+        const objects = await detectObjects(video);
+        setCurrentObjects(objects);
+      } catch (err) {
+        console.error('Error detecting objects on paused frame:', err);
+      }
+    };
+
+    // Small delay to ensure video frame is ready
+    const timeoutId = setTimeout(runDetection, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isPlaying, isObjectDetectionEnabled, isObjectDetectionLoading, detectObjects]);
+
   // Note: Projectile detection is now integrated with object detection loop above
   // No separate loop needed - ball tracking uses YOLO detections
 
@@ -582,7 +769,7 @@ export function VideoPoseViewer({
     const clickX = x * scaleX;
     const clickY = y * scaleY;
 
-    const pose = currentPoses[0]; // Use first person
+    const pose = selectedPose; // Use selected person
     if (!pose) return;
 
     // First, check if clicking directly on a joint (highest priority)
@@ -931,7 +1118,7 @@ export function VideoPoseViewer({
 
       // Draw angles
       if (showAngles && currentPoses.length > 0) {
-        const pose = currentPoses[0]; // Use first person for angle measurement
+        const pose = selectedPose; // Use selected person for angle measurement
         if (pose) {
           // Use same scaling as pose drawing
           let scaleX, scaleY;
@@ -1097,8 +1284,80 @@ export function VideoPoseViewer({
         showVelocity: true,
       });
     }
+
+    // Draw court overlay (from Gemini frame analysis)
+    if (showCourtOverlay && courtResult?.found && courtResult.corners) {
+      const corners = courtResult.corners;
+      
+      // Scale normalized coordinates (0-1) to canvas coordinates
+      const scaleCorner = (corner: { x: number; y: number }) => ({
+        x: corner.x * canvas.width,
+        y: corner.y * canvas.height,
+      });
+      
+      const topLeft = scaleCorner(corners.topLeft);
+      const topRight = scaleCorner(corners.topRight);
+      const bottomLeft = scaleCorner(corners.bottomLeft);
+      const bottomRight = scaleCorner(corners.bottomRight);
+      
+      // Draw court boundary lines
+      ctx.strokeStyle = "#00D4FF"; // Cyan color for court
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 4]); // Dashed line
+      
+      ctx.beginPath();
+      ctx.moveTo(topLeft.x, topLeft.y);
+      ctx.lineTo(topRight.x, topRight.y);
+      ctx.lineTo(bottomRight.x, bottomRight.y);
+      ctx.lineTo(bottomLeft.x, bottomLeft.y);
+      ctx.closePath();
+      ctx.stroke();
+      
+      ctx.setLineDash([]); // Reset dash
+      
+      // Draw corner markers
+      const cornerRadius = 6;
+      const cornerColor = "#00D4FF";
+      
+      [topLeft, topRight, bottomLeft, bottomRight].forEach((corner, index) => {
+        // Outer circle
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, cornerRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = cornerColor;
+        ctx.fill();
+        
+        // Inner circle (white dot)
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, cornerRadius - 2, 0, 2 * Math.PI);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fill();
+      });
+      
+      // Draw court type label
+      if (courtResult.courtType && courtResult.courtType !== "unknown") {
+        const labelText = `${courtResult.courtType.toUpperCase()} COURT`;
+        ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
+        const textMetrics = ctx.measureText(labelText);
+        const labelX = topLeft.x;
+        const labelY = topLeft.y - 10;
+        
+        // Background
+        ctx.fillStyle = "rgba(0, 212, 255, 0.85)";
+        const padding = 4;
+        ctx.fillRect(
+          labelX - padding,
+          labelY - 12,
+          textMetrics.width + padding * 2,
+          16
+        );
+        
+        // Text
+        ctx.fillStyle = "#000000";
+        ctx.fillText(labelText, labelX, labelY);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId, isObjectDetectionEnabled, currentObjects, showObjectLabels, isProjectileDetectionEnabled, currentProjectile, isPlaying]);
+  }, [currentPoses, showSkeleton, showTrajectories, jointTrajectories, dimensions.width, dimensions.height, showFaceLandmarks, showAngles, selectedAngleJoints, measuredAngles, smoothTrajectories, selectedModel, showTrackingId, isObjectDetectionEnabled, currentObjects, showObjectLabels, isProjectileDetectionEnabled, currentProjectile, isPlaying, showCourtOverlay, courtResult]);
 
   // Catmull-Rom spline interpolation for smooth trajectories
   // Creates smooth curves through points, simulating higher FPS
@@ -1253,8 +1512,8 @@ export function VideoPoseViewer({
 
   // Calculate current angle value from current poses
   const getCurrentAngleValue = (angle: [number, number, number]): number | null => {
-    if (currentPoses.length === 0) return null;
-    const pose = currentPoses[0];
+    if (currentPoses.length === 0 || !selectedPose) return null;
+    const pose = selectedPose;
     const [idxA, idxB, idxC] = angle;
     
     const pointA = pose.keypoints[idxA];
@@ -1426,8 +1685,8 @@ export function VideoPoseViewer({
 
   // Get first pose with 3D keypoints for visualization
   const pose3D = React.useMemo(() => {
-    if (isPoseEnabled && selectedModel === "BlazePose" && currentPoses.length > 0) {
-      const pose = currentPoses[0];
+    if (isPoseEnabled && selectedModel === "BlazePose" && currentPoses.length > 0 && selectedPose) {
+      const pose = selectedPose;
       if (pose && pose.keypoints3D && pose.keypoints3D.length > 0) {
         return pose;
       }
@@ -1718,34 +1977,59 @@ export function VideoPoseViewer({
               {/* Pose Detection Stats */}
               {isPoseEnabled && currentPoses.length > 0 && (
                 <>
-                  {!isMobile && (
+                  {!isMobile && currentPoses.length === 1 && (
                     <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
-                      {currentPoses.length === 1 ? "Tracking player" : `Detected ${currentPoses.length} players`}
+                      Tracking player
                     </Text>
                   )}
-                  {!isMobile && currentPoses.map((pose, idx) => {
-                    return (
-                      <Text key={idx} size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
-                        Player {idx + 1}: {pose.score ? `${(pose.score * 100).toFixed(0)}%` : "N/A"}
+                  {/* Player Toggle - show when multiple players detected */}
+                  {!isMobile && currentPoses.length > 1 && (
+                    <Flex align="center" gap="2">
+                      <Button
+                        size="1"
+                        variant="ghost"
+                        onClick={handlePrevPose}
+                        style={{ 
+                          padding: "2px 6px", 
+                          minWidth: "auto",
+                          color: "white",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ChevronLeftIcon width={12} height={12} />
+                      </Button>
+                      <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px", minWidth: "70px", textAlign: "center" }}>
+                        Player {selectedPoseIndex + 1}/{currentPoses.length}
                       </Text>
-                    );
-                  })}
-                  {currentPoses.length > 0 && (() => {
-                    // Calculate combined average accuracy across all players
-                    let totalSum = 0;
-                    let totalCount = 0;
-                    currentPoses.forEach((_, idx) => {
-                      const stats = confidenceStats.current.get(idx);
-                      if (stats) {
-                        totalSum += stats.sum;
-                        totalCount += stats.count;
-                      }
-                    });
-                    const overallAvg = totalCount > 0 ? (totalSum / totalCount) : 0;
+                      <Button
+                        size="1"
+                        variant="ghost"
+                        onClick={handleNextPose}
+                        style={{ 
+                          padding: "2px 6px", 
+                          minWidth: "auto",
+                          color: "white",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ChevronRightIcon width={12} height={12} />
+                      </Button>
+                    </Flex>
+                  )}
+                  {/* Show selected player's score */}
+                  {!isMobile && selectedPose && (
+                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
+                      Score: {selectedPose.score ? `${(selectedPose.score * 100).toFixed(0)}%` : "N/A"}
+                    </Text>
+                  )}
+                  {selectedPose && (() => {
+                    // Calculate average accuracy for selected player
+                    const stats = confidenceStats.current.get(selectedPoseIndex);
+                    const avg = stats && stats.count > 0 ? (stats.sum / stats.count) : 0;
                     
                     return (
                       <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: isMobile ? "9px" : "10px" }}>
-                        Confidence {(overallAvg * 100).toFixed(0)}%
+                        Confidence {(avg * 100).toFixed(0)}%
                       </Text>
                     );
                   })()}
@@ -2311,6 +2595,27 @@ export function VideoPoseViewer({
             setShowProjectileTrajectory={setShowProjectileTrajectory}
             showProjectilePrediction={showProjectilePrediction}
             setShowProjectilePrediction={setShowProjectilePrediction}
+          />
+
+          {/* Frame Analysis Settings Panel - Gemini AI */}
+          <FrameAnalysisSettingsPanel
+            isAnalyzing={isFrameAnalyzing}
+            analyzingTypes={analyzingTypes}
+            courtResult={courtResult}
+            cameraAngleResult={cameraAngleResult}
+            showCourtOverlay={showCourtOverlay}
+            setShowCourtOverlay={setShowCourtOverlay}
+            onAnalyzeCourt={handleAnalyzeCourt}
+            onAnalyzeCameraAngle={handleAnalyzeCameraAngle}
+            onAnalyzeBoth={handleAnalyzeBoth}
+            onClearResults={clearFrameAnalysisResults}
+            videoRef={videoRef}
+            error={frameAnalysisError}
+            onImageInsight={handleImageInsight}
+            isImageInsightLoading={isImageInsightLoading}
+            imageInsightError={imageInsightError}
+            developerMode={developerMode}
+            hasPose={!!selectedPose}
           />
 
           {/* Error Display */}

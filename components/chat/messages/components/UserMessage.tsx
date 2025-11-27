@@ -45,7 +45,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   
   // Check if this is an image (not a video)
   const isImage = message.videoFile?.type.startsWith("image/") || 
-                  (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i));
+                  (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ||
+                  (message.videoPreview && message.videoPreview.startsWith("data:image/"));
   
   // Floating video context (optional - won't error if not in provider)
   const floatingContext = useFloatingVideoContextOptional();

@@ -6,4 +6,5 @@ export * from "./DescriptiveSelect";
 export * from "./PoseSettingsPanel";
 export * from "./ObjectDetectionSettingsPanel";
 export * from "./ProjectileDetectionSettingsPanel";
+export * from "./FrameAnalysisSettingsPanel";
 

@@ -6,7 +6,7 @@ import {
   calculatePricing,
   formatCost,
 } from "./token-utils";
-import { getSystemPromptWithDomain } from "./prompts";
+import { getSystemPromptWithDomain, getFramePromptWithDomain, type PromptType } from "./prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 const MODEL_NAME = "gemini-3-pro-preview";
@@ -36,13 +36,16 @@ export async function queryLLM(
   conversationHistory?: ConversationHistory[],
   thinkingMode: ThinkingMode = "fast",
   mediaResolution: MediaResolution = "medium",
-  domainExpertise: DomainExpertise = "all-sports"
+  domainExpertise: DomainExpertise = "all-sports",
+  promptType: PromptType = "video"
 ): Promise<string> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Get system prompt with domain-specific enhancement
+  // Get system prompt with domain-specific enhancement based on prompt type
   // Use systemInstruction parameter instead of prepending to prompt
-  const systemPrompt = getSystemPromptWithDomain(domainExpertise);
+  const systemPrompt = promptType === "frame" 
+    ? getFramePromptWithDomain(domainExpertise)
+    : getSystemPromptWithDomain(domainExpertise);
   
   logger.info(`[${requestId}] Starting LLM query`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
@@ -329,13 +332,16 @@ export async function* streamLLM(
   videoData?: { data: Buffer; mimeType: string } | null,
   thinkingMode: ThinkingMode = "fast",
   mediaResolution: MediaResolution = "medium",
-  domainExpertise: DomainExpertise = "all-sports"
+  domainExpertise: DomainExpertise = "all-sports",
+  promptType: PromptType = "video"
 ): AsyncGenerator<string, void, unknown> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Get system prompt with domain-specific enhancement
+  // Get system prompt with domain-specific enhancement based on prompt type
   // Use systemInstruction parameter instead of prepending to prompt
-  const systemPrompt = getSystemPromptWithDomain(domainExpertise);
+  const systemPrompt = promptType === "frame" 
+    ? getFramePromptWithDomain(domainExpertise)
+    : getSystemPromptWithDomain(domainExpertise);
   
   logger.info(`[${requestId}] Starting LLM stream`);
   logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);

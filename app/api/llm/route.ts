@@ -3,6 +3,7 @@ import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import type { PromptType } from "@/lib/prompts";
 
 // Ensure this route uses Node.js runtime (required for file uploads and Buffer)
 export const runtime = "nodejs";
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     const thinkingMode = (formData.get("thinkingMode") as ThinkingMode) || "fast";
     const mediaResolution = (formData.get("mediaResolution") as MediaResolution) || "medium";
     const domainExpertise = (formData.get("domainExpertise") as DomainExpertise) || "all-sports";
+    const promptType = (formData.get("promptType") as PromptType) || "video";
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
     logger.debug(`[${requestId}] Media file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
@@ -290,7 +292,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               }
             }
             
-            for await (const chunk of streamLLM(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise)) {
+            for await (const chunk of streamLLM(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise, promptType)) {
               // Check if controller is still open before enqueueing
               // This can happen if the client aborts the request
               try {
@@ -342,7 +344,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
     }
     
     logger.info(`[${requestId}] Calling queryLLM...`);
-    const response = await queryLLM(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise);
+    const response = await queryLLM(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise, promptType);
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);

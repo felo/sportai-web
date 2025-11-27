@@ -235,6 +235,116 @@ export function AIChatForm() {
     };
   }, [isHydrated]);
 
+  // Handle Image Insight requests from VideoPoseViewer
+  useEffect(() => {
+    const handleImageInsightRequest = async (event: CustomEvent<{
+      imageBlob: Blob;
+      domainExpertise: string;
+      timestamp: number;
+    }>) => {
+      const { imageBlob, domainExpertise: insightDomainExpertise } = event.detail;
+      
+      console.log("📸 [AIChatForm] Received Image Insight request");
+      
+      // Don't process if already loading
+      if (loading) {
+        console.warn("[AIChatForm] Already loading, ignoring Image Insight request");
+        return;
+      }
+
+      setLoading(true);
+      setProgressStage("analyzing");
+
+      try {
+        // Create a data URL from the blob for display
+        const imageDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(imageBlob);
+        });
+
+        // Add user message with the image
+        const userMessageId = generateMessageId();
+        const userMessage: Message = {
+          id: userMessageId,
+          role: "user",
+          content: "🎯 **Image Insight** - Analyze this frame with pose detection overlay and joint angles.",
+          videoPreview: imageDataUrl, // Using videoPreview to display the captured frame
+        };
+        addMessage(userMessage);
+        console.log("[AIChatForm] Added Image Insight user message:", userMessageId);
+
+        // Scroll to bottom
+        setTimeout(() => scrollToBottom(), 100);
+
+        // Add assistant placeholder message
+        const assistantMessageId = generateMessageId();
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          role: "assistant",
+          content: "",
+        };
+        addMessage(assistantMessage);
+
+        // Create form data for the API
+        const formData = new FormData();
+        formData.append("prompt", "Analyze this frame from my sports video. The image shows my body position with pose detection overlay and joint angle measurements. Please provide detailed biomechanical feedback on my technique, body positioning, and the joint angles visible.");
+        formData.append("video", imageBlob, "frame.jpg");
+        formData.append("promptType", "frame");
+        formData.append("thinkingMode", "deep");
+        formData.append("mediaResolution", "high");
+        formData.append("domainExpertise", insightDomainExpertise);
+
+        // Send to LLM API with streaming
+        const response = await fetch("/api/llm", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "x-stream": "true",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error ${response.status}: ${errorText}`);
+        }
+
+        // Stream the response
+        const reader = response.body?.getReader();
+        if (reader) {
+          let fullResponse = "";
+          const decoder = new TextDecoder();
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            fullResponse += chunk;
+            
+            // Update the assistant message with streamed content
+            updateMessage(assistantMessageId, { content: fullResponse });
+          }
+          
+          console.log("✅ [AIChatForm] Image Insight complete, response length:", fullResponse.length);
+        }
+
+      } catch (error) {
+        console.error("❌ [AIChatForm] Image Insight error:", error);
+        setApiError(error instanceof Error ? error.message : "Failed to analyze frame");
+      } finally {
+        setLoading(false);
+        setProgressStage("idle");
+      }
+    };
+
+    window.addEventListener("image-insight-request", handleImageInsightRequest as EventListener);
+    
+    return () => {
+      window.removeEventListener("image-insight-request", handleImageInsightRequest as EventListener);
+    };
+  }, [loading, addMessage, updateMessage, scrollToBottom, setLoading, setProgressStage, setApiError]);
+
   // Auto-populate prompt when video is added and prompt is empty
   useEffect(() => {
     if (videoFile && !prompt.trim()) {
