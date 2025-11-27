@@ -164,7 +164,7 @@ export async function transcodeToH264(
           percent,
           currentFrame: encodedFrames,
           totalFrames,
-          message: `Encoding frame ${encodedFrames}/${totalFrames}`,
+          message: 'Encoding video...',
         });
       },
       error: (error) => {

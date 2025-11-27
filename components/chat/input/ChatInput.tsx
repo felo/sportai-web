@@ -354,7 +354,7 @@ export function ChatInput({
               <Flex direction="column" gap="2">
                 <Flex justify="between" align="center">
                   <Text size="2" weight="medium" style={{ color: "var(--mint-11)" }}>
-                    Converting video to compatible format...
+                    Preparing video for analysis...
                   </Text>
                   <Text size="1" style={{ color: "var(--mint-11)" }}>
                     {Math.round(transcodeProgress.percent)}%

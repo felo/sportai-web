@@ -403,13 +403,14 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
             <Box style={{ maxWidth: "none" }}>
               <AssistantMessage
                 messageId={message.id}
+                chatId={getCurrentChatId() || undefined}
                 content={message.content}
                 isStreaming={message.isStreaming}
                 isIncomplete={message.isIncomplete}
                 thinkingMessage={userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}
                 onAskForHelp={onAskForHelp}
                 onTTSUsage={handleTTSUsage}
-                onFeedback={() => setShowFeedbackToast(true)}
+                onFeedbackSubmitted={() => setShowFeedbackToast(true)}
                 onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
                 isRetrying={isRetrying}
               />

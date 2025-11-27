@@ -477,6 +477,59 @@ CREATE TRIGGER update_profiles_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
+-- MESSAGE_FEEDBACK TABLE
+-- Stores user feedback on assistant responses
+-- =============================================
+CREATE TABLE IF NOT EXISTS message_feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id TEXT NOT NULL, -- Store as TEXT since messages may be local-only
+  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- NULL if anonymous
+  feedback_type TEXT NOT NULL CHECK (feedback_type IN ('up', 'down')),
+  
+  -- Preset reasons (stored as array for multiple selections)
+  reasons TEXT[] DEFAULT '{}',
+  
+  -- Free-form comment
+  comment TEXT,
+  
+  -- Context data
+  chat_id TEXT, -- Store as TEXT since chats may be local-only
+  message_content TEXT, -- Snapshot of message content at feedback time
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for faster queries
+CREATE INDEX IF NOT EXISTS message_feedback_message_id_idx ON message_feedback(message_id);
+CREATE INDEX IF NOT EXISTS message_feedback_user_id_idx ON message_feedback(user_id);
+CREATE INDEX IF NOT EXISTS message_feedback_feedback_type_idx ON message_feedback(feedback_type);
+CREATE INDEX IF NOT EXISTS message_feedback_created_at_idx ON message_feedback(created_at DESC);
+
+-- Enable RLS on message_feedback
+ALTER TABLE message_feedback ENABLE ROW LEVEL SECURITY;
+
+-- Message feedback policies
+-- Anyone can insert feedback (allows anonymous feedback)
+CREATE POLICY "Anyone can insert feedback"
+  ON message_feedback FOR INSERT
+  WITH CHECK (true);
+
+-- Users can view their own feedback
+CREATE POLICY "Users can view their own feedback"
+  ON message_feedback FOR SELECT
+  USING (auth.uid() = user_id OR user_id IS NULL);
+
+-- Users can update their own feedback
+CREATE POLICY "Users can update their own feedback"
+  ON message_feedback FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- Users can delete their own feedback
+CREATE POLICY "Users can delete their own feedback"
+  ON message_feedback FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- =============================================
 -- HELPFUL QUERIES (commented out)
 -- =============================================
 

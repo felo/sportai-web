@@ -425,6 +425,50 @@ export interface Database {
           }
         ];
       };
+      message_feedback: {
+        Row: {
+          id: string;
+          message_id: string; // TEXT - not a foreign key since messages may be local-only
+          user_id: string | null;
+          feedback_type: "up" | "down";
+          reasons: string[];
+          comment: string | null;
+          chat_id: string | null; // TEXT - not a foreign key since chats may be local-only
+          message_content: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          user_id?: string | null;
+          feedback_type: "up" | "down";
+          reasons?: string[];
+          comment?: string | null;
+          chat_id?: string | null;
+          message_content?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          user_id?: string | null;
+          feedback_type?: "up" | "down";
+          reasons?: string[];
+          comment?: string | null;
+          chat_id?: string | null;
+          message_content?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "message_feedback_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

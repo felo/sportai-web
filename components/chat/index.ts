@@ -14,6 +14,8 @@ export { VideoPreview } from "./viewers/VideoPreview";
 export { ProgressIndicator } from "./feedback/ProgressIndicator";
 export { StreamingIndicator } from "./feedback/StreamingIndicator";
 export { FeedbackButtons } from "./feedback/FeedbackButtons";
+export { FeedbackModal } from "./feedback/FeedbackModal";
+export type { FeedbackData } from "./feedback/FeedbackModal";
 
 // Navigation
 export { ScrollToBottom } from "./navigation/ScrollToBottom";

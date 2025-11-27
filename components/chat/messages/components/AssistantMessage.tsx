@@ -9,13 +9,14 @@ import { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 
 interface AssistantMessageProps {
   messageId: string;
+  chatId?: string;
   content: string;
   isStreaming?: boolean;
   isIncomplete?: boolean;
   thinkingMessage: string;
   onAskForHelp?: (termName: string, swing?: any) => void;
   onTTSUsage: (characters: number, cost: number, quality: string) => void;
-  onFeedback: () => void;
+  onFeedbackSubmitted?: () => void;
   onRetry?: () => void;
   isRetrying?: boolean;
 }
@@ -25,13 +26,14 @@ interface AssistantMessageProps {
  */
 export function AssistantMessage({
   messageId,
+  chatId,
   content,
   isStreaming,
   isIncomplete,
   thinkingMessage,
   onAskForHelp,
   onTTSUsage,
-  onFeedback,
+  onFeedbackSubmitted,
   onRetry,
   isRetrying,
 }: AssistantMessageProps) {
@@ -49,7 +51,9 @@ export function AssistantMessage({
             feedbackButtons={!isStreaming && !isIncomplete ? (
               <FeedbackButtons 
                 messageId={messageId}
-                onFeedback={onFeedback}
+                chatId={chatId}
+                messageContent={content}
+                onFeedback={() => onFeedbackSubmitted?.()}
               />
             ) : undefined}
           >

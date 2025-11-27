@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { getDeveloperMode } from "@/utils/storage";
 import { Dialog, Flex, Text, Button, Box, Progress, Callout } from "@radix-ui/themes";
 import { Cross2Icon, ExclamationTriangleIcon, CheckCircledIcon, CrossCircledIcon } from "@radix-ui/react-icons";
 import type { VideoCompatibilityResult } from "@/utils/video-utils";
@@ -29,6 +30,24 @@ export function VideoCompatibilityModal({
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [canEncode, setCanEncode] = useState<boolean | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [developerMode, setDeveloperMode] = useState(false);
+
+  // Load developer mode on mount and listen for changes
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("storage", handleDeveloperModeChange);
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleDeveloperModeChange);
+      window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+    };
+  }, []);
 
   // Check encoding capability on mount
   useEffect(() => {
@@ -129,7 +148,7 @@ export function VideoCompatibilityModal({
           <Flex justify="between" align="start">
             <Flex direction="column" gap="1">
               <Dialog.Title style={{ margin: 0 }}>
-                {isConverting ? "Converting Video..." : "Video Compatibility Issue"}
+                {isConverting ? "Preparing video for analysis..." : "Video Compatibility Issue"}
               </Dialog.Title>
               {!isConverting && (
                 <Text size="2" color="gray">
@@ -165,7 +184,7 @@ export function VideoCompatibilityModal({
               <Text size="2" color="gray" align="center">
                 {conversionProgress?.message || "Initializing..."}
               </Text>
-              {conversionProgress?.currentFrame && conversionProgress?.totalFrames && (
+              {developerMode && conversionProgress?.currentFrame && conversionProgress?.totalFrames && (
                 <Text size="1" color="gray" align="center">
                   Frame {conversionProgress.currentFrame} of {conversionProgress.totalFrames}
                 </Text>
@@ -327,4 +346,5 @@ export function VideoCompatibilityModal({
     </Dialog.Root>
   );
 }
+
 
