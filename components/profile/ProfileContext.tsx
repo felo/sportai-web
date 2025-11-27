@@ -212,11 +212,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
+      // Cast sport to database type - the database CHECK constraint will validate
+      const dbSport = data.sport as "tennis" | "padel" | "pickleball";
+      
       const { data: newSport, error: addError } = await supabase
         .from("player_sports")
         .insert({
           profile_id: user.id,
-          sport: data.sport,
+          sport: dbSport,
           skill_level: data.skill_level,
           years_playing: data.years_playing,
           club_name: data.club_name,
@@ -273,7 +276,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      const { id, ...updateData } = data;
+      const { id, sport, ...restData } = data;
+      
+      // Prepare update data, casting sport to database type if present
+      const updateData = {
+        ...restData,
+        ...(sport !== undefined && { sport: sport as "tennis" | "padel" | "pickleball" }),
+      };
       
       const { data: updated, error: updateError } = await supabase
         .from("player_sports")
@@ -353,11 +362,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
+      // Cast sport to database type - the database CHECK constraint will validate
+      const dbSport = data.sport as "tennis" | "padel" | "pickleball";
+      
       const { data: newEquipment, error: addError } = await supabase
         .from("player_equipment")
         .insert({
           profile_id: user.id,
-          sport: data.sport,
+          sport: dbSport,
           equipment_type: data.equipment_type,
           brand: data.brand,
           model_name: data.model_name,
@@ -400,7 +412,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      const { id, ...updateData } = data;
+      const { id, sport, ...restData } = data;
+      
+      // Prepare update data, casting sport to database type if present
+      const updateData = {
+        ...restData,
+        ...(sport !== undefined && { sport: sport as "tennis" | "padel" | "pickleball" }),
+      };
       
       const { data: updated, error: updateError } = await supabase
         .from("player_equipment")
@@ -567,12 +585,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
+      // Cast sport to database type - the database CHECK constraint will validate
+      const dbSport = data.sport as "tennis" | "padel" | "pickleball";
+      
       const { data: coachSport, error: upsertError } = await supabase
         .from("coach_sports")
         .upsert(
           {
             coach_profile_id: user.id,
-            sport: data.sport,
+            sport: dbSport,
             certifications: data.certifications || [],
           },
           { onConflict: "coach_profile_id,sport" }
