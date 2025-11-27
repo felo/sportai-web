@@ -268,7 +268,7 @@ export function AIChatForm() {
         const userMessage: Message = {
           id: userMessageId,
           role: "user",
-          content: "🎯 **Image Insight** - Analyze this frame with pose detection overlay and joint angles.",
+          content: "Please analyse this moment in the video for me.",
           videoPreview: imageDataUrl, // Using videoPreview to display the captured frame
         };
         addMessage(userMessage);

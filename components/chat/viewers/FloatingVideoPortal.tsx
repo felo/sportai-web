@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
+import { EnterFullScreenIcon, ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { useSidebar } from "@/components/SidebarContext";
 import { getTheatreMode } from "@/utils/storage";
@@ -74,6 +74,8 @@ export function FloatingVideoPortal() {
     isDragging,
     dockedCorner,
     isMinimized,
+    poseEnabled,
+    setPoseEnabled,
     registeredVideos,
     setFloatingContainer,
     setPosition,
@@ -509,36 +511,64 @@ export function FloatingVideoPortal() {
                 transition: "background-color 0.2s ease, width 0.2s ease",
               }}
             />
+          </Box>
+          
+          {/* Mid-left control buttons */}
+          <Box
+            style={{
+              position: "absolute",
+              left: 6,
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              zIndex: 25,
+              opacity: showControls || isDragging ? 1 : 0,
+              transition: "opacity 0.2s ease",
+              pointerEvents: showControls ? "auto" : "none",
+            }}
+          >
+            {/* Expand/Collapse (Minimize) button - highest */}
+            <Tooltip content="Minimize" side="right">
+              <IconButton
+                size="1"
+                variant="solid"
+                style={{ 
+                  backgroundColor: "#7ADB8F",
+                  color: "#1C1C1C",
+                  border: "2px solid white",
+                  borderRadius: "var(--radius-3)",
+                  width: 28,
+                  height: 28,
+                }}
+                onClick={handleMinimizeToggle}
+              >
+                <ExitFullScreenIcon width={14} height={14} />
+              </IconButton>
+            </Tooltip>
             
-            {/* Minimize button - positioned absolutely on the right, styled like magic wand button */}
-            <Box
-              style={{
-                position: "absolute",
-                right: 4,
-                top: 4,
-                opacity: showControls || isDragging ? 1 : 0,
-                transition: "opacity 0.2s ease",
-                pointerEvents: showControls ? "auto" : "none",
-              }}
-            >
-              <Tooltip content="Minimize">
-                <IconButton
-                  size="1"
-                  variant="solid"
-                  style={{ 
-                    backgroundColor: "#7ADB8F",
-                    color: "#1C1C1C",
-                    border: "2px solid white",
-                    borderRadius: "var(--radius-3)",
-                    width: 24,
-                    height: 24,
-                  }}
-                  onClick={handleMinimizeToggle}
-                >
-                  <ExitFullScreenIcon width={12} height={12} />
-                </IconButton>
-              </Tooltip>
-            </Box>
+            {/* AI Overlay toggle - below */}
+            <Tooltip content={poseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"} side="right">
+              <IconButton
+                size="1"
+                variant="solid"
+                style={{ 
+                  backgroundColor: poseEnabled ? "#7ADB8F" : "rgba(60, 60, 60, 0.9)",
+                  color: poseEnabled ? "#1C1C1C" : "#7ADB8F",
+                  border: poseEnabled ? "2px solid white" : "2px solid #7ADB8F",
+                  borderRadius: "var(--radius-3)",
+                  width: 28,
+                  height: 28,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPoseEnabled(!poseEnabled);
+                }}
+              >
+                <MagicWandIcon width={14} height={14} />
+              </IconButton>
+            </Tooltip>
           </Box>
 
           {/* Container for the portaled VideoPoseViewer - fills entire space, drag zone overlays it */}

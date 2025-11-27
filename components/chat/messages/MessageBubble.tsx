@@ -135,6 +135,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   // Show video if we have a video URL, preview, file, or S3 key (for persisted videos)
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   
+  // Check if this is an image-only message (not a video) - used for bubble styling
+  const isImageOnly = !message.videoUrl && !message.videoFile && !message.videoS3Key && 
+                      message.videoPreview?.startsWith("data:image/");
+  
   // Check if any previous user messages (until we hit an assistant message) have a video
   const userSentVideo = (() => {
     if (message.role !== "assistant" || messageIndex === 0) return false;
@@ -370,22 +374,22 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
           style={{
             maxWidth: isMobile 
               ? "100%"
-              : theatreMode && hasVideo
+              : theatreMode && hasVideo && !isImageOnly
               ? "100%"
               : "80%",
-            width: (isMobile || (theatreMode && hasVideo)) && message.role === "user"
+            width: (isMobile || (theatreMode && hasVideo && !isImageOnly)) && message.role === "user"
               ? videoContainerStyle.width || "100%"
               : "auto",
-            margin: (isMobile || (theatreMode && hasVideo)) && message.role === "user" && hasVideo
+            margin: (isMobile || (theatreMode && hasVideo && !isImageOnly)) && message.role === "user" && hasVideo && !isImageOnly
               ? "0 auto"
               : "0",
-            borderRadius: message.role === "user" && !hasVideo
+            borderRadius: message.role === "user" && (!hasVideo || isImageOnly)
               ? "24px 8px 24px 24px" 
               : "var(--radius-3)",
-            padding: message.role === "user" && hasVideo ? "0" : "var(--space-3) var(--space-4)",
+            padding: message.role === "user" && hasVideo && !isImageOnly ? "0" : "var(--space-3) var(--space-4)",
             backgroundColor: "transparent",
             color: "var(--gray-12)",
-            border: message.role === "user" && !hasVideo ? "1px solid var(--mint-6)" : "none",
+            border: message.role === "user" && (!hasVideo || isImageOnly) ? "1px solid var(--mint-6)" : "none",
           }}
           role={message.role === "user" ? "user-message" : "assistant-message"}
         >

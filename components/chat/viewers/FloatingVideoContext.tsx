@@ -51,6 +51,9 @@ interface FloatingVideoContextValue {
 
 const FloatingVideoContext = createContext<FloatingVideoContextValue | null>(null);
 
+// Cooldown period after chat changes to prevent auto-floating
+const CHAT_CHANGE_COOLDOWN_MS = 500;
+
 interface FloatingVideoProviderProps {
   children: ReactNode;
   scrollContainerRef?: React.RefObject<HTMLElement>;
@@ -72,9 +75,15 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   // Track version to trigger re-renders only when needed
   const [registrationVersion, setRegistrationVersion] = useState(0);
   
+  // Track when chat changed to prevent auto-floating immediately after
+  const chatChangeCooldownRef = useRef<number>(0);
+  
   // Reset floating state when chat changes to prevent stale floating videos
   useEffect(() => {
     const handleChatChange = () => {
+      // Set cooldown to prevent auto-floating on new chat
+      chatChangeCooldownRef.current = Date.now();
+      
       // Reset all floating-related state when switching chats
       setActiveVideoId(null);
       setIsFloating(false);
@@ -141,6 +150,19 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   }, []);
 
   const setFloating = useCallback((floating: boolean) => {
+    // When trying to start floating, check if we're in cooldown period
+    // This prevents auto-floating immediately after switching chats
+    if (floating) {
+      const timeSinceChange = Date.now() - chatChangeCooldownRef.current;
+      if (timeSinceChange < CHAT_CHANGE_COOLDOWN_MS) {
+        console.log("[FloatingVideoContext] Ignoring float request during cooldown", {
+          timeSinceChange,
+          cooldown: CHAT_CHANGE_COOLDOWN_MS,
+        });
+        return;
+      }
+    }
+    
     setIsFloating(floating);
     // On mobile, auto-minimize when starting to float to respect the small screen
     if (floating && isMobile) {
