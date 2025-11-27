@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
 import { EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
+import { useSidebar } from "@/components/SidebarContext";
 import { getTheatreMode } from "@/utils/storage";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
 
@@ -80,6 +81,8 @@ export function FloatingVideoPortal() {
     setDockedCorner,
     setIsMinimized,
   } = useFloatingVideoContext();
+  
+  const { isCollapsed: isSidebarCollapsed } = useSidebar();
   
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
@@ -441,6 +444,9 @@ export function FloatingVideoPortal() {
   const width = getWidth();
   const height = getHeight();
 
+  // Hide floating video when sidebar is open
+  const isSidebarOpen = !isSidebarCollapsed;
+  
   const floatingContent = (
     <Box
       style={{
@@ -449,7 +455,7 @@ export function FloatingVideoPortal() {
         top: position.y,
         width,
         height,
-        zIndex: 9999,
+        zIndex: 50,
         borderRadius: isMinimized ? "50%" : "8px",
         overflow: "hidden",
         border: isMinimized ? "2px solid white" : "1px solid #7ADB8F",
@@ -463,6 +469,10 @@ export function FloatingVideoPortal() {
         transition: isDragging ? "none" : "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: isDragging ? "scale(1.02)" : "scale(1)",
         userSelect: "none",
+        // Hide when sidebar is open
+        opacity: isSidebarOpen ? 0 : 1,
+        pointerEvents: isSidebarOpen ? "none" : "auto",
+        visibility: isSidebarOpen ? "hidden" : "visible",
       }}
       onMouseDown={handleDragStart}
       onTouchStart={handleDragStart}

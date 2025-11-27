@@ -53,7 +53,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               position: "fixed",
               inset: 0,
               backgroundColor: "rgba(0, 0, 0, 0.5)",
-              zIndex: 30,
+              zIndex: 10000, // Above floating video (9999)
               transition: "opacity 0.2s ease-in-out",
             }}
           />
@@ -70,7 +70,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             backgroundColor: "var(--gray-2)",
             transform: isCollapsed ? "translateX(-100%)" : "translateX(0)",
             transition: "transform 0.3s ease-in-out",
-            zIndex: 40,
+            zIndex: 10001, // Above floating video (9999)
             display: "flex",
             flexDirection: "column",
             paddingTop: "calc(var(--space-4) + env(safe-area-inset-top))",
