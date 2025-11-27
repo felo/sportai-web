@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface VideoRegistration {
   id: string;
@@ -53,6 +54,7 @@ interface FloatingVideoProviderProps {
 }
 
 export function FloatingVideoProvider({ children, scrollContainerRef }: FloatingVideoProviderProps) {
+  const isMobile = useIsMobile();
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [isFloating, setIsFloating] = useState(false);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
@@ -120,7 +122,11 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
 
   const setFloating = useCallback((floating: boolean) => {
     setIsFloating(floating);
-  }, []);
+    // On mobile, auto-minimize when starting to float to respect the small screen
+    if (floating && isMobile) {
+      setIsMinimized(true);
+    }
+  }, [isMobile]);
 
   const scrollToVideo = useCallback(() => {
     if (activeVideoId) {

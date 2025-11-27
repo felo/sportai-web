@@ -266,7 +266,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     setVideoContainerStyle({
       position: "relative",
       width: "100%",
-      backgroundColor: "var(--gray-3)",
+      backgroundColor: "transparent",
       borderRadius: "var(--radius-3)",
       overflow: "hidden",
     });
@@ -385,7 +385,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
             padding: message.role === "user" && hasVideo ? "0" : "var(--space-3) var(--space-4)",
             backgroundColor: "transparent",
             color: "var(--gray-12)",
-            border: message.role === "user" ? "1px solid var(--mint-6)" : "none",
+            border: message.role === "user" && !hasVideo ? "1px solid var(--mint-6)" : "none",
           }}
           role={message.role === "user" ? "user-message" : "assistant-message"}
         >

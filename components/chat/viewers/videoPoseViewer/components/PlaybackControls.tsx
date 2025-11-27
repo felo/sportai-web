@@ -11,6 +11,7 @@ interface PlaybackControlsProps {
   onPlayPause: () => void;
   onReset: () => void;
   disabled?: boolean;
+  isPortraitVideo?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function PlaybackControls({
   onPlayPause,
   onReset,
   disabled = false,
+  isPortraitVideo = false,
 }: PlaybackControlsProps) {
   const isDisabled = disabled || isLoading || isPreprocessing;
 
@@ -40,16 +42,18 @@ export function PlaybackControls({
         </Button>
       </Tooltip>
 
-      <Tooltip content="Reset to start">
-        <Button
-          onClick={onReset}
-          disabled={isDisabled}
-          className={buttonStyles.actionButtonSquare}
-          size="2"
-        >
-          <ResetIcon width="16" height="16" />
-        </Button>
-      </Tooltip>
+      {!isPortraitVideo && (
+        <Tooltip content="Reset to start">
+          <Button
+            onClick={onReset}
+            disabled={isDisabled}
+            className={buttonStyles.actionButtonSquare}
+            size="2"
+          >
+            <ResetIcon width="16" height="16" />
+          </Button>
+        </Tooltip>
+      )}
     </Flex>
   );
 }

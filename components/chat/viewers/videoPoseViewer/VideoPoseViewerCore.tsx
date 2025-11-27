@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -1543,20 +1543,21 @@ export function VideoPoseViewer({
 
       {/* Video Container with Canvas Overlay - Pure CSS layout */}
       {/* In compact mode (floating), fill the container completely */}
+      {/* On mobile with portrait video, constrain width to avoid full-width stretch */}
       <Box
         ref={containerRef}
         style={{
           position: "relative",
-          width: "100%",
+          width: compactMode ? "100%" : "auto",
           height: compactMode ? "100%" : "auto",
           maxWidth: "100%",
-          maxHeight: videoMaxHeight,
-          backgroundColor: compactMode ? "transparent" : "var(--gray-2)",
+          maxHeight: compactMode ? "100%" : videoMaxHeight,
+          backgroundColor: "transparent",
           borderRadius: compactMode ? 0 : "var(--radius-3)",
           overflow: "hidden",
           margin: "0 auto",
           // Let the video drive the container's aspect ratio
-          display: "flex",
+          display: "inline-flex",
           justifyContent: "center",
           alignItems: "center",
         }}
@@ -1584,10 +1585,10 @@ export function VideoPoseViewer({
           controls
           style={{
             display: "block",
-            width: compactMode ? "100%" : (isPortraitVideo ? "auto" : "100%"),
-            height: compactMode ? "100%" : (isPortraitVideo ? "100%" : "auto"),
+            width: compactMode ? "100%" : "auto",
+            height: compactMode ? "100%" : "auto",
             maxWidth: "100%",
-            maxHeight: videoMaxHeight,
+            maxHeight: compactMode ? "100%" : videoMaxHeight,
             objectFit: "contain",
           }}
           playsInline
@@ -1872,6 +1873,7 @@ export function VideoPoseViewer({
                 isPreprocessing={isPreprocessing}
                 onPlayPause={handlePlayPause}
                 onReset={handleReset}
+                isPortraitVideo={isPortraitVideo}
               />
             {!isPreprocessing && !usePreprocessing && (
               <>
@@ -1920,7 +1922,7 @@ export function VideoPoseViewer({
                             opacity: measuredAngles.length > 0 ? 1 : 0.5
                           }}
                         >
-                          <Text size="1" weight="bold">Angles</Text>
+                          <RulerSquareIcon width="16" height="16" />
                         </Button>
                       </DropdownMenu.Trigger>
                     </Tooltip>
@@ -2041,7 +2043,7 @@ export function VideoPoseViewer({
                             opacity: measuredAngles.length > 0 ? 1 : 0.5
                           }}
                         >
-                          <Text size="1" weight="bold">Angles</Text>
+                          <RulerSquareIcon width="16" height="16" />
                         </Button>
                       </DropdownMenu.Trigger>
                     </Tooltip>

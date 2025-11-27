@@ -255,19 +255,16 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
             <Box
               ref={videoContainerRef}
               data-video-container="true"
-              style={
-                Object.keys(videoContainerStyle).length === 0
-                  ? {
-                      position: "relative",
-                      width: "100%",
-                      maxWidth: "100%",
-                      backgroundColor: "transparent",
-                      overflow: "hidden",
-                      borderRadius: "var(--radius-3)",
-                      margin: "0 auto",
-                    }
-                  : videoContainerStyle
-              }
+              style={{
+                position: "relative",
+                width: "fit-content",
+                maxWidth: "100%",
+                backgroundColor: "transparent",
+                overflow: "hidden",
+                borderRadius: "var(--radius-3)",
+                margin: "0 auto",
+                border: "1px solid var(--mint-6)",
+              }}
             >
               {/* Show placeholder when this video is floating */}
               {isThisVideoFloating && renderFloatingPlaceholder()}
