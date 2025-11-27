@@ -1,0 +1,22 @@
+{
+  "name": "sportai-video-converter",
+  "version": "1.0.0",
+  "description": "FFmpeg video conversion service for SportAI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.490.0",
+    "@aws-sdk/s3-request-presigner": "^3.490.0",
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
+

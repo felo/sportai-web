@@ -58,12 +58,33 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   const lastFloatChangeRef = useRef(0);
   const floatingContextRef = useRef(floatingContext);
   
+  // Track the scroll container element to re-setup observer when it changes
+  const [scrollContainerElement, setScrollContainerElement] = useState<HTMLElement | null>(null);
+  
   // Keep refs in sync with context
   useEffect(() => {
     isFloatingRef.current = floatingContext?.isFloating ?? false;
     activeVideoIdRef.current = floatingContext?.activeVideoId ?? null;
     floatingContextRef.current = floatingContext;
   }, [floatingContext?.isFloating, floatingContext?.activeVideoId, floatingContext]);
+  
+  // Track scroll container element changes - poll briefly to catch when ref is populated
+  useEffect(() => {
+    const checkScrollContainer = () => {
+      const element = floatingContext?.scrollContainerRef?.current ?? null;
+      if (element !== scrollContainerElement) {
+        setScrollContainerElement(element);
+      }
+    };
+    
+    // Check immediately
+    checkScrollContainer();
+    
+    // Also check after a short delay in case ref is populated after mount
+    const timeoutId = setTimeout(checkScrollContainer, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [floatingContext?.scrollContainerRef, scrollContainerElement]);
 
   // Register this video with the floating context (only once per videoSrc change)
   useEffect(() => {
@@ -84,10 +105,14 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, videoSrc, isImage]);
 
-  // IntersectionObserver to detect when video leaves viewport and should float
+  // IntersectionObserver to detect when video leaves scroll container and should float
   useEffect(() => {
     const ctx = floatingContextRef.current;
     if (!ctx || !videoContainerRef.current || !videoSrc || isImage) return;
+    
+    // Wait for scroll container to be available before setting up observer
+    // This ensures we use the correct root for intersection detection
+    if (!scrollContainerElement) return;
     
     const element = videoContainerRef.current;
     const DEBOUNCE_MS = 300; // Debounce rapid changes
@@ -118,14 +143,16 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           currentCtx.setFloating(false);
         }
       },
-      { threshold: [0, 0.3, 0.5, 1] }
+      { 
+        root: scrollContainerElement,
+        threshold: [0, 0.3, 0.5, 1] 
+      }
     );
 
     observer.observe(element);
     return () => observer.disconnect();
-    // Only set up observer once per video, use refs for state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message.id, videoSrc, isImage]);
+    // Re-setup observer when scroll container becomes available or changes
+  }, [message.id, videoSrc, isImage, scrollContainerElement]);
 
   // Video autoplay logic for non-pose-viewer mode
   useEffect(() => {

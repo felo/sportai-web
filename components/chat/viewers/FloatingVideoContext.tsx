@@ -32,6 +32,9 @@ interface FloatingVideoContextValue {
   floatingContainerRef: React.RefObject<HTMLDivElement>;
   setFloatingContainer: (element: HTMLDivElement | null) => void;
   
+  // Scroll container ref - for IntersectionObserver root
+  scrollContainerRef?: React.RefObject<HTMLElement>;
+  
   // Actions
   registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode, aspectRatio?: number) => void;
   updateVideoAspectRatio: (id: string, aspectRatio: number) => void;
@@ -68,6 +71,23 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   const registeredVideosRef = useRef<Map<string, VideoRegistration>>(new Map());
   // Track version to trigger re-renders only when needed
   const [registrationVersion, setRegistrationVersion] = useState(0);
+  
+  // Reset floating state when chat changes to prevent stale floating videos
+  useEffect(() => {
+    const handleChatChange = () => {
+      // Reset all floating-related state when switching chats
+      setActiveVideoId(null);
+      setIsFloating(false);
+      setIsMinimized(false);
+      setPoseEnabled(false);
+      // Clear registered videos - new chat will re-register them
+      registeredVideosRef.current.clear();
+      setRegistrationVersion(v => v + 1);
+    };
+    
+    window.addEventListener("chat-storage-change", handleChatChange);
+    return () => window.removeEventListener("chat-storage-change", handleChatChange);
+  }, []);
   
   // Ref to the floating container element for portal rendering
   const floatingContainerRef = useRef<HTMLDivElement>(null);
@@ -163,6 +183,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     registeredVideos: registeredVideosRef.current,
     floatingContainerRef: stableFloatingContainerRef,
     setFloatingContainer,
+    scrollContainerRef,
     registerVideo,
     updateVideoAspectRatio,
     unregisterVideo,
@@ -184,6 +205,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     poseEnabled,
     floatingContainerElement,
     setFloatingContainer,
+    scrollContainerRef,
     registerVideo,
     updateVideoAspectRatio,
     unregisterVideo,

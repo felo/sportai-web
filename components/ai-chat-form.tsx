@@ -86,6 +86,8 @@ export function AIChatForm() {
     // Transcoding state (for HEVC auto-conversion)
     isTranscoding,
     transcodeProgress,
+    // Server-side conversion flag (for Apple QuickTime on iOS)
+    needsServerConversion,
   } = useVideoUpload();
 
   const {
@@ -912,7 +914,8 @@ export function AIChatForm() {
           abortController,
           thinkingMode,
           mediaResolution,
-          domainExpertise
+          domainExpertise,
+          needsServerConversion
         );
       }
     } catch (err) {

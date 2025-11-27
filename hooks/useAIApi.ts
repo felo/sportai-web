@@ -200,7 +200,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       abortController?: AbortController,
       thinkingMode: ThinkingMode = "fast",
       mediaResolution: MediaResolution = "medium",
-      domainExpertise: DomainExpertise = "all-sports"
+      domainExpertise: DomainExpertise = "all-sports",
+      needsServerConversion: boolean = false
     ): Promise<void> => {
       const requestStartTime = Date.now();
       
@@ -396,7 +397,59 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
 
         setProgress(80);
         
-        // Step 2: Send S3 URL to Gemini API - backend will download it efficiently
+        // Step 2.5: Convert video on server if needed (for Apple QuickTime/MOV on iOS)
+        if (needsServerConversion) {
+          console.log("[Convert] Starting server-side video conversion...");
+          setStage("processing");
+          updateMessage(assistantMessageId, { 
+            content: "Converting video format for analysis...",
+            isStreaming: true 
+          });
+          
+          try {
+            const convertResponse = await fetch("/api/convert-video", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ key: s3Key }),
+              signal: abortController?.signal,
+            });
+            
+            if (!convertResponse.ok) {
+              const errorData = await convertResponse.json();
+              console.error("[Convert] ❌ Conversion failed:", errorData);
+              // Continue with original file - Gemini might still work
+              console.log("[Convert] Proceeding with original file...");
+            } else {
+              const convertResult = await convertResponse.json();
+              if (convertResult.success && convertResult.downloadUrl) {
+                console.log("[Convert] ✅ Video converted successfully!", {
+                  originalKey: s3Key,
+                  convertedKey: convertResult.convertedKey,
+                });
+                // Update S3 URL to use converted file
+                s3Url = convertResult.downloadUrl;
+                // Update the video message with converted URL
+                if (onVideoUploaded) {
+                  onVideoUploaded(s3Url, convertResult.convertedKey);
+                }
+              }
+            }
+          } catch (convertError) {
+            if ((convertError as Error).name === "AbortError") {
+              throw convertError; // Re-throw abort errors
+            }
+            console.error("[Convert] ❌ Conversion error:", convertError);
+            // Continue with original file
+            console.log("[Convert] Proceeding with original file...");
+          }
+          
+          // Clear the "converting" message
+          updateMessage(assistantMessageId, { content: "", isStreaming: true });
+        }
+        
+        // Step 3: Send S3 URL to Gemini API - backend will download it efficiently
         setStage("processing");
         console.log("[S3] Sending S3 URL to AI API (backend will download)...", {
           s3Url: s3Url,

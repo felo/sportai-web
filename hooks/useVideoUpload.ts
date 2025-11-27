@@ -18,12 +18,15 @@ export function useVideoUpload() {
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [transcodeProgress, setTranscodeProgress] = useState<TranscodeProgress | null>(null);
   
+  // Server-side conversion flag (for Apple QuickTime when client-side fails)
+  const [needsServerConversion, setNeedsServerConversion] = useState(false);
+  
   // Track the previous preview URL for cleanup
   const previousPreviewRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Internal function to actually set the video file
-  const setVideoInternal = useCallback((file: File) => {
+  const setVideoInternal = useCallback((file: File, serverConversionNeeded = false) => {
     // Clean up previous preview if exists
     if (previousPreviewRef.current) {
       revokeVideoPreview(previousPreviewRef.current);
@@ -33,6 +36,7 @@ export function useVideoUpload() {
     setError(null);
     setIsTranscoding(false);
     setTranscodeProgress(null);
+    setNeedsServerConversion(serverConversionNeeded);
     const previewUrl = createVideoPreview(file);
     setVideoPreview(previewUrl);
     previousPreviewRef.current = previewUrl;
@@ -51,7 +55,7 @@ export function useVideoUpload() {
     // Skip compatibility check for images
     if (isImageFile(file)) {
       console.log('[useVideoUpload] File is image, skipping compatibility check');
-      setVideoInternal(file);
+      setVideoInternal(file, false);
       return;
     }
 
@@ -87,57 +91,41 @@ export function useVideoUpload() {
           
           if (transcodeResult.success && transcodeResult.file) {
             console.log('[useVideoUpload] Transcoding complete, using converted file');
-            setVideoInternal(transcodeResult.file);
+            setVideoInternal(transcodeResult.file, false); // Already converted, no server conversion needed
           } else {
             console.error('[useVideoUpload] Transcoding failed:', transcodeResult.error);
-            // For Apple QuickTime H.264 that fails to transcode, allow fallback to original
-            // since the video CAN play, just might have issues with Gemini
-            if (result.isAppleQuickTime && !result.isHEVC) {
-              console.log('[useVideoUpload] Falling back to original Apple QuickTime file');
-              setIsTranscoding(false);
-              setTranscodeProgress(null);
-              setVideoInternal(file);
-            } else {
-              setError(`Video conversion failed: ${transcodeResult.error}`);
-              setIsTranscoding(false);
-              setTranscodeProgress(null);
-            }
+            // Client-side conversion failed - mark for server-side conversion
+            console.log('[useVideoUpload] Client-side conversion failed, marking for server-side conversion');
+            setIsTranscoding(false);
+            setTranscodeProgress(null);
+            setVideoInternal(file, true); // Mark for server-side conversion
           }
         } catch (transcodeErr) {
           if ((transcodeErr as Error).message === 'Transcoding cancelled') {
             console.log('[useVideoUpload] Transcoding was cancelled');
           } else {
             console.error('[useVideoUpload] Transcoding error:', transcodeErr);
-            // For Apple QuickTime H.264 that fails to transcode, allow fallback
-            if (result.isAppleQuickTime && !result.isHEVC) {
-              console.log('[useVideoUpload] Falling back to original Apple QuickTime file');
-              setVideoInternal(file);
-            } else {
-              setError('Video conversion failed. Try using a compatible video format (H.264/MP4).');
-            }
+            // Client-side conversion failed - mark for server-side conversion
+            console.log('[useVideoUpload] Client-side conversion failed, marking for server-side conversion');
+            setVideoInternal(file, true); // Mark for server-side conversion
           }
           setIsTranscoding(false);
           setTranscodeProgress(null);
         }
       } else if (needsTranscode && !isWebCodecsSupported()) {
-        // Transcoding needed but can't transcode
-        if (result.isHEVC) {
-          console.log('[useVideoUpload] HEVC detected but WebCodecs not supported');
-          setError('This video uses HEVC format which is not supported. Please use Chrome/Edge to convert, or use a desktop app like HandBrake.');
-        } else {
-          // Apple QuickTime without transcoding support - allow through with warning
-          console.log('[useVideoUpload] Apple QuickTime detected but cannot transcode - proceeding anyway');
-          setVideoInternal(file);
-        }
+        // Transcoding needed but can't transcode client-side - use server-side conversion
+        const reason = result.isHEVC ? 'HEVC' : 'Apple QuickTime';
+        console.log(`[useVideoUpload] ${reason} detected, WebCodecs not supported, marking for server-side conversion`);
+        setVideoInternal(file, true); // Mark for server-side conversion
       } else {
         // Standard MP4/video - proceed normally
         console.log('[useVideoUpload] Proceeding with file');
-        setVideoInternal(file);
+        setVideoInternal(file, false);
       }
     } catch (err) {
       // If compatibility check fails, proceed anyway
       console.warn("[useVideoUpload] Compatibility check failed, proceeding with file:", err);
-      setVideoInternal(file);
+      setVideoInternal(file, false);
     }
   }, [setVideoInternal]);
 
@@ -157,6 +145,7 @@ export function useVideoUpload() {
     setVideoPreview(null);
     setIsTranscoding(false);
     setTranscodeProgress(null);
+    setNeedsServerConversion(false);
   }, []);
 
   const handleVideoChange = useCallback(
@@ -193,6 +182,8 @@ export function useVideoUpload() {
     isTranscoding,
     transcodeProgress,
     cancelTranscoding,
+    // Server-side conversion flag (for Apple QuickTime when client-side fails)
+    needsServerConversion,
   };
 }
 
