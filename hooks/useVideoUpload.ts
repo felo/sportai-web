@@ -50,19 +50,28 @@ export function useVideoUpload() {
       return;
     }
 
-    // Check video codec compatibility
+    // Check if this is an Apple/iPhone video that needs conversion
+    // Convert ALL .mov files and video/quicktime MIME types since they often cause
+    // compatibility issues with Gemini API, regardless of codec detection
+    const isMOVFile = file.name.toLowerCase().endsWith('.mov');
+    const isQuickTime = file.type === 'video/quicktime';
+    
+    if (isMOVFile || isQuickTime) {
+      console.log('[useVideoUpload] MOV/QuickTime file detected, marking for server-side conversion');
+      setVideoInternal(file, true);
+      return;
+    }
+    
+    // Check video codec compatibility for other formats (MP4, etc.)
     try {
       console.log('[useVideoUpload] Starting codec compatibility check...');
       const result = await checkVideoCodecCompatibility(file);
       console.log('[useVideoUpload] Compatibility check result:', result);
       
-      // HEVC or Apple QuickTime MOV files need server-side conversion for Gemini API compatibility
-      const needsConversion = result.isHEVC || result.isAppleQuickTime;
-      
-      if (needsConversion) {
-        const reason = result.isHEVC ? 'HEVC' : 'Apple QuickTime MOV';
-        console.log(`[useVideoUpload] ${reason} detected, marking for server-side conversion`);
-        setVideoInternal(file, true); // Mark for server-side conversion
+      // HEVC videos need server-side conversion for Gemini API compatibility
+      if (result.isHEVC) {
+        console.log('[useVideoUpload] HEVC detected, marking for server-side conversion');
+        setVideoInternal(file, true);
       } else {
         // Standard MP4/video - proceed normally
         console.log('[useVideoUpload] Proceeding with file');
