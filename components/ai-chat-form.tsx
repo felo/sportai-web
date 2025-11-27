@@ -314,20 +314,8 @@ export function AIChatForm() {
   }, [videoFile, isDetectingSport, domainExpertise]);
 
   const error = videoError || apiError;
-  const hasScrolledToBottomRef = useRef(false);
 
-  // Scroll to bottom on initial load when messages are loaded from localStorage
-  useEffect(() => {
-    if (isHydrated && messages.length > 0 && !hasScrolledToBottomRef.current) {
-      // Small delay to ensure DOM is ready and messages are rendered
-      const timeoutId = setTimeout(() => {
-        scrollToBottom();
-        hasScrolledToBottomRef.current = true;
-      }, 150);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isHydrated, messages.length, scrollToBottom]);
+  // Note: Removed auto-scroll to bottom on initial load to preserve scroll position on refresh
 
   // Only auto-scroll if shouldAutoScroll is true (disabled during response generation)
   // Also don't auto-scroll if the last message is a video size limit error
@@ -1053,7 +1041,12 @@ export function AIChatForm() {
   return (
     <AudioPlayerProvider>
       <FloatingVideoProvider scrollContainerRef={scrollContainerRef}>
-      <div className="h-screen flex flex-col overflow-hidden">
+      {/* Loading spinner during hydration */}
+      <div className={`hydration-spinner ${isHydrated ? 'hidden' : ''}`}>
+        <div className="spinner" />
+      </div>
+      
+      <div className={`h-screen flex flex-col overflow-hidden hydration-guard ${isHydrated ? 'hydrated' : ''}`}>
         {/* Header - visible on both mobile and desktop */}
         <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
 
@@ -1066,21 +1059,7 @@ export function AIChatForm() {
 
       {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
-        style={{
-          marginLeft: isMobile ? "0" : (isSidebarCollapsed ? "64px" : "280px"),
-          marginRight: isMobile ? "0" : "0",
-          transition: "margin-left 0.2s ease-in-out",
-          width: isMobile ? "100%" : `calc(100% - ${isSidebarCollapsed ? "64px" : "280px"})`,
-          height: isMobile ? "100dvh" : "calc(100vh - 57px)", // Use dynamic viewport height on mobile
-          marginTop: isMobile ? "0" : "57px", // Start at top on mobile
-          display: "flex",
-          justifyContent: "center",
-          overflow: "hidden",
-          position: isMobile ? "fixed" : "relative", // Fix position on mobile to prevent scroll
-          top: isMobile ? "0" : "auto",
-          left: isMobile ? "0" : "auto",
-          right: isMobile ? "0" : "auto",
-        }}
+        className={`content-wrapper ${!isSidebarCollapsed ? 'sidebar-expanded' : ''}`}
       >
         {/* Scrollable content area - centered and responsive */}
         <div

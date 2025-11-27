@@ -16,21 +16,32 @@ interface UserMessageProps {
   theatreMode: boolean;
   isMobile: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  onUpdateMessage?: (id: string, updates: Partial<Message>) => void;
 }
 
 /**
  * User message component with video and text rendering
  * Supports floating video mode for picture-in-picture style viewing
  */
-export function UserMessage({ message, videoContainerStyle, theatreMode, isMobile, scrollContainerRef }: UserMessageProps) {
+export function UserMessage({ message, videoContainerStyle, theatreMode, isMobile, scrollContainerRef, onUpdateMessage }: UserMessageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoSrc = message.videoUrl || (message.videoPreview && !message.videoUrl ? message.videoPreview : null);
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   const showPoseViewer = true; // Always show viewer so users can toggle AI overlay on/off
   
-  // Track video aspect ratio (width / height)
-  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(DEFAULT_ASPECT_RATIO);
+  // Track video aspect ratio (width / height) - use stored dimensions if available
+  const storedAspectRatio = message.videoDimensions 
+    ? message.videoDimensions.width / message.videoDimensions.height 
+    : DEFAULT_ASPECT_RATIO;
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(storedAspectRatio);
+  
+  // Track if video is ready to show (actual video has loaded, not just cached dimensions)
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  
+  // Get stored dimensions for passing to VideoPoseViewer (prevents layout shift)
+  const initialWidth = message.videoDimensions?.width;
+  const initialHeight = message.videoDimensions?.height;
   
   // Check if this is an image (not a video)
   const isImage = message.videoFile?.type.startsWith("image/") || 
@@ -39,15 +50,23 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   // Floating video context (optional - won't error if not in provider)
   const floatingContext = useFloatingVideoContextOptional();
   
-  // Callback to handle video metadata loaded - get actual aspect ratio
+  // Callback to handle video metadata loaded - get actual aspect ratio and cache dimensions
   const handleVideoMetadataLoaded = useCallback((videoWidth: number, videoHeight: number) => {
     if (videoWidth && videoHeight) {
       const aspectRatio = videoWidth / videoHeight;
       setVideoAspectRatio(aspectRatio);
+      setIsVideoReady(true);
       // Update the context with the actual aspect ratio
       floatingContext?.updateVideoAspectRatio(message.id, aspectRatio);
+      
+      // Cache dimensions in message if not already stored (prevents future layout shifts)
+      if (!message.videoDimensions && onUpdateMessage) {
+        onUpdateMessage(message.id, { 
+          videoDimensions: { width: videoWidth, height: videoHeight } 
+        });
+      }
     }
-  }, [floatingContext, message.id]);
+  }, [floatingContext, message.id, message.videoDimensions, onUpdateMessage]);
   
   // Track if this video should be floating
   const isThisVideoFloating = floatingContext?.activeVideoId === message.id && floatingContext?.isFloating;
@@ -139,8 +158,30 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           currentCtx.setFloating(true);
         } else if (!shouldFloat && activeVideoIdRef.current === message.id && isFloatingRef.current) {
           // Stop floating when video is back in view
+          // Preserve scroll position to prevent jump on mobile when transitioning from floating to docked
+          const scrollContainer = scrollContainerElement;
+          const scrollTop = scrollContainer.scrollTop;
+          const elementTop = element.getBoundingClientRect().top;
+          const containerTop = scrollContainer.getBoundingClientRect().top;
+          const relativeTop = elementTop - containerTop + scrollTop;
+          
           lastFloatChangeRef.current = now;
           currentCtx.setFloating(false);
+          
+          // After state update, restore scroll position to keep the video at the same visual position
+          // Use requestAnimationFrame to ensure DOM has updated
+          requestAnimationFrame(() => {
+            // Re-measure element position after render
+            const newElementTop = element.getBoundingClientRect().top;
+            const newContainerTop = scrollContainer.getBoundingClientRect().top;
+            const newRelativeTop = newElementTop - newContainerTop + scrollContainer.scrollTop;
+            
+            // If the element moved, adjust scroll to compensate
+            const delta = newRelativeTop - relativeTop;
+            if (Math.abs(delta) > 1) {
+              scrollContainer.scrollTop = scrollTop + delta;
+            }
+          });
         }
       },
       { 
@@ -202,43 +243,6 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     }
   }, [hasVideo, isImage, message.videoFile, message.videoUrl, message.videoPlaybackSpeed]);
 
-  // Render floating placeholder - uses actual video aspect ratio
-  const renderFloatingPlaceholder = () => (
-    <Box
-      style={{
-        position: "relative",
-        width: "100%",
-        aspectRatio: String(videoAspectRatio),
-        maxHeight: videoAspectRatio < 1 ? "min(450px, 50vh)" : undefined, // Limit height for portrait videos
-        backgroundColor: "var(--gray-3)",
-        borderRadius: "var(--radius-3)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--space-3)",
-        border: "2px dashed var(--gray-6)",
-      }}
-    >
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: "var(--gray-9)" }}>
-        <rect x="2" y="4" width="12" height="8" rx="1" />
-        <rect x="10" y="12" width="12" height="8" rx="1" />
-        <path d="M14 8h4v4" />
-      </svg>
-      <Text size="2" color="gray" align="center">
-        Video is floating
-      </Text>
-      <Button
-        size="1"
-        variant="soft"
-        onClick={() => {
-          floatingContext?.closeFloating();
-        }}
-      >
-        Return to video
-      </Button>
-    </Box>
-  );
 
   return (
     <Box>
@@ -279,24 +283,51 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
               // Portrait videos get constrained width - no full-width container
               const isPortraitVideo = videoAspectRatio < 1;
               return (
-            <Box
-              ref={videoContainerRef}
-              data-video-container="true"
-              style={{
-                position: "relative",
-                width: "fit-content",
-                maxWidth: "100%",
-                backgroundColor: "transparent",
-                overflow: "hidden",
-                borderRadius: "var(--radius-3)",
-                margin: "0 auto",
-                border: "1px solid var(--mint-6)",
-              }}
-            >
-              {/* Show placeholder when this video is floating */}
-              {isThisVideoFloating && renderFloatingPlaceholder()}
-              
-              {/* Render VideoPoseViewer - portal to floating container when floating */}
+            <>
+              {/* Show spinner while video loads */}
+              {!isVideoReady && (
+                <Box
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "var(--space-6)",
+                  }}
+                >
+                  <div 
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      border: "3px solid rgba(122, 219, 143, 0.2)",
+                      borderTopColor: "#7ADB8F",
+                      borderRadius: "50%",
+                      animation: "spin 0.8s linear infinite",
+                    }}
+                  />
+                </Box>
+              )}
+              {/* Video container - hidden until video is ready to prevent layout flash */}
+              <Box
+                ref={videoContainerRef}
+                data-video-container="true"
+                style={{
+                  position: isVideoReady ? "relative" : "absolute",
+                  width: "fit-content",
+                  maxWidth: "100%",
+                  backgroundColor: "transparent",
+                  overflow: "hidden",
+                  borderRadius: "var(--radius-3)",
+                  margin: "0 auto",
+                  border: "1px solid var(--mint-6)",
+                  // Hide until video is ready (position absolute keeps it out of flow)
+                  opacity: isVideoReady ? 1 : 0,
+                  pointerEvents: isVideoReady ? "auto" : "none",
+                  // Move off-screen when hidden so it doesn't interfere
+                  left: isVideoReady ? undefined : "-9999px",
+                }}
+              >
+              {/* Render VideoPoseViewer - ALWAYS render in place to maintain DOM size */}
+              {/* When floating, portal a copy to the floating container AND overlay placeholder */}
               {showPoseViewer ? (
                 (() => {
                   const floatingContainer = floatingContext?.floatingContainerRef?.current;
@@ -308,6 +339,9 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   const videoPoseViewer = (
                     <VideoPoseViewer
                       videoUrl={videoSrc}
+                      // Pass cached dimensions to prevent layout shift on reload
+                      width={initialWidth}
+                      height={initialHeight}
                       autoPlay
                       initialModel={message.poseData?.model ?? "MoveNet"}
                       initialShowSkeleton={message.poseData?.showSkeleton ?? true}
@@ -335,11 +369,61 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                     />
                   );
                   
-                  if (shouldPortal) {
-                    return createPortal(videoPoseViewer, floatingContainer);
-                  }
-                  
-                  return videoPoseViewer;
+                  return (
+                    <>
+                      {/* Always render video in place - this maintains the container size */}
+                      {/* Hide it visually when floating but keep in DOM for stable layout */}
+                      <Box style={{ 
+                        visibility: isThisVideoFloating ? "hidden" : "visible",
+                        // Keep the element in the layout flow even when hidden
+                      }}>
+                        {videoPoseViewer}
+                      </Box>
+                      
+                      {/* Overlay placeholder when floating - absolutely positioned on top */}
+                      {isThisVideoFloating && (
+                        <Box
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: "var(--gray-3)",
+                            borderRadius: "var(--radius-3)",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "var(--space-3)",
+                            border: "2px dashed var(--gray-6)",
+                            zIndex: 10,
+                          }}
+                        >
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: "var(--gray-9)" }}>
+                            <rect x="2" y="4" width="12" height="8" rx="1" />
+                            <rect x="10" y="12" width="12" height="8" rx="1" />
+                            <path d="M14 8h4v4" />
+                          </svg>
+                          <Text size="2" color="gray" align="center">
+                            Video is floating
+                          </Text>
+                          <Button
+                            size="1"
+                            variant="soft"
+                            onClick={() => {
+                              floatingContext?.closeFloating();
+                            }}
+                          >
+                            Return to video
+                          </Button>
+                        </Box>
+                      )}
+                      
+                      {/* Portal to floating container when floating */}
+                      {shouldPortal && createPortal(videoPoseViewer, floatingContainer)}
+                    </>
+                  );
                 })()
               ) : (
                 <video
@@ -379,7 +463,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                   }}
                 />
               )}
-            </Box>
+              </Box>
+            </>
               );
             })()
           ) : (

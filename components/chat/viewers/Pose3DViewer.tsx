@@ -2,7 +2,7 @@
 
 import { lazy, Suspense } from "react";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Box } from "@radix-ui/themes";
 
 // Dynamic import of the Three.js-heavy component
 const Pose3DViewerCore = lazy(() => 
@@ -18,40 +18,35 @@ interface Pose3DViewerProps {
   showFace?: boolean;
 }
 
-// Loading placeholder that matches the viewer dimensions
-function Pose3DViewerLoading({ width, height }: { width: number; height: number }) {
+// Minimal loading placeholder - just a frame with spinner
+function Pose3DViewerLoading({ width, height }: { width?: number; height?: number }) {
+  const hasDimensions = width !== undefined && height !== undefined;
+  
   return (
     <Box 
       style={{ 
-        width: `${width}px`, 
-        height: `${height}px`,
-        backgroundColor: "#1a1a1a",
+        width: hasDimensions ? `${width}px` : "100%",
+        height: hasDimensions ? `${height}px` : undefined,
+        aspectRatio: hasDimensions ? undefined : "1 / 1",
+        maxWidth: hasDimensions ? undefined : "400px",
+        backgroundColor: "transparent",
         borderRadius: "var(--radius-3)",
+        border: "1px solid var(--gray-5)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Flex direction="column" align="center" gap="2">
-        <div className="animate-pulse">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" opacity="0.3" />
-            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
-              <animateTransform
-                attributeName="transform"
-                type="rotate"
-                from="0 12 12"
-                to="360 12 12"
-                dur="1s"
-                repeatCount="indefinite"
-              />
-            </path>
-          </svg>
-        </div>
-        <Text size="2" color="gray" style={{ color: "#888" }}>
-          Loading 3D viewer...
-        </Text>
-      </Flex>
+      <div 
+        style={{
+          width: "32px",
+          height: "32px",
+          border: "3px solid rgba(122, 219, 143, 0.2)",
+          borderTopColor: "#7ADB8F",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }}
+      />
     </Box>
   );
 }

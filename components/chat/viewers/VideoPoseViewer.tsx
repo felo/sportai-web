@@ -2,7 +2,7 @@
 
 import { lazy, Suspense } from "react";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Box } from "@radix-ui/themes";
 
 // Dynamic import of the TensorFlow-heavy component
 const VideoPoseViewerCore = lazy(() => 
@@ -42,45 +42,31 @@ interface VideoPoseViewerProps {
   compactMode?: boolean;
 }
 
-// Loading placeholder that matches video dimensions
-function VideoPoseViewerLoading({ width = 640, height = 480 }: { width?: number; height?: number }) {
+// Minimal loading placeholder - matches video dimensions exactly
+function VideoPoseViewerLoading({ width, height }: { width?: number; height?: number }) {
   return (
     <Box 
       style={{ 
-        width: `${width}px`, 
-        height: `${height}px`,
-        backgroundColor: "var(--gray-3)",
+        width: width ? `${width}px` : "100%",
+        height: height ? `${height}px` : undefined,
+        aspectRatio: (width && height) ? undefined : "16 / 9",
+        backgroundColor: "var(--gray-2)",
         borderRadius: "var(--radius-3)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Flex direction="column" align="center" gap="3">
-        <div className="animate-pulse">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" opacity="0.3" />
-            <circle cx="12" cy="10" r="2" />
-            <path d="M12 12v2" />
-            <path d="M10 16l2-2 2 2" />
-            <animateTransform
-              attributeName="transform"
-              type="scale"
-              values="1;1.1;1"
-              dur="1.5s"
-              repeatCount="indefinite"
-            />
-          </svg>
-        </div>
-        <Flex direction="column" align="center" gap="1">
-          <Text size="3" weight="medium">
-            Loading Pose Detection
-          </Text>
-          <Text size="2" color="gray">
-            Analysing video...
-          </Text>
-        </Flex>
-      </Flex>
+      <div 
+        style={{
+          width: "32px",
+          height: "32px",
+          border: "3px solid rgba(122, 219, 143, 0.2)",
+          borderTopColor: "#7ADB8F",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }}
+      />
     </Box>
   );
 }

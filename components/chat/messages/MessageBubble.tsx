@@ -396,6 +396,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
               theatreMode={theatreMode}
               isMobile={isMobile}
               scrollContainerRef={scrollContainerRef}
+              onUpdateMessage={onUpdateMessage}
             />
           )}
 
