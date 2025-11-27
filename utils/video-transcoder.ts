@@ -180,11 +180,21 @@ export async function transcodeToH264(
     video.playsInline = true;
     
     const videoUrl = URL.createObjectURL(file);
-    video.src = videoUrl;
     
+    // IMPORTANT: Set up event handlers BEFORE setting src to avoid race condition
+    // On mobile devices, videos can load very quickly and the event may fire
+    // before handlers are attached, causing the promise to hang
     await new Promise<void>((resolve, reject) => {
       video.onloadeddata = () => resolve();
       video.onerror = () => reject(new Error('Failed to load video'));
+      
+      // Set src after handlers are attached
+      video.src = videoUrl;
+      
+      // Handle case where video is already loaded (e.g., cached)
+      if (video.readyState >= 2) {  // HAVE_CURRENT_DATA or higher
+        resolve();
+      }
     });
     
     // Create canvas for frame extraction
