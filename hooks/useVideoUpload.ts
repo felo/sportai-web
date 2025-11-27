@@ -61,9 +61,13 @@ export function useVideoUpload() {
       const result = await checkVideoCodecCompatibility(file);
       console.log('[useVideoUpload] Compatibility check result:', result);
       
-      // If HEVC detected and we can transcode, start automatic conversion
-      if (result.isHEVC && isWebCodecsSupported()) {
-        console.log('[useVideoUpload] HEVC detected, starting automatic conversion...');
+      // Transcode HEVC videos (can't play at all) AND Apple QuickTime MOV files (for Gemini API compatibility)
+      const needsTranscode = result.isHEVC || result.isAppleQuickTime;
+      
+      // If transcoding needed and we can transcode, start automatic conversion
+      if (needsTranscode && isWebCodecsSupported()) {
+        const reason = result.isHEVC ? 'HEVC' : 'Apple QuickTime MOV';
+        console.log(`[useVideoUpload] ${reason} detected, starting automatic conversion...`);
         setIsTranscoding(true);
         setTranscodeProgress({ stage: 'initializing', percent: 0, message: 'Preparing to convert video...' });
         
@@ -86,27 +90,48 @@ export function useVideoUpload() {
             setVideoInternal(transcodeResult.file);
           } else {
             console.error('[useVideoUpload] Transcoding failed:', transcodeResult.error);
-            setError(`Video conversion failed: ${transcodeResult.error}. Try using a compatible video format.`);
-            setIsTranscoding(false);
-            setTranscodeProgress(null);
+            // For Apple QuickTime H.264 that fails to transcode, allow fallback to original
+            // since the video CAN play, just might have issues with Gemini
+            if (result.isAppleQuickTime && !result.isHEVC) {
+              console.log('[useVideoUpload] Falling back to original Apple QuickTime file');
+              setIsTranscoding(false);
+              setTranscodeProgress(null);
+              setVideoInternal(file);
+            } else {
+              setError(`Video conversion failed: ${transcodeResult.error}`);
+              setIsTranscoding(false);
+              setTranscodeProgress(null);
+            }
           }
         } catch (transcodeErr) {
           if ((transcodeErr as Error).message === 'Transcoding cancelled') {
             console.log('[useVideoUpload] Transcoding was cancelled');
           } else {
             console.error('[useVideoUpload] Transcoding error:', transcodeErr);
-            setError('Video conversion failed. Try using a compatible video format (H.264/MP4).');
+            // For Apple QuickTime H.264 that fails to transcode, allow fallback
+            if (result.isAppleQuickTime && !result.isHEVC) {
+              console.log('[useVideoUpload] Falling back to original Apple QuickTime file');
+              setVideoInternal(file);
+            } else {
+              setError('Video conversion failed. Try using a compatible video format (H.264/MP4).');
+            }
           }
           setIsTranscoding(false);
           setTranscodeProgress(null);
         }
-      } else if (result.isHEVC && !isWebCodecsSupported()) {
-        // HEVC detected but can't transcode
-        console.log('[useVideoUpload] HEVC detected but WebCodecs not supported');
-        setError('This video uses HEVC format which is not supported in your browser. Please use Chrome, Edge, or Safari, or convert the video to H.264/MP4.');
+      } else if (needsTranscode && !isWebCodecsSupported()) {
+        // Transcoding needed but can't transcode
+        if (result.isHEVC) {
+          console.log('[useVideoUpload] HEVC detected but WebCodecs not supported');
+          setError('This video uses HEVC format which is not supported. Please use Chrome/Edge to convert, or use a desktop app like HandBrake.');
+        } else {
+          // Apple QuickTime without transcoding support - allow through with warning
+          console.log('[useVideoUpload] Apple QuickTime detected but cannot transcode - proceeding anyway');
+          setVideoInternal(file);
+        }
       } else {
-        // No issues, proceed normally
-        console.log('[useVideoUpload] No issues, proceeding with file');
+        // Standard MP4/video - proceed normally
+        console.log('[useVideoUpload] Proceeding with file');
         setVideoInternal(file);
       }
     } catch (err) {

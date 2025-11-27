@@ -71,6 +71,7 @@ export interface VideoCompatibilityResult {
   codec?: string;
   isHEVC: boolean;
   isHDR: boolean;
+  isAppleQuickTime: boolean; // Apple-specific QuickTime format that may need conversion
   hasRotation: boolean;
   rotationDegrees?: number;
   width?: number;
@@ -80,7 +81,7 @@ export interface VideoCompatibilityResult {
 }
 
 export interface VideoCompatibilityIssue {
-  type: 'hevc' | 'hdr' | 'dolby_vision' | 'rotation' | 'unsupported_codec';
+  type: 'hevc' | 'hdr' | 'dolby_vision' | 'rotation' | 'unsupported_codec' | 'apple_quicktime';
   description: string;
   severity: 'error' | 'warning';
 }
@@ -117,7 +118,7 @@ function findFourCC(bytes: Uint8Array, fourcc: string): boolean {
 }
 
 /**
- * Parse MP4/MOV file to detect HEVC codec from the file
+ * Parse MP4/MOV file to detect codec information from the file
  * Reads from BOTH start and end of file since MOV files can have 
  * the "moov" atom at the end (common with iPhone recordings)
  */
@@ -125,17 +126,24 @@ async function detectCodecFromFile(file: File): Promise<{
   isHEVC: boolean;
   isHDR: boolean;
   hasDolbyVision: boolean;
+  isAppleQuickTime: boolean;
 }> {
   console.log('[VideoCodec] detectCodecFromFile called for:', file.name, 'size:', file.size);
+  
+  // Check file extension and MIME type for MOV
+  const isMOVExtension = file.name.toLowerCase().endsWith('.mov');
+  const isMOVMimeType = file.type === 'video/quicktime';
   
   const scanBytes = async (bytes: Uint8Array, label: string): Promise<{
     isHEVC: boolean;
     isHDR: boolean;
     hasDolbyVision: boolean;
+    isAppleQuickTime: boolean;
   }> => {
     let isHEVC = false;
     let isHDR = false;
     let hasDolbyVision = false;
+    let isAppleQuickTime = false;
     
     console.log(`[VideoCodec] Scanning ${label}: ${bytes.length} bytes`);
     
@@ -166,7 +174,34 @@ async function detectCodecFromFile(file: File): Promise<{
       console.log('[VideoCodec] ✓ Found HDR indicator in', label);
     }
     
-    return { isHEVC, isHDR, hasDolbyVision };
+    // Apple QuickTime indicators
+    // "qt  " is Apple QuickTime brand (with two trailing spaces)
+    if (findFourCC(bytes, 'qt  ')) {
+      isAppleQuickTime = true;
+      console.log('[VideoCodec] ✓ Found QuickTime brand (qt  ) in', label);
+    }
+    
+    // Apple Positional Audio Codec (spatial audio) - not browser compatible
+    if (findFourCC(bytes, 'apac')) {
+      isAppleQuickTime = true;
+      console.log('[VideoCodec] ✓ Found Apple Positional Audio (apac) in', label);
+    }
+    
+    // Apple metadata boxes (mebx) - indicates Apple-specific format
+    if (findFourCC(bytes, 'mebx')) {
+      isAppleQuickTime = true;
+      console.log('[VideoCodec] ✓ Found Apple metadata box (mebx) in', label);
+    }
+    
+    // Apple ProRes codecs
+    if (findFourCC(bytes, 'apch') || findFourCC(bytes, 'apcn') || 
+        findFourCC(bytes, 'apcs') || findFourCC(bytes, 'apco') || 
+        findFourCC(bytes, 'ap4h') || findFourCC(bytes, 'ap4x')) {
+      isAppleQuickTime = true;
+      console.log('[VideoCodec] ✓ Found Apple ProRes codec in', label);
+    }
+    
+    return { isHEVC, isHDR, hasDolbyVision, isAppleQuickTime };
   };
   
   const readSlice = (start: number, end: number): Promise<Uint8Array> => {
@@ -183,9 +218,12 @@ async function detectCodecFromFile(file: File): Promise<{
     const startBytes = await readSlice(0, 200000);
     const startResult = await scanBytes(startBytes, 'file start');
     
+    // Track if we found Apple QuickTime markers
+    let isAppleQuickTime = startResult.isAppleQuickTime || isMOVExtension || isMOVMimeType;
+    
     if (startResult.isHEVC) {
       console.log('[VideoCodec] HEVC detected in file start');
-      return startResult;
+      return { ...startResult, isAppleQuickTime };
     }
     
     // If not found at start, read last 500KB (moov atom often at end for iPhone)
@@ -193,18 +231,21 @@ async function detectCodecFromFile(file: File): Promise<{
       const endBytes = await readSlice(file.size - 500000, file.size);
       const endResult = await scanBytes(endBytes, 'file end');
       
+      // Combine Apple QuickTime detection from both scans
+      isAppleQuickTime = isAppleQuickTime || endResult.isAppleQuickTime;
+      
       if (endResult.isHEVC) {
         console.log('[VideoCodec] HEVC detected in file end');
-        return endResult;
+        return { ...endResult, isAppleQuickTime };
       }
     }
     
-    console.log('[VideoCodec] No HEVC detected in file');
-    return { isHEVC: false, isHDR: false, hasDolbyVision: false };
+    console.log('[VideoCodec] No HEVC detected in file, isAppleQuickTime:', isAppleQuickTime);
+    return { isHEVC: false, isHDR: false, hasDolbyVision: false, isAppleQuickTime };
     
   } catch (err) {
     console.error('[VideoCodec] Error reading file:', err);
-    return { isHEVC: false, isHDR: false, hasDolbyVision: false };
+    return { isHEVC: false, isHDR: false, hasDolbyVision: false, isAppleQuickTime: isMOVExtension || isMOVMimeType };
   }
 }
 
@@ -225,6 +266,7 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
       issues: [],
       isHEVC: false,
       isHDR: false,
+      isAppleQuickTime: false,
       hasRotation: false,
       canTranscode: isWebCodecsSupported(),
     };
@@ -271,11 +313,21 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
           });
         }
         
+        // Both HEVC and Apple QuickTime need conversion for Gemini API
+        if (fileCodecInfo.isAppleQuickTime && !fileCodecInfo.isHEVC) {
+          issues.push({
+            type: 'apple_quicktime',
+            description: 'This Apple QuickTime video needs conversion for API compatibility',
+            severity: 'warning',
+          });
+        }
+        
         resolve({
-          compatible: !fileCodecInfo.isHEVC,
+          compatible: !fileCodecInfo.isHEVC && !fileCodecInfo.isAppleQuickTime,
           issues,
           isHEVC: fileCodecInfo.isHEVC,
           isHDR: fileCodecInfo.isHDR,
+          isAppleQuickTime: fileCodecInfo.isAppleQuickTime,
           hasRotation: false,
           canTranscode: isWebCodecsSupported(),
         });
@@ -337,14 +389,28 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
                 severity: 'warning',
               });
             }
+            
+            // Check for Apple QuickTime format - needs conversion for Gemini API compatibility
+            if (fileCodecInfo.isAppleQuickTime && !fileCodecInfo.isHEVC) {
+              console.log('[VideoCodec] Apple QuickTime H.264 detected - converting for API compatibility');
+              issues.push({
+                type: 'apple_quicktime',
+                description: 'This Apple QuickTime video will be converted to MP4 for better compatibility',
+                severity: 'warning',
+              });
+            }
           }
+          
+          // Both HEVC and Apple QuickTime need conversion for Gemini API compatibility
+          const needsConversion = fileCodecInfo.isHEVC || fileCodecInfo.isAppleQuickTime;
           
           cleanup();
           resolve({
-            compatible: !fileCodecInfo.isHEVC || issues.every(i => i.severity === 'warning'),
+            compatible: !needsConversion,
             issues,
             isHEVC: fileCodecInfo.isHEVC,
             isHDR: fileCodecInfo.isHDR,
+            isAppleQuickTime: fileCodecInfo.isAppleQuickTime,
             hasRotation: false, // Would need more complex detection
             width,
             height,
@@ -373,6 +439,7 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
             issues,
             isHEVC: true,
             isHDR: fileCodecInfo.isHDR,
+            isAppleQuickTime: fileCodecInfo.isAppleQuickTime,
             hasRotation: false,
             width,
             height,
@@ -423,6 +490,7 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
         issues,
         isHEVC: fileCodecInfo.isHEVC,
         isHDR: fileCodecInfo.isHDR,
+        isAppleQuickTime: fileCodecInfo.isAppleQuickTime,
         hasRotation: false,
         canTranscode: isWebCodecsSupported(),
       });

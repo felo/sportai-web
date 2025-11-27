@@ -62,9 +62,25 @@ async function extractVideoInfo(file: File): Promise<{
 }
 
 /**
- * Create an H.264 encoder configuration
+ * H.264 codec profiles to try, in order of preference
+ * Safari has limited support, so we try multiple profiles
  */
-function getEncoderConfig(width: number, height: number, frameRate: number): VideoEncoderConfig {
+const H264_PROFILES = [
+  'avc1.640028', // High Profile, Level 4.0 (best quality, Chrome/Edge)
+  'avc1.4d0028', // Main Profile, Level 4.0 (good compatibility)
+  'avc1.42001f', // Baseline Profile, Level 3.1 (most compatible, Safari)
+  'avc1.420028', // Baseline Profile, Level 4.0
+  'avc1.4d001f', // Main Profile, Level 3.1
+];
+
+/**
+ * Find a supported H.264 encoder configuration
+ */
+async function findSupportedEncoderConfig(
+  width: number,
+  height: number,
+  frameRate: number
+): Promise<VideoEncoderConfig | null> {
   // Ensure dimensions are even (required for H.264)
   const adjustedWidth = width % 2 === 0 ? width : width - 1;
   const adjustedHeight = height % 2 === 0 ? height : height - 1;
@@ -76,14 +92,55 @@ function getEncoderConfig(width: number, height: number, frameRate: number): Vid
   const referencePixels = 1920 * 1080;
   const bitrate = Math.round((pixels / referencePixels) * referenceBitrate);
   
+  // Try each H.264 profile until we find one that works
+  for (const codec of H264_PROFILES) {
+    const config: VideoEncoderConfig = {
+      codec,
+      width: adjustedWidth,
+      height: adjustedHeight,
+      bitrate: Math.max(1_000_000, Math.min(bitrate, 15_000_000)), // 1-15 Mbps
+      framerate: frameRate,
+      latencyMode: 'quality',
+      avc: { format: 'avc' }, // Use Annex B format for MP4
+    };
+    
+    try {
+      const support = await VideoEncoder.isConfigSupported(config);
+      if (support.supported) {
+        console.log(`[Transcoder] Found supported codec: ${codec}`);
+        return config;
+      }
+    } catch (e) {
+      console.log(`[Transcoder] Codec ${codec} check failed:`, e);
+    }
+  }
+  
+  console.log('[Transcoder] No supported H.264 profile found');
+  return null;
+}
+
+/**
+ * Create an H.264 encoder configuration (legacy function for compatibility)
+ */
+function getEncoderConfig(width: number, height: number, frameRate: number): VideoEncoderConfig {
+  // Ensure dimensions are even (required for H.264)
+  const adjustedWidth = width % 2 === 0 ? width : width - 1;
+  const adjustedHeight = height % 2 === 0 ? height : height - 1;
+  
+  // Calculate bitrate based on resolution
+  const pixels = adjustedWidth * adjustedHeight;
+  const referenceBitrate = 8_000_000;
+  const referencePixels = 1920 * 1080;
+  const bitrate = Math.round((pixels / referencePixels) * referenceBitrate);
+  
   return {
-    codec: 'avc1.640028', // H.264 High Profile, Level 4.0
+    codec: 'avc1.42001f', // Default to Baseline for max compatibility
     width: adjustedWidth,
     height: adjustedHeight,
-    bitrate: Math.max(1_000_000, Math.min(bitrate, 15_000_000)), // 1-15 Mbps
+    bitrate: Math.max(1_000_000, Math.min(bitrate, 15_000_000)),
     framerate: frameRate,
     latencyMode: 'quality',
-    avc: { format: 'avc' }, // Use Annex B format for MP4
+    avc: { format: 'avc' },
   };
 }
 
@@ -127,6 +184,22 @@ export async function transcodeToH264(
       return { success: false, error: 'Transcoding cancelled' };
     }
     
+    // Find a supported encoder configuration (tries multiple H.264 profiles)
+    onProgress({
+      stage: 'initializing',
+      percent: 6,
+      message: 'Finding compatible encoder...',
+    });
+    
+    const encoderConfig = await findSupportedEncoderConfig(adjustedWidth, adjustedHeight, frameRate);
+    
+    if (!encoderConfig) {
+      return {
+        success: false,
+        error: 'H.264 encoding is not supported in your browser. Try using Chrome or Edge, or convert the video using a desktop app like HandBrake.',
+      };
+    }
+    
     // Set up MP4 muxer
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
@@ -137,18 +210,6 @@ export async function transcodeToH264(
       },
       fastStart: 'in-memory',
     });
-    
-    // Set up encoder
-    const encoderConfig = getEncoderConfig(adjustedWidth, adjustedHeight, frameRate);
-    
-    // Check if encoder is supported
-    const encoderSupport = await VideoEncoder.isConfigSupported(encoderConfig);
-    if (!encoderSupport.supported) {
-      return {
-        success: false,
-        error: 'H.264 encoding is not supported in your browser.',
-      };
-    }
     
     let encodedFrames = 0;
     let encodingComplete = false;
@@ -311,7 +372,7 @@ export async function transcodeToH264(
 }
 
 /**
- * Check if the browser can encode H.264 video
+ * Check if the browser can encode H.264 video (tries multiple profiles)
  */
 export async function canEncodeH264(): Promise<boolean> {
   if (!isWebCodecsSupported()) {
@@ -319,16 +380,9 @@ export async function canEncodeH264(): Promise<boolean> {
   }
   
   try {
-    const config: VideoEncoderConfig = {
-      codec: 'avc1.640028',
-      width: 1280,
-      height: 720,
-      bitrate: 5_000_000,
-      framerate: 30,
-    };
-    
-    const support = await VideoEncoder.isConfigSupported(config);
-    return support.supported === true;
+    // Try to find any supported H.264 profile
+    const config = await findSupportedEncoderConfig(1280, 720, 30);
+    return config !== null;
   } catch {
     return false;
   }
