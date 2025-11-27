@@ -28,7 +28,7 @@ import { type ThinkingMode, type MediaResolution, type DomainExpertise, generate
 import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat, loadChat } from "@/utils/storage-unified";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
-import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
+import { getMediaType, downloadVideoFromUrl, extractFirstFrame, isImageFile } from "@/utils/video-utils";
 import {
   sharedSwings,
   tennisSwings,
@@ -69,9 +69,13 @@ export function AIChatForm() {
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const [showingVideoSizeError, setShowingVideoSizeError] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
+  // Video sport auto-detection state
+  const [videoSportDetected, setVideoSportDetected] = useState<DomainExpertise | null>(null);
+  const [isDetectingSport, setIsDetectingSport] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastDetectedVideoRef = useRef<File | null>(null);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
   const isMobile = useIsMobile();
 
@@ -83,10 +87,7 @@ export function AIChatForm() {
     processVideoFile,
     clearVideo,
     handleVideoChange,
-    // Transcoding state (for HEVC auto-conversion)
-    isTranscoding,
-    transcodeProgress,
-    // Server-side conversion flag (for Apple QuickTime on iOS)
+    // Server-side conversion flag (for HEVC/Apple QuickTime)
     needsServerConversion,
   } = useVideoUpload();
 
@@ -242,6 +243,75 @@ export function AIChatForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoFile]); // Only depend on videoFile to avoid loops
+
+  // Auto-detect sport from video first frame
+  useEffect(() => {
+    // Skip if no video, already detecting, or same video as last detection
+    if (!videoFile || isDetectingSport || videoFile === lastDetectedVideoRef.current) {
+      return;
+    }
+    
+    // Skip sport detection for images - they don't need it (user likely knows the context)
+    if (isImageFile(videoFile)) {
+      return;
+    }
+    
+    // Mark this video as being processed
+    lastDetectedVideoRef.current = videoFile;
+    
+    const detectSport = async () => {
+      setIsDetectingSport(true);
+      setVideoSportDetected(null);
+      
+      try {
+        console.log("[SportDetect] Extracting first frame from video...");
+        const frameBlob = await extractFirstFrame(videoFile, 640, 0.7);
+        
+        console.log("[SportDetect] Sending frame to detection API...");
+        const formData = new FormData();
+        formData.append("image", frameBlob, "frame.jpg");
+        
+        const response = await fetch("/api/detect-sport", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error("Sport detection API failed");
+        }
+        
+        const data = await response.json();
+        const detectedSport = data.sport as "tennis" | "pickleball" | "padel" | "other";
+        
+        console.log("[SportDetect] Detected sport:", detectedSport);
+        
+        // Only switch if a specific sport was detected (not "other")
+        if (detectedSport !== "other" && detectedSport !== domainExpertise) {
+          // Update domain expertise
+          setDomainExpertise(detectedSport);
+          const currentChatId = getCurrentChatId();
+          if (currentChatId) {
+            updateChatSettings(currentChatId, { domainExpertise: detectedSport });
+          }
+          
+          // Signal ChatInput to show glow effect
+          setVideoSportDetected(detectedSport);
+          
+          // Clear the signal after glow animation duration
+          setTimeout(() => {
+            setVideoSportDetected(null);
+          }, 2500);
+        }
+      } catch (err) {
+        console.error("[SportDetect] Failed to detect sport:", err);
+        // Fail silently - sport detection is optional
+      } finally {
+        setIsDetectingSport(false);
+      }
+    };
+    
+    detectSport();
+  }, [videoFile, isDetectingSport, domainExpertise]);
 
   const error = videoError || apiError;
   const hasScrolledToBottomRef = useRef(false);
@@ -1113,8 +1183,7 @@ export function AIChatForm() {
             onDomainExpertiseChange={handleDomainExpertiseChange}
             disableTooltips={hasJustDropped}
             hideDisclaimer={showingVideoSizeError}
-            isTranscoding={isTranscoding}
-            transcodeProgress={transcodeProgress}
+            videoSportDetected={videoSportDetected}
           />
         </div>
       </div>

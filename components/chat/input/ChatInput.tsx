@@ -1,13 +1,12 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { TextArea, Button, Tooltip, Box, Flex, Callout, Text, Select, Progress } from "@radix-ui/themes";
+import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
 import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "../viewers/VideoPreview";
 import type { ProgressStage } from "@/types/chat";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import type { TranscodeProgress } from "@/utils/video-transcoder";
 
 interface ChatInputProps {
   prompt: string;
@@ -30,9 +29,8 @@ interface ChatInputProps {
   onDomainExpertiseChange?: (expertise: DomainExpertise) => void;
   disableTooltips?: boolean;
   hideDisclaimer?: boolean; // Hide the "contact us" disclaimer
-  // Transcoding state for HEVC auto-conversion
-  isTranscoding?: boolean;
-  transcodeProgress?: TranscodeProgress | null;
+  // Video sport auto-detection - triggers glow effect when sport is detected from video
+  videoSportDetected?: DomainExpertise | null;
 }
 
 export function ChatInput({
@@ -56,8 +54,7 @@ export function ChatInput({
   onDomainExpertiseChange,
   disableTooltips = false,
   hideDisclaimer = false,
-  isTranscoding = false,
-  transcodeProgress = null,
+  videoSportDetected = null,
 }: ChatInputProps) {
   const isMobile = useIsMobile();
   
@@ -91,6 +88,27 @@ export function ChatInput({
       }
     };
   }, []);
+
+  // Trigger glow effect when sport is auto-detected from video
+  // Note: videoSportDetected is only set when a valid sport (tennis/pickleball/padel) is detected
+  useEffect(() => {
+    if (videoSportDetected) {
+      console.log("[ChatInput] Video sport auto-detected:", videoSportDetected);
+      
+      // Trigger glow effect
+      setIsGlowing(true);
+      
+      // Clear existing timeout
+      if (glowTimeoutRef.current) {
+        clearTimeout(glowTimeoutRef.current);
+      }
+      
+      // Remove glow after 2 seconds
+      glowTimeoutRef.current = setTimeout(() => {
+        setIsGlowing(false);
+      }, 2000);
+    }
+  }, [videoSportDetected]);
 
   // Update local state when props change (e.g., from starter prompts)
   useEffect(() => {
@@ -341,36 +359,7 @@ export function ChatInput({
 
       <form onSubmit={onSubmit}>
         <Flex direction="column" gap="4" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
-          {/* Transcoding progress indicator */}
-          {isTranscoding && transcodeProgress && (
-            <Box
-              style={{
-                padding: "12px 16px",
-                backgroundColor: "var(--mint-2)",
-                borderRadius: "var(--radius-3)",
-                border: "1px solid var(--mint-6)",
-              }}
-            >
-              <Flex direction="column" gap="2">
-                <Flex justify="between" align="center">
-                  <Text size="2" weight="medium" style={{ color: "var(--mint-11)" }}>
-                    Preparing video for analysis...
-                  </Text>
-                  <Text size="1" style={{ color: "var(--mint-11)" }}>
-                    {Math.round(transcodeProgress.percent)}%
-                  </Text>
-                </Flex>
-                <Progress value={transcodeProgress.percent} size="2" />
-                {transcodeProgress.message && (
-                  <Text size="1" color="gray">
-                    {transcodeProgress.message}
-                  </Text>
-                )}
-              </Flex>
-            </Box>
-          )}
-          
-          {videoFile && videoPreview && !isTranscoding && (
+          {videoFile && videoPreview && (
             <VideoPreview
               videoFile={videoFile}
               videoPreview={videoPreview}

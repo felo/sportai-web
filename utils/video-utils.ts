@@ -530,3 +530,143 @@ export async function downloadVideoFromUrl(url: string): Promise<File> {
   }
 }
 
+/**
+ * Extract the first frame from a video file as a JPEG blob
+ * Returns a low-resolution image (~640px wide) for efficient API calls
+ * 
+ * @param file - Video file to extract frame from
+ * @param maxWidth - Maximum width of the output image (default 640px)
+ * @param quality - JPEG quality 0-1 (default 0.8)
+ * @returns Promise<Blob> - JPEG blob of the first frame
+ */
+export async function extractFirstFrame(
+  file: File,
+  maxWidth: number = 640,
+  quality: number = 0.8
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    // Skip if it's an image file - just return the image itself
+    if (isImageFile(file)) {
+      // For images, we could resize but for simplicity just return as-is
+      // The API will handle the image directly
+      file.arrayBuffer()
+        .then(buffer => resolve(new Blob([buffer], { type: file.type })))
+        .catch(reject);
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    
+    let resolved = false;
+    
+    // Timeout after 10 seconds
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        reject(new Error('Timeout extracting first frame from video'));
+      }
+    }, 10000);
+    
+    const cleanup = () => {
+      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('error', onError);
+      video.removeEventListener('seeked', onSeeked);
+      if (video.src) {
+        URL.revokeObjectURL(video.src);
+      }
+      video.src = '';
+    };
+    
+    const extractFrame = () => {
+      try {
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        if (!videoWidth || !videoHeight) {
+          throw new Error('Could not determine video dimensions');
+        }
+        
+        // Calculate scaled dimensions maintaining aspect ratio
+        let width = videoWidth;
+        let height = videoHeight;
+        
+        if (width > maxWidth) {
+          const scale = maxWidth / width;
+          width = maxWidth;
+          height = Math.round(height * scale);
+        }
+        
+        // Ensure even dimensions (required for some codecs)
+        width = width % 2 === 0 ? width : width - 1;
+        height = height % 2 === 0 ? height : height - 1;
+        
+        // Create canvas and draw the frame
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Could not create canvas context');
+        }
+        
+        ctx.drawImage(video, 0, 0, width, height);
+        
+        // Convert to JPEG blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              console.log(`[extractFirstFrame] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB`);
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob from canvas'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch (err) {
+        reject(err);
+      }
+    };
+    
+    const onSeeked = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      extractFrame();
+      cleanup();
+    };
+    
+    const onLoadedData = () => {
+      // Video has enough data to display first frame
+      // Seek to a tiny offset to ensure frame is ready
+      video.currentTime = 0.001;
+    };
+    
+    const onError = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('Error loading video for frame extraction'));
+    };
+    
+    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('seeked', onSeeked);
+    video.addEventListener('error', onError);
+    
+    // Handle case where video is already loaded (cached)
+    if (video.readyState >= 2) {
+      video.currentTime = 0.001;
+    }
+    
+    const url = URL.createObjectURL(file);
+    video.src = url;
+  });
+}
+
