@@ -135,9 +135,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   // Show video if we have a video URL, preview, file, or S3 key (for persisted videos)
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   
-  // Check if this is an image-only message (not a video) - used for bubble styling
-  const isImageOnly = !message.videoUrl && !message.videoFile && !message.videoS3Key && 
-                      message.videoPreview?.startsWith("data:image/");
+  // Check if this is an image-only message (not a video) - used for styling
+  // Images get border but no padding, taking full space within the bubble
+  const isImageOnly = (
+    // S3 URL with image extension
+    (message.videoUrl?.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/i)) ||
+    // S3 key with image extension (for persisted images)
+    (message.videoS3Key?.match(/\.(jpg|jpeg|png|gif|webp)$/i)) ||
+    // Data URL image
+    (message.videoPreview?.startsWith("data:image/")) ||
+    // File type is image
+    (message.videoFile?.type.startsWith("image/"))
+  );
   
   // Check if any previous user messages (until we hit an assistant message) have a video
   const userSentVideo = (() => {
@@ -383,13 +392,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
             margin: (isMobile || (theatreMode && hasVideo && !isImageOnly)) && message.role === "user" && hasVideo && !isImageOnly
               ? "0 auto"
               : "0",
-            borderRadius: message.role === "user" && (!hasVideo || isImageOnly)
+            // Text messages: asymmetric bubble corners, Videos & Images: slightly rounded
+            borderRadius: message.role === "user" && !hasVideo && !isImageOnly
               ? "24px 8px 24px 24px" 
               : "var(--radius-3)",
-            padding: message.role === "user" && hasVideo && !isImageOnly ? "0" : "var(--space-3) var(--space-4)",
+            // Images: no padding (image fills to border), Videos: no padding, Text: padding
+            padding: message.role === "user" && (hasVideo || isImageOnly) ? "0" : "var(--space-3) var(--space-4)",
             backgroundColor: "transparent",
             color: "var(--gray-12)",
+            // Images get border, videos don't, text gets border
             border: message.role === "user" && (!hasVideo || isImageOnly) ? "1px solid var(--mint-6)" : "none",
+            // For images, add overflow hidden so the image respects border radius
+            overflow: isImageOnly ? "hidden" : undefined,
           }}
           role={message.role === "user" ? "user-message" : "assistant-message"}
         >

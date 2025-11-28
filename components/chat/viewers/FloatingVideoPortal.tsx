@@ -222,6 +222,29 @@ export function FloatingVideoPortal() {
     }, 1500);
   };
 
+  // Toggle controls on tap (for mobile)
+  const handleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    // Don't toggle if clicking a button
+    if (target.closest("button") || target.closest('[role="button"]')) {
+      return;
+    }
+    
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current);
+    }
+    
+    if (showControls) {
+      setShowControls(false);
+    } else {
+      setShowControls(true);
+      // Auto-hide after 3 seconds on tap
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
+  }, [showControls]);
+
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("button") || target.closest('[role="button"]') || target.closest("video")) {
@@ -480,6 +503,7 @@ export function FloatingVideoPortal() {
       onTouchStart={handleDragStart}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={handleTap}
     >
       {/* Video content */}
       {!isMinimized && (
@@ -512,24 +536,41 @@ export function FloatingVideoPortal() {
               }}
             />
           </Box>
+
+          {/* Container for the portaled VideoPoseViewer - fills entire space, drag zone overlays it */}
+          <Box
+            ref={videoContainerRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "#000",
+              overflow: "hidden",
+              zIndex: 1,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
           
-          {/* Mid-left control buttons */}
+          {/* Mid-left control buttons - appear on hover/tap */}
+          {/* Positioned at vertical center to avoid corners where native device controls appear */}
           <Box
             style={{
               position: "absolute",
-              left: 6,
+              left: 8,
               top: "50%",
               transform: "translateY(-50%)",
               display: "flex",
               flexDirection: "column",
-              gap: 6,
-              zIndex: 25,
-              opacity: showControls || isDragging ? 1 : 0,
+              gap: 8,
+              zIndex: 100, // Ensure above video
+              opacity: showControls || isDragging ? 1 : 0.4,
               transition: "opacity 0.2s ease",
-              pointerEvents: showControls ? "auto" : "none",
             }}
           >
-            {/* Expand/Collapse (Minimize) button - highest */}
+            {/* Minimize button */}
             <Tooltip content="Minimize" side="right">
               <IconButton
                 size="1"
@@ -548,7 +589,7 @@ export function FloatingVideoPortal() {
               </IconButton>
             </Tooltip>
             
-            {/* AI Overlay toggle - below */}
+            {/* AI Overlay toggle */}
             <Tooltip content={poseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"} side="right">
               <IconButton
                 size="1"
@@ -570,22 +611,6 @@ export function FloatingVideoPortal() {
               </IconButton>
             </Tooltip>
           </Box>
-
-          {/* Container for the portaled VideoPoseViewer - fills entire space, drag zone overlays it */}
-          <Box
-            ref={videoContainerRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "#000",
-              overflow: "hidden",
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          />
 
           {/* Resize handles at corners - triangular */}
           {(["nw", "ne", "sw", "se"] as const).map((handle) => {

@@ -4,7 +4,11 @@ import { Flex, Button, Text } from "@radix-ui/themes";
 import { ChevronDownIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { EmptyState } from "@/components/ui";
 import { ChatListItem } from "./ChatListItem";
+import { ChatListGrouped } from "./ChatListGrouped";
 import type { ChatListProps } from "./types";
+
+// Threshold for showing grouped view
+const GROUPING_THRESHOLD = 8;
 
 export function ChatList({
   chats,
@@ -18,6 +22,8 @@ export function ChatList({
   onChatEdit,
   onChatDelete,
 }: ChatListProps) {
+  const shouldGroup = chats.length >= GROUPING_THRESHOLD;
+
   return (
     <Flex direction="column" gap="2">
       <Button
@@ -46,6 +52,17 @@ export function ChatList({
         >
           {chats.length === 0 ? (
             <EmptyState message="No chats yet" />
+          ) : shouldGroup ? (
+            <ChatListGrouped
+              chats={chats}
+              currentChatId={currentChatId}
+              hoveredChatId={hoveredChatId}
+              isMobile={isMobile}
+              onHoverChat={onHoverChat}
+              onChatClick={onChatClick}
+              onChatEdit={onChatEdit}
+              onChatDelete={onChatDelete}
+            />
           ) : (
             chats.map((chat) => (
               <ChatListItem

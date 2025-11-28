@@ -61,6 +61,8 @@ const FORMATTING_GUIDELINES = `
 
 - **User-Friendly Presentation**: Break down technical concepts in an accessible way. Use analogies, comparisons, or simple explanations when discussing complex techniques.
 
+- **Plain Text for Angles and Numbers**: When mentioning angles, write them in plain text format using the degree symbol directly (e.g., "176°" or "176 degrees"). Do NOT use LaTeX or math notation - avoid formats like \`$...$\`, \`^{\\circ}\`, or \`\\(...\\)\`. Keep all numbers and measurements as simple, readable plain text.
+
 - **Be Specific**: Avoid vague feedback. Instead of "improve your swing," say "your backswing is too short, which reduces power - try extending your arm further back."
 
 - **Positive, Motivating & Approachable Tone**: 

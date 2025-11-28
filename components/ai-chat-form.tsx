@@ -242,7 +242,7 @@ export function AIChatForm() {
       domainExpertise: string;
       timestamp: number;
     }>) => {
-      const { imageBlob, domainExpertise: insightDomainExpertise } = event.detail;
+      const { imageBlob, domainExpertise: insightDomainExpertise, timestamp } = event.detail;
       
       console.log("📸 [AIChatForm] Received Image Insight request");
       
@@ -253,26 +253,75 @@ export function AIChatForm() {
       }
 
       setLoading(true);
-      setProgressStage("analyzing");
+      setProgressStage("uploading");
 
       try {
-        // Create a data URL from the blob for display
-        const imageDataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(imageBlob);
+        // Convert blob to File for S3 upload
+        const imageFile = new File([imageBlob], `frame_${timestamp}.jpg`, { type: "image/jpeg" });
+        
+        // Step 1: Upload image to S3
+        console.log("[Image Insight] Uploading image to S3...");
+        
+        const urlResponse = await fetch("/api/s3/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: imageFile.name,
+            contentType: imageFile.type,
+          }),
         });
 
-        // Add user message with the image
-        const userMessageId = generateMessageId();
-        const userMessage: Message = {
-          id: userMessageId,
+        if (!urlResponse.ok) {
+          const errorData = await urlResponse.json();
+          throw new Error(errorData.error || "Failed to get upload URL");
+        }
+
+        const { url: presignedUrl, downloadUrl, key: s3Key } = await urlResponse.json();
+        console.log("[Image Insight] ✅ Got presigned URL, uploading...");
+
+        // Upload to S3 using XHR (from lib/s3.ts pattern)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.addEventListener("load", () => {
+            if (xhr.status === 200 || xhr.status === 204) {
+              resolve();
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status}`));
+            }
+          });
+          xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+          xhr.open("PUT", presignedUrl);
+          xhr.setRequestHeader("Content-Type", imageFile.type);
+          xhr.send(imageFile);
+        });
+
+        const s3Url = downloadUrl;
+        console.log("[Image Insight] ✅ Image uploaded to S3:", s3Key);
+
+        setProgressStage("analyzing");
+
+        // Create two separate messages like video uploads:
+        // 1. First message: image only (in its own frame)
+        const imageMessageId = generateMessageId();
+        const imageMessage: Message = {
+          id: imageMessageId,
+          role: "user",
+          content: "",  // Empty content - image only
+          videoUrl: s3Url,      // S3 URL for display
+          videoS3Key: s3Key,    // S3 key for persistence
+        };
+        addMessage(imageMessage);
+        console.log("[AIChatForm] Added Image Insight image message:", imageMessageId);
+
+        // 2. Second message: text only (as user dialog bubble)
+        const textMessageId = generateMessageId();
+        const textMessage: Message = {
+          id: textMessageId,
           role: "user",
           content: "Please analyse this moment in the video for me.",
-          videoPreview: imageDataUrl, // Using videoPreview to display the captured frame
         };
-        addMessage(userMessage);
-        console.log("[AIChatForm] Added Image Insight user message:", userMessageId);
+        addMessage(textMessage);
+        console.log("[AIChatForm] Added Image Insight text message:", textMessageId);
 
         // Scroll to bottom
         setTimeout(() => scrollToBottom(), 100);
@@ -283,13 +332,14 @@ export function AIChatForm() {
           id: assistantMessageId,
           role: "assistant",
           content: "",
+          isStreaming: true,
         };
         addMessage(assistantMessage);
 
-        // Create form data for the API
+        // Create form data for the API - send S3 URL instead of blob
         const formData = new FormData();
         formData.append("prompt", "Analyze this frame from my sports video. The image shows my body position with pose detection overlay and joint angle measurements. Please provide detailed biomechanical feedback on my technique, body positioning, and the joint angles visible.");
-        formData.append("video", imageBlob, "frame.jpg");
+        formData.append("videoUrl", s3Url);  // Use S3 URL
         formData.append("promptType", "frame");
         formData.append("thinkingMode", "deep");
         formData.append("mediaResolution", "high");
@@ -323,9 +373,11 @@ export function AIChatForm() {
             fullResponse += chunk;
             
             // Update the assistant message with streamed content
-            updateMessage(assistantMessageId, { content: fullResponse });
+            updateMessage(assistantMessageId, { content: fullResponse, isStreaming: true });
           }
           
+          // Mark streaming as complete
+          updateMessage(assistantMessageId, { isStreaming: false });
           console.log("✅ [AIChatForm] Image Insight complete, response length:", fullResponse.length);
         }
 
@@ -338,10 +390,10 @@ export function AIChatForm() {
       }
     };
 
-    window.addEventListener("image-insight-request", handleImageInsightRequest as EventListener);
+    window.addEventListener("image-insight-request", handleImageInsightRequest as unknown as EventListener);
     
     return () => {
-      window.removeEventListener("image-insight-request", handleImageInsightRequest as EventListener);
+      window.removeEventListener("image-insight-request", handleImageInsightRequest as unknown as EventListener);
     };
   }, [loading, addMessage, updateMessage, scrollToBottom, setLoading, setProgressStage, setApiError]);
 

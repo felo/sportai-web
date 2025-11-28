@@ -3,6 +3,7 @@ export { Sidebar } from "./Sidebar";
 
 // Sub-components (for customization if needed)
 export { ChatList } from "./ChatList";
+export { ChatListGrouped } from "./ChatListGrouped";
 export { ChatListItem } from "./ChatListItem";
 export { NewChatButton } from "./NewChatButton";
 export { SidebarContent } from "./SidebarContent";

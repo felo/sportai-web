@@ -39,6 +39,12 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   // Track if video is ready to show (actual video has loaded, not just cached dimensions)
   const [isVideoReady, setIsVideoReady] = useState(false);
   
+  // Capture the exact dimensions when floating starts - never change while floating
+  const [frozenDimensions, setFrozenDimensions] = useState<{ width: number; height: number } | null>(null);
+  
+  // Track dimensions continuously when NOT floating (ref updates don't cause re-renders)
+  const lastKnownDimensionsRef = useRef<{ width: number; height: number } | null>(null);
+  
   // Get stored dimensions for passing to VideoPoseViewer (prevents layout shift)
   const initialWidth = message.videoDimensions?.width;
   const initialHeight = message.videoDimensions?.height;
@@ -124,6 +130,45 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     // Only depend on message.id and videoSrc, not the full context
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, videoSrc, isImage]);
+  
+  // Continuously track dimensions when NOT floating using ResizeObserver
+  // This ensures we always have the correct pre-float dimensions ready
+  useEffect(() => {
+    if (!videoContainerRef.current || isThisVideoFloating) return;
+    
+    const element = videoContainerRef.current;
+    
+    // Capture initial dimensions
+    const rect = element.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
+    }
+    
+    // Use ResizeObserver to track dimension changes while not floating
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          lastKnownDimensionsRef.current = { width, height };
+        }
+      }
+    });
+    
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, [isThisVideoFloating, isVideoReady]);
+  
+  // When floating starts, freeze the last known dimensions
+  // When floating ends, clear frozen dimensions
+  useEffect(() => {
+    if (isThisVideoFloating && !frozenDimensions && lastKnownDimensionsRef.current) {
+      // Use the pre-captured dimensions (before any layout changes)
+      setFrozenDimensions(lastKnownDimensionsRef.current);
+    } else if (!isThisVideoFloating && frozenDimensions) {
+      // Clear frozen dimensions when floating ends
+      setFrozenDimensions(null);
+    }
+  }, [isThisVideoFloating, frozenDimensions]);
 
   // IntersectionObserver to detect when video leaves scroll container and should float
   useEffect(() => {
@@ -153,6 +198,12 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         if (!currentCtx) return;
         
         if (shouldFloat && !isFloatingRef.current) {
+          // Capture dimensions RIGHT BEFORE floating starts (most accurate)
+          const rect = element.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
+          }
+          
           // Start floating this video
           lastFloatChangeRef.current = now;
           currentCtx.setActiveVideo(message.id);
@@ -313,7 +364,9 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 data-video-container="true"
                 style={{
                   position: isVideoReady ? "relative" : "absolute",
-                  width: "fit-content",
+                  // When floating, use frozen dimensions to prevent placeholder size changes
+                  width: frozenDimensions ? frozenDimensions.width : "fit-content",
+                  height: frozenDimensions ? frozenDimensions.height : undefined,
                   maxWidth: "100%",
                   backgroundColor: "transparent",
                   overflow: "hidden",
