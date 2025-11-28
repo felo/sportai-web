@@ -1929,9 +1929,10 @@ export function VideoPoseViewer({
           console.log(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
         }
 
-        // Yield to browser (every 10 frames like manual preprocessing)
-        if (frame % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 0));
+        // Yield more frequently to prevent browser freeze on longer videos
+        // Every 5 frames with 10ms delay for GC and UI updates
+        if (frame % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
       }
 

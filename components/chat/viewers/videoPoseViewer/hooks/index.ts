@@ -11,4 +11,5 @@ export * from "./useVelocitySettings";
 export * from "./useTrophyDetection";
 export * from "./useContactPointDetection";
 export * from "./useLandingDetection";
+export * from "./useWristSpeedProtocol";
 
