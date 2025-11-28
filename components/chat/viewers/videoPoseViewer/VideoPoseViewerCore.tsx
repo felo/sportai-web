@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon, RocketIcon, Crosshair2Icon, ArrowDownIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon, RocketIcon, Crosshair2Icon, ArrowDownIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -1801,6 +1801,7 @@ export function VideoPoseViewer({
       if (firstPoses) {
         setCurrentPoses(firstPoses);
       }
+
     } catch (err) {
       console.error('Pre-processing error:', err);
       setIsPreprocessing(false);
@@ -1949,6 +1950,7 @@ export function VideoPoseViewer({
         if (framePoses) {
           setCurrentPoses(framePoses);
         }
+
       } else {
         // Aborted - return to original position
         video.currentTime = originalTime;
@@ -1970,6 +1972,7 @@ export function VideoPoseViewer({
 
   // Auto-start preprocessing when AI overlay is enabled and model is loaded
   // FPS detection is built into startAutoPreprocess, so we start immediately
+  // Skip preprocessing in compact/floating mode
   useEffect(() => {
     // All conditions for preprocessing
     const canPreprocess = isPoseEnabled && 
@@ -1977,7 +1980,8 @@ export function VideoPoseViewer({
                           !isBackgroundPreprocessing && 
                           !usePreprocessing && 
                           preprocessedPoses.size === 0 && 
-                          isVideoMetadataLoaded;
+                          isVideoMetadataLoaded &&
+                          !compactMode; // Don't preprocess in floating mode
     
     if (!canPreprocess) return;
     
@@ -1988,7 +1992,7 @@ export function VideoPoseViewer({
     }, 100); // Small delay to ensure UI is ready
     return () => clearTimeout(timer);
     
-  }, [isPoseEnabled, isLoading, isBackgroundPreprocessing, usePreprocessing, preprocessedPoses.size, isVideoMetadataLoaded, startAutoPreprocess]);
+  }, [isPoseEnabled, isLoading, isBackgroundPreprocessing, usePreprocessing, preprocessedPoses.size, isVideoMetadataLoaded, startAutoPreprocess, compactMode]);
 
   // Cancel background preprocessing when AI overlay is disabled
   useEffect(() => {
@@ -1996,6 +2000,17 @@ export function VideoPoseViewer({
       cancelBackgroundPreprocess();
     }
   }, [isPoseEnabled, isBackgroundPreprocessing, cancelBackgroundPreprocess]);
+
+  // Auto-run key frame detections when preprocessing completes
+  useEffect(() => {
+    if (usePreprocessing && preprocessedPoses.size > 0 && !trophyResult && !contactResult && !landingResult) {
+      console.log('🎯 Auto-detecting key frames...');
+      // Run all detections - they won't seek since we're not using the handlers
+      detectTrophyPosition("auto");
+      detectContactPoint("auto");
+      detectLanding();
+    }
+  }, [usePreprocessing, preprocessedPoses.size, trophyResult, contactResult, landingResult, detectTrophyPosition, detectContactPoint, detectLanding]);
 
   const handleVideoEnded = () => {
     setIsPlaying(false);
@@ -2051,17 +2066,19 @@ export function VideoPoseViewer({
     return null;
   }, [currentPoses, selectedModel, isPoseEnabled]);
 
-  // Toggle Pose Detection (Enable/Disable)
+  // Toggle Pose Detection (Enable/Disable) and controls visibility
   const handleTogglePose = () => {
     if (isPoseEnabled) {
-      // Disabling
+      // Disabling - also hide controls
       setIsPoseEnabled(false);
+      setIsExpanded(false);
       setCurrentPoses([]);
       clearTrajectories();
       stopDetection();
     } else {
-      // Enabling
+      // Enabling - also show controls
       setIsPoseEnabled(true);
+      setIsExpanded(true);
       
       // If enabling for the first time on a standard video (not a preset card), 
       // apply the "Technique Analysis" default settings
@@ -2270,54 +2287,30 @@ export function VideoPoseViewer({
             </Tooltip>
           )}
 
-          {/* AI Overlay Toggle Button */}
-          <Tooltip content={isPoseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"}>
-            <Button
-              className={buttonStyles.actionButtonSquare}
-              onClick={handleTogglePose}
-              style={{
-                height: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
-                padding: compactMode ? "0 6px" : (isPortraitVideo || isMobile ? "0 8px" : "0 10px"),
-                fontSize: isMobile ? "10px" : "11px",
-                opacity: isPoseEnabled ? 1 : 0.7,
-                minWidth: compactMode ? "24px" : undefined,
-              }}
-            >
-              <Flex gap={isPortraitVideo || isMobile ? "1" : "2"} align="center">
-                <MagicWandIcon width={isPortraitVideo || isMobile || compactMode ? 12 : 14} height={isPortraitVideo || isMobile || compactMode ? 12 : 14} />
-                {!compactMode && (
-                  <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
-                    AI Overlay
-                  </Text>
-                )}
-              </Flex>
-            </Button>
-          </Tooltip>
-
-          {/* Config Button - Show when AI overlay is enabled, but hide when docked/floating */}
-          {isPoseEnabled && !compactMode && (
-            <Tooltip content={isExpanded ? "Hide Video Player Controls" : "Show Video Player Controls"}>
+          {/* AI Overlay Toggle Button - hidden in compact/floating mode */}
+          {!compactMode && (
+            <Tooltip content={isPoseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"}>
               <Button
                 className={buttonStyles.actionButtonSquare}
-                onClick={() => setIsExpanded(!isExpanded)}
+                onClick={handleTogglePose}
                 style={{
-                  height: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
-                  width: isPortraitVideo || isMobile || compactMode ? "24px" : "28px",
-                  padding: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: isExpanded ? 1 : 0.7,
+                  height: isPortraitVideo || isMobile ? "24px" : "28px",
+                  padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
+                  fontSize: isMobile ? "10px" : "11px",
+                  opacity: isPoseEnabled ? 1 : 0.7,
                 }}
               >
-                <GearIcon width={isPortraitVideo || isMobile || compactMode ? 12 : 14} height={isPortraitVideo || isMobile || compactMode ? 12 : 14} />
+                <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
+                  AI Overlay
+                </Text>
               </Button>
             </Tooltip>
           )}
+
         </Flex>
 
-        {/* Stats Overlay */}
-        {!isMobile && ((isPoseEnabled && showSkeleton && currentPoses.length > 0) || (isObjectDetectionEnabled && currentObjects.length > 0) || (isProjectileDetectionEnabled && currentProjectile)) && (
+        {/* Stats Overlay - hidden in compact/floating mode */}
+        {!isMobile && !compactMode && ((isPoseEnabled && showSkeleton && currentPoses.length > 0) || (isObjectDetectionEnabled && currentObjects.length > 0) || (isProjectileDetectionEnabled && currentProjectile)) && (
           <Box
             style={{
               position: "absolute",
@@ -2377,12 +2370,6 @@ export function VideoPoseViewer({
                         <ChevronRightIcon width={12} height={12} />
                       </Button>
                     </Flex>
-                  )}
-                  {/* Show selected player's score */}
-                  {!isMobile && selectedPose && (
-                    <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "10px" }}>
-                      Score: {selectedPose.score ? `${(selectedPose.score * 100).toFixed(0)}%` : "N/A"}
-                    </Text>
                   )}
                   {selectedPose && (() => {
                     // Calculate average accuracy for selected player
@@ -2839,88 +2826,223 @@ export function VideoPoseViewer({
             )}
             </Flex>
 
-            {/* Second Row: Key Frame Detection */}
-            {!isPreprocessing && usePreprocessing && (
-              <Flex gap="2" align="center" wrap="wrap">
-                {/* Trophy Position Detection */}
-                <Tooltip content={trophyResult ? `Trophy at ${trophyResult.trophyTimestamp.toFixed(2)}s - Click to go there` : "Detect trophy position"}>
-                  <Button
-                    onClick={handleDetectTrophy}
-                    disabled={isTrophyAnalyzing}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: trophyResult ? 1 : 0.5,
-                    }}
-                  >
-                    {isTrophyAnalyzing ? (
-                      <Spinner size="1" />
-                    ) : (
-                      <RocketIcon width="16" height="16" />
-                    )}
-                  </Button>
-                </Tooltip>
-
-                {/* Contact Point Detection */}
-                <Tooltip content={contactResult ? `Contact at ${contactResult.contactTimestamp.toFixed(2)}s - Click to go there` : "Detect contact point"}>
-                  <Button
-                    onClick={handleDetectContact}
-                    disabled={isContactAnalyzing}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: contactResult ? 1 : 0.5,
-                    }}
-                  >
-                    {isContactAnalyzing ? (
-                      <Spinner size="1" />
-                    ) : (
-                      <Crosshair2Icon width="16" height="16" />
-                    )}
-                  </Button>
-                </Tooltip>
-
-                {/* Landing Detection */}
-                <Tooltip content={landingResult ? `Landing at ${landingResult.landingTimestamp.toFixed(2)}s - Click to go there` : "Detect landing position"}>
-                  <Button
-                    onClick={handleDetectLanding}
-                    disabled={isLandingAnalyzing}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                    style={{
-                      opacity: landingResult ? 1 : 0.5,
-                    }}
-                  >
-                    {isLandingAnalyzing ? (
-                      <Spinner size="1" />
-                    ) : (
-                      <ArrowDownIcon width="16" height="16" />
-                    )}
-                  </Button>
-                </Tooltip>
-
-                {/* Frame Insight Button - right aligned on second row */}
-                <Box style={{ marginLeft: 'auto' }}>
-                  <Tooltip content="Frame Insight – Analyze this frame with AI">
-                    <Button
-                      onClick={handleImageInsight}
-                      disabled={isImageInsightLoading || !selectedPose}
-                      className={buttonStyles.actionButtonSquare}
-                      size="2"
+            {/* Second Row: Key Frame Timeline */}
+            {!isPreprocessing && usePreprocessing && (() => {
+              // Calculate marker positions with overlap prevention
+              const duration = videoRef.current?.duration || 1;
+              const currentTime = videoRef.current?.currentTime || 0;
+              const currentTimePercent = (currentTime / duration) * 100;
+              const markerSize = 28;
+              const minGap = 0; // Minimum gap between markers
+              const minDistance = markerSize + minGap; // 32px minimum between marker centers
+              
+              // Threshold for "active" state (within 0.1 seconds of key frame)
+              const activeThreshold = 0.1;
+              const isTrophyActive = trophyResult && Math.abs(currentTime - trophyResult.trophyTimestamp) < activeThreshold;
+              const isContactActive = contactResult && Math.abs(currentTime - contactResult.contactTimestamp) < activeThreshold;
+              const isLandingActive = landingResult && Math.abs(currentTime - landingResult.landingTimestamp) < activeThreshold;
+              
+              // Green glow styles for active markers
+              const activeGlowStyle = {
+                border: '2px solid #7ADB8F',
+                boxShadow: '0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)',
+              };
+              
+              // Get raw positions (as percentages 0-100)
+              const rawPositions = {
+                trophy: trophyResult ? (trophyResult.trophyTimestamp / duration) * 100 : 0,
+                contact: contactResult ? (contactResult.contactTimestamp / duration) * 100 : 50,
+                landing: landingResult ? (landingResult.landingTimestamp / duration) * 100 : 100,
+              };
+              
+              // Sort markers by position for overlap calculation
+              const markers = [
+                { key: 'trophy', pos: rawPositions.trophy, detected: !!trophyResult },
+                { key: 'contact', pos: rawPositions.contact, detected: !!contactResult },
+                { key: 'landing', pos: rawPositions.landing, detected: !!landingResult },
+              ].sort((a, b) => a.pos - b.pos);
+              
+              // Adjust positions to prevent overlaps (working in percentage space)
+              // Assuming timeline is roughly 300px wide, 32px = ~10.7% of width
+              const minDistancePercent = 12; // ~12% minimum distance
+              
+              const adjustedPositions: Record<string, number> = {};
+              markers.forEach((marker, i) => {
+                if (i === 0) {
+                  adjustedPositions[marker.key] = marker.pos;
+                } else {
+                  const prevKey = markers[i - 1].key;
+                  const prevPos = adjustedPositions[prevKey];
+                  const minPos = prevPos + minDistancePercent;
+                  adjustedPositions[marker.key] = Math.max(marker.pos, minPos);
+                }
+              });
+              
+              // Clamp positions to valid range (0-100)
+              Object.keys(adjustedPositions).forEach(key => {
+                adjustedPositions[key] = Math.min(Math.max(adjustedPositions[key], 0), 100);
+              });
+              
+              return (
+              <Flex gap="2" align="center">
+                {/* Timeline with key frame markers */}
+                <Box style={{ 
+                  flex: 1, 
+                  position: 'relative', 
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}>
+                  {/* Timeline track */}
+                  <Box style={{
+                    position: 'absolute',
+                    left: '24px',
+                    right: '24px',
+                    height: '2px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '1px',
+                  }} />
+                  
+                  {/* Airborne indicator line (above main track) */}
+                  {landingResult && (
+                    <Box style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: `calc(24px + (100% - 48px) * ${(landingResult.takeoffTimestamp / duration)})`,
+                      width: `calc((100% - 48px) * ${(landingResult.landingTimestamp - landingResult.takeoffTimestamp) / duration})`,
+                      height: '3px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                      borderRadius: '1.5px',
+                      boxShadow: '0 0 4px rgba(255, 255, 255, 0.4)',
+                      pointerEvents: 'none',
+                    }} />
+                  )}
+                  
+                  {/* Current position playhead (green dot) */}
+                  <Box style={{
+                    position: 'absolute',
+                    // Constrain to track area: track goes from 24px to (100% - 24px)
+                    // Dot is 10px wide, so center it within that range
+                    left: `calc(19px + (100% - 48px) * ${currentTimePercent / 100})`,
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: '#7ADB8F',
+                    boxShadow: '0 0 8px rgba(122, 219, 143, 0.8)',
+                    zIndex: 1,
+                    transition: 'left 0.05s linear',
+                    pointerEvents: 'none',
+                  }} />
+                  
+                  {/* Trophy marker */}
+                  <Tooltip content={trophyResult ? `Trophy at ${trophyResult.trophyTimestamp.toFixed(2)}s` : "Detect trophy position"}>
+                    <Box
+                      onClick={handleDetectTrophy}
                       style={{
-                        opacity: selectedPose ? 1 : 0.5,
+                        position: 'absolute',
+                        left: `calc(10px + (100% - 48px) * ${adjustedPositions.trophy / 100})`,
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: trophyResult ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                        border: isTrophyActive ? activeGlowStyle.border : '2px solid white',
+                        boxShadow: isTrophyActive ? activeGlowStyle.boxShadow : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        zIndex: 2,
                       }}
                     >
-                      {isImageInsightLoading ? (
+                      {isTrophyAnalyzing ? (
                         <Spinner size="1" />
                       ) : (
-                        <CameraIcon width="16" height="16" />
+                        <RocketIcon width="14" height="14" style={{ color: trophyResult ? 'black' : 'white' }} />
                       )}
-                    </Button>
+                    </Box>
+                  </Tooltip>
+
+                  {/* Contact/Hit marker */}
+                  <Tooltip content={contactResult ? `Contact at ${contactResult.contactTimestamp.toFixed(2)}s` : "Detect contact point"}>
+                    <Box
+                      onClick={handleDetectContact}
+                      style={{
+                        position: 'absolute',
+                        left: `calc(10px + (100% - 48px) * ${adjustedPositions.contact / 100})`,
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: contactResult ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                        border: isContactActive ? activeGlowStyle.border : '2px solid white',
+                        boxShadow: isContactActive ? activeGlowStyle.boxShadow : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        zIndex: 2,
+                      }}
+                    >
+                      {isContactAnalyzing ? (
+                        <Spinner size="1" />
+                      ) : (
+                        <Crosshair2Icon width="14" height="14" style={{ color: contactResult ? 'black' : 'white' }} />
+                      )}
+                    </Box>
+                  </Tooltip>
+
+                  {/* Landing marker */}
+                  <Tooltip content={landingResult ? `Landing at ${landingResult.landingTimestamp.toFixed(2)}s` : "Detect landing position"}>
+                    <Box
+                      onClick={handleDetectLanding}
+                      style={{
+                        position: 'absolute',
+                        left: `calc(10px + (100% - 48px) * ${adjustedPositions.landing / 100})`,
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: landingResult ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                        border: isLandingActive ? activeGlowStyle.border : '2px solid white',
+                        boxShadow: isLandingActive ? activeGlowStyle.boxShadow : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        zIndex: 2,
+                      }}
+                    >
+                      {isLandingAnalyzing ? (
+                        <Spinner size="1" />
+                      ) : (
+                        <ArrowDownIcon width="14" height="14" style={{ color: landingResult ? 'black' : 'white' }} />
+                      )}
+                    </Box>
                   </Tooltip>
                 </Box>
+
+                {/* Frame Insight Button - right aligned */}
+                <Tooltip content="Frame Insight – Analyze this frame with AI">
+                  <Button
+                    onClick={handleImageInsight}
+                    disabled={isImageInsightLoading || !selectedPose}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: selectedPose ? 1 : 0.5,
+                    }}
+                  >
+                    {isImageInsightLoading ? (
+                      <Spinner size="1" />
+                    ) : (
+                      <CameraIcon width="16" height="16" />
+                    )}
+                  </Button>
+                </Tooltip>
               </Flex>
-            )}
+              );
+            })()}
 
             {/* Advanced Settings Toggle - Only in Developer Mode */}
             <CollapsibleSection
