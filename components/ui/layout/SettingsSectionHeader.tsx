@@ -7,10 +7,10 @@ export interface SettingsSectionHeaderProps {
   title: string;
   /** Section description */
   description: string;
-  /** Whether the section is enabled */
-  enabled: boolean;
-  /** Callback when enabled state changes */
-  onEnabledChange: (enabled: boolean) => void;
+  /** Whether the section is enabled (optional - if not provided, no toggle is shown) */
+  enabled?: boolean;
+  /** Callback when enabled state changes (optional - if not provided, no toggle is shown) */
+  onEnabledChange?: (enabled: boolean) => void;
   /** Disabled state */
   disabled?: boolean;
   /** Title size */
@@ -24,21 +24,28 @@ export interface SettingsSectionHeaderProps {
 }
 
 /**
- * SettingsSectionHeader - A header for settings sections with toggle
+ * SettingsSectionHeader - A header for settings sections with optional toggle
  * 
  * Features:
  * - Title and description on left
- * - Toggle switch on right
+ * - Optional toggle switch on right (only shown when enabled/onEnabledChange are provided)
  * - Consistent spacing and alignment
  * - Used to enable/disable entire feature sections
  * 
  * @example
  * ```tsx
+ * // With toggle
  * <SettingsSectionHeader
  *   title="Pose Detection"
  *   description="Track body movement and skeleton"
  *   enabled={isPoseEnabled}
  *   onEnabledChange={setIsPoseEnabled}
+ * />
+ * 
+ * // Without toggle (header only)
+ * <SettingsSectionHeader
+ *   title="Frame Analysis"
+ *   description="Analyze current frame"
  * />
  * ```
  */
@@ -53,6 +60,8 @@ export function SettingsSectionHeader({
   className,
   style,
 }: SettingsSectionHeaderProps) {
+  const showToggle = enabled !== undefined && onEnabledChange !== undefined;
+  
   return (
     <Flex 
       align="center" 
@@ -68,11 +77,13 @@ export function SettingsSectionHeader({
           {description}
         </Text>
       </Flex>
-      <Switch
-        checked={enabled}
-        onCheckedChange={onEnabledChange}
-        disabled={disabled}
-      />
+      {showToggle && (
+        <Switch
+          checked={enabled}
+          onCheckedChange={onEnabledChange}
+          disabled={disabled}
+        />
+      )}
     </Flex>
   );
 }
