@@ -297,7 +297,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
           .from("messages")
           .delete()
           .eq("chat_id", chat.id)
-          .not("id", "in", `(${currentMessageIds.map(id => `'${id}'`).join(",")})`);
+          .not("id", "in", `(${currentMessageIds.join(",")})`);
 
         if (deleteError) {
           console.warn("[Supabase] Warning: Could not clean up old messages:", deleteError.message);

@@ -26,7 +26,9 @@ interface UserMessageProps {
 export function UserMessage({ message, videoContainerStyle, theatreMode, isMobile, scrollContainerRef, onUpdateMessage }: UserMessageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const videoSrc = message.videoUrl || (message.videoPreview && !message.videoUrl ? message.videoPreview : null);
+  // Prefer blob URL (videoPreview) over S3 URL (videoUrl) for same-origin access
+  // This is important for pose detection which requires CORS-safe video sources
+  const videoSrc = message.videoPreview || message.videoUrl || null;
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   const showPoseViewer = true; // Always show viewer so users can toggle AI overlay on/off
   

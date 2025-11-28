@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon, RocketIcon, Crosshair2Icon, ArrowDownIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -21,7 +21,7 @@ import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings, useTrophyDetection, useContactPointDetection, useLandingDetection } from "./hooks";
 import { VelocityDisplay, CollapsibleSection, PlaybackControls, DescriptiveSelect, PoseSettingsPanel, ObjectDetectionSettingsPanel, ProjectileDetectionSettingsPanel, FrameAnalysisSettingsPanel } from "./components";
-import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS } from "./constants";
+import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS, DEFAULT_VIDEO_FPS } from "./constants";
 
 interface VideoPoseViewerProps {
   videoUrl: string;
@@ -54,6 +54,27 @@ interface VideoPoseViewerProps {
   compactMode?: boolean;
 }
 
+// Helper to determine if crossOrigin should be used for a URL
+// crossOrigin is needed for external URLs but can cause issues with blob/data URLs
+function shouldUseCrossOrigin(url: string): boolean {
+  // Blob URLs and data URLs don't need crossOrigin
+  if (url.startsWith("blob:") || url.startsWith("data:")) {
+    return false;
+  }
+  // For http/https URLs, check if same origin
+  if (typeof window !== "undefined" && (url.startsWith("http://") || url.startsWith("https://"))) {
+    try {
+      const videoOrigin = new URL(url).origin;
+      const currentOrigin = window.location.origin;
+      return videoOrigin !== currentOrigin;
+    } catch {
+      return true; // Default to using crossOrigin if URL parsing fails
+    }
+  }
+  // For relative URLs, same origin - no crossOrigin needed
+  return false;
+}
+
 export function VideoPoseViewer({
   videoUrl,
   width = 640,
@@ -73,7 +94,7 @@ export function VideoPoseViewer({
   initialSelectedJoints = [9, 10],
   initialShowVelocity = false,
   initialVelocityWrist = "right",
-  initialPoseEnabled = false, // Changed: Don't load pose model until user enables overlay
+  initialPoseEnabled = false, // Auto-enable AI overlay - preprocessing starts automatically
   theatreMode = true,
   hideTheatreToggle = false,
   // Controlled mode props
@@ -119,7 +140,14 @@ export function VideoPoseViewer({
   const [isPreprocessing, setIsPreprocessing] = useState(false);
   const [preprocessProgress, setPreprocessProgress] = useState(0);
   const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
+  const [preprocessingFPS, setPreprocessingFPS] = useState<number>(30); // FPS used during preprocessing
   const [usePreprocessing, setUsePreprocessing] = useState(false);
+  
+  // Background preprocessing state (runs while live detection is active)
+  const [isBackgroundPreprocessing, setIsBackgroundPreprocessing] = useState(false);
+  const [backgroundPreprocessProgress, setBackgroundPreprocessProgress] = useState(0);
+  const backgroundPreprocessAbortRef = useRef<boolean>(false);
+  // backgroundVideoRef removed - now using main video for preprocessing
   const [maxPoses, setMaxPoses] = useState(1); // Default to 1 player
   const [selectedPoseIndex, setSelectedPoseIndex] = useState(0); // Which person to analyze
   
@@ -717,7 +745,12 @@ export function VideoPoseViewer({
           }
           setIsPlaying(true);
           setHasStartedPlaying(true);
-        }).catch(console.error);
+        }).catch((e) => {
+          // Ignore AbortError - happens when play() is interrupted
+          if (e.name !== "AbortError") {
+            console.error("Video play error:", e);
+          }
+        });
       }
     }
   }, [isLoading, autoPlay, playbackSpeed]);
@@ -728,8 +761,9 @@ export function VideoPoseViewer({
     if (!video || !showSkeleton || isLoading || !isPoseEnabled) return;
 
     const handleSeeked = async () => {
-      // Update frame number
-      const frame = Math.floor(video.currentTime * videoFPS);
+      // Update frame number (use preprocessingFPS for lookup when using preprocessed poses)
+      const lookupFPS = usePreprocessing ? preprocessingFPS : videoFPS;
+      const frame = Math.floor(video.currentTime * lookupFPS);
       setCurrentFrame(frame);
       
       if (video.paused) {
@@ -750,7 +784,7 @@ export function VideoPoseViewer({
 
     video.addEventListener('seeked', handleSeeked);
     return () => video.removeEventListener('seeked', handleSeeked);
-  }, [showSkeleton, isLoading, detectPose, videoFPS, usePreprocessing, preprocessedPoses, isPoseEnabled]);
+  }, [showSkeleton, isLoading, detectPose, videoFPS, usePreprocessing, preprocessedPoses, preprocessingFPS, isPoseEnabled]);
 
   // Track current frame number during playback
   useEffect(() => {
@@ -766,23 +800,42 @@ export function VideoPoseViewer({
   }, [videoFPS]);
 
   // Sync preprocessed poses during playback using requestAnimationFrame for smooth updates
+  // CRITICAL: Use preprocessingFPS (the FPS used when poses were indexed) not videoFPS
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !usePreprocessing || !isPlaying) return;
 
+    console.log(`🎯 Starting pose sync: ${preprocessedPoses.size} frames available at ${preprocessingFPS} FPS`);
+    
     let rafId: number;
     let lastFrame = -1;
 
     const syncPoses = () => {
       if (!video.paused && !video.ended) {
-        const currentFrame = Math.floor(video.currentTime * videoFPS);
+        // Use preprocessingFPS to calculate frame - this matches how poses were indexed
+        const currentFrame = Math.floor(video.currentTime * preprocessingFPS);
         
         // Only update if we're on a new frame
-        if (currentFrame !== lastFrame && preprocessedPoses.has(currentFrame)) {
-          const poses = preprocessedPoses.get(currentFrame);
-          if (poses && poses.length > 0) {
-            setCurrentPoses(poses);
-            lastFrame = currentFrame;
+        if (currentFrame !== lastFrame) {
+          if (preprocessedPoses.has(currentFrame)) {
+            const poses = preprocessedPoses.get(currentFrame);
+            if (poses && poses.length > 0) {
+              setCurrentPoses(poses);
+              lastFrame = currentFrame;
+            }
+          } else {
+            // Try nearby frames if exact frame not found (timing variance)
+            const nearbyFrames = [currentFrame - 1, currentFrame + 1];
+            for (const f of nearbyFrames) {
+              if (preprocessedPoses.has(f)) {
+                const poses = preprocessedPoses.get(f);
+                if (poses && poses.length > 0) {
+                  setCurrentPoses(poses);
+                  lastFrame = currentFrame;
+                  break;
+                }
+              }
+            }
           }
         }
         
@@ -797,7 +850,49 @@ export function VideoPoseViewer({
         cancelAnimationFrame(rafId);
       }
     };
-  }, [usePreprocessing, isPlaying, videoFPS, preprocessedPoses]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePreprocessing, isPlaying, preprocessingFPS, preprocessedPoses, preprocessedPoses.size]);
+
+  // Show preprocessed pose for current frame when paused or when preprocessing completes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !usePreprocessing || preprocessedPoses.size === 0) return;
+
+    console.log(`🎯 Paused pose sync active: ${preprocessedPoses.size} frames, video at ${video.currentTime.toFixed(2)}s`);
+
+    // Immediately show pose for current frame
+    const showCurrentPose = () => {
+      const currentFrame = Math.floor(video.currentTime * videoFPS);
+      let poses = preprocessedPoses.get(currentFrame);
+      
+      // Try nearby frames if exact frame not found
+      if (!poses || poses.length === 0) {
+        const nearbyFrames = [currentFrame - 1, currentFrame + 1, currentFrame - 2, currentFrame + 2];
+        for (const f of nearbyFrames) {
+          poses = preprocessedPoses.get(f);
+          if (poses && poses.length > 0) break;
+        }
+      }
+      
+      if (poses && poses.length > 0) {
+        setCurrentPoses(poses);
+      }
+    };
+
+    // Show immediately
+    showCurrentPose();
+
+    // Also update when time changes (e.g., scrubbing while paused)
+    const handleTimeUpdate = () => {
+      if (video.paused) {
+        showCurrentPose();
+      }
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePreprocessing, preprocessedPoses, preprocessedPoses.size, videoFPS]);
 
   // Auto-adjust playback speed for accurate trajectory tracking
   useEffect(() => {
@@ -1622,7 +1717,12 @@ export function VideoPoseViewer({
       video.pause();
       setIsPlaying(false);
     } else {
-      video.play();
+      video.play().catch((e) => {
+        // Ignore AbortError - happens when play() is interrupted (normal behavior)
+        if (e.name !== "AbortError") {
+          console.error("Video play error:", e);
+        }
+      });
       setIsPlaying(true);
       setHasStartedPlaying(true);
     }
@@ -1708,6 +1808,195 @@ export function VideoPoseViewer({
     }
   };
 
+  // Auto preprocessing - uses main video with blocking overlay
+  // Includes quick FPS detection before preprocessing for accuracy
+  const startAutoPreprocess = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || !detectPose || isBackgroundPreprocessing) return;
+
+    console.log("🎬 Starting auto preprocessing...");
+    setIsBackgroundPreprocessing(true);
+    setBackgroundPreprocessProgress(0);
+    backgroundPreprocessAbortRef.current = false;
+
+    // Remember current position
+    const originalTime = video.currentTime;
+    
+    try {
+      // Step 1: Quick FPS detection by briefly playing the video (hidden behind overlay)
+      let detectedFPS = videoFPS;
+      
+      // Only detect if we haven't already (still at default)
+      if (videoFPS === DEFAULT_VIDEO_FPS && "requestVideoFrameCallback" in video) {
+        console.log("🔍 Detecting FPS (video plays briefly behind overlay)...");
+        
+        detectedFPS = await new Promise<number>((resolve) => {
+          let frameCount = 0;
+          let startMediaTime = 0;
+          const maxFrames = 20; // Quick detection - only need ~20 frames
+          const timeout = setTimeout(() => {
+            video.pause();
+            console.log("⏱️ FPS detection timeout, using default");
+            resolve(DEFAULT_VIDEO_FPS);
+          }, 1500); // 1.5s max
+          
+          const callback = (_now: number, metadata: any) => {
+            if (frameCount === 0) {
+              startMediaTime = metadata.mediaTime || 0;
+            }
+            frameCount++;
+            
+            if (frameCount >= maxFrames) {
+              clearTimeout(timeout);
+              video.pause();
+              
+              // Calculate FPS from media time
+              const mediaTimeDiff = metadata.mediaTime - startMediaTime;
+              let fps = DEFAULT_VIDEO_FPS;
+              if (mediaTimeDiff > 0) {
+                fps = Math.round(frameCount / mediaTimeDiff);
+                // Snap to common values
+                const COMMON_FPS = [24, 25, 30, 50, 60, 120];
+                fps = COMMON_FPS.reduce((prev, curr) =>
+                  Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
+                );
+              }
+              console.log(`🔍 Detected FPS: ${fps} (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
+              resolve(fps);
+            } else if (!video.paused && !video.ended) {
+              (video as any).requestVideoFrameCallback(callback);
+            }
+          };
+          
+          // Start from beginning for consistent detection
+          video.currentTime = 0;
+          video.play().then(() => {
+            (video as any).requestVideoFrameCallback(callback);
+          }).catch(() => {
+            clearTimeout(timeout);
+            resolve(DEFAULT_VIDEO_FPS);
+          });
+        });
+        
+        // Ensure video is paused after detection
+        video.pause();
+        setIsPlaying(false);
+      } else {
+        // Already detected or API not available
+        video.pause();
+        setIsPlaying(false);
+      }
+      
+      // Step 2: Preprocessing with detected FPS
+      const fps = detectedFPS;
+      const duration = video.duration;
+      const totalFrames = Math.floor(duration * fps);
+      const allPoses = new Map<number, PoseDetectionResult[]>();
+
+      console.log(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
+
+      for (let frame = 0; frame < totalFrames; frame++) {
+        // Check if aborted
+        if (backgroundPreprocessAbortRef.current) {
+          console.log("🎬 Preprocessing aborted");
+          break;
+        }
+
+        // Seek to exact frame
+        const targetTime = frame / fps;
+        video.currentTime = targetTime;
+
+        // Wait for seek to complete
+        await new Promise<void>(resolve => {
+          const onSeeked = () => {
+            video.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          video.addEventListener('seeked', onSeeked);
+        });
+
+        // Detect pose on this frame
+        const poses = await detectPose(video);
+        allPoses.set(frame, poses);
+
+        // Update progress
+        const progress = ((frame + 1) / totalFrames) * 100;
+        setBackgroundPreprocessProgress(progress);
+
+        // Log progress every 10%
+        if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
+          console.log(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
+        }
+
+        // Yield to browser (every 10 frames like manual preprocessing)
+        if (frame % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+
+      // Only complete if not aborted
+      if (!backgroundPreprocessAbortRef.current) {
+        console.log(`✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`);
+        
+        setPreprocessedPoses(allPoses);
+        setPreprocessingFPS(fps);
+        setUsePreprocessing(true);
+
+        // Return to original position
+        video.currentTime = originalTime;
+        const currentFrame = Math.round(originalTime * fps);
+        const framePoses = allPoses.get(currentFrame) || allPoses.get(0);
+        if (framePoses) {
+          setCurrentPoses(framePoses);
+        }
+      } else {
+        // Aborted - return to original position
+        video.currentTime = originalTime;
+      }
+    } catch (err) {
+      console.error('Preprocessing error:', err);
+      // Return to original position on error
+      video.currentTime = originalTime;
+    } finally {
+      setIsBackgroundPreprocessing(false);
+      setBackgroundPreprocessProgress(0);
+    }
+  }, [detectPose, isBackgroundPreprocessing, videoFPS]);
+
+  // Cancel background preprocessing
+  const cancelBackgroundPreprocess = useCallback(() => {
+    backgroundPreprocessAbortRef.current = true;
+  }, []);
+
+  // Auto-start preprocessing when AI overlay is enabled and model is loaded
+  // FPS detection is built into startAutoPreprocess, so we start immediately
+  useEffect(() => {
+    // All conditions for preprocessing
+    const canPreprocess = isPoseEnabled && 
+                          !isLoading && // Main detector must be loaded
+                          !isBackgroundPreprocessing && 
+                          !usePreprocessing && 
+                          preprocessedPoses.size === 0 && 
+                          isVideoMetadataLoaded;
+    
+    if (!canPreprocess) return;
+    
+    // Start immediately - FPS detection happens inside startAutoPreprocess
+    console.log("🎬 AI overlay enabled, starting preprocessing...");
+    const timer = setTimeout(() => {
+      startAutoPreprocess();
+    }, 100); // Small delay to ensure UI is ready
+    return () => clearTimeout(timer);
+    
+  }, [isPoseEnabled, isLoading, isBackgroundPreprocessing, usePreprocessing, preprocessedPoses.size, isVideoMetadataLoaded, startAutoPreprocess]);
+
+  // Cancel background preprocessing when AI overlay is disabled
+  useEffect(() => {
+    if (!isPoseEnabled && isBackgroundPreprocessing) {
+      cancelBackgroundPreprocess();
+    }
+  }, [isPoseEnabled, isBackgroundPreprocessing, cancelBackgroundPreprocess]);
+
   const handleVideoEnded = () => {
     setIsPlaying(false);
     stopDetection();
@@ -1733,8 +2022,9 @@ export function VideoPoseViewer({
       video.currentTime = Math.max(video.currentTime - frameDuration, 0);
     }
 
-    // Update frame and pose
-    const newFrame = Math.floor(video.currentTime * videoFPS);
+    // Update frame and pose (use preprocessingFPS for lookup when using preprocessed poses)
+    const lookupFPS = usePreprocessing ? preprocessingFPS : videoFPS;
+    const newFrame = Math.floor(video.currentTime * lookupFPS);
     setCurrentFrame(newFrame);
 
     // Use preprocessed poses if available, otherwise detect in real-time
@@ -1800,7 +2090,12 @@ export function VideoPoseViewer({
         video.pause();
         setTimeout(() => {
           if (video && wasPlaying) {
-            video.play();
+            video.play().catch((e) => {
+              // Ignore AbortError - happens when play() is interrupted
+              if (e.name !== "AbortError") {
+                console.error("Video play error:", e);
+              }
+            });
           }
         }, 50); // Small delay to ensure pause event is processed
       }
@@ -1892,7 +2187,7 @@ export function VideoPoseViewer({
           ref={videoRef}
           src={videoUrl}
           autoPlay={autoPlay && !isLoading}
-          crossOrigin="anonymous"
+          crossOrigin={shouldUseCrossOrigin(videoUrl) ? "anonymous" : undefined}
           onLoadedMetadata={() => {
             setIsVideoMetadataLoaded(true);
             const video = videoRef.current;
@@ -2205,6 +2500,62 @@ export function VideoPoseViewer({
               </Flex>
             </Flex>
           </Flex>
+        )}
+
+        {/* Preprocessing blocking overlay - blocks interaction during analysis */}
+        {isBackgroundPreprocessing && (
+          <Box
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "transparent",
+              zIndex: 24,
+            }}
+          />
+        )}
+        
+        {/* Background Preprocessing Progress - Shows at top center while analyzing */}
+        {isBackgroundPreprocessing && (
+          <Box
+            style={{
+              position: "absolute",
+              top: compactMode ? "4px" : (isPortraitVideo ? "8px" : "12px"),
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "rgba(0, 0, 0, 0.6)",
+              borderRadius: "var(--radius-2)",
+              padding: "4px 10px",
+              zIndex: 25,
+            }}
+          >
+            <Flex align="center" gap="2">
+              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
+                Analysing movement
+              </Text>
+              {/* Progress Bar */}
+              <Box
+                style={{
+                  width: "50px",
+                  height: "3px",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  borderRadius: "2px",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  style={{
+                    width: `${backgroundPreprocessProgress}%`,
+                    height: "100%",
+                    backgroundColor: "var(--accent-9)",
+                    transition: "width 0.1s ease-out",
+                  }}
+                />
+              </Box>
+            </Flex>
+          </Box>
         )}
       </Box>
 
@@ -2527,7 +2878,7 @@ export function VideoPoseViewer({
                     {isTrophyAnalyzing ? (
                       <Spinner size="1" />
                     ) : (
-                      <Text size="2">🏆</Text>
+                      <RocketIcon width="16" height="16" />
                     )}
                   </Button>
                 </Tooltip>
@@ -2546,7 +2897,7 @@ export function VideoPoseViewer({
                     {isContactAnalyzing ? (
                       <Spinner size="1" />
                     ) : (
-                      <Text size="2">🎯</Text>
+                      <Crosshair2Icon width="16" height="16" />
                     )}
                   </Button>
                 </Tooltip>
@@ -2565,7 +2916,7 @@ export function VideoPoseViewer({
                     {isLandingAnalyzing ? (
                       <Spinner size="1" />
                     ) : (
-                      <Text size="2">🦶</Text>
+                      <ArrowDownIcon width="16" height="16" />
                     )}
                   </Button>
                 </Tooltip>
