@@ -227,6 +227,20 @@ html[data-theme="dark"] .radix-themes,
   }
 }
 
+/* Slide down animation for rally timeline */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+    transform: translateY(0);
+  }
+}
+
 /* Radix Dialog scroll prevention - ensure dialog doesn't affect main scroll container */
 [data-radix-dialog-content] {
   /* Prevent focus from causing scroll in parent containers */

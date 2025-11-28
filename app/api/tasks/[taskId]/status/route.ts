@@ -138,25 +138,38 @@ export async function GET(
     
     const statusResult = await statusResponse.json();
     
+    logger.info(`[${requestId}] SportAI status response:`, JSON.stringify(statusResult, null, 2));
+    
     // Update task based on SportAI response
     let updates: Partial<Database["public"]["Tables"]["sportai_tasks"]["Update"]> = {
       updated_at: new Date().toISOString(),
     };
     
-    const resultStatus = statusResult.status || statusResult.data?.status;
+    // SportAI API returns status at data.task_status
+    const resultStatus = statusResult.data?.task_status;
+    const taskProgress = statusResult.data?.task_progress;
+    
+    logger.info(`[${requestId}] Parsed status: ${resultStatus}, progress: ${taskProgress}`);
     
     if (resultStatus === "completed") {
-      // Upload result to S3
-      const resultData = statusResult.result || statusResult.data?.result;
+      // Upload result to S3 - try multiple possible locations for result data
+      const resultData = statusResult.data?.result 
+        || statusResult.result 
+        || statusResult.data?.output
+        || statusResult.data; // Sometimes the whole data object IS the result
+      
       let resultS3Key: string | null = null;
       
       if (resultData) {
         try {
           resultS3Key = await uploadResultToS3(taskId, resultData);
+          logger.info(`[${requestId}] Uploaded result to S3: ${resultS3Key}`);
         } catch (s3Error) {
           logger.error(`[${requestId}] Failed to upload result to S3:`, s3Error);
           // Continue without S3 upload - we'll still mark as completed
         }
+      } else {
+        logger.warn(`[${requestId}] Task completed but no result data found in response`);
       }
       
       updates = {
@@ -165,14 +178,15 @@ export async function GET(
         result_s3_key: resultS3Key,
         completed_at: new Date().toISOString(),
       };
-    } else if (resultStatus === "failed") {
+    } else if (resultStatus === "failed" || resultStatus === "error") {
       updates = {
         ...updates,
         status: "failed",
-        error_message: statusResult.error || statusResult.data?.error || "Task failed",
+        error_message: statusResult.data?.error || statusResult.error || "Task failed",
       };
-    } else if (resultStatus === "processing") {
-      updates.status = "processing";
+    } else if (resultStatus === "processing" || resultStatus === "pending") {
+      // Map pending to processing in our system
+      updates.status = resultStatus === "pending" ? "pending" : "processing";
     }
     
     const { data: updatedTask, error: updateError } = await supabase

@@ -14,7 +14,7 @@ import {
   Card,
   Select,
 } from "@radix-ui/themes";
-import { ArrowLeftIcon, PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon } from "@radix-ui/react-icons";
+import { ArrowLeftIcon, PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 const TASK_TYPES = [
@@ -99,6 +99,51 @@ export function TasksPage() {
     }
   };
   
+  const [fetchingResult, setFetchingResult] = useState<string | null>(null);
+  
+  const fetchAndDownloadResult = async (taskId: string) => {
+    if (!user) return;
+    
+    setFetchingResult(taskId);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/result`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      
+      if (response.status === 202) {
+        throw new Error("Task is still being processed");
+      }
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to fetch result");
+      }
+      
+      const { url, filename } = await response.json();
+      
+      // Update task in state to show it now has a result
+      setTasks(prev => 
+        prev.map(t => t.id === taskId ? { ...t, result_s3_key: `task-results/${taskId}.json` } : t)
+      );
+      
+      // Trigger download
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch result");
+    } finally {
+      setFetchingResult(null);
+    }
+  };
+  
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -132,32 +177,68 @@ export function TasksPage() {
     fetchTasks();
   }, [fetchTasks]);
   
+  // Check status for a single task
+  const checkTaskStatus = useCallback(async (task: Task) => {
+    if (!user) return null;
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/status`, {
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      
+      if (response.ok) {
+        const { task: updatedTask } = await response.json();
+        return updatedTask;
+      }
+    } catch {
+      // Silent fail for status polling
+    }
+    return null;
+  }, [user]);
+  
+  // Check all active tasks
+  const checkAllActiveTasks = useCallback(async () => {
+    const activeTasks = tasks.filter(t => t.status === "processing" || t.status === "pending");
+    if (activeTasks.length === 0 || !user) return;
+    
+    const updates: Task[] = [];
+    for (const task of activeTasks) {
+      const updated = await checkTaskStatus(task);
+      if (updated && updated.status !== task.status) {
+        updates.push(updated);
+      }
+    }
+    
+    if (updates.length > 0) {
+      setTasks(prev => 
+        prev.map(t => {
+          const updated = updates.find(u => u.id === t.id);
+          return updated || t;
+        })
+      );
+    }
+  }, [tasks, user, checkTaskStatus]);
+  
+  // Immediate status check when tasks are first loaded
+  const [hasCheckedInitial, setHasCheckedInitial] = useState(false);
+  useEffect(() => {
+    if (!loading && tasks.length > 0 && !hasCheckedInitial) {
+      const activeTasks = tasks.filter(t => t.status === "processing" || t.status === "pending");
+      if (activeTasks.length > 0) {
+        checkAllActiveTasks();
+      }
+      setHasCheckedInitial(true);
+    }
+  }, [loading, tasks, hasCheckedInitial, checkAllActiveTasks]);
+  
   // Poll for task status updates
   useEffect(() => {
-    const processingTasks = tasks.filter(t => t.status === "processing");
-    if (processingTasks.length === 0 || !user) return;
+    const activeTasks = tasks.filter(t => t.status === "processing" || t.status === "pending");
+    if (activeTasks.length === 0 || !user) return;
     
-    const interval = setInterval(async () => {
-      for (const task of processingTasks) {
-        try {
-          const response = await fetch(`/api/tasks/${task.id}/status`, {
-            headers: { Authorization: `Bearer ${user.id}` },
-          });
-          
-          if (response.ok) {
-            const { task: updatedTask } = await response.json();
-            setTasks(prev => 
-              prev.map(t => t.id === updatedTask.id ? updatedTask : t)
-            );
-          }
-        } catch {
-          // Silent fail for status polling
-        }
-      }
-    }, 30000); // Poll every 30 seconds
+    const interval = setInterval(checkAllActiveTasks, 30000);
     
     return () => clearInterval(interval);
-  }, [tasks, user]);
+  }, [tasks, user, checkAllActiveTasks]);
   
   // Submit new task
   const handleSubmit = async (e: React.FormEvent) => {
@@ -244,9 +325,17 @@ export function TasksPage() {
   
   const formatElapsed = (task: Task) => {
     const startTime = new Date(task.created_at).getTime();
-    const endTime = task.completed_at 
-      ? new Date(task.completed_at).getTime() 
-      : Date.now();
+    
+    // For completed/failed tasks, use completed_at or updated_at as fallback
+    let endTime: number;
+    if (task.status === "completed" || task.status === "failed") {
+      endTime = task.completed_at 
+        ? new Date(task.completed_at).getTime()
+        : new Date(task.updated_at).getTime();
+    } else {
+      endTime = Date.now();
+    }
+    
     const elapsedSeconds = Math.floor((endTime - startTime) / 1000);
     return formatDuration(elapsedSeconds);
   };
@@ -312,7 +401,11 @@ export function TasksPage() {
             <Text size="6" weight="bold">SportAI Tasks</Text>
           </Flex>
           
-          <Button variant="soft" onClick={fetchTasks}>
+          <Button variant="soft" onClick={async () => {
+            await fetchTasks();
+            // Small delay then check status
+            setTimeout(checkAllActiveTasks, 500);
+          }}>
             <ReloadIcon />
             Refresh
           </Button>
@@ -464,30 +557,54 @@ export function TasksPage() {
                     <Table.Cell>{formatDate(task.created_at)}</Table.Cell>
                     <Table.Cell>{formatElapsed(task)}</Table.Cell>
                     <Table.Cell>
-                      {task.status === "processing" || task.status === "pending"
-                        ? formatTimeRemaining(task) || "-"
-                        : task.estimated_compute_time
-                          ? `${Math.round(Math.abs(task.estimated_compute_time) / 60)}m total`
-                          : "-"}
+                      {task.status === "completed" ? (
+                        <Text color="green" size="2">Done</Text>
+                      ) : task.status === "failed" ? (
+                        <Text color="red" size="2">Failed</Text>
+                      ) : (
+                        formatTimeRemaining(task) || "-"
+                      )}
                     </Table.Cell>
                     <Table.Cell>
-                      {task.result_s3_key ? (
-                        <Button
-                          variant="soft"
-                          size="1"
-                          color="green"
-                          onClick={() => downloadResult(task.id)}
-                        >
-                          <DownloadIcon />
-                          Download
-                        </Button>
-                      ) : task.error_message ? (
-                        <Text size="1" color="red" style={{ maxWidth: "150px", display: "block" }}>
-                          {task.error_message}
-                        </Text>
-                      ) : (
-                        "-"
-                      )}
+                      <Flex gap="2" align="center">
+                        {task.status === "completed" && (
+                          <Button
+                            variant="soft"
+                            size="1"
+                            color="mint"
+                            onClick={() => router.push(`/tasks/${task.id}`)}
+                          >
+                            <EyeOpenIcon />
+                            View
+                          </Button>
+                        )}
+                        {task.result_s3_key ? (
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            color="gray"
+                            onClick={() => downloadResult(task.id)}
+                          >
+                            <DownloadIcon />
+                          </Button>
+                        ) : task.status === "completed" ? (
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            color="gray"
+                            onClick={() => fetchAndDownloadResult(task.id)}
+                            disabled={fetchingResult === task.id}
+                          >
+                            {fetchingResult === task.id ? <Spinner size="1" /> : <DownloadIcon />}
+                          </Button>
+                        ) : task.error_message ? (
+                          <Text size="1" color="red" style={{ maxWidth: "150px", display: "block" }}>
+                            {task.error_message}
+                          </Text>
+                        ) : (
+                          "-"
+                        )}
+                      </Flex>
                     </Table.Cell>
                   </Table.Row>
                 ))}
