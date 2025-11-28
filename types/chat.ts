@@ -50,6 +50,7 @@ export type Message = {
     showVelocity?: boolean;
     velocityWrist?: "left" | "right";
   };
+  poseDataS3Key?: string | null; // S3 key for preprocessed pose detection data
 };
 
 export type Chat = {

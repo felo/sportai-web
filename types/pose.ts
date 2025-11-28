@@ -1,5 +1,51 @@
 import type { Keypoint } from "@tensorflow-models/pose-detection";
 
+// ============================================================================
+// Stored Pose Data (for S3 persistence)
+// ============================================================================
+
+/**
+ * Serialized keypoint data with reduced precision for storage efficiency.
+ * Coordinates are normalized (0-1) with 4 decimal places.
+ */
+export interface StoredKeypoint {
+  x: number;
+  y: number;
+  score?: number;
+  name?: string;
+}
+
+/**
+ * Serialized pose detection result for a single person in a frame.
+ */
+export interface StoredPoseResult {
+  keypoints: StoredKeypoint[];
+  score?: number;
+  id?: number; // Tracking ID for multi-pose
+}
+
+/**
+ * Complete pose data structure stored in S3.
+ * Contains metadata and all frame-by-frame pose detections.
+ */
+export interface StoredPoseData {
+  version: 1;
+  model: "MoveNet" | "BlazePose";
+  modelType: string; // e.g., "SinglePose.Lightning", "SinglePose.Thunder", "full"
+  videoFPS: number;
+  totalFrames: number;
+  videoDuration: number; // in seconds
+  createdAt: string; // ISO timestamp
+  // Frame data keyed by frame number (as string for JSON compatibility)
+  frames: {
+    [frameNumber: string]: StoredPoseResult[];
+  };
+}
+
+// ============================================================================
+// Pose Connection Types
+// ============================================================================
+
 export interface PoseConnection {
   start: number;
   end: number;

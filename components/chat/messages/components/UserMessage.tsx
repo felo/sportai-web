@@ -197,6 +197,10 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         const currentCtx = floatingContextRef.current;
         if (!currentCtx) return;
         
+        // Safety check: ensure this video is still registered (guards against stale closures after chat switch)
+        const registration = currentCtx.registeredVideos?.get(message.id);
+        if (!registration) return;
+        
         if (shouldFloat && !isFloatingRef.current) {
           // Capture dimensions RIGHT BEFORE floating starts (most accurate)
           const rect = element.getBoundingClientRect();
@@ -243,7 +247,82 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     );
 
     observer.observe(element);
-    return () => observer.disconnect();
+    
+    // Delayed visibility check - runs after chat-change cooldown (500ms) to auto-float if video not visible
+    // This handles the case when switching to a chat where the video is scrolled out of view
+    // IMPORTANT: Cancel this if user scrolls - they're actively navigating, don't interrupt
+    const COOLDOWN_CHECK_DELAY = 600; // Slightly longer than the 500ms cooldown
+    let userHasScrolled = false;
+    
+    const handleScroll = () => {
+      userHasScrolled = true;
+      // Remove listener after first scroll - we only need to know if ANY scroll happened
+      scrollContainerElement.removeEventListener("scroll", handleScroll);
+    };
+    scrollContainerElement.addEventListener("scroll", handleScroll);
+    
+    const delayedCheckTimeout = setTimeout(() => {
+      // Clean up scroll listener
+      scrollContainerElement.removeEventListener("scroll", handleScroll);
+      
+      // If user has scrolled, they're actively navigating - don't auto-float
+      if (userHasScrolled) return;
+      
+      const currentCtx = floatingContextRef.current;
+      // Check context state directly (not refs) to avoid race conditions with multiple videos
+      // If ANY video is already floating or has been set as active, don't try to float this one
+      if (!currentCtx || currentCtx.isFloating || currentCtx.activeVideoId) return;
+      
+      // Safety check: ensure element is still in DOM (guards against fast chat switching)
+      if (!element.isConnected) return;
+      
+      // Additional check: ensure this video is still registered (guards against stale closures)
+      const registration = currentCtx.registeredVideos?.get(message.id);
+      if (!registration) return;
+      
+      // Check if video is visible in the scroll container
+      const containerRect = scrollContainerElement.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      
+      // Only auto-float if this is the TOPMOST video in the chat
+      // This prevents the wrong video from floating when multiple videos are out of view
+      const allVideoContainers = Array.from(scrollContainerElement.querySelectorAll('[data-video-container="true"]'));
+      
+      // Sort by vertical position (top of element)
+      const sortedByPosition = allVideoContainers.sort((a, b) => {
+        return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+      });
+      
+      // If this isn't the topmost video, don't auto-float it
+      const topmostVideo = sortedByPosition[0];
+      if (!topmostVideo || topmostVideo !== element) return;
+      
+      // Calculate how much of the element is visible within the container
+      const visibleTop = Math.max(elementRect.top, containerRect.top);
+      const visibleBottom = Math.min(elementRect.bottom, containerRect.bottom);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+      const visibilityRatio = elementRect.height > 0 ? visibleHeight / elementRect.height : 0;
+      
+      // If less than 30% visible, start floating AND minimized
+      if (visibilityRatio < 0.3) {
+        // Capture dimensions before floating
+        const rect = element.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
+        }
+        
+        lastFloatChangeRef.current = Date.now();
+        currentCtx.setActiveVideo(message.id);
+        currentCtx.setFloating(true);
+        currentCtx.setIsMinimized(true); // Start minimized when auto-floating on chat switch
+      }
+    }, COOLDOWN_CHECK_DELAY);
+    
+    return () => {
+      observer.disconnect();
+      clearTimeout(delayedCheckTimeout);
+      scrollContainerElement.removeEventListener("scroll", handleScroll);
+    };
     // Re-setup observer when scroll container becomes available or changes
   }, [message.id, videoSrc, isImage, scrollContainerElement]);
 
@@ -420,6 +499,15 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                       onVideoMetadataLoaded={handleVideoMetadataLoaded}
                       // Compact mode when floating - hide button text
                       compactMode={!!shouldPortal}
+                      // S3 storage for pose data caching
+                      videoS3Key={message.videoS3Key ?? undefined}
+                      poseDataS3Key={message.poseDataS3Key ?? undefined}
+                      onPoseDataSaved={(s3Key) => {
+                        // Save the pose data S3 key to the message
+                        onUpdateMessage?.(message.id, { poseDataS3Key: s3Key });
+                      }}
+                      // Skip preprocessing when floating - just playback, no heavy analysis
+                      skipPreprocessing={!!shouldPortal}
                     />
                   );
                   

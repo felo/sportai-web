@@ -6,6 +6,7 @@ import { Box, IconButton, Tooltip } from "@radix-ui/themes";
 import { EnterFullScreenIcon, ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { useSidebar } from "@/components/SidebarContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { getTheatreMode } from "@/utils/storage";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
 
@@ -85,6 +86,7 @@ export function FloatingVideoPortal() {
   } = useFloatingVideoContext();
   
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
+  const isMobile = useIsMobile();
   
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
@@ -469,8 +471,8 @@ export function FloatingVideoPortal() {
   const width = getWidth();
   const height = getHeight();
 
-  // Hide floating video when sidebar is open
-  const isSidebarOpen = !isSidebarCollapsed;
+  // Hide floating video when sidebar is open (only on mobile - desktop can show both)
+  const shouldHideForSidebar = !isSidebarCollapsed && isMobile;
   
   const floatingContent = (
     <Box
@@ -494,10 +496,10 @@ export function FloatingVideoPortal() {
         transition: isDragging ? "none" : "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: isDragging ? "scale(1.02)" : "scale(1)",
         userSelect: "none",
-        // Hide when sidebar is open
-        opacity: isSidebarOpen ? 0 : 1,
-        pointerEvents: isSidebarOpen ? "none" : "auto",
-        visibility: isSidebarOpen ? "hidden" : "visible",
+        // Hide when sidebar is open (only on mobile)
+        opacity: shouldHideForSidebar ? 0 : 1,
+        pointerEvents: shouldHideForSidebar ? "none" : "auto",
+        visibility: shouldHideForSidebar ? "hidden" : "visible",
       }}
       onMouseDown={handleDragStart}
       onTouchStart={handleDragStart}

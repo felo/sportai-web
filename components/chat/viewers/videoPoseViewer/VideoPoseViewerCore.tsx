@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
-import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
+import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, GearIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon } from "@radix-ui/react-icons";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -19,7 +19,7 @@ import { Pose3DViewer } from "../Pose3DViewer";
 import buttonStyles from "@/styles/buttons.module.css";
 import selectStyles from "@/styles/selects.module.css";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings } from "./hooks";
+import { useVideoDimensions, useVideoFPS, useVelocityTracking, useJointTrajectories, useDetectionSettings, useTrophyDetection, useContactPointDetection, useLandingDetection } from "./hooks";
 import { VelocityDisplay, CollapsibleSection, PlaybackControls, DescriptiveSelect, PoseSettingsPanel, ObjectDetectionSettingsPanel, ProjectileDetectionSettingsPanel, FrameAnalysisSettingsPanel } from "./components";
 import { LABEL_POSITION_STABILITY_FRAMES, CONFIDENCE_PRESETS, RESOLUTION_PRESETS, PLAYBACK_SPEEDS } from "./constants";
 
@@ -238,6 +238,46 @@ export function VideoPoseViewer({
     sport: sportFilter !== "all" ? sportFilter : undefined,
   });
 
+  // Trophy, Contact Point, and Landing Detection hooks
+  const {
+    isAnalyzing: isTrophyAnalyzing,
+    result: trophyResult,
+    error: trophyError,
+    detectTrophyPosition,
+    clearResult: clearTrophyResult,
+  } = useTrophyDetection({
+    preprocessedPoses,
+    selectedModel,
+    videoFPS,
+    selectedPoseIndex,
+  });
+
+  const {
+    isAnalyzing: isContactAnalyzing,
+    result: contactResult,
+    error: contactError,
+    detectContactPoint,
+    clearResult: clearContactResult,
+  } = useContactPointDetection({
+    preprocessedPoses,
+    selectedModel,
+    videoFPS,
+    selectedPoseIndex,
+  });
+
+  const {
+    isAnalyzing: isLandingAnalyzing,
+    result: landingResult,
+    error: landingError,
+    detectLanding,
+    clearResult: clearLandingResult,
+  } = useLandingDetection({
+    preprocessedPoses,
+    selectedModel,
+    videoFPS,
+    selectedPoseIndex,
+  });
+
   // Frame analysis handlers
   const handleAnalyzeCourt = useCallback(async () => {
     const video = videoRef.current;
@@ -256,6 +296,33 @@ export function VideoPoseViewer({
     if (!video) return;
     await analyzeFrameMultiple(video, ["court", "camera-angle"]);
   }, [analyzeFrameMultiple]);
+
+  // Trophy Position Detection handler
+  const handleDetectTrophy = useCallback(async () => {
+    const result = await detectTrophyPosition("auto");
+    if (result && videoRef.current) {
+      // Seek to trophy frame
+      videoRef.current.currentTime = result.trophyTimestamp;
+    }
+  }, [detectTrophyPosition]);
+
+  // Contact Point Detection handler
+  const handleDetectContact = useCallback(async () => {
+    const result = await detectContactPoint("auto");
+    if (result && videoRef.current) {
+      // Seek to contact frame
+      videoRef.current.currentTime = result.contactTimestamp;
+    }
+  }, [detectContactPoint]);
+
+  // Landing Detection handler
+  const handleDetectLanding = useCallback(async () => {
+    const result = await detectLanding();
+    if (result && videoRef.current) {
+      // Seek to landing frame
+      videoRef.current.currentTime = result.landingTimestamp;
+    }
+  }, [detectLanding]);
 
   // All 4 angle presets: both elbows and both knees
   const ALL_ANGLE_PRESETS: Array<[number, number, number]> = [
@@ -2277,6 +2344,26 @@ export function VideoPoseViewer({
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
+                  
+                  {/* Frame Insight Button - next to ruler */}
+                  <Tooltip content="Frame Insight – Analyze this frame with AI">
+                    <Button
+                      onClick={handleImageInsight}
+                      disabled={isImageInsightLoading || !selectedPose}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{
+                        opacity: selectedPose ? 1 : 0.5,
+                        marginLeft: '4px',
+                      }}
+                    >
+                      {isImageInsightLoading ? (
+                        <Spinner size="1" />
+                      ) : (
+                        <CameraIcon width="16" height="16" />
+                      )}
+                    </Button>
+                  </Tooltip>
                 </Box>
               </>
             )}
@@ -2398,10 +2485,92 @@ export function VideoPoseViewer({
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
+                  
+                  {/* Frame Insight Button - next to ruler */}
+                  <Tooltip content="Frame Insight – Analyze this frame with AI">
+                    <Button
+                      onClick={handleImageInsight}
+                      disabled={isImageInsightLoading || !selectedPose}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{
+                        opacity: selectedPose ? 1 : 0.5,
+                        marginLeft: '4px',
+                      }}
+                    >
+                      {isImageInsightLoading ? (
+                        <Spinner size="1" />
+                      ) : (
+                        <CameraIcon width="16" height="16" />
+                      )}
+                    </Button>
+                  </Tooltip>
                 </Box>
               </>
             )}
             </Flex>
+
+            {/* Second Row: Key Frame Detection */}
+            {!isPreprocessing && usePreprocessing && (
+              <Flex gap="2" align="center" wrap="wrap">
+                {/* Trophy Position Detection */}
+                <Tooltip content={trophyResult ? `Trophy at ${trophyResult.trophyTimestamp.toFixed(2)}s - Click to go there` : "Detect trophy position (requires preprocessing)"}>
+                  <Button
+                    onClick={handleDetectTrophy}
+                    disabled={isTrophyAnalyzing || preprocessedPoses.size === 0}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: trophyResult ? 1 : 0.5,
+                    }}
+                  >
+                    {isTrophyAnalyzing ? (
+                      <Spinner size="1" />
+                    ) : (
+                      <Text size="2">🏆</Text>
+                    )}
+                  </Button>
+                </Tooltip>
+
+                {/* Contact Point Detection */}
+                <Tooltip content={contactResult ? `Contact at ${contactResult.contactTimestamp.toFixed(2)}s - Click to go there` : "Detect contact point (requires preprocessing)"}>
+                  <Button
+                    onClick={handleDetectContact}
+                    disabled={isContactAnalyzing || preprocessedPoses.size === 0}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: contactResult ? 1 : 0.5,
+                    }}
+                  >
+                    {isContactAnalyzing ? (
+                      <Spinner size="1" />
+                    ) : (
+                      <Text size="2">🎯</Text>
+                    )}
+                  </Button>
+                </Tooltip>
+
+                {/* Landing Detection */}
+                <Tooltip content={landingResult ? `Landing at ${landingResult.landingTimestamp.toFixed(2)}s - Click to go there` : "Detect landing position (requires preprocessing)"}>
+                  <Button
+                    onClick={handleDetectLanding}
+                    disabled={isLandingAnalyzing || preprocessedPoses.size === 0}
+                    className={buttonStyles.actionButtonSquare}
+                    size="2"
+                    style={{
+                      opacity: landingResult ? 1 : 0.5,
+                    }}
+                  >
+                    {isLandingAnalyzing ? (
+                      <Spinner size="1" />
+                    ) : (
+                      <Text size="2">🦶</Text>
+                    )}
+                  </Button>
+                </Tooltip>
+              </Flex>
+            )}
 
             {/* Advanced Settings Toggle - Only in Developer Mode */}
             <CollapsibleSection

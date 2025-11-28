@@ -40,6 +40,12 @@ interface VideoPoseViewerProps {
   onVideoMetadataLoaded?: (width: number, height: number) => void;
   // Compact mode - hides button text, used when video is floating/docked
   compactMode?: boolean;
+  // S3 storage for pose data caching
+  videoS3Key?: string;
+  poseDataS3Key?: string;
+  onPoseDataSaved?: (s3Key: string) => void;
+  // Skip preprocessing - used when video is floating (just playback, no analysis)
+  skipPreprocessing?: boolean;
 }
 
 // Minimal loading placeholder - matches video dimensions exactly

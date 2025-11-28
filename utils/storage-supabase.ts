@@ -42,6 +42,7 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     modelSettings: dbMsg.model_settings ? (dbMsg.model_settings as any) : undefined,
     ttsUsage: dbMsg.tts_usage ? (dbMsg.tts_usage as any) : undefined,
     poseData: dbMsg.pose_data ? (dbMsg.pose_data as any) : undefined,
+    poseDataS3Key: dbMsg.pose_data_s3_key || undefined,
     videoFile: null,
     videoPreview: null,
   };
@@ -87,6 +88,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     model_settings: message.modelSettings ? (message.modelSettings as any) : null,
     tts_usage: message.ttsUsage ? (message.ttsUsage as any) : null,
     pose_data: message.poseData ? (message.poseData as any) : null,
+    pose_data_s3_key: message.poseDataS3Key || null,
   };
 }
 
@@ -452,6 +454,7 @@ export async function updateMessageInSupabase(
     if (updates.modelSettings !== undefined) dbUpdates.model_settings = updates.modelSettings;
     if (updates.ttsUsage !== undefined) dbUpdates.tts_usage = updates.ttsUsage;
     if (updates.poseData !== undefined) dbUpdates.pose_data = updates.poseData;
+    if (updates.poseDataS3Key !== undefined) dbUpdates.pose_data_s3_key = updates.poseDataS3Key;
 
     const { error } = await supabase
       .from("messages")

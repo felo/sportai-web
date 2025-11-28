@@ -392,7 +392,10 @@ CREATE TABLE IF NOT EXISTS messages (
   tts_usage JSONB,
   
   -- Pose detection data
-  pose_data JSONB
+  pose_data JSONB,
+  
+  -- Pose detection S3 storage (for preprocessed frame-by-frame data)
+  pose_data_s3_key TEXT
 );
 
 -- =============================================
@@ -400,6 +403,12 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Run this if you already have the messages table
 -- =============================================
 -- ALTER TABLE messages ADD COLUMN IF NOT EXISTS sequence_number INTEGER NOT NULL DEFAULT 0;
+
+-- =============================================
+-- MIGRATION: Add pose_data_s3_key for storing preprocessed pose data
+-- Run this if you already have the messages table
+-- =============================================
+-- ALTER TABLE messages ADD COLUMN IF NOT EXISTS pose_data_s3_key TEXT;
 
 -- Create index on chat_id for faster message retrieval
 CREATE INDEX IF NOT EXISTS messages_chat_id_idx ON messages(chat_id);

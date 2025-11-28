@@ -8,28 +8,35 @@ export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
     // Check if requestVideoFrameCallback is available (Chrome/Edge)
     if ("requestVideoFrameCallback" in video) {
       let frameCount = 0;
-      let startTime = 0;
-      let lastMediaTime = 0;
+      let startMediaTime = 0;
       const maxFrames = 30; // Reduced from 60 for faster detection
 
-      const callback = (now: number, metadata: any) => {
+      const callback = (_now: number, metadata: any) => {
         if (frameCount === 0) {
-          startTime = now;
-          lastMediaTime = metadata.mediaTime || 0;
+          // Use mediaTime which is the actual video time, not wall-clock time
+          // This is CRITICAL for accurate FPS detection when playback speed is not 1.0
+          startMediaTime = metadata.mediaTime || 0;
         }
 
         frameCount++;
 
         if (frameCount >= maxFrames) {
-          const elapsed = (now - startTime) / 1000; // Convert to seconds
-          let detectedFPS = Math.round(frameCount / elapsed);
+          let detectedFPS: number;
 
-          // Use metadata.mediaTime for more accurate FPS if available
-          if (metadata.mediaTime && frameCount > 10) {
-            const mediaTimeDiff = metadata.mediaTime - lastMediaTime;
+          // ALWAYS use metadata.mediaTime for FPS calculation
+          // This correctly handles any playback speed (0.25x, 0.5x, 2x, etc.)
+          // because mediaTime represents actual video time, not wall-clock time
+          if (metadata.mediaTime !== undefined && startMediaTime !== undefined) {
+            const mediaTimeDiff = metadata.mediaTime - startMediaTime;
             if (mediaTimeDiff > 0) {
               detectedFPS = Math.round(frameCount / mediaTimeDiff);
+            } else {
+              // Fallback if mediaTime didn't advance (shouldn't happen)
+              detectedFPS = DEFAULT_VIDEO_FPS;
             }
+          } else {
+            // Fallback if mediaTime not available
+            detectedFPS = DEFAULT_VIDEO_FPS;
           }
 
           // Clamp to common frame rates
@@ -38,7 +45,7 @@ export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
           );
 
           setVideoFPS(closest);
-          console.log(`Detected video FPS: ${closest} (raw: ${detectedFPS})`);
+          console.log(`Detected video FPS: ${closest} (raw: ${detectedFPS}, playbackRate: ${video.playbackRate})`);
         } else if (!video.paused && !video.ended) {
           (video as any).requestVideoFrameCallback(callback);
         }
@@ -47,6 +54,7 @@ export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
       // Start detection when video plays
       const startDetection = () => {
         frameCount = 0;
+        startMediaTime = 0;
         (video as any).requestVideoFrameCallback(callback);
       };
 

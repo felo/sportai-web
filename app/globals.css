@@ -409,6 +409,15 @@ html[data-theme="dark"] .radix-themes [data-radix-menu-content] [data-highlighte
   }
 }
 
+@keyframes phaseLoadingBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* Content wrapper responsive styles - avoids hydration layout shift */
 .content-wrapper {
   /* Mobile first */

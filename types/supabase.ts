@@ -376,6 +376,7 @@ export interface Database {
           model_settings: Json | null;
           tts_usage: Json | null;
           pose_data: Json | null;
+          pose_data_s3_key: string | null;
         };
         Insert: {
           id?: string;
@@ -395,6 +396,7 @@ export interface Database {
           model_settings?: Json | null;
           tts_usage?: Json | null;
           pose_data?: Json | null;
+          pose_data_s3_key?: string | null;
         };
         Update: {
           id?: string;
@@ -414,6 +416,7 @@ export interface Database {
           model_settings?: Json | null;
           tts_usage?: Json | null;
           pose_data?: Json | null;
+          pose_data_s3_key?: string | null;
         };
         Relationships: [
           {
