@@ -1,3 +1,2 @@
 export { TaskViewer } from "./TaskViewer";
-export { usePlayerPortraits } from "./usePlayerPortraits";
-
+export type { Task, StatisticsResult, Player, Swing, Highlight, BallBounce } from "./types";
