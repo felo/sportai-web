@@ -2174,7 +2174,7 @@ export function VideoPoseViewer({
           maxWidth: "100%",
           maxHeight: compactMode ? "100%" : videoMaxHeight,
           backgroundColor: "transparent",
-          borderRadius: compactMode ? 0 : "var(--radius-3)",
+          borderRadius: compactMode ? 0 : (showControls && isExpanded ? "var(--radius-3) var(--radius-3) 0 0" : "var(--radius-3)"),
           overflow: "hidden",
           margin: "0 auto",
           // Let the video drive the container's aspect ratio
@@ -2557,12 +2557,28 @@ export function VideoPoseViewer({
             </Flex>
           </Box>
         )}
+
+        {/* Bottom gradient mask for smooth transition to controls */}
+        {showControls && isExpanded && (
+          <Box
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: "12px",
+              background: "linear-gradient(to bottom, transparent 0%, black 100%)",
+              pointerEvents: "none",
+              zIndex: 5,
+            }}
+          />
+        )}
       </Box>
 
       {/* Controls */}
       {showControls && isExpanded && (
         <Flex direction="column" gap="2" style={{
-          backgroundColor: "var(--gray-2)",
+          backgroundColor: "black",
           padding: "var(--space-3)",
           borderRadius: "0 0 var(--radius-3) var(--radius-3)",
         }}>
@@ -2695,43 +2711,25 @@ export function VideoPoseViewer({
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
-                  
-                  {/* Frame Insight Button - next to ruler */}
-                  <Tooltip content="Frame Insight – Analyze this frame with AI">
-                    <Button
-                      onClick={handleImageInsight}
-                      disabled={isImageInsightLoading || !selectedPose}
-                      className={buttonStyles.actionButtonSquare}
-                      size="2"
-                      style={{
-                        opacity: selectedPose ? 1 : 0.5,
-                        marginLeft: '4px',
-                      }}
-                    >
-                      {isImageInsightLoading ? (
-                        <Spinner size="1" />
-                      ) : (
-                        <CameraIcon width="16" height="16" />
-                      )}
-                    </Button>
-                  </Tooltip>
                 </Box>
               </>
             )}
             {usePreprocessing && (
               <>
-                <Tooltip content="Disable pre-processed frames">
-                  <Button
-                    onClick={() => {
-                      setUsePreprocessing(false);
-                      setPreprocessedPoses(new Map());
-                    }}
-                    className={buttonStyles.actionButtonSquare}
-                    size="2"
-                  >
-                    <CrossCircledIcon width="16" height="16" />
-                  </Button>
-                </Tooltip>
+                {developerMode && (
+                  <Tooltip content="Disable pre-processed frames">
+                    <Button
+                      onClick={() => {
+                        setUsePreprocessing(false);
+                        setPreprocessedPoses(new Map());
+                      }}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                    >
+                      <CrossCircledIcon width="16" height="16" />
+                    </Button>
+                  </Tooltip>
+                )}
                 <Tooltip content="Previous Frame">
                   <Button
                     onClick={() => handleFrameStep('backward')}
@@ -2836,26 +2834,6 @@ export function VideoPoseViewer({
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
-                  
-                  {/* Frame Insight Button - next to ruler */}
-                  <Tooltip content="Frame Insight – Analyze this frame with AI">
-                    <Button
-                      onClick={handleImageInsight}
-                      disabled={isImageInsightLoading || !selectedPose}
-                      className={buttonStyles.actionButtonSquare}
-                      size="2"
-                      style={{
-                        opacity: selectedPose ? 1 : 0.5,
-                        marginLeft: '4px',
-                      }}
-                    >
-                      {isImageInsightLoading ? (
-                        <Spinner size="1" />
-                      ) : (
-                        <CameraIcon width="16" height="16" />
-                      )}
-                    </Button>
-                  </Tooltip>
                 </Box>
               </>
             )}
@@ -2865,10 +2843,10 @@ export function VideoPoseViewer({
             {!isPreprocessing && usePreprocessing && (
               <Flex gap="2" align="center" wrap="wrap">
                 {/* Trophy Position Detection */}
-                <Tooltip content={trophyResult ? `Trophy at ${trophyResult.trophyTimestamp.toFixed(2)}s - Click to go there` : "Detect trophy position (requires preprocessing)"}>
+                <Tooltip content={trophyResult ? `Trophy at ${trophyResult.trophyTimestamp.toFixed(2)}s - Click to go there` : "Detect trophy position"}>
                   <Button
                     onClick={handleDetectTrophy}
-                    disabled={isTrophyAnalyzing || preprocessedPoses.size === 0}
+                    disabled={isTrophyAnalyzing}
                     className={buttonStyles.actionButtonSquare}
                     size="2"
                     style={{
@@ -2884,10 +2862,10 @@ export function VideoPoseViewer({
                 </Tooltip>
 
                 {/* Contact Point Detection */}
-                <Tooltip content={contactResult ? `Contact at ${contactResult.contactTimestamp.toFixed(2)}s - Click to go there` : "Detect contact point (requires preprocessing)"}>
+                <Tooltip content={contactResult ? `Contact at ${contactResult.contactTimestamp.toFixed(2)}s - Click to go there` : "Detect contact point"}>
                   <Button
                     onClick={handleDetectContact}
-                    disabled={isContactAnalyzing || preprocessedPoses.size === 0}
+                    disabled={isContactAnalyzing}
                     className={buttonStyles.actionButtonSquare}
                     size="2"
                     style={{
@@ -2903,10 +2881,10 @@ export function VideoPoseViewer({
                 </Tooltip>
 
                 {/* Landing Detection */}
-                <Tooltip content={landingResult ? `Landing at ${landingResult.landingTimestamp.toFixed(2)}s - Click to go there` : "Detect landing position (requires preprocessing)"}>
+                <Tooltip content={landingResult ? `Landing at ${landingResult.landingTimestamp.toFixed(2)}s - Click to go there` : "Detect landing position"}>
                   <Button
                     onClick={handleDetectLanding}
-                    disabled={isLandingAnalyzing || preprocessedPoses.size === 0}
+                    disabled={isLandingAnalyzing}
                     className={buttonStyles.actionButtonSquare}
                     size="2"
                     style={{
@@ -2920,6 +2898,27 @@ export function VideoPoseViewer({
                     )}
                   </Button>
                 </Tooltip>
+
+                {/* Frame Insight Button - right aligned on second row */}
+                <Box style={{ marginLeft: 'auto' }}>
+                  <Tooltip content="Frame Insight – Analyze this frame with AI">
+                    <Button
+                      onClick={handleImageInsight}
+                      disabled={isImageInsightLoading || !selectedPose}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{
+                        opacity: selectedPose ? 1 : 0.5,
+                      }}
+                    >
+                      {isImageInsightLoading ? (
+                        <Spinner size="1" />
+                      ) : (
+                        <CameraIcon width="16" height="16" />
+                      )}
+                    </Button>
+                  </Tooltip>
+                </Box>
               </Flex>
             )}
 
