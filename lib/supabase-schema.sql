@@ -573,3 +573,71 @@ CREATE POLICY "Users can delete their own feedback"
 -- WHERE c.id = 'chat-uuid-here' AND c.user_id = auth.uid()
 -- GROUP BY c.id;
 
+-- =============================================
+-- SPORTAI_TASKS TABLE
+-- Generic table for all SportAI API tasks
+-- =============================================
+CREATE TABLE IF NOT EXISTS sportai_tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  
+  -- Task type (statistics, activity_detection, etc.)
+  task_type TEXT NOT NULL,
+  
+  -- Sport type
+  sport TEXT NOT NULL DEFAULT 'padel' CHECK (sport IN ('tennis', 'padel', 'pickleball')),
+  
+  -- SportAI API fields
+  sportai_task_id UUID, -- Task ID returned from SportAI API
+  video_url TEXT NOT NULL,
+  video_length NUMERIC, -- Video length in seconds
+  
+  -- Task status
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+  estimated_compute_time NUMERIC, -- From API response
+  
+  -- Request parameters (flexible JSONB for different task types)
+  request_params JSONB,
+  
+  -- Results (S3 key for the result JSON file)
+  result_s3_key TEXT,
+  error_message TEXT,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS sportai_tasks_user_id_idx ON sportai_tasks(user_id);
+CREATE INDEX IF NOT EXISTS sportai_tasks_status_idx ON sportai_tasks(status);
+CREATE INDEX IF NOT EXISTS sportai_tasks_task_type_idx ON sportai_tasks(task_type);
+CREATE INDEX IF NOT EXISTS sportai_tasks_sportai_task_id_idx ON sportai_tasks(sportai_task_id);
+
+-- Enable RLS
+ALTER TABLE sportai_tasks ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view their own sportai tasks"
+  ON sportai_tasks FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own sportai tasks"
+  ON sportai_tasks FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own sportai tasks"
+  ON sportai_tasks FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own sportai tasks"
+  ON sportai_tasks FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Trigger for updated_at
+CREATE TRIGGER update_sportai_tasks_updated_at
+  BEFORE UPDATE ON sportai_tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+

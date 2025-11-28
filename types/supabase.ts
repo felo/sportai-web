@@ -29,6 +29,8 @@ type BusinessTypeType =
   | "equipment-brand" | "retail-proshop" | "app-developer" | "content-creator"
   | "tournament-organizer" | "fitness-wellness" | "sports-analytics" | "other";
 
+type TaskStatusType = "pending" | "processing" | "completed" | "failed";
+
 export interface Database {
   public: {
     Tables: {
@@ -465,6 +467,68 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "message_feedback_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      sportai_tasks: {
+        Row: {
+          id: string;
+          user_id: string;
+          task_type: string;
+          sport: SportType;
+          sportai_task_id: string | null;
+          video_url: string;
+          video_length: number | null;
+          status: TaskStatusType;
+          estimated_compute_time: number | null;
+          request_params: Json | null;
+          result_s3_key: string | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          task_type: string;
+          sport?: SportType;
+          sportai_task_id?: string | null;
+          video_url: string;
+          video_duration?: number | null;
+          status?: TaskStatusType;
+          estimated_compute_time?: number | null;
+          request_params?: Json | null;
+          result_s3_key?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          task_type?: string;
+          sport?: SportType;
+          sportai_task_id?: string | null;
+          video_url?: string;
+          video_duration?: number | null;
+          status?: TaskStatusType;
+          estimated_compute_time?: number | null;
+          request_params?: Json | null;
+          result_s3_key?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sportai_tasks_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
