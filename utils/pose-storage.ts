@@ -301,3 +301,4 @@ export function estimatePoseDataSize(poses: Map<number, PoseDetectionResult[]>):
   return totalKeypoints * 70 + poses.size * 50;
 }
 
+

@@ -290,3 +290,4 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 | `components/ui/` | Reusable UI components |
 | `docs/design/design-components.md` | Full component catalog |
 
+

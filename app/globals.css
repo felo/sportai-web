@@ -241,6 +241,28 @@ html[data-theme="dark"] .radix-themes,
   }
 }
 
+/* Simple fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slide in from right animation */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Radix Dialog scroll prevention - ensure dialog doesn't affect main scroll container */
 [data-radix-dialog-content] {
   /* Prevent focus from causing scroll in parent containers */
