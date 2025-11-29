@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, forwardRef, useRef, useCallback } from "react";
-import { Box, Flex, IconButton, Tooltip } from "@radix-ui/themes";
+import { Box, IconButton, Tooltip } from "@radix-ui/themes";
 import { GearIcon, EnterFullScreenIcon, ExitFullScreenIcon } from "@radix-ui/react-icons";
-import { CONFIG } from "../constants";
 import { VideoSettings } from "./VideoSettings";
-import { ResizeHandle } from "./ResizeHandle";
 import { BallTrackerOverlay } from "./BallTrackerOverlay";
 
 interface BallPosition {
@@ -41,8 +39,6 @@ interface SwingWithPlayer {
 
 interface VideoPlayerProps {
   videoUrl: string;
-  videoWidth: number;
-  onWidthChange: (width: number) => void;
   ballPositions?: BallPosition[];
   ballBounces?: BallBounce[];
   swings?: SwingWithPlayer[];
@@ -54,8 +50,7 @@ interface VideoPlayerProps {
 }
 
 export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
-  ({ videoUrl, videoWidth, onWidthChange, ballPositions, ballBounces, swings, isFullWidth = false, onFullWidthChange, inferSwingBounces = true, onInferSwingBouncesChange }, ref) => {
-    const [isResizing, setIsResizing] = useState(false);
+  ({ videoUrl, ballPositions, ballBounces, swings, isFullWidth = false, onFullWidthChange, inferSwingBounces = true, onInferSwingBouncesChange }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
     const [showBallTracker, setShowBallTracker] = useState(false);
     const [usePerspective, setUsePerspective] = useState(true);
@@ -78,44 +73,17 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
       }
     }, [ref]);
 
-    const handleResizeStart = (startX: number, startWidth: number, side: "left" | "right") => {
-      setIsResizing(true);
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const delta = side === "left" ? startX - moveEvent.clientX : moveEvent.clientX - startX;
-        const newWidth = Math.max(
-          CONFIG.VIDEO_MIN_WIDTH,
-          Math.min(CONFIG.VIDEO_MAX_WIDTH, startWidth + delta * 2)
-        );
-        onWidthChange(newWidth);
-      };
-
-      const onMouseUp = () => {
-        setIsResizing(false);
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    };
-
     return (
-      <Flex justify="center" style={{ marginBottom: "var(--space-4)" }}>
-        {!isFullWidth && <Box style={{ flex: 1 }} />}
-
-        <Box
-          style={{
-            position: "relative",
-            width: isFullWidth ? "100%" : `${videoWidth}px`,
-            maxWidth: "100%",
-            minWidth: `${CONFIG.VIDEO_MIN_WIDTH}px`,
-            aspectRatio: "16 / 9",
-            backgroundColor: "var(--gray-3)",
-            borderRadius: "var(--radius-3)",
-            overflow: "hidden",
-          }}
-        >
+      <Box
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          backgroundColor: "var(--gray-3)",
+          borderRadius: "var(--radius-3)",
+          overflow: "hidden",
+        }}
+      >
           <video
             ref={setVideoRef}
             src={videoUrl}
@@ -215,26 +183,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
             />
           )}
 
-          {!isFullWidth && (
-            <>
-              <ResizeHandle
-                side="left"
-                isResizing={isResizing}
-                videoWidth={videoWidth}
-                onResizeStart={handleResizeStart}
-              />
-              <ResizeHandle
-                side="right"
-                isResizing={isResizing}
-                videoWidth={videoWidth}
-                onResizeStart={handleResizeStart}
-              />
-            </>
-          )}
         </Box>
-
-        {!isFullWidth && <Box style={{ flex: 1 }} />}
-      </Flex>
     );
   }
 );

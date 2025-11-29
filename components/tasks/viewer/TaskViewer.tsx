@@ -2,9 +2,8 @@
 
 import { useState, useEffect, use, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Card, Text } from "@radix-ui/themes";
+import { Box, Card, Text, Flex } from "@radix-ui/themes";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { CONFIG } from "./constants";
 import { Task, StatisticsResult, BallBounce } from "./types";
 import { useVideoPlayback, useEventTooltip } from "./hooks";
 import {
@@ -15,6 +14,8 @@ import {
   RallyTimeline,
   MainTimeline,
   MatchInsights,
+  PadelCourt2D,
+  VideoCourtLayout,
 } from "./components";
 
 interface TaskViewerProps {
@@ -32,7 +33,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [loadingResult, setLoadingResult] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRallyIndex, setSelectedRallyIndex] = useState<number | null>(null);
-  const [videoWidth, setVideoWidth] = useState(CONFIG.VIDEO_DEFAULT_WIDTH);
   const [isVideoFullWidth, setIsVideoFullWidth] = useState(false);
   const [inferSwingBounces, setInferSwingBounces] = useState(true);
   
@@ -238,18 +238,24 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
           </Card>
         )}
 
-        <VideoPlayer
-          ref={videoRef}
-          videoUrl={task.video_url}
-          videoWidth={isVideoFullWidth ? CONFIG.VIDEO_MAX_WIDTH : videoWidth}
-          onWidthChange={setVideoWidth}
-          ballPositions={result?.ball_positions}
-          ballBounces={enhancedBallBounces}
-          swings={allSwings}
+        {/* Video + Court Layout */}
+        <VideoCourtLayout
           isFullWidth={isVideoFullWidth}
-          onFullWidthChange={setIsVideoFullWidth}
-          inferSwingBounces={inferSwingBounces}
-          onInferSwingBouncesChange={setInferSwingBounces}
+          showCourt={task.sport === "padel"}
+          videoPlayer={
+            <VideoPlayer
+              ref={videoRef}
+              videoUrl={task.video_url}
+              ballPositions={result?.ball_positions}
+              ballBounces={enhancedBallBounces}
+              swings={allSwings}
+              isFullWidth={isVideoFullWidth}
+              onFullWidthChange={setIsVideoFullWidth}
+              inferSwingBounces={inferSwingBounces}
+              onInferSwingBouncesChange={setInferSwingBounces}
+            />
+          }
+          courtComponent={<PadelCourt2D />}
         />
 
         {result && selectedRallyIndex !== null && (

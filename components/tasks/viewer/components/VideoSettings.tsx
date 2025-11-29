@@ -107,7 +107,7 @@ export function VideoSettings({
         <ToggleSwitch
           checked={showVelocity}
           onCheckedChange={onVelocityChange}
-          label="Shot speed"
+          label="Swing type and speed"
         />
 
         <ToggleSwitch

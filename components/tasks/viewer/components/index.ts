@@ -14,4 +14,6 @@ export { PlayerCard } from "./PlayerCard";
 export { BounceHeatmap } from "./BounceHeatmap";
 export { ConfidenceCard } from "./ConfidenceCard";
 export { TaskStatusCard } from "./TaskStatusCard";
+export { PadelCourt2D } from "./PadelCourt2D";
+export { VideoCourtLayout } from "./VideoCourtLayout";
 
