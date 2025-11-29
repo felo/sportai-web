@@ -1,12 +1,13 @@
 "use client";
 
-import { RefObject } from "react";
-import { Box, Flex, Heading, Badge, Text, Tooltip, Card } from "@radix-ui/themes";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import { RefObject, useState } from "react";
+import { Box, Flex, Heading, Badge, Text, Tooltip, Card, Switch } from "@radix-ui/themes";
+import { Cross2Icon, SpeakerLoudIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
 import { CONFIG } from "../constants";
 import { StatisticsResult, ActiveEventTooltip, BallBounce } from "../types";
 import { formatSwingType, formatDuration, getPlayerIndex } from "../utils";
+import { AudioWaveform } from "./AudioWaveform";
 
 interface RallyTimelineProps {
   result: StatisticsResult;
@@ -17,6 +18,7 @@ interface RallyTimelineProps {
   rallyTimelineRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   enhancedBallBounces?: BallBounce[];
+  playerDisplayNames?: Record<number, string>;
 }
 
 export function RallyTimeline({
@@ -28,7 +30,9 @@ export function RallyTimeline({
   rallyTimelineRef,
   onClose,
   enhancedBallBounces,
+  playerDisplayNames = {},
 }: RallyTimelineProps) {
+  const [showAudioWaveform, setShowAudioWaveform] = useState(false);
   const [rallyStart, rallyEnd] = result.rallies[selectedRallyIndex];
   const rallyDuration = rallyEnd - rallyStart;
 
@@ -90,6 +94,12 @@ export function RallyTimeline({
                   <Text size="1" color="gray">Swing</Text>
                 </Flex>
               </Flex>
+              <Tooltip content="Show audio waveform (play video to analyze)">
+                <Flex align="center" gap="1" style={{ cursor: "pointer" }} onClick={() => setShowAudioWaveform(!showAudioWaveform)}>
+                  <SpeakerLoudIcon style={{ width: 14, height: 14, color: showAudioWaveform ? "var(--pink-9)" : "var(--gray-9)" }} />
+                  <Switch size="1" checked={showAudioWaveform} onCheckedChange={setShowAudioWaveform} />
+                </Flex>
+              </Tooltip>
               <IconButton
                 icon={<Cross2Icon />}
                 variant="ghost"
@@ -113,17 +123,28 @@ export function RallyTimeline({
               cursor: "pointer",
             }}
           >
+            {/* Audio Waveform (behind other elements) */}
+            {showAudioWaveform && (
+              <AudioWaveform
+                videoRef={videoRef}
+                startTime={rallyStart}
+                endTime={rallyEnd}
+                height={44}
+              />
+            )}
+
             {/* Swings */}
             {rallySwings.map((swing, idx) => {
               const relativeTime = swing.ball_hit.timestamp - rallyStart;
               const position = (relativeTime / rallyDuration) * 100;
               const playerIndex = getPlayerIndex(result.players, swing.player_id);
+              const playerName = playerDisplayNames[swing.player_id] || `P${playerIndex}`;
               const isNearPlayhead = Math.abs(currentTime - swing.ball_hit.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
 
               return (
                 <Tooltip
                   key={`swing-${idx}`}
-                  content={`P${playerIndex} ${formatSwingType(swing.swing_type)} @ ${formatDuration(swing.ball_hit.timestamp)}`}
+                  content={`${playerName} ${formatSwingType(swing.swing_type)} @ ${formatDuration(swing.ball_hit.timestamp)}`}
                 >
                   <Box
                     onClick={(e: React.MouseEvent) => {
@@ -180,7 +201,25 @@ export function RallyTimeline({
               const relativeTime = bounce.timestamp - rallyStart;
               const position = (relativeTime / rallyDuration) * 100;
               const isNearPlayhead = Math.abs(currentTime - bounce.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
-              const glowColor = bounce.type === "floor" ? "rgba(245, 158, 11, 0.8)" : "rgba(168, 85, 247, 0.8)";
+              
+              // Determine color based on bounce type
+              // Inferred types → Yellow, Swings → Purple, Floor → Orange
+              const isInferred = bounce.type.startsWith("inferred");
+              const isSwing = bounce.type === "swing";
+              const bounceColor = isInferred 
+                ? "var(--yellow-9)"  // Yellow for all inferred types
+                : isSwing 
+                  ? "var(--purple-9)"  // Purple for swings
+                  : bounce.type === "floor" 
+                    ? "var(--orange-9)"  // Orange for floor
+                    : "var(--purple-9)"; // Purple for others
+              const glowColor = isInferred
+                ? "rgba(234, 179, 8, 0.8)"  // Yellow glow
+                : isSwing 
+                  ? "rgba(168, 85, 247, 0.8)"  // Purple glow
+                  : bounce.type === "floor" 
+                    ? "rgba(245, 158, 11, 0.8)"  // Orange glow
+                    : "rgba(168, 85, 247, 0.8)"; // Purple glow
 
               return (
                 <Tooltip key={`bounce-${idx}`} content={`${bounce.type} bounce @ ${formatDuration(bounce.timestamp)}`}>
@@ -223,7 +262,7 @@ export function RallyTimeline({
                         width: "14px",
                         height: "14px",
                         borderRadius: "50%",
-                        backgroundColor: bounce.type === "floor" ? "var(--orange-9)" : "var(--purple-9)",
+                        backgroundColor: bounceColor,
                         border: "2px solid white",
                         boxShadow: isNearPlayhead ? `0 0 16px ${glowColor}` : "none",
                         transition: "all 0.15s ease",

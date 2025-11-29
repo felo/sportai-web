@@ -18,9 +18,10 @@ interface MatchInsightsProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   portraits: Record<number, string>;
   enhancedBallBounces?: BallBounce[];
+  playerDisplayNames?: Record<number, string>;
 }
 
-export function MatchInsights({ result, task, videoRef, portraits, enhancedBallBounces }: MatchInsightsProps) {
+export function MatchInsights({ result, task, videoRef, portraits, enhancedBallBounces, playerDisplayNames = {} }: MatchInsightsProps) {
   const [expanded, setExpanded] = useState(false);
 
   const filteredPlayers: Player[] = result
@@ -81,6 +82,7 @@ export function MatchInsights({ result, task, videoRef, portraits, enhancedBallB
                       key={player.player_id}
                       player={player}
                       displayIndex={index + 1}
+                      displayName={playerDisplayNames[player.player_id] || `Player ${index + 1}`}
                       portrait={portraits[player.player_id]}
                     />
                   ))}

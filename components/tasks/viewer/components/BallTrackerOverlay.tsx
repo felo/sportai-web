@@ -2,6 +2,26 @@
 
 import { useRef, useEffect, RefObject } from "react";
 import { OVERLAY_COLORS } from "../constants";
+import { POSE_CONNECTIONS } from "@/types/pose";
+
+// ============================================================================
+// POSE SKELETON CONFIGURATION - Tweak these to adjust skeleton size
+// ============================================================================
+const POSE_CONFIG = {
+  // Multiplier for joint radius (relative to bounding box height)
+  jointRadiusMultiplier: 0.08,  // Increase for larger joints
+  // Multiplier for line width (relative to bounding box height)
+  lineWidthMultiplier: 0.06,   // Increase for thicker lines
+  // Min/max clamps for joint radius (in pixels)
+  jointRadiusMin: 2,
+  jointRadiusMax: 6,
+  // Min/max clamps for line width (in pixels)
+  lineWidthMin: 1,
+  lineWidthMax: 4,
+  // Colors
+  jointColor: "#FF9800",        // Orange
+  lineColor: "#7ADB8F",         // Mint green
+};
 
 interface BallPosition {
   timestamp: number;
@@ -19,6 +39,8 @@ interface BallBounce {
 interface SwingAnnotation {
   bbox: [number, number, number, number];
   box_confidence: number;
+  keypoints?: number[][]; // COCO 17-point format: [[x, y], ...]
+  confidences?: number[];
 }
 
 interface SwingWithPlayer {
@@ -55,6 +77,10 @@ interface BallTrackerOverlayProps {
   showVelocity?: boolean;
   /** Whether to show player bounding boxes */
   showPlayerBoxes?: boolean;
+  /** Whether to show pose skeletons */
+  showPose?: boolean;
+  /** Map of player_id to display name (e.g., { 0: "Player 1", 3: "Player 2" }) */
+  playerDisplayNames?: Record<number, string>;
 }
 
 // Binary search to find index near a timestamp
@@ -137,8 +163,13 @@ function getBounceColor(type: string): { r: number; g: number; b: number } {
   const colors = OVERLAY_COLORS.bounce;
   if (type === "floor") return colors.floor.rgb;
   if (type === "swing") return colors.swing.rgb;
+  // All inferred types use the same color
+  if (type === "inferred" || type === "inferred_swing" || type === "inferred_wall" || type === "inferred_back") {
+    return colors.inferred.rgb;
+  }
   return colors.default.rgb;
 }
+
 
 export function BallTrackerOverlay({
   ballPositions,
@@ -153,6 +184,8 @@ export function BallTrackerOverlay({
   showBounceRipples = true,
   showVelocity = true,
   showPlayerBoxes = false,
+  showPose = false,
+  playerDisplayNames = {},
 }: BallTrackerOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -579,8 +612,8 @@ export function BallTrackerOverlay({
             ctx.lineWidth = playerBoxConfig.lineWidth;
             ctx.strokeRect(x1, y1, boxWidth, boxHeight);
             
-            // Draw player label
-            const label = `Player ${swing.player_id + 1}`;
+            // Draw player label (use display name if available, fallback to P + id)
+            const label = playerDisplayNames[swing.player_id] || `P${swing.player_id}`;
             const fontSize = playerBoxConfig.labelFontSize;
             const padding = playerBoxConfig.labelPadding;
             
@@ -609,6 +642,162 @@ export function BallTrackerOverlay({
             
             ctx.globalAlpha = 1;
           }
+        }
+      }
+
+      // Draw pose skeletons (custom drawing for proper perspective scaling)
+      // Uses full annotations array to show pose throughout the entire swing
+      if (showPose && swings.length > 0) {
+        const fadeInDuration = 0.15; // Fade in at start
+        const fadeOutDuration = 0.3; // Fade out at end
+        const drawnPoses = new Set<number>();
+        
+        for (const swing of swings) {
+          // Skip if no annotations with keypoints
+          if (!swing.annotations || swing.annotations.length === 0) continue;
+          
+          // Filter annotations that have keypoints
+          const validAnnotations = swing.annotations.filter(
+            ann => ann.keypoints && ann.keypoints.length >= 17
+          );
+          if (validAnnotations.length === 0) continue;
+          
+          const swingStart = swing.start.timestamp;
+          const swingEnd = swing.end.timestamp;
+          const swingDuration = swingEnd - swingStart;
+          
+          // Check if current time is within the swing window
+          if (currentTime < swingStart - fadeInDuration || currentTime > swingEnd + fadeOutDuration) {
+            continue;
+          }
+          
+          // Skip if we've already drawn this player's pose
+          if (drawnPoses.has(swing.player_id)) continue;
+          drawnPoses.add(swing.player_id);
+          
+          // Find which annotation to use based on current time
+          // Map current time to annotation index
+          let annotation;
+          if (validAnnotations.length === 1) {
+            annotation = validAnnotations[0];
+          } else {
+            // Calculate progress through the swing (0 to 1)
+            const progress = Math.max(0, Math.min(1, (currentTime - swingStart) / swingDuration));
+            // Map to annotation index
+            const annotationIndex = Math.min(
+              validAnnotations.length - 1,
+              Math.floor(progress * validAnnotations.length)
+            );
+            annotation = validAnnotations[annotationIndex];
+          }
+          
+          if (!annotation?.keypoints) continue;
+          
+          // Calculate opacity with fade in/out
+          let opacity = 1;
+          if (currentTime < swingStart) {
+            // Fade in before swing starts
+            opacity = 1 - (swingStart - currentTime) / fadeInDuration;
+          } else if (currentTime > swingEnd) {
+            // Fade out after swing ends
+            opacity = 1 - (currentTime - swingEnd) / fadeOutDuration;
+          }
+          opacity = Math.max(0, Math.min(1, opacity));
+          
+          if (opacity <= 0) continue;
+          
+          ctx.globalAlpha = opacity;
+          
+          // Convert keypoints from [[x, y], ...] to { x, y, score }[] format
+          // and scale to pixel coordinates (same approach as VideoPoseViewerCore)
+          const scaledKeypoints = annotation.keypoints.map((kp, idx) => {
+            if (!kp || kp.length < 2) {
+              return { x: 0, y: 0, score: 0, name: `keypoint_${idx}` };
+            }
+            // Check if keypoint is valid (not at origin)
+            const isValid = kp[0] > 0.01 || kp[1] > 0.01;
+            return {
+              x: kp[0] * logicalWidth,
+              y: kp[1] * logicalHeight,
+              score: isValid ? (annotation.confidences?.[idx] ?? 1.0) : 0,
+              name: `keypoint_${idx}`,
+            };
+          });
+          
+          // Calculate player's center Y for perspective scaling
+          let playerCenterY = 0.5; // Default to middle
+          if (annotation.bbox) {
+            const [, by1, , by2] = annotation.bbox;
+            playerCenterY = (by1 + by2) / 2; // Normalized center Y
+          } else {
+            const validKps = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
+            if (validKps.length > 0) {
+              const avgY = validKps.reduce((sum, kp) => sum + kp.y, 0) / validKps.length;
+              playerCenterY = avgY / logicalHeight; // Normalize
+            }
+          }
+          
+          // Apply perspective scaling (same as ball indicator)
+          const perspectiveScale = getPerspectiveScale(playerCenterY);
+          
+          // Calculate base sizes from bounding box height
+          let boxHeight = 100; // Default
+          if (annotation.bbox) {
+            const [, by1, , by2] = annotation.bbox;
+            boxHeight = (by2 - by1) * logicalHeight;
+          } else {
+            const validKps = scaledKeypoints.filter(kp => (kp.score ?? 0) > 0.3);
+            if (validKps.length > 0) {
+              const yCoords = validKps.map(kp => kp.y);
+              boxHeight = Math.max(...yCoords) - Math.min(...yCoords);
+            }
+          }
+          
+          // Calculate sizes using POSE_CONFIG constants
+          const baseRadius = Math.max(
+            POSE_CONFIG.jointRadiusMin, 
+            Math.min(POSE_CONFIG.jointRadiusMax, boxHeight * POSE_CONFIG.jointRadiusMultiplier)
+          );
+          const baseLineWidth = Math.max(
+            POSE_CONFIG.lineWidthMin, 
+            Math.min(POSE_CONFIG.lineWidthMax, boxHeight * POSE_CONFIG.lineWidthMultiplier)
+          );
+          const jointRadius = baseRadius * perspectiveScale;
+          const lineWidth = baseLineWidth * perspectiveScale;
+          
+          // Draw skeleton connections directly (no face - indices 0-4)
+          ctx.strokeStyle = POSE_CONFIG.lineColor;
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = "round";
+          
+          for (const conn of POSE_CONNECTIONS) {
+            // Skip face connections (indices 0-4)
+            if (conn.start <= 4 || conn.end <= 4) continue;
+            
+            const p1 = scaledKeypoints[conn.start];
+            const p2 = scaledKeypoints[conn.end];
+            
+            if (p1 && p2 && (p1.score ?? 0) > 0.3 && (p2.score ?? 0) > 0.3) {
+              ctx.beginPath();
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
+          }
+          
+          // Draw keypoints (skip face - indices 0-4)
+          for (let i = 5; i < scaledKeypoints.length; i++) {
+            const kp = scaledKeypoints[i];
+            if ((kp.score ?? 0) > 0.3) {
+              // Small filled circle
+              ctx.beginPath();
+              ctx.arc(kp.x, kp.y, jointRadius, 0, 2 * Math.PI);
+              ctx.fillStyle = POSE_CONFIG.jointColor;
+              ctx.fill();
+            }
+          }
+          
+          ctx.globalAlpha = 1;
         }
       }
 
@@ -677,7 +866,7 @@ export function BallTrackerOverlay({
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes]);
+  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose]);
 
   return (
     <canvas

@@ -7,10 +7,11 @@ import { formatDuration } from "../utils";
 interface PlayerCardProps {
   player: Player;
   displayIndex: number;
+  displayName: string;
   portrait?: string;
 }
 
-export function PlayerCard({ player, displayIndex, portrait }: PlayerCardProps) {
+export function PlayerCard({ player, displayIndex, displayName, portrait }: PlayerCardProps) {
   return (
     <Card style={{ border: "1px solid var(--gray-6)" }}>
       <Flex direction="column" gap="3" p="4">
@@ -33,7 +34,7 @@ export function PlayerCard({ player, displayIndex, portrait }: PlayerCardProps) 
               {portrait ? (
                 <img
                   src={portrait}
-                  alt={`Player ${player.player_id}`}
+                  alt={displayName}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               ) : (
@@ -43,7 +44,7 @@ export function PlayerCard({ player, displayIndex, portrait }: PlayerCardProps) 
               )}
             </Box>
             <Heading size="4" weight="medium">
-              Player {player.player_id}
+              {displayName}
             </Heading>
           </Flex>
           <Badge color="gray" variant="soft">

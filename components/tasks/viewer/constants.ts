@@ -1,3 +1,35 @@
+// ===========================================
+// PLAYER SETTINGS
+// ===========================================
+export const PLAYER_CONFIG = {
+  // Minimum swings to be considered a "valid" player
+  MIN_SWINGS_THRESHOLD: 10,
+  
+  // Colors for each player (used for heatmaps, dots, boxes)
+  colors: [
+    { 
+      primary: "#3B82F6",      // Blue - Player 1
+      heatmap: "rgba(59, 130, 246, 0.6)",
+      rgb: { r: 59, g: 130, b: 246 },
+    },
+    { 
+      primary: "#EF4444",      // Red - Player 2
+      heatmap: "rgba(239, 68, 68, 0.6)",
+      rgb: { r: 239, g: 68, b: 68 },
+    },
+    { 
+      primary: "#10B981",      // Emerald - Player 3
+      heatmap: "rgba(16, 185, 129, 0.6)",
+      rgb: { r: 16, g: 185, b: 129 },
+    },
+    { 
+      primary: "#F59E0B",      // Amber - Player 4
+      heatmap: "rgba(245, 158, 11, 0.6)",
+      rgb: { r: 245, g: 158, b: 11 },
+    },
+  ],
+};
+
 export const CONFIG = {
   // Video playback update frequency (ms)
   PLAYHEAD_UPDATE_INTERVAL: 50,
@@ -41,6 +73,10 @@ export const OVERLAY_COLORS = {
     swing: {
       rgb: { r: 168, g: 85, b: 247 },      // Purple - var(--purple-9)
       hex: "#A855F7",
+    },
+    inferred: {
+      rgb: { r: 236, g: 72, b: 153 },      // Pink - var(--pink-9) - between orange and purple
+      hex: "#EC4899",
     },
     // Default for unknown types
     default: {

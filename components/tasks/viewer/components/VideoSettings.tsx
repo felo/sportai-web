@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Flex, Heading } from "@radix-ui/themes";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import { Box, Flex, Heading, Text, Tooltip } from "@radix-ui/themes";
+import { Cross2Icon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { IconButton, ToggleSwitch } from "@/components/ui";
 
 interface VideoSettingsProps {
@@ -19,9 +19,15 @@ interface VideoSettingsProps {
   onVelocityChange: (value: boolean) => void;
   showPlayerBoxes: boolean;
   onPlayerBoxesChange: (value: boolean) => void;
+  showPose: boolean;
+  onPoseChange: (value: boolean) => void;
   // Data enhancement
   inferSwingBounces: boolean;
   onInferSwingBouncesChange: (value: boolean) => void;
+  inferTrajectoryBounces: boolean;
+  onInferTrajectoryBouncesChange: (value: boolean) => void;
+  inferAudioBounces: boolean;
+  onInferAudioBouncesChange: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -40,8 +46,14 @@ export function VideoSettings({
   onVelocityChange,
   showPlayerBoxes,
   onPlayerBoxesChange,
+  showPose,
+  onPoseChange,
   inferSwingBounces,
   onInferSwingBouncesChange,
+  inferTrajectoryBounces,
+  onInferTrajectoryBouncesChange,
+  inferAudioBounces,
+  onInferAudioBouncesChange,
   onClose,
 }: VideoSettingsProps) {
   return (
@@ -116,6 +128,12 @@ export function VideoSettings({
           label="Player swing boxes"
         />
 
+        <ToggleSwitch
+          checked={showPose}
+          onCheckedChange={onPoseChange}
+          label="Player pose"
+        />
+
         {(showBallTracker || showTrail || showBounceRipples || showVelocity) && (
           <ToggleSwitch
             checked={usePerspective}
@@ -136,6 +154,24 @@ export function VideoSettings({
           onCheckedChange={onInferSwingBouncesChange}
           label="Infer shot bounces"
         />
+
+        <ToggleSwitch
+          checked={inferTrajectoryBounces}
+          onCheckedChange={onInferTrajectoryBouncesChange}
+          label="Infer bounces from trajectory"
+        />
+
+        <Flex align="center" gap="2">
+          <ToggleSwitch
+            checked={inferAudioBounces}
+            onCheckedChange={onInferAudioBouncesChange}
+            label="Infer bounces from audio"
+            disabled={true}
+          />
+          <Tooltip content="Requires CORS-enabled video. Coming soon!">
+            <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+          </Tooltip>
+        </Flex>
       </Flex>
     </Box>
   );

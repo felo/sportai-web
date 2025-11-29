@@ -17,6 +17,10 @@ export interface Task {
 export interface SwingAnnotation {
   bbox: [number, number, number, number]; // [x1, y1, x2, y2] normalized
   box_confidence: number;
+  keypoints?: number[][]; // COCO 17-point format: [[x, y], ...]
+  confidences?: number[]; // Confidence scores for each keypoint
+  timestamp?: number; // Frame timestamp (if available)
+  frame_nr?: number; // Frame number (if available)
 }
 
 export interface Swing {
@@ -29,6 +33,7 @@ export interface Swing {
   ball_hit: { timestamp: number; frame_nr: number };
   confidence?: number;
   annotations?: SwingAnnotation[];
+  is_in_rally?: boolean; // Only show swings that are part of a rally
 }
 
 export interface Player {
@@ -58,6 +63,12 @@ export interface BallBounce {
   type: string;
 }
 
+export interface PlayerPosition {
+  timestamp: number;
+  X: number; // Court coordinates (meters)
+  Y: number; // Court coordinates (meters)
+}
+
 export interface StatisticsResult {
   players: Player[];
   team_sessions: Array<{
@@ -75,6 +86,7 @@ export interface StatisticsResult {
     X: number;
     Y: number;
   }>;
+  player_positions?: Record<string, PlayerPosition[]>; // Keyed by player_id
   confidences: {
     final_confidences: {
       pose: number;
