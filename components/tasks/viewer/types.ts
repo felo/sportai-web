@@ -14,6 +14,11 @@ export interface Task {
   completed_at: string | null;
 }
 
+export interface SwingAnnotation {
+  bbox: [number, number, number, number]; // [x1, y1, x2, y2] normalized
+  box_confidence: number;
+}
+
 export interface Swing {
   start: { timestamp: number; frame_nr: number };
   end: { timestamp: number; frame_nr: number };
@@ -22,6 +27,8 @@ export interface Swing {
   volley: boolean;
   serve: boolean;
   ball_hit: { timestamp: number; frame_nr: number };
+  confidence?: number;
+  annotations?: SwingAnnotation[];
 }
 
 export interface Player {

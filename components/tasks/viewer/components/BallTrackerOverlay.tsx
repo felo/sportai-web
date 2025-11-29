@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, RefObject } from "react";
+import { OVERLAY_COLORS } from "../constants";
 
 interface BallPosition {
   timestamp: number;
@@ -8,13 +9,68 @@ interface BallPosition {
   Y: number;
 }
 
+interface BallBounce {
+  timestamp: number;
+  court_pos: [number, number];
+  player_id: number;
+  type: string;
+}
+
+interface SwingAnnotation {
+  bbox: [number, number, number, number];
+  box_confidence: number;
+}
+
+interface SwingWithPlayer {
+  start: { timestamp: number; frame_nr: number };
+  end: { timestamp: number; frame_nr: number };
+  swing_type: string;
+  ball_speed: number;
+  volley: boolean;
+  serve: boolean;
+  ball_hit: { timestamp: number; frame_nr: number };
+  confidence?: number;
+  annotations?: SwingAnnotation[];
+  player_id: number;
+}
+
 interface BallTrackerOverlayProps {
   ballPositions: BallPosition[];
+  ballBounces: BallBounce[];
+  swings: SwingWithPlayer[];
   videoRef: RefObject<HTMLVideoElement | null>;
   /** Time window in seconds to search for nearest ball position */
   timeThreshold?: number;
   /** Whether to apply perspective scaling based on Y position */
   usePerspective?: boolean;
+  /** Whether to show the ball indicator circle */
+  showIndicator?: boolean;
+  /** Whether to show the ball trail */
+  showTrail?: boolean;
+  /** Whether to smooth/interpolate the trail curves */
+  useSmoothing?: boolean;
+  /** Whether to show bounce ripple effects */
+  showBounceRipples?: boolean;
+  /** Whether to show velocity on swings */
+  showVelocity?: boolean;
+  /** Whether to show player bounding boxes */
+  showPlayerBoxes?: boolean;
+}
+
+// Binary search to find index near a timestamp
+function findIndexNearTimestamp(positions: BallPosition[], timestamp: number): number {
+  let left = 0;
+  let right = positions.length - 1;
+
+  while (left < right) {
+    const mid = Math.floor((left + right) / 2);
+    if (positions[mid].timestamp < timestamp) {
+      left = mid + 1;
+    } else {
+      right = mid;
+    }
+  }
+  return left;
 }
 
 // Binary search for finding nearest position (much faster for large arrays)
@@ -25,18 +81,7 @@ function findNearestBallPosition(
 ): BallPosition | null {
   if (!positions.length) return null;
 
-  // Binary search to find approximate position
-  let left = 0;
-  let right = positions.length - 1;
-
-  while (left < right) {
-    const mid = Math.floor((left + right) / 2);
-    if (positions[mid].timestamp < currentTime) {
-      left = mid + 1;
-    } else {
-      right = mid;
-    }
-  }
+  const left = findIndexNearTimestamp(positions, currentTime);
 
   // Check neighbors to find the closest
   let nearest: BallPosition | null = null;
@@ -53,11 +98,61 @@ function findNearestBallPosition(
   return nearest;
 }
 
+// Get trail of ball positions leading up to current time
+function getTrailPositions(
+  positions: BallPosition[],
+  currentTime: number,
+  trailDuration: number
+): BallPosition[] {
+  if (!positions.length) return [];
+
+  const endIndex = findIndexNearTimestamp(positions, currentTime);
+  const startTime = currentTime - trailDuration;
+  
+  const trail: BallPosition[] = [];
+  
+  // Collect positions from startTime to currentTime
+  for (let i = Math.max(0, endIndex - 100); i <= Math.min(positions.length - 1, endIndex + 1); i++) {
+    const pos = positions[i];
+    if (pos.timestamp >= startTime && pos.timestamp <= currentTime + 0.05) {
+      trail.push(pos);
+    }
+  }
+  
+  return trail;
+}
+
+// Interpolate between green and yellow based on age (0 = current/green, 1 = old/yellow)
+function getTrailColor(age: number, alpha: number): string {
+  // Green: rgb(122, 219, 143) - #7ADB8F
+  // Yellow: rgb(255, 200, 50)
+  const r = Math.round(122 + (255 - 122) * age);
+  const g = Math.round(219 + (200 - 219) * age);
+  const b = Math.round(143 + (50 - 143) * age);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Helper to get bounce color based on type
+function getBounceColor(type: string): { r: number; g: number; b: number } {
+  const colors = OVERLAY_COLORS.bounce;
+  if (type === "floor") return colors.floor.rgb;
+  if (type === "swing") return colors.swing.rgb;
+  return colors.default.rgb;
+}
+
 export function BallTrackerOverlay({
   ballPositions,
+  ballBounces,
+  swings,
   videoRef,
   timeThreshold = 0.1,
   usePerspective = true,
+  showIndicator = true,
+  showTrail = true,
+  useSmoothing = true,
+  showBounceRipples = true,
+  showVelocity = true,
+  showPlayerBoxes = false,
 }: BallTrackerOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -66,51 +161,468 @@ export function BallTrackerOverlay({
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    if (!canvas || !video || !ballPositions.length) return;
+    if (!canvas || !video) return;
+    if (!ballPositions.length && !ballBounces.length) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const TRAIL_DURATION = 0.5; // seconds of trail to show
+    const TRAIL_MIN_WIDTH = 0.5;
+    const TRAIL_MAX_WIDTH = 4;
+    
+    // Perspective constants (same as indicator)
+    const minRadius = 0.25;
+    const maxRadius = 8;
+    
+    // Ripple settings from config
+    const rippleConfig = OVERLAY_COLORS.ripple;
+    const rippleDuration = rippleConfig.durationMs / 1000; // Convert to seconds
+    
+    // Helper to calculate perspective scale for a Y position
+    const getPerspectiveScale = (y: number): number => {
+      if (!usePerspective) return 1;
+      const perspectiveY = Math.pow(y, 0.8);
+      return (minRadius + (maxRadius - minRadius) * perspectiveY) / maxRadius;
+    };
 
     const draw = () => {
       const currentTime = video.currentTime;
       const isPaused = video.paused;
       const position = findNearestBallPosition(ballPositions, currentTime, timeThreshold);
+      const trail = getTrailPositions(ballPositions, currentTime, TRAIL_DURATION);
 
-      // Update canvas size to match parent
+      // Update canvas size to match parent (with high-DPI support)
       const parent = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
       if (parent) {
         const rect = parent.getBoundingClientRect();
-        if (canvas.width !== rect.width || canvas.height !== rect.height) {
-          canvas.width = rect.width;
-          canvas.height = rect.height;
+        const targetWidth = rect.width * dpr;
+        const targetHeight = rect.height * dpr;
+        
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          // Scale context to account for DPR
+          ctx.scale(dpr, dpr);
+        }
+      }
+      
+      // Get logical dimensions for drawing
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+
+      // Draw ball trail (gradient from yellow to green)
+      if (showTrail && trail.length >= 2) {
+        if (useSmoothing && trail.length >= 3) {
+          // Draw smooth curve using quadratic bezier curves
+          // We draw each segment separately to apply per-segment gradients and widths
+          for (let i = 0; i < trail.length - 1; i++) {
+            const p0 = trail[Math.max(0, i - 1)];
+            const p1 = trail[i];
+            const p2 = trail[i + 1];
+            const p3 = trail[Math.min(trail.length - 1, i + 2)];
+            
+            const x1 = p1.X * logicalWidth;
+            const y1 = p1.Y * logicalHeight;
+            const x2 = p2.X * logicalWidth;
+            const y2 = p2.Y * logicalHeight;
+            
+            // Calculate control points using Catmull-Rom to Bezier conversion
+            const tension = 0.5;
+            const cp1x = x1 + (p2.X * logicalWidth - p0.X * logicalWidth) * tension / 3;
+            const cp1y = y1 + (p2.Y * logicalHeight - p0.Y * logicalHeight) * tension / 3;
+            const cp2x = x2 - (p3.X * logicalWidth - p1.X * logicalWidth) * tension / 3;
+            const cp2y = y2 - (p3.Y * logicalHeight - p1.Y * logicalHeight) * tension / 3;
+            
+            // Calculate age (0 = current, 1 = oldest)
+            const age1 = Math.max(0, Math.min(1, (currentTime - p1.timestamp) / TRAIL_DURATION));
+            const age2 = Math.max(0, Math.min(1, (currentTime - p2.timestamp) / TRAIL_DURATION));
+            
+            // Fade out opacity for older segments
+            const alpha1 = 0.8 * (1 - age1 * 0.7);
+            const alpha2 = 0.8 * (1 - age2 * 0.7);
+            
+            // Calculate perspective-based line width
+            const avgY = (p1.Y + p2.Y) / 2;
+            const perspectiveScale = getPerspectiveScale(avgY);
+            const lineWidth = TRAIL_MIN_WIDTH + (TRAIL_MAX_WIDTH - TRAIL_MIN_WIDTH) * perspectiveScale;
+            
+            // Create gradient for this segment
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+            gradient.addColorStop(0, getTrailColor(age1, alpha1));
+            gradient.addColorStop(1, getTrailColor(age2, alpha2));
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+            ctx.stroke();
+          }
+        } else {
+          // Draw straight line segments (no smoothing)
+          for (let i = 0; i < trail.length - 1; i++) {
+            const p1 = trail[i];
+            const p2 = trail[i + 1];
+            
+            const x1 = p1.X * logicalWidth;
+            const y1 = p1.Y * logicalHeight;
+            const x2 = p2.X * logicalWidth;
+            const y2 = p2.Y * logicalHeight;
+            
+            // Calculate age (0 = current, 1 = oldest)
+            const age1 = Math.max(0, Math.min(1, (currentTime - p1.timestamp) / TRAIL_DURATION));
+            const age2 = Math.max(0, Math.min(1, (currentTime - p2.timestamp) / TRAIL_DURATION));
+            
+            // Fade out opacity for older segments
+            const alpha1 = 0.8 * (1 - age1 * 0.7);
+            const alpha2 = 0.8 * (1 - age2 * 0.7);
+            
+            // Calculate perspective-based line width
+            const avgY = (p1.Y + p2.Y) / 2;
+            const perspectiveScale = getPerspectiveScale(avgY);
+            const lineWidth = TRAIL_MIN_WIDTH + (TRAIL_MAX_WIDTH - TRAIL_MIN_WIDTH) * perspectiveScale;
+            
+            // Create gradient for this segment
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+            gradient.addColorStop(0, getTrailColor(age1, alpha1));
+            gradient.addColorStop(1, getTrailColor(age2, alpha2));
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+          }
         }
       }
 
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (position) {
-        const x = position.X * canvas.width;
-        const y = position.Y * canvas.height;
-        
-        // Perspective effect for bird's eye court view:
-        // Y=0 (top) = far end of court = smaller
-        // Y=1 (bottom) = near end of court = larger
-        const minRadius = 0.25;
-        const maxRadius = 8;
-        
-        let radius: number;
-        if (usePerspective) {
-          // Use a slight power curve for more natural perspective falloff
-          const perspectiveY = Math.pow(position.Y, 0.8);
-          radius = minRadius + (maxRadius - minRadius) * perspectiveY;
-        } else {
-          // No perspective - always use max size
-          radius = maxRadius;
+      // Draw bounce ripples
+      if (showBounceRipples && ballBounces.length > 0 && ballPositions.length > 0) {
+        for (const bounce of ballBounces) {
+          const timeSinceBounce = currentTime - bounce.timestamp;
+          
+          // Only draw ripples that are currently active (within animation duration)
+          if (timeSinceBounce >= 0 && timeSinceBounce <= rippleDuration) {
+            // Find the ball position at the bounce timestamp (use ball_positions for video frame coords)
+            const bouncePosition = findNearestBallPosition(ballPositions, bounce.timestamp, 0.2);
+            if (!bouncePosition) continue;
+            
+            const progress = timeSinceBounce / rippleDuration; // 0 to 1
+            
+            // Use ball_positions coordinates (video frame coordinates)
+            const x = bouncePosition.X * logicalWidth;
+            const y = bouncePosition.Y * logicalHeight;
+            
+            // Calculate perspective scale based on Y position
+            const perspectiveScale = getPerspectiveScale(bouncePosition.Y);
+            
+            // Animate radius from min to max
+            const baseMinRadius = rippleConfig.minRadius;
+            const baseMaxRadius = rippleConfig.maxRadius;
+            const currentRadius = (baseMinRadius + (baseMaxRadius - baseMinRadius) * progress) * perspectiveScale;
+            
+            // Fade out opacity as ripple expands
+            const opacity = rippleConfig.startOpacity * (1 - progress);
+            
+            // Get color based on bounce type
+            const color = getBounceColor(bounce.type);
+            
+            // Scale line width with perspective
+            const lineWidth = rippleConfig.lineWidth * perspectiveScale;
+            
+            // Draw the ripple ring
+            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
+            ctx.lineWidth = Math.max(1, lineWidth * (1 - progress * 0.5)); // Line gets thinner as it expands
+            ctx.beginPath();
+            ctx.arc(x, y, currentRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw a subtle inner glow at the start
+            if (progress < 0.3) {
+              const glowOpacity = opacity * 0.5 * (1 - progress / 0.3);
+              const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, currentRadius * 0.5);
+              glowGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${glowOpacity})`);
+              glowGradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+              ctx.fillStyle = glowGradient;
+              ctx.beginPath();
+              ctx.arc(x, y, currentRadius * 0.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         }
+      }
+
+      // Draw velocity display for swings
+      if (showVelocity && swings.length > 0 && ballPositions.length > 0) {
+        const velocityConfig = OVERLAY_COLORS.velocity;
+        const displayDuration = velocityConfig.displayDurationMs / 1000;
+        
+        for (const swing of swings) {
+          // Skip swings with no ball speed
+          if (!swing.ball_speed || swing.ball_speed <= 0) continue;
+          
+          const timeSinceHit = currentTime - swing.ball_hit.timestamp;
+          
+          // Only show velocity around the swing hit time
+          if (timeSinceHit >= -0.1 && timeSinceHit <= displayDuration) {
+            // Find ball position at the swing timestamp
+            const swingBallPos = findNearestBallPosition(ballPositions, swing.ball_hit.timestamp, 0.2);
+            if (!swingBallPos) continue;
+            
+            // Calculate opacity with fade in/out
+            let opacity = 1;
+            if (timeSinceHit < 0) {
+              // Fade in
+              opacity = 1 + (timeSinceHit / 0.1);
+            } else if (timeSinceHit > displayDuration - velocityConfig.fadeOutMs / 1000) {
+              // Fade out
+              const fadeProgress = (timeSinceHit - (displayDuration - velocityConfig.fadeOutMs / 1000)) / (velocityConfig.fadeOutMs / 1000);
+              opacity = 1 - fadeProgress;
+            }
+            opacity = Math.max(0, Math.min(1, opacity));
+            
+            if (opacity <= 0) continue;
+            
+            // Get ball position for display location
+            const ballX = swingBallPos.X * logicalWidth;
+            const ballY = swingBallPos.Y * logicalHeight;
+            
+            // Determine position to avoid player (prefer above the ball, offset to side)
+            const offsetDistance = velocityConfig.offsetFromBall;
+            let boxX = ballX;
+            let boxY: number;
+            
+            // Check if there's an annotation with player bbox
+            const annotation = swing.annotations?.[0];
+            if (annotation) {
+              const [bx1, by1, bx2, by2] = annotation.bbox;
+              const playerCenterX = ((bx1 + bx2) / 2) * logicalWidth;
+              const playerTop = by1 * logicalHeight;
+              const playerBottom = by2 * logicalHeight;
+              
+              // Place velocity box on opposite side of player from ball
+              if (ballY < playerTop) {
+                // Ball is above player, place box above ball
+                boxY = ballY - offsetDistance;
+              } else if (ballY > playerBottom) {
+                // Ball is below player, place box below ball
+                boxY = ballY + offsetDistance;
+              } else {
+                // Ball overlaps player, place to the side
+                boxY = ballY - offsetDistance;
+                boxX = ballX + (ballX < playerCenterX ? -offsetDistance : offsetDistance);
+              }
+            } else {
+              // No bbox, default to above the ball (typical overhead camera view)
+              boxY = ballY - offsetDistance;
+            }
+            
+            // Format swing type (e.g., "forehand_drive" -> "Forehand Drive")
+            const swingTypeFormatted = swing.swing_type
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+            
+            // Format velocity text (no perspective scaling - must stay readable!)
+            const speed = Math.round(swing.ball_speed);
+            const speedText = `${speed}`;
+            const unit = "km/h";
+            
+            // Calculate text dimensions (fixed size for readability)
+            const fontSize = velocityConfig.fontSize;
+            const typeFontSize = fontSize * 0.6;
+            const unitFontSize = fontSize * 0.65;
+            
+            // Measure swing type
+            ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
+            const typeMetrics = ctx.measureText(swingTypeFormatted);
+            
+            // Measure speed + unit
+            ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+            const speedMetrics = ctx.measureText(speedText);
+            ctx.font = `${unitFontSize}px system-ui, -apple-system, sans-serif`;
+            const unitMetrics = ctx.measureText(unit);
+            
+            const padding = velocityConfig.padding;
+            const speedRowWidth = speedMetrics.width + unitMetrics.width + padding * 0.5;
+            const totalWidth = Math.max(typeMetrics.width, speedRowWidth) + padding * 2;
+            const boxHeight = typeFontSize + fontSize + padding * 2.5;
+            
+            // Clamp box position to canvas bounds
+            boxX = Math.max(totalWidth / 2 + 5, Math.min(logicalWidth - totalWidth / 2 - 5, boxX));
+            boxY = Math.max(boxHeight / 2 + 5, Math.min(logicalHeight - boxHeight / 2 - 5, boxY));
+            
+            // Draw background box
+            const boxLeft = boxX - totalWidth / 2;
+            const boxTop = boxY - boxHeight / 2;
+            const borderRadius = velocityConfig.borderRadius;
+            
+            ctx.globalAlpha = opacity;
+            
+            // Draw connecting line from ball to box
+            ctx.strokeStyle = velocityConfig.borderColor;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(ballX, ballY);
+            ctx.lineTo(boxX, boxY);
+            ctx.stroke();
+            
+            // Draw small dot at ball end of line
+            ctx.fillStyle = velocityConfig.borderColor;
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw rounded rectangle background
+            ctx.fillStyle = velocityConfig.backgroundColor;
+            ctx.beginPath();
+            ctx.roundRect(boxLeft, boxTop, totalWidth, boxHeight, borderRadius);
+            ctx.fill();
+            
+            // Draw border
+            ctx.strokeStyle = velocityConfig.borderColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(boxLeft, boxTop, totalWidth, boxHeight, borderRadius);
+            ctx.stroke();
+            
+            // Draw swing type (above, smaller, gray)
+            const typeY = boxTop + padding + typeFontSize / 2;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+            ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
+            ctx.textBaseline = "middle";
+            ctx.fillText(swingTypeFormatted, boxLeft + padding, typeY);
+            
+            // Draw speed text (below type)
+            const speedY = typeY + typeFontSize / 2 + padding * 0.5 + fontSize / 2;
+            ctx.fillStyle = velocityConfig.textColor;
+            ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+            ctx.fillText(speedText, boxLeft + padding, speedY);
+            
+            // Draw unit text (next to speed)
+            ctx.fillStyle = velocityConfig.unitColor;
+            ctx.font = `${unitFontSize}px system-ui, -apple-system, sans-serif`;
+            ctx.fillText(unit, boxLeft + padding + speedMetrics.width + padding * 0.3, speedY);
+            
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+
+      // Draw player bounding boxes
+      if (showPlayerBoxes && swings.length > 0) {
+        const playerBoxConfig = OVERLAY_COLORS.playerBox;
+        const displayDuration = playerBoxConfig.displayDurationMs / 1000;
+        
+        // Track which players we've drawn to avoid duplicates at the same timestamp
+        const drawnPlayers = new Set<number>();
+        
+        for (const swing of swings) {
+          // Skip if no annotation with bbox
+          if (!swing.annotations?.[0]?.bbox) continue;
+          
+          const timeSinceHit = currentTime - swing.ball_hit.timestamp;
+          
+          // Only show around the swing hit time
+          if (timeSinceHit >= -0.1 && timeSinceHit <= displayDuration) {
+            // Skip if we've already drawn this player at this time
+            if (drawnPlayers.has(swing.player_id)) continue;
+            drawnPlayers.add(swing.player_id);
+            
+            const annotation = swing.annotations[0];
+            const [bx1, by1, bx2, by2] = annotation.bbox;
+            
+            // Convert normalized coords to logical pixels
+            const x1 = bx1 * logicalWidth;
+            const y1 = by1 * logicalHeight;
+            const x2 = bx2 * logicalWidth;
+            const y2 = by2 * logicalHeight;
+            const boxWidth = x2 - x1;
+            const boxHeight = y2 - y1;
+            
+            // Calculate opacity with fade in/out
+            let opacity = 1;
+            if (timeSinceHit < 0) {
+              opacity = 1 + (timeSinceHit / 0.1);
+            } else if (timeSinceHit > displayDuration - 0.3) {
+              const fadeProgress = (timeSinceHit - (displayDuration - 0.3)) / 0.3;
+              opacity = 1 - fadeProgress;
+            }
+            opacity = Math.max(0, Math.min(1, opacity));
+            
+            if (opacity <= 0) continue;
+            
+            // Get player color (cycle through available colors)
+            const colorIndex = swing.player_id % playerBoxConfig.colors.length;
+            const colors = playerBoxConfig.colors[colorIndex];
+            
+            ctx.globalAlpha = opacity;
+            
+            // Draw filled background
+            ctx.fillStyle = colors.fill;
+            ctx.fillRect(x1, y1, boxWidth, boxHeight);
+            
+            // Draw border
+            ctx.strokeStyle = colors.stroke;
+            ctx.lineWidth = playerBoxConfig.lineWidth;
+            ctx.strokeRect(x1, y1, boxWidth, boxHeight);
+            
+            // Draw player label
+            const label = `Player ${swing.player_id + 1}`;
+            const fontSize = playerBoxConfig.labelFontSize;
+            const padding = playerBoxConfig.labelPadding;
+            
+            ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+            const labelMetrics = ctx.measureText(label);
+            const labelWidth = labelMetrics.width + padding * 2;
+            const labelHeight = fontSize + padding * 2;
+            
+            // Position label at top of box
+            const labelX = x1;
+            const labelY = y1 - labelHeight;
+            
+            // Draw label background
+            ctx.fillStyle = `rgba(0, 0, 0, ${playerBoxConfig.labelBackgroundOpacity})`;
+            ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
+            
+            // Draw label border (same color as box)
+            ctx.strokeStyle = colors.stroke;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(labelX, labelY, labelWidth, labelHeight);
+            
+            // Draw label text
+            ctx.fillStyle = "#FFFFFF";
+            ctx.textBaseline = "middle";
+            ctx.fillText(label, labelX + padding, labelY + labelHeight / 2);
+            
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+
+      // Draw ball indicator (circle, crosshairs, glow)
+      if (showIndicator && position) {
+        const x = position.X * logicalWidth;
+        const y = position.Y * logicalHeight;
+        
+        // Calculate radius using perspective
+        const perspectiveScale = getPerspectiveScale(position.Y);
+        const radius = minRadius + (maxRadius - minRadius) * perspectiveScale;
         
         // Scale crosshair and glow proportionally  
-        const scale = radius / maxRadius;
+        const scale = perspectiveScale;
         const crosshairLength = 25 * scale;
         const glowSize = 10 * scale;
         const lineWidth = 2 + 1.5 * scale;
@@ -165,7 +677,7 @@ export function BallTrackerOverlay({
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [ballPositions, videoRef, timeThreshold, usePerspective]);
+  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes]);
 
   return (
     <canvas

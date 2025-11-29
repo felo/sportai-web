@@ -5,7 +5,7 @@ import { Box, Flex, Heading, Badge, Text, Tooltip, Card } from "@radix-ui/themes
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
 import { CONFIG } from "../constants";
-import { StatisticsResult, ActiveEventTooltip } from "../types";
+import { StatisticsResult, ActiveEventTooltip, BallBounce } from "../types";
 import { formatSwingType, formatDuration, getPlayerIndex } from "../utils";
 
 interface RallyTimelineProps {
@@ -16,6 +16,7 @@ interface RallyTimelineProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   rallyTimelineRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  enhancedBallBounces?: BallBounce[];
 }
 
 export function RallyTimeline({
@@ -26,11 +27,14 @@ export function RallyTimeline({
   videoRef,
   rallyTimelineRef,
   onClose,
+  enhancedBallBounces,
 }: RallyTimelineProps) {
   const [rallyStart, rallyEnd] = result.rallies[selectedRallyIndex];
   const rallyDuration = rallyEnd - rallyStart;
 
-  const rallyBounces = result.ball_bounces.filter(
+  // Use enhanced bounces if provided, otherwise fall back to result.ball_bounces
+  const allBounces = enhancedBallBounces || result.ball_bounces;
+  const rallyBounces = allBounces.filter(
     b => b.timestamp >= rallyStart && b.timestamp <= rallyEnd
   );
 

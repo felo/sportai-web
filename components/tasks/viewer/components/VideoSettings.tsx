@@ -9,6 +9,19 @@ interface VideoSettingsProps {
   onBallTrackerChange: (value: boolean) => void;
   usePerspective: boolean;
   onPerspectiveChange: (value: boolean) => void;
+  showTrail: boolean;
+  onTrailChange: (value: boolean) => void;
+  useSmoothing: boolean;
+  onSmoothingChange: (value: boolean) => void;
+  showBounceRipples: boolean;
+  onBounceRipplesChange: (value: boolean) => void;
+  showVelocity: boolean;
+  onVelocityChange: (value: boolean) => void;
+  showPlayerBoxes: boolean;
+  onPlayerBoxesChange: (value: boolean) => void;
+  // Data enhancement
+  inferSwingBounces: boolean;
+  onInferSwingBouncesChange: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -17,6 +30,18 @@ export function VideoSettings({
   onBallTrackerChange,
   usePerspective,
   onPerspectiveChange,
+  showTrail,
+  onTrailChange,
+  useSmoothing,
+  onSmoothingChange,
+  showBounceRipples,
+  onBounceRipplesChange,
+  showVelocity,
+  onVelocityChange,
+  showPlayerBoxes,
+  onPlayerBoxesChange,
+  inferSwingBounces,
+  onInferSwingBouncesChange,
   onClose,
 }: VideoSettingsProps) {
   return (
@@ -56,16 +81,61 @@ export function VideoSettings({
         <ToggleSwitch
           checked={showBallTracker}
           onCheckedChange={onBallTrackerChange}
-          label="Show ball tracker"
+          label="Ball indicator"
         />
 
-        {showBallTracker && (
+        <ToggleSwitch
+          checked={showTrail}
+          onCheckedChange={onTrailChange}
+          label="Ball trail"
+        />
+
+        {showTrail && (
+          <ToggleSwitch
+            checked={useSmoothing}
+            onCheckedChange={onSmoothingChange}
+            label="Smooth trail"
+          />
+        )}
+
+        <ToggleSwitch
+          checked={showBounceRipples}
+          onCheckedChange={onBounceRipplesChange}
+          label="Bounce ripples"
+        />
+
+        <ToggleSwitch
+          checked={showVelocity}
+          onCheckedChange={onVelocityChange}
+          label="Shot speed"
+        />
+
+        <ToggleSwitch
+          checked={showPlayerBoxes}
+          onCheckedChange={onPlayerBoxesChange}
+          label="Player swing boxes"
+        />
+
+        {(showBallTracker || showTrail || showBounceRipples || showVelocity) && (
           <ToggleSwitch
             checked={usePerspective}
             onCheckedChange={onPerspectiveChange}
             label="Overlay perspective"
           />
         )}
+
+        {/* Data Enhancement Section */}
+        <Box style={{ height: "1px", backgroundColor: "var(--gray-6)", marginTop: "var(--space-2)" }} />
+        
+        <Heading size="2" weight="medium" style={{ color: "var(--gray-11)" }}>
+          Data Enhancement
+        </Heading>
+
+        <ToggleSwitch
+          checked={inferSwingBounces}
+          onCheckedChange={onInferSwingBouncesChange}
+          label="Infer shot bounces"
+        />
       </Flex>
     </Box>
   );

@@ -3,7 +3,7 @@
 import { RefObject } from "react";
 import { Box, Flex, Heading, Text, Tooltip, Card } from "@radix-ui/themes";
 import { CONFIG } from "../constants";
-import { StatisticsResult, Task } from "../types";
+import { StatisticsResult, Task, BallBounce } from "../types";
 import { formatDuration } from "../utils";
 
 interface MainTimelineProps {
@@ -13,6 +13,7 @@ interface MainTimelineProps {
   selectedRallyIndex: number | null;
   videoRef: RefObject<HTMLVideoElement | null>;
   onRallySelect: (index: number) => void;
+  enhancedBallBounces?: BallBounce[];
 }
 
 export function MainTimeline({
@@ -22,9 +23,13 @@ export function MainTimeline({
   selectedRallyIndex,
   videoRef,
   onRallySelect,
+  enhancedBallBounces,
 }: MainTimelineProps) {
+  // Use enhanced bounces if provided
+  const allBounces = enhancedBallBounces || result.ball_bounces;
+  
   const lastRally = result.rallies[result.rallies.length - 1];
-  const lastBounce = result.ball_bounces[result.ball_bounces.length - 1];
+  const lastBounce = allBounces[allBounces.length - 1];
   const estimatedDuration = Math.max(
     task.video_length || 0,
     lastRally ? lastRally[1] : 0,
@@ -59,7 +64,7 @@ export function MainTimeline({
               Timeline
             </Heading>
             <Text size="2" color="gray">
-              {result.rallies.length} rallies • {result.ball_bounces.length} bounces
+              {result.rallies.length} rallies • {allBounces.length} bounces
             </Text>
           </Flex>
           <Flex align="center" gap="1">

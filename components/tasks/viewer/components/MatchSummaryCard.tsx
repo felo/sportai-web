@@ -1,15 +1,17 @@
 "use client";
 
 import { Box, Flex, Grid, Heading, Text, Card } from "@radix-ui/themes";
-import { StatisticsResult } from "../types";
+import { StatisticsResult, BallBounce } from "../types";
 
 interface MatchSummaryCardProps {
   result: StatisticsResult;
+  enhancedBallBounces?: BallBounce[];
 }
 
-export function MatchSummaryCard({ result }: MatchSummaryCardProps) {
+export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCardProps) {
   const filteredPlayers = result.players.filter(p => p.swing_count >= 10);
   const totalSwings = filteredPlayers.reduce((sum, p) => sum + p.swing_count, 0);
+  const bounceCount = enhancedBallBounces?.length ?? result.ball_bounces.length;
 
   return (
     <Card style={{ border: "1px solid var(--gray-6)" }}>
@@ -47,7 +49,7 @@ export function MatchSummaryCard({ result }: MatchSummaryCardProps) {
               Bounces
             </Text>
             <Text size="3" weight="bold">
-              {result.ball_bounces.length}
+              {bounceCount}
             </Text>
           </Box>
         </Grid>

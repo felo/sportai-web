@@ -4,7 +4,7 @@ import { useState, RefObject } from "react";
 import { Box, Flex, Grid, Heading, Text, Card } from "@radix-ui/themes";
 import { ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
-import { StatisticsResult, Task, Player } from "../types";
+import { StatisticsResult, Task, Player, BallBounce } from "../types";
 import { HighlightsCard } from "./HighlightsCard";
 import { MatchSummaryCard } from "./MatchSummaryCard";
 import { PlayerCard } from "./PlayerCard";
@@ -17,9 +17,10 @@ interface MatchInsightsProps {
   task: Task;
   videoRef: RefObject<HTMLVideoElement | null>;
   portraits: Record<number, string>;
+  enhancedBallBounces?: BallBounce[];
 }
 
-export function MatchInsights({ result, task, videoRef, portraits }: MatchInsightsProps) {
+export function MatchInsights({ result, task, videoRef, portraits, enhancedBallBounces }: MatchInsightsProps) {
   const [expanded, setExpanded] = useState(false);
 
   const filteredPlayers: Player[] = result
@@ -72,7 +73,7 @@ export function MatchInsights({ result, task, videoRef, portraits }: MatchInsigh
               <Flex direction="column" gap="4">
                 {!result && <TaskStatusCard task={task} />}
 
-                {result && <MatchSummaryCard result={result} />}
+                {result && <MatchSummaryCard result={result} enhancedBallBounces={enhancedBallBounces} />}
 
                 {result &&
                   filteredPlayers.map((player, index) => (
