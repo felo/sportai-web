@@ -9,9 +9,13 @@ interface MatchSummaryCardProps {
 }
 
 export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCardProps) {
-  const filteredPlayers = result.players.filter(p => p.swing_count >= 10);
+  const players = result.players || [];
+  const rallies = result.rallies || [];
+  const ballBounces = result.ball_bounces || [];
+  
+  const filteredPlayers = players.filter(p => p.swing_count >= 10);
   const totalSwings = filteredPlayers.reduce((sum, p) => sum + p.swing_count, 0);
-  const bounceCount = enhancedBallBounces?.length ?? result.ball_bounces.length;
+  const bounceCount = enhancedBallBounces?.length ?? ballBounces.length;
 
   return (
     <Card style={{ border: "1px solid var(--gray-6)" }}>
@@ -41,7 +45,7 @@ export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCa
               Rallies
             </Text>
             <Text size="3" weight="bold">
-              {result.rallies.length}
+              {rallies.length}
             </Text>
           </Box>
           <Box>

@@ -49,7 +49,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
   // Get valid players with display info (filtered by minimum swings)
   const validPlayers = useMemo(() => {
-    if (!result) return [];
+    if (!result || !result.players) return [];
     return result.players
       .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
       .sort((a, b) => b.swing_count - a.swing_count)
@@ -75,7 +75,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   // Flatten all swings from all players with player_id attached
   // Filter out swings not in a rally
   const allSwings = useMemo(() => {
-    if (!result) return [];
+    if (!result || !result.players) return [];
     return result.players.flatMap(player =>
       player.swings
         .filter(swing => swing.is_in_rally !== false) // Keep in-rally and undefined (backwards compat)
@@ -282,7 +282,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
   // Auto-select rally when playhead enters it
   useEffect(() => {
-    if (!result) return;
+    if (!result || !result.rallies) return;
     
     // Find which rally the playhead is currently in
     const currentRallyIndex = result.rallies.findIndex(

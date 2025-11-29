@@ -22,6 +22,13 @@ interface ModelSettings {
   thinkingBudget?: number;
 }
 
+interface ContextUsage {
+  messagesInContext: number;
+  tokensUsed: number;
+  maxTokens: number;
+  complexity: "simple" | "complex";
+}
+
 interface Pricing {
   totalCost: number;
 }
@@ -41,11 +48,39 @@ interface DeveloperInfoProps {
   responseDuration?: number;
   timeToFirstToken?: number;
   modelSettings?: ModelSettings;
+  contextUsage?: ContextUsage;
+  cacheUsed?: boolean;
+  cacheName?: string;
+  modelUsed?: string;
+  modelReason?: string;
 }
 
 /**
  * Developer mode information display showing token usage, costs, and performance metrics
  */
+// Helper to format model reason for display
+function formatModelReason(reason: string): string {
+  const reasonMap: Record<string, string> = {
+    video_analysis: "Video analysis",
+    complex_query: "Complex query detected",
+    text_query: "Text-only query",
+    simple_followup: "Simple follow-up",
+    fallback: "Fallback",
+  };
+  return reasonMap[reason] || reason;
+}
+
+// Helper to get a short model display name
+function getModelDisplayName(model: string): { name: string; isFlash: boolean } {
+  if (model.includes("flash")) {
+    return { name: "Flash ⚡", isFlash: true };
+  }
+  if (model.includes("pro")) {
+    return { name: "Pro", isFlash: false };
+  }
+  return { name: model, isFlash: false };
+}
+
 export function DeveloperInfo({
   show,
   messageTokens,
@@ -57,6 +92,11 @@ export function DeveloperInfo({
   responseDuration,
   timeToFirstToken,
   modelSettings,
+  contextUsage,
+  cacheUsed,
+  cacheName,
+  modelUsed,
+  modelReason,
 }: DeveloperInfoProps) {
   if (!show) return null;
 
@@ -108,7 +148,7 @@ export function DeveloperInfo({
                 <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
               </Text>
               {timeToFirstToken !== undefined && (
-                <Text size="1" style={{ paddingLeft: "var(--space-2)" }}>
+                <Text size="1">
                   <strong>Time to first token:</strong> {timeToFirstToken.toLocaleString()}ms ({(timeToFirstToken / 1000).toFixed(2)}s)
                   {responseDuration > 0 && (
                     <span style={{ color: "var(--gray-10)" }}>
@@ -119,6 +159,22 @@ export function DeveloperInfo({
               )}
             </>
           )}
+          {modelUsed && (
+            <Text size="1">
+              <strong>Model:</strong>{" "}
+              {(() => {
+                const { name, isFlash } = getModelDisplayName(modelUsed);
+                return (
+                  <span style={{ color: isFlash ? "var(--amber-11)" : "var(--blue-11)" }}>
+                    {name}
+                  </span>
+                );
+              })()}
+              {modelReason && (
+                <span style={{ color: "var(--gray-10)" }}> • {formatModelReason(modelReason)}</span>
+              )}
+            </Text>
+          )}
           {modelSettings && (
             <>
               <Text size="1">
@@ -126,7 +182,7 @@ export function DeveloperInfo({
                 {modelSettings.thinkingBudget && ` (budget: ${modelSettings.thinkingBudget} tokens)`}, Resolution={modelSettings.mediaResolution}
               </Text>
               {modelSettings.domainExpertise && (
-                <Text size="1" style={{ paddingLeft: "var(--space-2)" }}>
+                <Text size="1">
                   <strong>Domain knowledge:</strong> {
                     modelSettings.domainExpertise === "all-sports" 
                       ? "All Sports (General coaching knowledge)" 
@@ -135,6 +191,27 @@ export function DeveloperInfo({
                 </Text>
               )}
             </>
+          )}
+          {contextUsage && (
+            <Text size="1">
+              <strong>Context:</strong> {contextUsage.messagesInContext} messages, {contextUsage.tokensUsed.toLocaleString()}/{contextUsage.maxTokens.toLocaleString()} tokens ({Math.round((contextUsage.tokensUsed / contextUsage.maxTokens) * 100)}%)
+              {contextUsage.complexity === "simple" && (
+                <span style={{ color: "var(--green-11)" }}> • Simple query mode</span>
+              )}
+            </Text>
+          )}
+          {cacheUsed !== undefined && (
+            <Text size="1">
+              <strong>LLM Cache:</strong>{" "}
+              {cacheUsed ? (
+                <span style={{ color: "var(--green-11)" }}>
+                  ✓ Cached content used
+                  {cacheName && <span style={{ color: "var(--gray-10)" }}> ({cacheName.split('/').pop()})</span>}
+                </span>
+              ) : (
+                <span style={{ color: "var(--gray-10)" }}>Not cached (video &lt; 22MB or first request)</span>
+              )}
+            </Text>
           )}
           {ttsUsage.requestCount > 0 && (
             <>

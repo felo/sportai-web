@@ -4,7 +4,7 @@ import { RefObject, useState } from "react";
 import { Box, Flex, Heading, Badge, Text, Tooltip, Card, Switch } from "@radix-ui/themes";
 import { Cross2Icon, SpeakerLoudIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
-import { CONFIG } from "../constants";
+import { CONFIG, FEATURE_FLAGS } from "../constants";
 import { StatisticsResult, ActiveEventTooltip, BallBounce } from "../types";
 import { formatSwingType, formatDuration, getPlayerIndex } from "../utils";
 import { AudioWaveform } from "./AudioWaveform";
@@ -33,16 +33,19 @@ export function RallyTimeline({
   playerDisplayNames = {},
 }: RallyTimelineProps) {
   const [showAudioWaveform, setShowAudioWaveform] = useState(false);
-  const [rallyStart, rallyEnd] = result.rallies[selectedRallyIndex];
+  
+  const rallies = result.rallies || [];
+  const players = result.players || [];
+  const [rallyStart, rallyEnd] = rallies[selectedRallyIndex] || [0, 0];
   const rallyDuration = rallyEnd - rallyStart;
 
   // Use enhanced bounces if provided, otherwise fall back to result.ball_bounces
-  const allBounces = enhancedBallBounces || result.ball_bounces;
+  const allBounces = enhancedBallBounces || result.ball_bounces || [];
   const rallyBounces = allBounces.filter(
     b => b.timestamp >= rallyStart && b.timestamp <= rallyEnd
   );
 
-  const rallySwings = result.players
+  const rallySwings = players
     .filter(p => p.swing_count >= 10)
     .flatMap(player =>
       player.swings
@@ -94,12 +97,14 @@ export function RallyTimeline({
                   <Text size="1" color="gray">Swing</Text>
                 </Flex>
               </Flex>
-              <Tooltip content="Show audio waveform (play video to analyze)">
-                <Flex align="center" gap="1" style={{ cursor: "pointer" }} onClick={() => setShowAudioWaveform(!showAudioWaveform)}>
-                  <SpeakerLoudIcon style={{ width: 14, height: 14, color: showAudioWaveform ? "var(--pink-9)" : "var(--gray-9)" }} />
-                  <Switch size="1" checked={showAudioWaveform} onCheckedChange={setShowAudioWaveform} />
-                </Flex>
-              </Tooltip>
+              {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && (
+                <Tooltip content="Show audio waveform (play video to analyze)">
+                  <Flex align="center" gap="1" style={{ cursor: "pointer" }} onClick={() => setShowAudioWaveform(!showAudioWaveform)}>
+                    <SpeakerLoudIcon style={{ width: 14, height: 14, color: showAudioWaveform ? "var(--pink-9)" : "var(--gray-9)" }} />
+                    <Switch size="1" checked={showAudioWaveform} onCheckedChange={setShowAudioWaveform} />
+                  </Flex>
+                </Tooltip>
+              )}
               <IconButton
                 icon={<Cross2Icon />}
                 variant="ghost"
@@ -124,7 +129,7 @@ export function RallyTimeline({
             }}
           >
             {/* Audio Waveform (behind other elements) */}
-            {showAudioWaveform && (
+            {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && showAudioWaveform && (
               <AudioWaveform
                 videoRef={videoRef}
                 startTime={rallyStart}
@@ -137,14 +142,14 @@ export function RallyTimeline({
             {rallySwings.map((swing, idx) => {
               const relativeTime = swing.ball_hit.timestamp - rallyStart;
               const position = (relativeTime / rallyDuration) * 100;
-              const playerIndex = getPlayerIndex(result.players, swing.player_id);
+              const playerIndex = getPlayerIndex(players, swing.player_id);
               const playerName = playerDisplayNames[swing.player_id] || `P${playerIndex}`;
               const isNearPlayhead = Math.abs(currentTime - swing.ball_hit.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
 
               return (
                 <Tooltip
                   key={`swing-${idx}`}
-                  content={`${playerName} ${formatSwingType(swing.swing_type)} @ ${formatDuration(swing.ball_hit.timestamp)}`}
+                  content={`${playerName} ${formatSwingType(swing.swing_type)} – ${formatDuration(swing.ball_hit.timestamp)}`}
                 >
                   <Box
                     onClick={(e: React.MouseEvent) => {
@@ -173,7 +178,7 @@ export function RallyTimeline({
                       height: "100%",
                       transform: "translateX(-50%)",
                       cursor: "pointer",
-                      zIndex: 5,
+                      zIndex: 10,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -188,7 +193,7 @@ export function RallyTimeline({
                         borderRadius: "2px",
                         boxShadow: isNearPlayhead ? "0 0 12px rgba(59, 130, 246, 0.8)" : "none",
                         transition: "all 0.15s ease",
-                        transform: "scaleX(1)",
+                        transform: isNearPlayhead ? "scaleX(1.5)" : "scaleX(1)",
                       }}
                     />
                   </Box>
@@ -222,7 +227,7 @@ export function RallyTimeline({
                     : "rgba(168, 85, 247, 0.8)"; // Purple glow
 
               return (
-                <Tooltip key={`bounce-${idx}`} content={`${bounce.type} bounce @ ${formatDuration(bounce.timestamp)}`}>
+                <Tooltip key={`bounce-${idx}`} content={`${bounce.type} bounce – ${formatDuration(bounce.timestamp)}`}>
                   <Box
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
@@ -250,7 +255,7 @@ export function RallyTimeline({
                       height: "100%",
                       transform: "translateX(-50%)",
                       cursor: "pointer",
-                      zIndex: 10,
+                      zIndex: 5,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -266,7 +271,7 @@ export function RallyTimeline({
                         border: "2px solid white",
                         boxShadow: isNearPlayhead ? `0 0 16px ${glowColor}` : "none",
                         transition: "all 0.15s ease",
-                        transform: "scale(1)",
+                        transform: isNearPlayhead ? "scale(1.5)" : "scale(1)",
                       }}
                     />
                   </Box>

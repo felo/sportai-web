@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAICacheManager } from "@google/generative-ai/server";
 import { logger } from "./logger";
 import {
   estimateTextTokens,
@@ -9,10 +10,65 @@ import {
 import { getSystemPromptWithDomain, getFramePromptWithDomain, type PromptType } from "./prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
-const MODEL_NAME = "gemini-3-pro-preview";
+// Model selection: Pro for video/complex, Flash for simple text follow-ups
+const MODEL_NAME_PRO = "gemini-3-pro-preview";
+const MODEL_NAME_FLASH = "gemini-2.0-flash";
+
+// Minimum tokens for explicit caching (Gemini requirement: 32,768 tokens)
+// ~22MB of video content
+const MIN_TOKENS_FOR_CACHING = 32768;
+const CACHE_TTL_SECONDS = 3600; // 1 hour
+
+/**
+ * Patterns that indicate an explicitly complex query needing the Pro model
+ * These queries benefit from deeper reasoning capabilities
+ */
+const COMPLEX_QUERY_PATTERNS = [
+  /\b(compare|comparison|versus|vs\.?|difference between)\b/i,
+  /\b(overall|throughout|all of|each of|entire|whole)\b/i,
+  /\b(summarize|summary|recap|overview)\b/i,
+  /\b(first|second|third|earlier|previous|before|beginning)\b/i,
+  /\b(analyze|analyse|review|evaluate|assess|critique)\b/i,
+  /\b(strategy|tactical|game plan|approach)\b/i,
+  /\b(step by step|detailed|in-depth|comprehensive)\b/i,
+];
+
+/**
+ * Determine which model to use based on query characteristics
+ * 
+ * Use Pro model for:
+ * - Video analysis (needs visual understanding)
+ * - Explicitly complex queries (compare, analyze, summarize, etc.)
+ * 
+ * Use Flash model for:
+ * - All text-only queries (faster, cheaper)
+ * - Including first message without video (likely simple questions)
+ */
+function selectModel(
+  hasVideo: boolean,
+  hasHistory: boolean,
+  prompt: string
+): { modelName: string; reason: string } {
+  // Always use Pro for video analysis
+  if (hasVideo) {
+    return { modelName: MODEL_NAME_PRO, reason: "video_analysis" };
+  }
+  
+  // Check for explicitly complex queries (even without video)
+  for (const pattern of COMPLEX_QUERY_PATTERNS) {
+    if (pattern.test(prompt)) {
+      return { modelName: MODEL_NAME_PRO, reason: "complex_query" };
+    }
+  }
+  
+  // All text-only queries → use Flash for speed
+  // This includes first message without video (probably just a simple question)
+  return { modelName: MODEL_NAME_FLASH, reason: "text_query" };
+}
 
 // Lazy initialization - only check API key when actually used (at runtime)
 let genAI: GoogleGenerativeAI | null = null;
+let cacheManager: GoogleAICacheManager | null = null;
 
 function getGenAI(): GoogleGenerativeAI {
   if (!genAI) {
@@ -25,9 +81,36 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI;
 }
 
+function getCacheManager(): GoogleAICacheManager {
+  if (!cacheManager) {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is required for cache management");
+    }
+    cacheManager = new GoogleAICacheManager(process.env.GEMINI_API_KEY);
+  }
+  return cacheManager;
+}
+
+/**
+ * Check if video content is large enough for explicit caching
+ */
+function isEligibleForCaching(videoSizeBytes: number): boolean {
+  // Rough estimate: 1.5 tokens per KB
+  const estimatedTokens = Math.ceil((videoSizeBytes / 1024) * 1.5);
+  return estimatedTokens >= MIN_TOKENS_FOR_CACHING;
+}
+
 export interface ConversationHistory {
   role: "user" | "model";
   parts: Array<{ text: string }>;
+}
+
+export interface LLMResponse {
+  text: string;
+  cacheName?: string; // If a new cache was created
+  cacheUsed: boolean; // Whether cached content was used
+  modelUsed: string; // Which model was used (pro or flash)
+  modelReason: string; // Why that model was selected
 }
 
 export async function queryLLM(
@@ -37,8 +120,10 @@ export async function queryLLM(
   thinkingMode: ThinkingMode = "fast",
   mediaResolution: MediaResolution = "medium",
   domainExpertise: DomainExpertise = "all-sports",
-  promptType: PromptType = "video"
-): Promise<string> {
+  promptType: PromptType = "video",
+  queryComplexity: "simple" | "complex" = "complex",
+  existingCacheName?: string // Existing cache to use for this video
+): Promise<LLMResponse> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   // Get system prompt with domain-specific enhancement based on prompt type
@@ -47,8 +132,13 @@ export async function queryLLM(
     ? getFramePromptWithDomain(domainExpertise)
     : getSystemPromptWithDomain(domainExpertise);
   
+  // Select model based on query characteristics
+  const hasVideo = !!videoData;
+  const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
+  const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
+  
   logger.info(`[${requestId}] Starting LLM query`);
-  logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
+  logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
@@ -95,62 +185,120 @@ export async function queryLLM(
   logger.time(`[${requestId}] API call duration`);
   
   try {
-    // Build generation config with thinking level and media resolution
-    // Gemini 3 API parameters: thinking_level and media_resolution
+    // Build generation config
     const generationConfig: any = {};
+    const isFlashModel = selectedModel.includes("flash");
     
-    // Smart thinking budget based on query complexity
-    let thinkingBudget: number;
+    // Thinking config only applies to Pro/thinking models, not Flash
+    let thinkingBudget: number | undefined;
     
-    if (thinkingMode === "deep") {
-      thinkingBudget = 8192; // Always high for deep mode
-    } else {
-      // In fast mode, adapt based on query complexity
-      const hasVideo = !!videoData;
-      const promptTokens = estimateTextTokens(prompt);
-      const hasHistory = conversationHistory && conversationHistory.length > 5;
-      
-      if (hasVideo) {
-        // Video analysis needs more thinking even in fast mode
-        thinkingBudget = 1024;
-      } else if (promptTokens > 50 || hasHistory) {
-        // Complex text queries benefit from moderate thinking
-        // 50 tokens ≈ a detailed question or paragraph
-        thinkingBudget = 256;
+    if (!isFlashModel) {
+      // Smart thinking budget for Pro model
+      if (thinkingMode === "deep") {
+        thinkingBudget = 8192;
       } else {
-        // Simple queries need minimal thinking
-        // <50 tokens = greetings, short questions
-        thinkingBudget = 64;
+        const promptTokens = estimateTextTokens(prompt);
+        const hasLongHistory = conversationHistory && conversationHistory.length > 5;
+        
+        if (hasVideo) {
+          thinkingBudget = 1024;
+        } else if (queryComplexity === "simple") {
+          thinkingBudget = 64;
+        } else if (promptTokens > 50 || hasLongHistory) {
+          thinkingBudget = 256;
+        } else {
+          thinkingBudget = 64;
+        }
       }
+      
+      generationConfig.thinkingConfig = { thinkingBudget };
+      logger.debug(`[${requestId}] Pro model - thinking budget: ${thinkingBudget} tokens`);
+    } else {
+      logger.debug(`[${requestId}] Flash model - no thinking config`);
     }
     
-    generationConfig.thinkingConfig = { thinkingBudget };
-    logger.debug(`[${requestId}] Thinking budget: ${thinkingBudget} tokens (prompt: ${estimateTextTokens(prompt)} tokens)`);
-    
-    // Map media resolution to API parameter (snake_case for API)
-    // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
-    const mediaResolutionMap: Record<MediaResolution, string> = {
-      low: "MEDIA_RESOLUTION_LOW",
-      medium: "MEDIA_RESOLUTION_MEDIUM",
-      high: "MEDIA_RESOLUTION_HIGH",
-    };
-    generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
+    // Media resolution only for Pro model with video
+    if (hasVideo && !isFlashModel) {
+      const mediaResolutionMap: Record<MediaResolution, string> = {
+        low: "MEDIA_RESOLUTION_LOW",
+        medium: "MEDIA_RESOLUTION_MEDIUM",
+        high: "MEDIA_RESOLUTION_HIGH",
+      };
+      generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
+    }
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
-    // Using Gemini 3 Pro with generation config and system instruction
-    // systemInstruction keeps system context without repeating it in every message
-    const model = getGenAI().getGenerativeModel({ 
-      model: MODEL_NAME,
-      generationConfig,
-      systemInstruction: systemPrompt,
-    });
+    // Track caching state
+    let cacheUsed = false;
+    let newCacheName: string | undefined;
+    let model: any;
+    
+    // Try to use existing cache if provided
+    if (existingCacheName) {
+      try {
+        logger.debug(`[${requestId}] Attempting to use existing cache: ${existingCacheName}`);
+        const cachedContent = await getCacheManager().get(existingCacheName);
+        model = getGenAI().getGenerativeModelFromCachedContent(cachedContent, {
+          generationConfig,
+        });
+        cacheUsed = true;
+        logger.info(`[${requestId}] ✅ Using cached content`);
+      } catch (cacheError) {
+        logger.warn(`[${requestId}] Cache not found or expired, falling back to normal model`, cacheError);
+      }
+    }
+    
+    // If no cache used, check if we should create one for large videos
+    if (!cacheUsed && videoData && isEligibleForCaching(videoData.data.length)) {
+      try {
+        logger.debug(`[${requestId}] Video eligible for caching (${(videoData.data.length / 1024 / 1024).toFixed(2)} MB)`);
+        const cache = await getCacheManager().create({
+          model: `models/${MODEL_NAME_PRO}`,
+          displayName: `sportai_${requestId}`,
+          systemInstruction: systemPrompt,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    data: videoData.data.toString("base64"),
+                    mimeType: videoData.mimeType,
+                  },
+                },
+              ],
+            },
+          ],
+          ttlSeconds: CACHE_TTL_SECONDS,
+        });
+        
+        newCacheName = cache.name;
+        model = getGenAI().getGenerativeModelFromCachedContent(cache, {
+          generationConfig,
+        });
+        cacheUsed = true;
+        logger.info(`[${requestId}] ✅ Created new cache: ${cache.name}`);
+      } catch (cacheError) {
+        logger.warn(`[${requestId}] Failed to create cache, using normal model`, cacheError);
+      }
+    }
+    
+    // Fall back to normal model if caching wasn't used
+    if (!model) {
+      model = getGenAI().getGenerativeModel({ 
+        model: selectedModel,
+        generationConfig,
+        systemInstruction: systemPrompt,
+      });
+    }
     
     // Build current message parts (user prompt only - system instruction is separate)
     const parts: any[] = [{ text: prompt }];
     
-    // Add media (video or image) if provided
-    if (videoData) {
+    // Add media (video or image) if provided AND not using cached content
+    // Cached content already includes the video
+    if (videoData && !cacheUsed) {
       const base64Length = videoData.data.toString("base64").length;
       const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
       logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
@@ -228,7 +376,13 @@ export async function queryLLM(
     logger.debug(`[${requestId}]   Output: ${formatCost(pricing.outputCost)} ($${pricing.outputPricePerM}/1M tokens)`);
     logger.debug(`[${requestId}]   Total: ${formatCost(pricing.totalCost)}`);
     
-    return responseText;
+    return {
+      text: responseText,
+      cacheName: newCacheName,
+      cacheUsed,
+      modelUsed: selectedModel,
+      modelReason,
+    };
   } catch (error: any) {
     logger.timeEnd(`[${requestId}] API call duration`);
     
@@ -245,7 +399,7 @@ export async function queryLLM(
       try {
         // Retry with minimal thinking config (model requires thinking mode)
         const fallbackModel = getGenAI().getGenerativeModel({ 
-          model: MODEL_NAME,
+          model: MODEL_NAME_PRO,
           generationConfig: {
             thinkingConfig: {
               thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
@@ -277,7 +431,13 @@ export async function queryLLM(
         const responseText = response.text();
         
         logger.info(`[${requestId}] Response received (fallback): ${responseText.length} characters`);
-        return responseText;
+        return {
+          text: responseText,
+          cacheName: undefined,
+          cacheUsed: false,
+          modelUsed: MODEL_NAME_PRO,
+          modelReason: "fallback",
+        };
       } catch (fallbackError: any) {
         logger.error(`[${requestId}] Fallback also failed:`, fallbackError);
         throw fallbackError;
@@ -322,29 +482,43 @@ export async function queryLLM(
   }
 }
 
+export interface StreamLLMResult {
+  textGenerator: AsyncGenerator<string, void, unknown>;
+  cacheName?: string;
+  cacheUsed: boolean;
+  modelUsed: string;
+  modelReason: string;
+}
+
 /**
  * Stream LLM response (for text-only and video queries)
- * Returns an async generator that yields text chunks
+ * Returns an async generator that yields text chunks, plus cache info
  */
-export async function* streamLLM(
+export async function streamLLM(
   prompt: string,
   conversationHistory?: ConversationHistory[],
   videoData?: { data: Buffer; mimeType: string } | null,
   thinkingMode: ThinkingMode = "fast",
   mediaResolution: MediaResolution = "medium",
   domainExpertise: DomainExpertise = "all-sports",
-  promptType: PromptType = "video"
-): AsyncGenerator<string, void, unknown> {
+  promptType: PromptType = "video",
+  queryComplexity: "simple" | "complex" = "complex",
+  existingCacheName?: string
+): Promise<StreamLLMResult> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   // Get system prompt with domain-specific enhancement based on prompt type
-  // Use systemInstruction parameter instead of prepending to prompt
   const systemPrompt = promptType === "frame" 
     ? getFramePromptWithDomain(domainExpertise)
     : getSystemPromptWithDomain(domainExpertise);
   
+  // Select model based on query characteristics
+  const hasVideo = !!videoData;
+  const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
+  const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
+  
   logger.info(`[${requestId}] Starting LLM stream`);
-  logger.debug(`[${requestId}] Model: ${MODEL_NAME}`);
+  logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
@@ -359,62 +533,120 @@ export async function* streamLLM(
   }
   
   try {
-    // Build generation config with thinking level and media resolution
-    // Gemini 3 API parameters: thinking_level and media_resolution
+    // Build generation config
     const generationConfig: any = {};
+    const isFlashModel = selectedModel.includes("flash");
     
-    // Smart thinking budget based on query complexity
-    let thinkingBudget: number;
+    // Thinking config only applies to Pro/thinking models, not Flash
+    let thinkingBudget: number | undefined;
     
-    if (thinkingMode === "deep") {
-      thinkingBudget = 8192; // Always high for deep mode
-    } else {
-      // In fast mode, adapt based on query complexity
-      const hasVideo = !!videoData;
-      const promptTokens = estimateTextTokens(prompt);
-      const hasHistory = conversationHistory && conversationHistory.length > 5;
-      
-      if (hasVideo) {
-        // Video analysis needs more thinking even in fast mode
-        thinkingBudget = 1024;
-      } else if (promptTokens > 50 || hasHistory) {
-        // Complex text queries benefit from moderate thinking
-        // 50 tokens ≈ a detailed question or paragraph
-        thinkingBudget = 256;
+    if (!isFlashModel) {
+      // Smart thinking budget for Pro model
+      if (thinkingMode === "deep") {
+        thinkingBudget = 8192;
       } else {
-        // Simple queries need minimal thinking
-        // <50 tokens = greetings, short questions
-        thinkingBudget = 64;
+        const promptTokens = estimateTextTokens(prompt);
+        const hasLongHistory = conversationHistory && conversationHistory.length > 5;
+        
+        if (hasVideo) {
+          thinkingBudget = 1024;
+        } else if (queryComplexity === "simple") {
+          thinkingBudget = 64;
+        } else if (promptTokens > 50 || hasLongHistory) {
+          thinkingBudget = 256;
+        } else {
+          thinkingBudget = 64;
+        }
       }
+      
+      generationConfig.thinkingConfig = { thinkingBudget };
+      logger.debug(`[${requestId}] Pro model - thinking budget: ${thinkingBudget} tokens`);
+    } else {
+      logger.debug(`[${requestId}] Flash model - no thinking config`);
     }
     
-    generationConfig.thinkingConfig = { thinkingBudget };
-    logger.debug(`[${requestId}] Thinking budget: ${thinkingBudget} tokens (prompt: ${estimateTextTokens(prompt)} tokens)`);
-    
-    // Map media resolution to API parameter (snake_case for API)
-    // The API expects: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, or MEDIA_RESOLUTION_HIGH
-    const mediaResolutionMap: Record<MediaResolution, string> = {
-      low: "MEDIA_RESOLUTION_LOW",
-      medium: "MEDIA_RESOLUTION_MEDIUM",
-      high: "MEDIA_RESOLUTION_HIGH",
-    };
-    generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
+    // Media resolution only for Pro model with video
+    if (hasVideo && !isFlashModel) {
+      const mediaResolutionMap: Record<MediaResolution, string> = {
+        low: "MEDIA_RESOLUTION_LOW",
+        medium: "MEDIA_RESOLUTION_MEDIUM",
+        high: "MEDIA_RESOLUTION_HIGH",
+      };
+      generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
+    }
     
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
     
-    // Using Gemini 3 Pro with generation config and system instruction
-    // systemInstruction keeps system context without repeating it in every message
-    const model = getGenAI().getGenerativeModel({ 
-      model: MODEL_NAME,
-      generationConfig,
-      systemInstruction: systemPrompt,
-    });
+    // Track caching state
+    let cacheUsed = false;
+    let newCacheName: string | undefined;
+    let model: any;
+    
+    // Try to use existing cache if provided
+    if (existingCacheName) {
+      try {
+        logger.debug(`[${requestId}] Attempting to use existing cache: ${existingCacheName}`);
+        const cachedContent = await getCacheManager().get(existingCacheName);
+        model = getGenAI().getGenerativeModelFromCachedContent(cachedContent, {
+          generationConfig,
+        });
+        cacheUsed = true;
+        logger.info(`[${requestId}] ✅ Using cached content for streaming`);
+      } catch (cacheError) {
+        logger.warn(`[${requestId}] Cache not found or expired, falling back to normal model`, cacheError);
+      }
+    }
+    
+    // If no cache used, check if we should create one for large videos
+    if (!cacheUsed && videoData && isEligibleForCaching(videoData.data.length)) {
+      try {
+        logger.debug(`[${requestId}] Video eligible for caching (${(videoData.data.length / 1024 / 1024).toFixed(2)} MB)`);
+        const cache = await getCacheManager().create({
+          model: `models/${MODEL_NAME_PRO}`,
+          displayName: `sportai_${requestId}`,
+          systemInstruction: systemPrompt,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    data: videoData.data.toString("base64"),
+                    mimeType: videoData.mimeType,
+                  },
+                },
+              ],
+            },
+          ],
+          ttlSeconds: CACHE_TTL_SECONDS,
+        });
+        
+        newCacheName = cache.name;
+        model = getGenAI().getGenerativeModelFromCachedContent(cache, {
+          generationConfig,
+        });
+        cacheUsed = true;
+        logger.info(`[${requestId}] ✅ Created new cache for streaming: ${cache.name}`);
+      } catch (cacheError) {
+        logger.warn(`[${requestId}] Failed to create cache, using normal model`, cacheError);
+      }
+    }
+    
+    // Fall back to normal model if caching wasn't used
+    if (!model) {
+      model = getGenAI().getGenerativeModel({ 
+        model: selectedModel,
+        generationConfig,
+        systemInstruction: systemPrompt,
+      });
+    }
     
     // Build current message parts (user prompt only - system instruction is separate)
     const parts: any[] = [{ text: prompt }];
     
-    // Add media (video or image) if provided
-    if (videoData) {
+    // Add media (video or image) if provided AND not using cached content
+    // Cached content already includes the video
+    if (videoData && !cacheUsed) {
       const base64Length = videoData.data.toString("base64").length;
       const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
       logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
@@ -445,16 +677,26 @@ export async function* streamLLM(
     
     logger.debug(`[${requestId}] Streaming request to LLM API...`);
     
-    let fullText = "";
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      if (chunkText) {
-        fullText += chunkText;
-        yield chunkText;
+    // Create the text generator as an inner async generator
+    async function* createTextGenerator(): AsyncGenerator<string, void, unknown> {
+      let fullText = "";
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullText += chunkText;
+          yield chunkText;
+        }
       }
+      logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
     }
     
-    logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
+    return {
+      textGenerator: createTextGenerator(),
+      cacheName: newCacheName,
+      cacheUsed,
+      modelUsed: selectedModel,
+      modelReason,
+    };
   } catch (error: any) {
     // If generationConfig fails, try without it (for backwards compatibility)
     // Also catch "Budget 0 is invalid" errors which indicate thinking mode is required
@@ -470,7 +712,7 @@ export async function* streamLLM(
       logger.debug(`[${requestId}] Generation config parameters not supported, falling back to default settings`);
       // Retry with minimal thinking config (model requires thinking mode)
       const fallbackModel = getGenAI().getGenerativeModel({ 
-        model: MODEL_NAME,
+        model: MODEL_NAME_PRO,
         generationConfig: {
           thinkingConfig: {
             thinkingBudget: 1024, // Minimum required for gemini-3-pro-preview
@@ -480,9 +722,9 @@ export async function* streamLLM(
       });
       
       // Rebuild parts (user prompt only)
-      const parts: any[] = [{ text: prompt }];
+      const fallbackParts: any[] = [{ text: prompt }];
       if (videoData) {
-        parts.push({
+        fallbackParts.push({
           inlineData: {
             data: videoData.data.toString("base64"),
             mimeType: videoData.mimeType,
@@ -490,25 +732,33 @@ export async function* streamLLM(
         });
       }
       
-      let result: any;
+      let fallbackResult: any;
       if (conversationHistory && conversationHistory.length > 0) {
         const chat = fallbackModel.startChat({ history: conversationHistory });
-        result = await chat.sendMessageStream(parts);
+        fallbackResult = await chat.sendMessageStream(fallbackParts);
       } else {
-        result = await fallbackModel.generateContentStream(parts);
+        fallbackResult = await fallbackModel.generateContentStream(fallbackParts);
       }
       
-      let fullText = "";
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        if (chunkText) {
-          fullText += chunkText;
-          yield chunkText;
+      async function* fallbackGenerator(): AsyncGenerator<string, void, unknown> {
+        let fullText = "";
+        for await (const chunk of fallbackResult.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            fullText += chunkText;
+            yield chunkText;
+          }
         }
+        logger.info(`[${requestId}] Stream completed (fallback): ${fullText.length} characters`);
       }
       
-      logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
-      return;
+      return {
+        textGenerator: fallbackGenerator(),
+        cacheName: undefined,
+        cacheUsed: false,
+        modelUsed: MODEL_NAME_PRO,
+        modelReason: "fallback",
+      };
     }
     
     logger.error(`[${requestId}] Error streaming LLM:`, {

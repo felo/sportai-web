@@ -1,8 +1,13 @@
 import { useState, useCallback, useRef } from "react";
 import type { ProgressStage, Message } from "@/types/chat";
-import { getConversationContext, trimMessagesByTokens, formatMessagesForGemini } from "@/utils/context-utils";
+import { 
+  getOptimizedContext, 
+  trimMessagesByTokens, 
+  formatMessagesForGemini,
+} from "@/utils/context-utils";
 import { uploadToS3 } from "@/lib/s3";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
+import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 // Rough estimate for system prompt token count (server-side prompt is not exposed to client)
@@ -12,12 +17,15 @@ const ESTIMATED_SYSTEM_PROMPT_TOKENS = 500;
 /**
  * Calculate thinking budget based on query complexity
  * Matches the server-side logic in lib/llm.ts
+ * 
+ * Now also considers if the query is a simple follow-up for faster responses
  */
 function calculateThinkingBudget(
   thinkingMode: ThinkingMode,
   hasVideo: boolean,
   promptTokens: number,
-  historyLength: number
+  historyLength: number,
+  isSimpleQuery: boolean = false
 ): number {
   if (thinkingMode === "deep") {
     return 8192; // Always high for deep mode
@@ -27,6 +35,10 @@ function calculateThinkingBudget(
   if (hasVideo) {
     // Video analysis needs more thinking even in fast mode
     return 1024;
+  } else if (isSimpleQuery) {
+    // Simple follow-up questions need minimal thinking
+    // This is a quick clarifying or referential question
+    return 64;
   } else if (promptTokens > 50 || historyLength > 5) {
     // Complex text queries benefit from moderate thinking
     // 50 tokens ≈ a detailed question or paragraph
@@ -81,13 +93,56 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       formData.append("mediaResolution", mediaResolution);
       formData.append("domainExpertise", domainExpertise);
 
+      // Detect if this is a simple follow-up for optimized handling
+      let isSimpleQuery = false;
+      let detectedComplexity: "simple" | "complex" = "complex";
+
       // Add conversation history if provided and not empty
       // Skip if empty array to avoid sending unnecessary data
       // For first message, conversationHistory should be empty, so we skip this
+      console.log("🔍 [useAIApi] ========== HISTORY PROCESSING ==========");
+      console.log("🔍 [useAIApi] Input conversationHistory length:", conversationHistory?.length ?? 0);
+      
+      // Track context usage for developer mode display
+      let contextUsageInfo: {
+        messagesInContext: number;
+        tokensUsed: number;
+        maxTokens: number;
+        complexity: "simple" | "complex";
+      } | undefined;
+      
       if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-        const context = getConversationContext(conversationHistory);
+        // Use optimized context with smart history reduction for simple follow-ups
+        const { context, complexity, originalMessageCount, trimmedMessageCount, tokensUsed, maxTokens } = getOptimizedContext(
+          conversationHistory,
+          prompt
+        );
+        
+        isSimpleQuery = complexity === "simple";
+        detectedComplexity = complexity;
+        
+        // Capture context usage for display
+        contextUsageInfo = {
+          messagesInContext: trimmedMessageCount,
+          tokensUsed,
+          maxTokens,
+          complexity,
+        };
+        
+        console.log("🔍 [useAIApi] Complexity:", complexity);
+        console.log("🔍 [useAIApi] Original messages:", originalMessageCount);
+        console.log("🔍 [useAIApi] After trimming:", trimmedMessageCount);
+        console.log("🔍 [useAIApi] Formatted context length:", context.length);
+        
+        // Log the actual context being sent
+        context.forEach((msg, i) => {
+          console.log(`🔍 [useAIApi] Context[${i}] ${msg.role}: "${msg.parts[0]?.text?.slice(0, 100)}..."`);
+        });
+        
         if (context.length > 0) {
           const historyJson = JSON.stringify(context);
+          console.log("🔍 [useAIApi] History JSON size:", historyJson.length, "bytes");
+          
           // Check size - allow up to 20MB total payload
           // Leave room for prompt and other data (reserve 2MB for prompt/video/overhead)
           const MAX_HISTORY_SIZE = 18 * 1024 * 1024; // 18MB to leave room for prompt and other data
@@ -99,15 +154,25 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             const trimmedJson = JSON.stringify(trimmedContext);
             if (trimmedJson.length <= MAX_HISTORY_SIZE) {
               formData.append("history", trimmedJson);
+              console.log("🔍 [useAIApi] ✅ Appended trimmed history to form");
             } else {
               // If still too large, don't send history
               console.warn("Conversation history still too large after trimming, skipping");
             }
           } else {
             formData.append("history", historyJson);
+            console.log("🔍 [useAIApi] ✅ Appended history to form");
           }
+        } else {
+          console.log("🔍 [useAIApi] ⚠️ Context is empty after formatting!");
         }
+      } else {
+        console.log("🔍 [useAIApi] No conversation history provided (first message or empty)");
       }
+      console.log("🔍 [useAIApi] ==========================================");
+      
+      // Send query complexity hint to server for optimized thinking budget
+      formData.append("queryComplexity", detectedComplexity);
 
       const response = await fetch("/api/llm", {
         method: "POST",
@@ -133,11 +198,37 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           // Mark as streaming when we start
           updateMessage(assistantMessageId, { isStreaming: true });
           
+          // Track metadata from stream (cache info, model info)
+          let cacheName: string | undefined;
+          let cacheUsed = false;
+          let modelUsed: string | undefined;
+          let modelReason: string | undefined;
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
+            let chunk = decoder.decode(value, { stream: true });
+            
+            // Check for stream metadata at end of stream
+            if (chunk.includes("__STREAM_META__")) {
+              const metaIndex = chunk.indexOf("__STREAM_META__");
+              const metaJson = chunk.slice(metaIndex + "__STREAM_META__".length);
+              chunk = chunk.slice(0, metaIndex); // Remove metadata from displayed content
+              
+              try {
+                const meta = JSON.parse(metaJson);
+                if (meta.__metadata__) {
+                  cacheName = meta.cacheName;
+                  cacheUsed = meta.cacheUsed;
+                  modelUsed = meta.modelUsed;
+                  modelReason = meta.modelReason;
+                  console.log("🔍 [useAIApi] Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
             
             // Capture time to first token on first chunk
             if (!timeToFirstToken && chunk.length > 0) {
@@ -159,18 +250,23 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           const duration = Date.now() - requestStartTime;
           const promptTokens = estimateTextTokens(prompt);
           const historyLength = conversationHistory?.length || 0;
-          const thinkingBudget = calculateThinkingBudget(thinkingMode, false, promptTokens, historyLength);
+          const thinkingBudget = calculateThinkingBudget(thinkingMode, false, promptTokens, historyLength, isSimpleQuery);
           
           updateMessage(assistantMessageId, {
             responseDuration: duration,
             timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
+            cacheName,
+            cacheUsed,
+            modelUsed,
+            modelReason,
             modelSettings: {
               thinkingMode,
               mediaResolution,
               domainExpertise,
               thinkingBudget,
             },
+            contextUsage: contextUsageInfo,
           });
         } catch (error) {
           // Also set streaming to false on error
@@ -209,59 +305,12 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       const isVideo = videoFile.type.startsWith("video/");
       if (isVideo) {
         const sizeMB = videoFile.size / (1024 * 1024);
-        const LARGE_VIDEO_LIMIT_MB = 100;
         
         if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
           console.log(`[Client] Video size (${sizeMB.toFixed(2)} MB) exceeds limit, showing natural response immediately`);
           
           // Generate the natural response immediately without uploading
-          const naturalResponse = `## 📹 Video Size Issue
-
-I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
-
-<details>
-<summary>📊 Why This Matters</summary>
-
-This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
-
-Video analysis requires significant processing power, and keeping files under 100 MB ensures:
-- Faster processing times
-- More reliable analysis
-- Better quality insights
-- Consistent performance across different video types
-
-</details>
-
-<details>
-<summary>💡 How to Fix This</summary>
-
-Here are a few ways you can help me analyze your video:
-
-**1. Trim the video**
-- Focus on the most important moments or rallies you'd like me to review
-- Even a 30-60 second clip can provide valuable insights!
-- Most video editing apps allow you to easily cut specific sections
-
-**2. Compress the video**
-- Use a video compression tool to reduce the file size while maintaining good quality
-- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
-- Target a lower bitrate while keeping the resolution
-
-**3. Adjust media resolution**
-- You can change the media resolution setting to **Low** in the chat input below
-- This helps me process larger videos more efficiently
-- Low resolution is often sufficient for technique analysis
-
-**4. Split into clips**
-- Break your video into shorter segments and submit them separately
-- I can analyze multiple clips and provide focused feedback on each
-- This approach often leads to more detailed, actionable insights
-
-</details>
-
----
-
-I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+          const naturalResponse = getVideoSizeErrorMessage(sizeMB);
 
           // Stream the response gradually for natural feel
           setStage("generating");
@@ -463,15 +512,36 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         formData.append("mediaResolution", mediaResolution);
         formData.append("domainExpertise", domainExpertise);
 
+        // Track context usage for developer mode display
+        let contextUsageInfo: {
+          messagesInContext: number;
+          tokensUsed: number;
+          maxTokens: number;
+          complexity: "simple" | "complex";
+        } | undefined;
+        
         // Add conversation history if provided
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-          const context = getConversationContext(conversationHistory);
+          const { context, complexity, trimmedMessageCount, tokensUsed, maxTokens } = getOptimizedContext(
+            conversationHistory,
+            prompt
+          );
+          
+          // Capture context usage for display
+          contextUsageInfo = {
+            messagesInContext: trimmedMessageCount,
+            tokensUsed,
+            maxTokens,
+            complexity,
+          };
+          
           if (context.length > 0) {
             const historyJson = JSON.stringify(context);
             // With S3 URL, we have more room for history since video isn't in the payload
             const MAX_HISTORY_SIZE_WITH_S3 = 18 * 1024 * 1024; // 18MB
             if (historyJson.length <= MAX_HISTORY_SIZE_WITH_S3) {
               formData.append("history", historyJson);
+              formData.append("queryComplexity", complexity);
             } else {
               console.warn(`Conversation history too large (${historyJson.length} bytes), skipping`);
             }
@@ -528,6 +598,12 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
           // Mark as streaming when we start
           updateMessage(assistantMessageId, { isStreaming: true });
           
+          // Track metadata from stream (cache info, model info)
+          let cacheName: string | undefined;
+          let cacheUsed = false;
+          let modelUsed: string | undefined;
+          let modelReason: string | undefined;
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
@@ -535,7 +611,27 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               break;
             }
 
-            const chunk = decoder.decode(value, { stream: true });
+            let chunk = decoder.decode(value, { stream: true });
+            
+            // Check for stream metadata at end of stream
+            if (chunk.includes("__STREAM_META__")) {
+              const metaIndex = chunk.indexOf("__STREAM_META__");
+              const metaJson = chunk.slice(metaIndex + "__STREAM_META__".length);
+              chunk = chunk.slice(0, metaIndex); // Remove metadata from displayed content
+              
+              try {
+                const meta = JSON.parse(metaJson);
+                if (meta.__metadata__) {
+                  cacheName = meta.cacheName;
+                  cacheUsed = meta.cacheUsed;
+                  modelUsed = meta.modelUsed;
+                  modelReason = meta.modelReason;
+                  console.log("🔍 [useAIApi] Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
             
             // Capture time to first token on first chunk
             if (!timeToFirstToken && chunk.length > 0) {
@@ -568,12 +664,17 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             responseDuration: duration,
             timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
+            cacheName,
+            cacheUsed,
+            modelUsed,
+            modelReason,
             modelSettings: {
               thinkingMode,
               mediaResolution,
               domainExpertise,
               thinkingBudget,
             },
+            contextUsage: contextUsageInfo,
           });
         } catch (error) {
           // Also set streaming to false on error
@@ -631,14 +732,35 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
         formData.append("mediaResolution", mediaResolution);
         formData.append("domainExpertise", domainExpertise);
 
+        // Track context usage for developer mode display (fallback path)
+        let fallbackContextUsageInfo: {
+          messagesInContext: number;
+          tokensUsed: number;
+          maxTokens: number;
+          complexity: "simple" | "complex";
+        } | undefined;
+        
         // Add conversation history
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-          const context = getConversationContext(conversationHistory);
+          const { context, complexity, trimmedMessageCount, tokensUsed, maxTokens } = getOptimizedContext(
+            conversationHistory,
+            prompt
+          );
+          
+          // Capture context usage for display
+          fallbackContextUsageInfo = {
+            messagesInContext: trimmedMessageCount,
+            tokensUsed,
+            maxTokens,
+            complexity,
+          };
+          
           if (context.length > 0) {
             const historyJson = JSON.stringify(context);
             const MAX_HISTORY_SIZE_WITH_VIDEO = 15 * 1024 * 1024; // 15MB
             if (historyJson.length <= MAX_HISTORY_SIZE_WITH_VIDEO) {
               formData.append("history", historyJson);
+              formData.append("queryComplexity", complexity);
             }
           }
         }
@@ -703,6 +825,7 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               responseDuration: duration,
               timeToFirstToken: timeToFirstToken,
               isStreaming: false, // Mark as complete
+              contextUsage: fallbackContextUsageInfo,
               modelSettings: {
                 thinkingMode,
                 mediaResolution,

@@ -35,7 +35,7 @@ export function TaskHeader({ task, result, loadingResult, onBack, onLoadResult }
             {task.task_type}
           </Badge>
           <Text size="2" color="gray">
-            Task: {task.sportai_task_id?.slice(0, 8) || task.id.slice(0, 8)}
+            Task: {task.sportai_task_id || task.id}
           </Text>
         </Flex>
       </Flex>

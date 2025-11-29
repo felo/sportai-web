@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
+import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 import type { PromptType } from "@/lib/prompts";
 
@@ -57,6 +58,10 @@ export async function POST(request: NextRequest) {
     const mediaResolution = (formData.get("mediaResolution") as MediaResolution) || "medium";
     const domainExpertise = (formData.get("domainExpertise") as DomainExpertise) || "all-sports";
     const promptType = (formData.get("promptType") as PromptType) || "video";
+    // Query complexity hint from client (for optimized thinking budget)
+    const queryComplexity = (formData.get("queryComplexity") as "simple" | "complex") || "complex";
+    // Existing cache name for reuse (e.g., on retry)
+    const existingCacheName = formData.get("cacheName") as string | null;
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
     logger.debug(`[${requestId}] Media file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
@@ -65,6 +70,7 @@ export async function POST(request: NextRequest) {
     logger.debug(`[${requestId}] Thinking mode: ${thinkingMode}`);
     logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
     logger.debug(`[${requestId}] Domain expertise: ${domainExpertise}`);
+    logger.debug(`[${requestId}] Query complexity: ${queryComplexity}`);
 
     if (!prompt || typeof prompt !== "string") {
       logger.error(`[${requestId}] Validation failed: Prompt is required`);
@@ -130,58 +136,11 @@ export async function POST(request: NextRequest) {
       const sizeMB = videoData.data.length / (1024 * 1024);
       // Gemini API tends to have issues with videos > 50MB, especially longer duration ones
       const LARGE_VIDEO_WARNING_MB = 50;
-      const LARGE_VIDEO_LIMIT_MB = 100;
       
       if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
         logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds recommended limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
         // Return a natural LLM-style response instead of an error
-        const naturalResponse = `## 📹 Video Size Issue
-
-I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
-
-<details>
-<summary>📊 Why This Matters</summary>
-
-This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
-
-Video analysis requires significant processing power, and keeping files under 100 MB ensures:
-- Faster processing times
-- More reliable analysis
-- Better quality insights
-- Consistent performance across different video types
-
-</details>
-
-<details>
-<summary>💡 How to Fix This</summary>
-
-Here are a few ways you can help me analyze your video:
-
-**1. Trim the video**
-- Focus on the most important moments or rallies you'd like me to review
-- Even a 30-60 second clip can provide valuable insights!
-- Most video editing apps allow you to easily cut specific sections
-
-**2. Compress the video**
-- Use a video compression tool to reduce the file size while maintaining good quality
-- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
-- Target a lower bitrate while keeping the resolution
-
-**3. Adjust media resolution**
-- You can change the media resolution setting to **Low** in the chat input below
-- This helps me process larger videos more efficiently
-- Low resolution is often sufficient for technique analysis
-
-**4. Split into clips**
-- Break your video into shorter segments and submit them separately
-- I can analyze multiple clips and provide focused feedback on each
-- This approach often leads to more detailed, actionable insights
-
-</details>
-
----
-
-I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+        const naturalResponse = getVideoSizeErrorMessage(sizeMB);
 
         logger.debug(`[${requestId}] Returning natural LLM response for oversized video`);
         
@@ -209,58 +168,11 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
             // Check if video is too large before streaming
             if (videoData && videoData.mimeType.startsWith("video/")) {
               const sizeMB = videoData.data.length / (1024 * 1024);
-              const LARGE_VIDEO_LIMIT_MB = 100;
               
               if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
                 logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds limit in streaming mode`);
                 // Stream the natural error response instead
-                const naturalResponse = `## 📹 Video Size Issue
-
-I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process effectively - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
-
-<details>
-<summary>📊 Why This Matters</summary>
-
-This size limitation helps ensure I can analyze your video thoroughly and provide you with detailed, accurate coaching insights. Larger files can cause processing issues and may not complete successfully.
-
-Video analysis requires significant processing power, and keeping files under 100 MB ensures:
-- Faster processing times
-- More reliable analysis
-- Better quality insights
-- Consistent performance across different video types
-
-</details>
-
-<details>
-<summary>💡 How to Fix This</summary>
-
-Here are a few ways you can help me analyze your video:
-
-**1. Trim the video**
-- Focus on the most important moments or rallies you'd like me to review
-- Even a 30-60 second clip can provide valuable insights!
-- Most video editing apps allow you to easily cut specific sections
-
-**2. Compress the video**
-- Use a video compression tool to reduce the file size while maintaining good quality
-- Many free tools are available online (e.g., HandBrake, Adobe Express, CloudConvert)
-- Target a lower bitrate while keeping the resolution
-
-**3. Adjust media resolution**
-- You can change the media resolution setting to **Low** in the chat input below
-- This helps me process larger videos more efficiently
-- Low resolution is often sufficient for technique analysis
-
-**4. Split into clips**
-- Break your video into shorter segments and submit them separately
-- I can analyze multiple clips and provide focused feedback on each
-- This approach often leads to more detailed, actionable insights
-
-</details>
-
----
-
-I'm here to help you improve, so please feel free to try again with a smaller file. I'm excited to analyze your performance once you're ready! 🎾`;
+                const naturalResponse = getVideoSizeErrorMessage(sizeMB);
                 
                 // Stream the response character by character for a natural typing effect
                 const encoder = new TextEncoder();
@@ -292,7 +204,26 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
               }
             }
             
-            for await (const chunk of streamLLM(prompt, conversationHistory, videoData, thinkingMode, mediaResolution, domainExpertise, promptType)) {
+            // Get streaming result (includes cache info and text generator)
+            const streamResult = await streamLLM(
+              prompt, 
+              conversationHistory, 
+              videoData, 
+              thinkingMode, 
+              mediaResolution, 
+              domainExpertise, 
+              promptType, 
+              queryComplexity,
+              existingCacheName || undefined
+            );
+            
+            // Log cache status
+            if (streamResult.cacheUsed) {
+              logger.info(`[${requestId}] Using cached content${streamResult.cacheName ? ` (new cache: ${streamResult.cacheName})` : ''}`);
+            }
+            
+            // Stream the text chunks
+            for await (const chunk of streamResult.textGenerator) {
               // Check if controller is still open before enqueueing
               // This can happen if the client aborts the request
               try {
@@ -309,6 +240,21 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
                 throw enqueueError;
               }
             }
+            
+            // Send model/cache info as a final metadata chunk (JSON-encoded, prefixed with special marker)
+            const streamMetadata = JSON.stringify({
+              __metadata__: true,
+              cacheName: streamResult.cacheName,
+              cacheUsed: streamResult.cacheUsed,
+              modelUsed: streamResult.modelUsed,
+              modelReason: streamResult.modelReason,
+            });
+            try {
+              controller.enqueue(new TextEncoder().encode(`\n__STREAM_META__${streamMetadata}`));
+            } catch (e) {
+              // Ignore if controller is closed
+            }
+            
             // Only close if controller is still open
             try {
               controller.close();
@@ -344,13 +290,33 @@ I'm here to help you improve, so please feel free to try again with a smaller fi
     }
     
     logger.info(`[${requestId}] Calling queryLLM...`);
-    const response = await queryLLM(prompt, videoData, conversationHistory, thinkingMode, mediaResolution, domainExpertise, promptType);
+    const llmResponse = await queryLLM(
+      prompt, 
+      videoData, 
+      conversationHistory, 
+      thinkingMode, 
+      mediaResolution, 
+      domainExpertise, 
+      promptType, 
+      queryComplexity,
+      existingCacheName || undefined
+    );
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);
-    logger.debug(`[${requestId}] Response length: ${response.length} characters`);
+    logger.debug(`[${requestId}] Response length: ${llmResponse.text.length} characters`);
     
-    return NextResponse.json({ response });
+    if (llmResponse.cacheUsed) {
+      logger.info(`[${requestId}] Cache used${llmResponse.cacheName ? ` (new cache: ${llmResponse.cacheName})` : ''}`);
+    }
+    
+    return NextResponse.json({ 
+      response: llmResponse.text,
+      cacheName: llmResponse.cacheName,
+      cacheUsed: llmResponse.cacheUsed,
+      modelUsed: llmResponse.modelUsed,
+      modelReason: llmResponse.modelReason,
+    });
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.error(`[${requestId}] Request failed after ${duration}ms:`, {

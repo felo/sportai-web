@@ -317,55 +317,6 @@ export function PadelCourt2D({
     );
   }
 
-  // Sequential bounce connections (thin green lines between consecutive bounces)
-  const recentConnections = useMemo(() => {
-    if (!showTrajectories || ballBounces.length < 2) return [];
-    
-    const connections: Array<{
-      from: { x: number; y: number; timestamp: number };
-      to: { x: number; y: number; timestamp: number };
-      isShot: boolean; // true if this is a shot (swing → floor), handled separately
-    }> = [];
-    
-    const sortedBounces = [...ballBounces].sort((a, b) => a.timestamp - b.timestamp);
-    
-    for (let i = 0; i < sortedBounces.length - 1; i++) {
-      const curr = sortedBounces[i];
-      const next = sortedBounces[i + 1];
-      
-      // Skip if too far apart in time (> 5 seconds)
-      if (next.timestamp - curr.timestamp > 5.0) continue;
-      
-      const from = toCourtCoords(curr.court_pos);
-      const to = toCourtCoords(next.court_pos);
-      
-      // Skip if out of bounds
-      if (!isInBounds(from.x, from.y) || !isInBounds(to.x, to.y)) continue;
-      
-      // Check if this is a shot trajectory (swing → floor) - these are handled by recentTrajectories
-      const isShot = curr.type === "swing" && next.type === "floor";
-      
-      connections.push({
-        from: { ...from, timestamp: curr.timestamp },
-        to: { ...to, timestamp: next.timestamp },
-        isShot,
-      });
-    }
-    
-    return connections;
-  }, [ballBounces, showTrajectories]);
-
-  // Filter to recent non-shot connections (only within current rally)
-  const recentNonShotConnections = useMemo(() => {
-    return recentConnections.filter(c => {
-      if (c.isShot) return false; // Skip shots, they have their own parabolic arcs
-      // Must be after current rally start (clear on rally change)
-      if (currentRallyStart !== null && c.from.timestamp < currentRallyStart) return false;
-      const age = currentTime - c.to.timestamp;
-      return age >= -0.5 && age < DISPLAY_DURATION;
-    });
-  }, [recentConnections, currentTime, currentRallyStart]);
-
   // Calculate current player positions using keypoints from swings
   // DISABLED FOR NOW - uncomment when ready to show players on 2D court
   /*
@@ -591,7 +542,6 @@ export function PadelCourt2D({
                   fill="none"
                   stroke="rgba(255,255,255,0.1)"
                   strokeWidth={0.08}
-                  strokeDasharray="0.2 0.2"
                 />
               )}
               {/* Animated arc - grows along the curve */}
@@ -638,47 +588,6 @@ export function PadelCourt2D({
           );
         })}
 
-        {/* === NON-SHOT CONNECTIONS (thin green lines between consecutive bounces) === */}
-        {recentNonShotConnections.map((conn, idx) => {
-          const age = currentTime - conn.to.timestamp;
-          const opacity = Math.max(0, 1 - age / DISPLAY_DURATION);
-          
-          // Calculate animation progress
-          const duration = conn.to.timestamp - conn.from.timestamp;
-          const timeSinceStart = currentTime - conn.from.timestamp;
-          const progress = Math.min(1, Math.max(0, timeSinceStart / duration));
-          
-          // Interpolate current position along the line
-          const currentX = conn.from.x + (conn.to.x - conn.from.x) * progress;
-          const currentY = conn.from.y + (conn.to.y - conn.from.y) * progress;
-          
-          return (
-            <g key={`conn-${idx}`} opacity={opacity}>
-              {/* Thin green line */}
-              {progress > 0 && (
-                <line
-                  x1={conn.from.x}
-                  y1={conn.from.y}
-                  x2={currentX}
-                  y2={currentY}
-                  stroke="#7ADB8F"
-                  strokeWidth={0.06}
-                  strokeLinecap="round"
-                  strokeDasharray="0.15 0.1"
-                />
-              )}
-              {/* Small dot at current position */}
-              {progress > 0 && progress < 1 && (
-                <circle
-                  cx={currentX}
-                  cy={currentY}
-                  r={0.1}
-                  fill="#7ADB8F"
-                />
-              )}
-            </g>
-          );
-        })}
 
         {/* === BOUNCES === */}
         {recentBounces.map((bounce, idx) => {

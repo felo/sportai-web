@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Tooltip } from "@radix-ui/themes";
 import styles from "@/styles/markdown.module.css";
+import buttonStyles from "@/styles/buttons.module.css";
 import { 
   swingExplanations, 
   type SwingExplanation,
@@ -522,14 +523,48 @@ export const createMarkdownComponents = (
       <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </em>
   ),
-  a: ({ node, ...props }: any) => (
-    <a
-      className="text-blue-600 dark:text-blue-400 hover:underline"
-      target="_blank"
-      rel="noopener noreferrer"
-      {...props}
-    />
-  ),
+  a: ({ node, href, children, ...props }: any) => {
+    // Check if this is a PRO-related link that should be styled as a button
+    const isProLink = href && (
+      href.includes('/pricing') || 
+      href.includes('/contact') || 
+      href.includes('sportai.com/contact') ||
+      (typeof children === 'string' && children.toLowerCase().includes('pro'))
+    );
+    
+    if (isProLink) {
+      return (
+        <a
+          href="https://sportai.com/contact"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonStyles.actionButton}
+          style={{
+            display: 'inline-block',
+            padding: '8px 16px',
+            textDecoration: 'none',
+            fontSize: '14px',
+            marginTop: '8px',
+          }}
+          {...props}
+        >
+          Contact us for PRO
+        </a>
+      );
+    }
+    
+    return (
+      <a
+        href={href}
+        className="text-blue-600 dark:text-blue-400 hover:underline"
+        target="_blank"
+        rel="noopener noreferrer"
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
   table: ({ node, ...props }: any) => (
     <div className="overflow-x-auto my-4">
       <table

@@ -692,28 +692,44 @@ export function AIChatForm() {
       return;
     }
     
+    const requestChatId = getCurrentChatId();
+    if (!requestChatId) return;
+    
     console.log("[AIChatForm] Retrying message:", {
       assistantMessageId,
       userPrompt: userPrompt.substring(0, 50) + "...",
       hasVideo: !!userVideoUrl,
+      chatId: requestChatId,
     });
     
     // Get conversation history BEFORE this exchange
-    const conversationHistory = messages.slice(0, assistantMessageIndex).filter((m, idx) => {
+    // Always load fresh from storage - it's the source of truth
+    const currentChat = await loadChat(requestChatId);
+    const messagesToUse = currentChat?.messages ?? [];
+    
+    if (messagesToUse.length === 0) {
+      console.warn("[AIChatForm] ⚠️ Retry: No messages found in storage for chat", requestChatId);
+    }
+    
+    // Find the assistant message index in the storage messages
+    const storageAssistantIndex = messagesToUse.findIndex(m => m.id === assistantMessageId);
+    if (storageAssistantIndex === -1) {
+      console.error("[AIChatForm] Cannot find assistant message in storage:", assistantMessageId);
+      return;
+    }
+    
+    const conversationHistory = messagesToUse.slice(0, storageAssistantIndex).filter((m, idx) => {
       // Find user messages before the current exchange
-      for (let i = assistantMessageIndex - 1; i >= 0; i--) {
-        if (messages[i].id === m.id) {
+      for (let i = storageAssistantIndex - 1; i >= 0; i--) {
+        if (messagesToUse[i].id === m.id) {
           return false; // Exclude messages that are part of the current exchange
         }
-        if (messages[i].role === "assistant") {
+        if (messagesToUse[i].role === "assistant") {
           return true; // Include if before the previous assistant message
         }
       }
       return true;
     });
-    
-    const requestChatId = getCurrentChatId();
-    if (!requestChatId) return;
     
     setRetryingMessageId(assistantMessageId);
     setLoading(true);
@@ -915,10 +931,6 @@ export function AIChatForm() {
     const currentVideoFile = videoFile;
     const currentVideoPreview = videoPreview;
 
-    // Get conversation history BEFORE adding new messages
-    // This ensures we send the correct history to the API
-    const conversationHistory = messages;
-    
     // Get the current chat ID - there should always be one (created on mount)
     const requestChatId = getCurrentChatId();
     console.log("[AIChatForm] Using chat:", requestChatId);
@@ -927,6 +939,79 @@ export function AIChatForm() {
       console.error("[AIChatForm] No chat ID available! This should not happen - chat should be created on mount.");
       return;
     }
+
+    // Get conversation history BEFORE adding new messages
+    // Strategy: Compare storage vs React state and use the most complete/appropriate one
+    let conversationHistory: Message[] = [];
+    
+    // Load from storage to check what's persisted
+    const currentChat = await loadChat(requestChatId);
+    const storageMessages = currentChat?.messages ?? [];
+    const stateMessages = messages;
+    
+    // Determine which history to use:
+    // 1. If storage has messages and state is empty/different chat → use storage (prevents context bleeding)
+    // 2. If state has MORE messages than storage → use state (storage save may be pending)
+    // 3. If both empty → new chat, use empty
+    
+    if (storageMessages.length > 0 && stateMessages.length === 0) {
+      // State was cleared (new chat) but storage has old data - don't use old data
+      console.log("[AIChatForm] State empty, storage has data - using empty history (new chat)", {
+        storageMessages: storageMessages.length,
+        chatId: requestChatId,
+      });
+      conversationHistory = [];
+    } else if (stateMessages.length > storageMessages.length) {
+      // State has more messages - storage save may still be pending
+      // Verify state messages belong to this chat by checking if storage messages are a prefix
+      const storageIds = storageMessages.map(m => m.id).join(',');
+      const statePrefix = stateMessages.slice(0, storageMessages.length).map(m => m.id).join(',');
+      
+      if (storageMessages.length === 0 || storageIds === statePrefix) {
+        // State is a superset of storage - use state (more current)
+        console.log("[AIChatForm] Using React state (more current than storage)", {
+          stateMessages: stateMessages.length,
+          storageMessages: storageMessages.length,
+          chatId: requestChatId,
+        });
+        conversationHistory = stateMessages;
+      } else {
+        // State and storage have different messages - context bleeding!
+        console.warn("[AIChatForm] ⚠️ Context mismatch - using storage", {
+          stateMessages: stateMessages.length,
+          storageMessages: storageMessages.length,
+          chatId: requestChatId,
+        });
+        conversationHistory = storageMessages;
+      }
+    } else if (storageMessages.length > 0) {
+      // Storage has messages (and state has same or fewer) - use storage
+      conversationHistory = storageMessages;
+      
+      if (stateMessages.length !== storageMessages.length) {
+        console.log("[AIChatForm] Using storage messages", {
+          stateMessages: stateMessages.length,
+          storageMessages: storageMessages.length,
+          chatId: requestChatId,
+        });
+      }
+    } else {
+      // Both empty - new chat
+      conversationHistory = [];
+    }
+    
+    console.log("🔍 [DEBUG] ========== CONVERSATION HISTORY DEBUG ==========");
+    console.log("🔍 [DEBUG] Chat ID:", requestChatId);
+    console.log("🔍 [DEBUG] State messages:", stateMessages.length);
+    console.log("🔍 [DEBUG] Storage messages:", storageMessages.length);
+    console.log("🔍 [DEBUG] Using history from:", conversationHistory === stateMessages ? "STATE" : "STORAGE");
+    console.log("🔍 [DEBUG] History length being sent:", conversationHistory.length);
+    console.log("🔍 [DEBUG] History messages:");
+    conversationHistory.forEach((msg, i) => {
+      const hasVideo = !!(msg.videoUrl || msg.videoS3Key || msg.videoFile);
+      console.log(`🔍 [DEBUG]   [${i}] ${msg.role}: "${msg.content.slice(0, 80)}${msg.content.length > 80 ? '...' : ''}" ${hasVideo ? '📹 HAS VIDEO' : ''}`);
+    });
+    console.log("🔍 [DEBUG] ================================================");
 
     // Set loading state
     console.log("[AIChatForm] Setting loading state to true");

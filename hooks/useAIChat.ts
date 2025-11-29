@@ -115,6 +115,19 @@ export function useAIChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrated]);
 
+  // Use refs to avoid stale closures in event handler
+  const messagesRef = useRef<Message[]>([]);
+  const loadingRef = useRef(false);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
   // Listen for chat changes and load messages from the selected chat
   useEffect(() => {
     if (!isHydrated) return;
@@ -123,19 +136,23 @@ export function useAIChat() {
       const currentChatId = getCurrentChatId();
       const isSwitchingToDifferentChat = activeChatIdRef.current !== currentChatId;
       
+      // Use refs to get current values (not stale closure values)
+      const currentMessages = messagesRef.current;
+      const isLoading = loadingRef.current;
+      
       console.log("[useAIChat] ===== CHAT CHANGE HANDLER =====", {
         currentChatId,
         activeChatId: activeChatIdRef.current,
         isSwitchingToDifferentChat,
-        currentMessages: messages.length,
-        loading,
+        currentMessages: currentMessages.length,
+        loading: isLoading,
       });
       
       // If this is the same chat we're already on, don't reload
       if (!isSwitchingToDifferentChat && currentChatId) {
         console.log("[useAIChat] Same chat, skipping reload", {
           chatId: currentChatId,
-          messageCount: messages.length,
+          messageCount: currentMessages.length,
         });
         return;
       }
@@ -143,15 +160,15 @@ export function useAIChat() {
       // If we're switching to a different chat and currently loading, 
       // only keep messages if we're switching to an empty chat during submission
       // Otherwise, we should switch chats normally
-      if (loading && isSwitchingToDifferentChat) {
+      if (isLoading && isSwitchingToDifferentChat) {
         const chat = currentChatId ? await loadChat(currentChatId) : null;
         // Only keep messages if the new chat is empty AND we're actively submitting
         // This prevents losing messages mid-submission
-        if (chat && chat.messages.length === 0 && messages.length > 0) {
+        if (chat && chat.messages.length === 0 && currentMessages.length > 0) {
           console.log("[useAIChat] ⚠️ Switching to empty chat during submission - KEEPING STATE MESSAGES", {
             chatId: currentChatId,
             chatMessages: chat.messages.length,
-            stateMessages: messages.length,
+            stateMessages: currentMessages.length,
           });
           // Update activeChatIdRef but don't clear messages yet
           activeChatIdRef.current = currentChatId;
@@ -161,7 +178,7 @@ export function useAIChat() {
       }
       
       // Don't interfere if we're already loading AND not switching chats
-      if (loading && !isSwitchingToDifferentChat) {
+      if (isLoading && !isSwitchingToDifferentChat) {
         console.log("[useAIChat] Ignoring chat change during active loading (same chat)", {
           currentChatId,
           activeChatId: activeChatIdRef.current,
@@ -185,7 +202,7 @@ export function useAIChat() {
           console.log("[useAIChat] Loading messages from chat:", {
             chatId: currentChatId,
             messageCount: chat.messages.length,
-            currentMessages: messages.length,
+            currentMessages: currentMessages.length,
           });
           
           // If chat is empty, clear messages immediately (before async operations)

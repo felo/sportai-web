@@ -204,69 +204,48 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
   try {
     console.log("[Supabase] Saving chat:", chat.id, "for user:", userId);
     
-    // Check if chat already exists
-    const { data: existingChat } = await supabase
-      .from("chats")
-      .select("id")
-      .eq("id", chat.id)
-      .single();
+    // Use UPSERT to avoid race conditions
+    // This handles both insert and update atomically
+    const chatUpsert = {
+      id: chat.id,
+      user_id: userId,
+      title: chat.title,
+      created_at: new Date(chat.createdAt).toISOString(),
+      updated_at: new Date(chat.updatedAt).toISOString(),
+      thinking_mode: chat.thinkingMode || "fast",
+      media_resolution: chat.mediaResolution || "medium",
+      domain_expertise: chat.domainExpertise || "all-sports",
+    };
     
-    if (existingChat) {
-      // Chat exists - UPDATE without changing created_at
-      console.log("[Supabase] Chat exists, updating without changing created_at");
-      const updateData = {
-        user_id: userId,
-        title: chat.title,
-        updated_at: new Date(chat.updatedAt).toISOString(),
-        thinking_mode: chat.thinkingMode || "fast",
-        media_resolution: chat.mediaResolution || "medium",
-        domain_expertise: chat.domainExpertise || "all-sports",
-      };
-      
-      const { error: chatError } = await supabase
-        .from("chats")
-        .update(updateData)
-        .eq("id", chat.id);
+    const { error: chatError } = await supabase
+      .from("chats")
+      .upsert(chatUpsert, {
+        onConflict: "id",
+        ignoreDuplicates: false, // Update existing chats
+      });
 
-      if (chatError) {
-        console.error("[Supabase] Error updating chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
-        return false;
+    if (chatError) {
+      console.error("[Supabase] Error upserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
+      
+      // Check if it's a foreign key error (profile doesn't exist)
+      if (chatError.code === "23503") {
+        console.error("[Supabase] Foreign key error - profile does not exist for user:", userId);
+        console.error("[Supabase] This usually happens if the sync happens too quickly after sign-in.");
+        console.error("[Supabase] The profile should be created by a database trigger.");
       }
       
-      console.log("[Supabase] Chat updated successfully");
-    } else {
-      // Chat doesn't exist - INSERT with created_at
-      console.log("[Supabase] Chat doesn't exist, inserting new chat");
-      const chatInsert = chatToDbInsert(chat, userId);
-      console.log("[Supabase] Chat insert data:", JSON.stringify(chatInsert, null, 2));
+      // Log detailed error information
+      console.error("[Supabase] Chat save failed for:", {
+        chatId: chat.id,
+        userId,
+        errorCode: chatError.code,
+        errorMessage: chatError.message,
+      });
       
-      const { error: chatError } = await supabase
-        .from("chats")
-        .insert(chatInsert);
-
-      if (chatError) {
-        console.error("[Supabase] Error inserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
-        
-        // Check if it's a foreign key error (profile doesn't exist)
-        if (chatError.code === "23503") {
-          console.error("[Supabase] Foreign key error - profile does not exist for user:", userId);
-          console.error("[Supabase] This usually happens if the sync happens too quickly after sign-in.");
-          console.error("[Supabase] The profile should be created by a database trigger.");
-        }
-        
-        // Log detailed error information
-        console.error("[Supabase] Chat save failed for:", {
-          chatId: chat.id,
-          userId,
-          errorCode: chatError.code,
-          errorMessage: chatError.message,
-        });
-        
-        return false;
-      }
-      
-      console.log("[Supabase] Chat inserted successfully");
+      return false;
     }
+    
+    console.log("[Supabase] Chat upserted successfully");
 
     // Upsert messages (insert or update if they already exist)
     // This is safer than delete + insert and handles race conditions

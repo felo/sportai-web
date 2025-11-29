@@ -1,4 +1,12 @@
 // ===========================================
+// FEATURE FLAGS - Master toggles for experimental features
+// ===========================================
+export const FEATURE_FLAGS = {
+  // Audio waveform analysis (experimental - disabled due to CORS issues)
+  AUDIO_ANALYSIS_ENABLED: false,
+};
+
+// ===========================================
 // PLAYER SETTINGS
 // ===========================================
 export const PLAYER_CONFIG = {
@@ -88,10 +96,10 @@ export const OVERLAY_COLORS = {
   // Ripple animation settings
   ripple: {
     durationMs: 500,           // How long the ripple animation lasts
-    minRadius: 5,              // Starting radius (before perspective)
-    maxRadius: 35,             // Ending radius (before perspective)
-    lineWidth: 3,              // Stroke width
-    startOpacity: 0.9,         // Opacity at start of animation
+    minRadius: 7.5,            // Starting radius (before perspective) - 1.5x bigger
+    maxRadius: 52.5,           // Ending radius (before perspective) - 1.5x bigger
+    lineWidth: 4.5,            // Stroke width - 1.5x bigger
+    startOpacity: 0.95,        // Opacity at start of animation - less transparent
   },
   
   // Velocity display settings

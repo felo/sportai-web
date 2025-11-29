@@ -8,7 +8,7 @@ import { calculatePricing } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage } from "./components";
-import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES } from "./utils";
+import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
 const avatarPokeKeyframes = `
@@ -167,6 +167,40 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     return false;
   })();
   
+  // Check if this is the first assistant message in the conversation
+  const isFirstAssistantMessage = (() => {
+    if (message.role !== "assistant") return false;
+    // Count assistant messages before this one
+    const previousAssistantCount = allMessages
+      .slice(0, messageIndex)
+      .filter(m => m.role === "assistant").length;
+    return previousAssistantCount === 0;
+  })();
+  
+  // Check if this appears to be a complex query (for thinking message display)
+  // Look at the most recent user message
+  const isComplexQuery = (() => {
+    if (message.role !== "assistant") return false;
+    // Find the most recent user message
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      const prevMessage = allMessages[i];
+      if (prevMessage.role === "user" && prevMessage.content) {
+        const content = prevMessage.content.toLowerCase();
+        // Complex query indicators
+        const complexPatterns = [
+          /\b(compare|versus|vs\.?|difference)\b/,
+          /\b(analyze|analyse|evaluate|review|assess)\b/,
+          /\b(explain|why|how does|what causes)\b/,
+          /\b(strategy|tactical|approach|technique)\b/,
+          /\b(summarize|summary|overall|throughout)\b/,
+          /\b(step by step|detailed|in-depth)\b/,
+        ];
+        return complexPatterns.some(p => p.test(content));
+      }
+    }
+    return false;
+  })();
+  
   // Calculate cumulative tokens up to this message
   const cumulativeTokens = allMessages.slice(0, messageIndex + 1).reduce(
     (acc, msg) => {
@@ -213,16 +247,29 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     ? calculatePricing(cumulativeTokens.input, cumulativeTokens.output)
     : null;
   
-  // Rotate thinking messages every 3 seconds (only when user sent a video)
+  // Rotate thinking messages every 3 seconds
+  // Use different rotation speeds: faster for simple queries, slower for video/complex
   useEffect(() => {
-    if (!message.content && message.role === "assistant" && userSentVideo) {
+    if (!message.content && message.role === "assistant") {
+      // Only video or complex queries get deep thinking treatment
+      // First message without video → quick response expected
+      const useDeepThinking = userSentVideo || isComplexQuery;
+      
+      // Determine message set length based on context
+      const messageCount = userSentVideo 
+        ? THINKING_MESSAGES_VIDEO.length 
+        : isComplexQuery ? 7 : 3; // DEEP vs QUICK counts
+      
+      // Rotate faster for simple queries (2s), slower for video/complex (3-4s)
+      const rotationSpeed = userSentVideo ? 3000 : isComplexQuery ? 4000 : 2000;
+      
       const interval = setInterval(() => {
-        setThinkingMessageIndex((prev) => (prev + 1) % THINKING_MESSAGES.length);
-      }, 3000);
+        setThinkingMessageIndex((prev) => (prev + 1) % messageCount);
+      }, rotationSpeed);
       
       return () => clearInterval(interval);
     }
-  }, [message.content, message.role, userSentVideo]);
+  }, [message.content, message.role, userSentVideo, isComplexQuery]);
 
   // Intelligent preloading: Load pose detection components when video is present
   useEffect(() => {
@@ -426,7 +473,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                 content={message.content}
                 isStreaming={message.isStreaming}
                 isIncomplete={message.isIncomplete}
-                thinkingMessage={userSentVideo ? THINKING_MESSAGES[thinkingMessageIndex] : "thinking…"}
+                thinkingMessage={getThinkingMessage(thinkingMessageIndex, {
+                  hasVideo: userSentVideo,
+                  isFirstMessage: false, // First message without video → treat as quick
+                  isComplexQuery: isComplexQuery,
+                })}
                 onAskForHelp={onAskForHelp}
                 onTTSUsage={handleTTSUsage}
                 onFeedbackSubmitted={() => setShowFeedbackToast(true)}
@@ -449,6 +500,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                 responseDuration={message.responseDuration}
                 timeToFirstToken={message.timeToFirstToken}
                 modelSettings={message.modelSettings}
+                contextUsage={message.contextUsage}
+                cacheUsed={message.cacheUsed}
+                cacheName={message.cacheName}
+                modelUsed={message.modelUsed}
+                modelReason={message.modelReason}
               />
             </Box>
           )}

@@ -54,7 +54,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
       "Review the strategic decisions in this pickleball rally video. Analyze shot selection, court positioning, and tactical choices. What could be improved from a strategic perspective?",
     videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/Rally.mp4",
     thinkingMode: "fast",
-    mediaResolution: "medium",
+    mediaResolution: "high", // High resolution for tactical details
     domainExpertise: "pickleball",
     playbackSpeed: 1.0,
   },
@@ -65,8 +65,8 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
     prompt:
       "Analyze the technique in this video. Focus on form, body positioning, and swing mechanics. Identify 2-3 key areas for improvement and suggest specific drills to help.",
     videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4",
-    thinkingMode: "deep",
-    mediaResolution: "high",
+    thinkingMode: "fast",
+    mediaResolution: "medium",
     domainExpertise: "tennis",
     playbackSpeed: 0.25, // Slow motion for detailed technique analysis
     poseSettings: {
@@ -96,7 +96,7 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
       "Watch this video and provide 3-5 quick, actionable tips that would make the biggest immediate impact on performance. Keep it concise and practical.",
     videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/Rally.mp4",
     thinkingMode: "fast",
-    mediaResolution: "low",
+    mediaResolution: "medium",
     domainExpertise: "pickleball",
     playbackSpeed: 1.0,
   },

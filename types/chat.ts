@@ -29,6 +29,16 @@ export type Message = {
     domainExpertise?: string;
     thinkingBudget?: number; // Thinking budget in tokens
   };
+  contextUsage?: {
+    messagesInContext: number; // Number of messages sent as context
+    tokensUsed: number; // Estimated tokens used for context
+    maxTokens: number; // Maximum allowed tokens
+    complexity: "simple" | "complex"; // Detected query complexity
+  };
+  cacheName?: string; // Gemini cache name for video content (enables faster retries)
+  cacheUsed?: boolean; // Whether this response used cached content
+  modelUsed?: string; // Which LLM model was used (e.g., "gemini-2.0-flash", "gemini-2.5-pro")
+  modelReason?: string; // Why that model was selected (e.g., "simple_followup", "video_analysis")
   ttsUsage?: {
     totalCharacters: number; // Total characters converted to speech
     totalCost: number; // Total cost in USD

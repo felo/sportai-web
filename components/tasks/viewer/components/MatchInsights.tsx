@@ -24,7 +24,7 @@ interface MatchInsightsProps {
 export function MatchInsights({ result, task, videoRef, portraits, enhancedBallBounces, playerDisplayNames = {} }: MatchInsightsProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const filteredPlayers: Player[] = result
+  const filteredPlayers: Player[] = result?.players
     ? result.players.filter(p => p.swing_count >= 10).sort((a, b) => b.swing_count - a.swing_count)
     : [];
 
@@ -43,7 +43,7 @@ export function MatchInsights({ result, task, videoRef, portraits, enhancedBallB
           </Heading>
           {result && (
             <Text size="2" color="gray">
-              {filteredPlayers.length} players • {result.highlights.length} highlights
+              {filteredPlayers.length} players • {(result.highlights || []).length} highlights
             </Text>
           )}
         </Flex>
@@ -67,7 +67,7 @@ export function MatchInsights({ result, task, videoRef, portraits, enhancedBallB
             <Grid columns={{ initial: "1", md: "2" }} gap="4">
               {/* Left Column - Highlights */}
               <Flex direction="column" gap="4">
-                {result && <HighlightsCard highlights={result.highlights} videoRef={videoRef} />}
+                {result && <HighlightsCard highlights={result.highlights || []} videoRef={videoRef} />}
               </Flex>
 
               {/* Right Column - Stats */}
@@ -90,7 +90,7 @@ export function MatchInsights({ result, task, videoRef, portraits, enhancedBallB
                 {result && result.bounce_heatmap && (
                   <BounceHeatmap
                     heatmap={result.bounce_heatmap}
-                    totalBounces={result.ball_bounces.length}
+                    totalBounces={(result.ball_bounces || []).length}
                   />
                 )}
 

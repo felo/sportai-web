@@ -3,6 +3,7 @@
 import { Box, Flex, Heading, Text, Tooltip } from "@radix-ui/themes";
 import { Cross2Icon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { IconButton, ToggleSwitch } from "@/components/ui";
+import { FEATURE_FLAGS } from "../constants";
 
 interface VideoSettingsProps {
   showBallTracker: boolean;
@@ -161,17 +162,19 @@ export function VideoSettings({
           label="Infer bounces from trajectory"
         />
 
-        <Flex align="center" gap="2">
-          <ToggleSwitch
-            checked={inferAudioBounces}
-            onCheckedChange={onInferAudioBouncesChange}
-            label="Infer bounces from audio"
-            disabled={true}
-          />
-          <Tooltip content="Requires CORS-enabled video. Coming soon!">
-            <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
-          </Tooltip>
-        </Flex>
+        {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && (
+          <Flex align="center" gap="2">
+            <ToggleSwitch
+              checked={inferAudioBounces}
+              onCheckedChange={onInferAudioBouncesChange}
+              label="Infer bounces from audio"
+              disabled={true}
+            />
+            <Tooltip content="Requires CORS-enabled video. Coming soon!">
+              <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+            </Tooltip>
+          </Flex>
+        )}
       </Flex>
     </Box>
   );

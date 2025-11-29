@@ -13,11 +13,16 @@ export function useEventTooltip(
 
   useEffect(() => {
     if (!result || selectedRallyIndex === null) return;
+    
+    const rallies = result.rallies || [];
+    const players = result.players || [];
+    
+    if (!rallies[selectedRallyIndex]) return;
 
-    const [rallyStart, rallyEnd] = result.rallies[selectedRallyIndex];
+    const [rallyStart, rallyEnd] = rallies[selectedRallyIndex];
     const rallyDuration = rallyEnd - rallyStart;
 
-    const rallySwings = result.players
+    const rallySwings = players
       .filter(p => p.swing_count >= 10)
       .flatMap(player =>
         player.swings
@@ -30,7 +35,7 @@ export function useEventTooltip(
       if (Math.abs(currentTime - swing.ball_hit.timestamp) < CONFIG.EVENT_TOOLTIP_THRESHOLD) {
         if (lastTriggeredEventRef.current !== eventId) {
           lastTriggeredEventRef.current = eventId;
-          const playerIndex = getPlayerIndex(result.players, swing.player_id);
+          const playerIndex = getPlayerIndex(players, swing.player_id);
           const speed = swing.ball_speed ? `${Math.round(swing.ball_speed)} km/h` : "";
           const position = ((swing.ball_hit.timestamp - rallyStart) / rallyDuration) * 100;
 

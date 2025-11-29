@@ -146,12 +146,14 @@ export async function POST(request: NextRequest) {
     // Build request body for SportAI API
     const sportaiBody: Record<string, unknown> = {
       video_url: videoUrl,
-      version: params.version || "stable",
+      version: params.version || "latest",
+      onlyInRally: true,
       ...params,
     };
     
     // Call SportAI API to register the task
-    const sportaiResponse = await fetch(`${SPORTAI_API_URL}${endpoint}`, {
+    // API endpoint format: /api/statistics/{sport} (e.g., /api/statistics/tennis, /api/statistics/padel)
+    const sportaiResponse = await fetch(`${SPORTAI_API_URL}${endpoint}/${sport}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

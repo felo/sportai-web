@@ -25,10 +25,11 @@ export function MainTimeline({
   onRallySelect,
   enhancedBallBounces,
 }: MainTimelineProps) {
-  // Use enhanced bounces if provided
-  const allBounces = enhancedBallBounces || result.ball_bounces;
+  // Use enhanced bounces if provided, fallback to empty array
+  const allBounces = enhancedBallBounces || result.ball_bounces || [];
+  const rallies = result.rallies || [];
   
-  const lastRally = result.rallies[result.rallies.length - 1];
+  const lastRally = rallies[rallies.length - 1];
   const lastBounce = allBounces[allBounces.length - 1];
   const estimatedDuration = Math.max(
     task.video_length || 0,
@@ -64,7 +65,7 @@ export function MainTimeline({
               Timeline
             </Heading>
             <Text size="2" color="gray">
-              {result.rallies.length} rallies • {allBounces.length} bounces
+              {rallies.length} rallies • {allBounces.length} bounces
             </Text>
           </Flex>
           <Flex align="center" gap="1">
@@ -86,7 +87,7 @@ export function MainTimeline({
           }}
         >
           {/* Rally markers */}
-          {result.rallies.map(([start, end], i) => {
+          {rallies.map(([start, end], i) => {
             const left = (start / totalDuration) * 100;
             const width = ((end - start) / totalDuration) * 100;
             const isPlayheadInRally = currentTime >= start && currentTime <= end;
