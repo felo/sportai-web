@@ -168,22 +168,26 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
           </Heading>
         </Flex>
 
-        {/* Medal summary row */}
-        <Flex justify="center" align="center" gap="4" py="2">
+        {/* Medal summary row - fixed height for consistent card sizes */}
+        <Flex justify="center" align="center" gap="4" py="2" style={{ minHeight: 80 }}>
           {/* Overall big medal */}
           <OverallMedal rank={overallRank} />
           
           {/* Individual category medals */}
-          {earnedMedals.length > 0 && (
-            <Flex direction="column" gap="2">
-              <Text size="1" color="gray" style={{ textAlign: "center" }}>Medals earned</Text>
-              <Flex gap="3" justify="center">
-                {earnedMedals.map((m, i) => (
-                  <SmallMedal key={i} rank={m.rank} label={m.label} />
-                ))}
-              </Flex>
-            </Flex>
-          )}
+          <Flex direction="column" gap="2" style={{ minWidth: 140 }}>
+            {earnedMedals.length > 0 ? (
+              <>
+                <Text size="1" color="gray" style={{ textAlign: "center" }}>Medals earned</Text>
+                <Flex gap="3" justify="center">
+                  {earnedMedals.map((m, i) => (
+                    <SmallMedal key={i} rank={m.rank} label={m.label} />
+                  ))}
+                </Flex>
+              </>
+            ) : (
+              <Text size="1" color="gray" style={{ textAlign: "center", opacity: 0.5 }}>No medals yet</Text>
+            )}
+          </Flex>
         </Flex>
 
         {/* Charts Section */}

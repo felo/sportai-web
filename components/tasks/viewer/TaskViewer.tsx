@@ -858,76 +858,15 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
                 <Text size="2" color="gray">Player statistics will appear here once the analysis is complete</Text>
               </Flex>
             ) : (
-              <Box style={{ position: "relative" }}>
-                {/* Left edge indicator - shows more content */}
-                <Box
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 48,
-                    background: "linear-gradient(to right, var(--gray-3), transparent)",
-                    pointerEvents: "none",
-                    zIndex: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Box style={{ 
-                    width: 24, 
-                    height: 24, 
-                    borderRadius: "50%", 
-                    background: "var(--gray-5)", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    opacity: 0.8,
-                  }}>
-                    <Text size="2" style={{ color: "var(--gray-11)" }}>←</Text>
-                  </Box>
-                </Box>
-                {/* Right edge indicator - shows more content */}
-                <Box
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 48,
-                    background: "linear-gradient(to left, var(--gray-3), transparent)",
-                    pointerEvents: "none",
-                    zIndex: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Box style={{ 
-                    width: 24, 
-                    height: 24, 
-                    borderRadius: "50%", 
-                    background: "var(--gray-5)", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    opacity: 0.8,
-                  }}>
-                    <Text size="2" style={{ color: "var(--gray-11)" }}>→</Text>
-                  </Box>
-                </Box>
-                <Box
-                  style={{
-                    overflowX: "auto",
-                    overflowY: "hidden",
-                    paddingBottom: 16,
-                    paddingLeft: 48,
-                    paddingRight: 48,
-                    scrollSnapType: "x mandatory",
-                    cursor: "grab",
-                    scrollBehavior: "smooth",
-                  }}
+              <Box
+                style={{
+                  overflowX: "auto",
+                  overflowY: "visible",
+                  paddingBottom: 16,
+                  scrollSnapType: "x mandatory",
+                  cursor: "grab",
+                  scrollBehavior: "smooth",
+                }}
                   onMouseDown={(e) => {
                     const container = e.currentTarget;
                     container.style.cursor = "grabbing";
@@ -1009,7 +948,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
                     ));
                   })()}
                 </Flex>
-                </Box>
               </Box>
             )}
           </Box>

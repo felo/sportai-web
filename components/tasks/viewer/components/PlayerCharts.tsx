@@ -897,6 +897,7 @@ function DistanceRing({
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showMedal, setShowMedal] = useState(false);
   const hasStartedRef = useRef(false);
   const animationRef = useRef<number | null>(null);
 
@@ -921,8 +922,12 @@ function DistanceRing({
 
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate);
-        } else if (rank === 1) {
-          setShowConfetti(true);
+        } else {
+          // Animation complete - show medal
+          setShowMedal(true);
+          if (rank === 1) {
+            setShowConfetti(true);
+          }
         }
       };
 
@@ -1053,8 +1058,17 @@ function DistanceRing({
         </Box>
       </Box>
 
-      {/* Legend with medals */}
-      <Flex justify="center" gap="3" align="center">
+      {/* Legend with medals - fades in when animation completes */}
+      <Flex 
+        justify="center" 
+        gap="3" 
+        align="center"
+        style={{
+          opacity: showMedal ? 1 : 0,
+          transform: showMedal ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.4s ease-out, transform 0.4s ease-out",
+        }}
+      >
         {(() => {
           const percentValue = Math.round(percentage * 100);
           
@@ -1131,6 +1145,7 @@ function SprintRing({
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showMedal, setShowMedal] = useState(false);
   const hasStartedRef = useRef(false);
   const animationRef = useRef<number | null>(null);
 
@@ -1155,8 +1170,11 @@ function SprintRing({
 
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate);
-        } else if (rank === 1) {
-          setShowConfetti(true);
+        } else {
+          setShowMedal(true);
+          if (rank === 1) {
+            setShowConfetti(true);
+          }
         }
       };
 
@@ -1288,8 +1306,17 @@ function SprintRing({
         </Box>
       </Box>
 
-      {/* Medal/Ranking display */}
-      <Flex justify="center" align="center" gap="2">
+      {/* Medal/Ranking display - fades in when animation completes */}
+      <Flex 
+        justify="center" 
+        align="center" 
+        gap="2"
+        style={{
+          opacity: showMedal ? 1 : 0,
+          transform: showMedal ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.4s ease-out, transform 0.4s ease-out",
+        }}
+      >
         {(() => {
           const percentValue = Math.round(percentage * 100);
           
@@ -1359,6 +1386,7 @@ function ActivityRing({
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showMedal, setShowMedal] = useState(false);
   const hasStartedRef = useRef(false);
   const animationRef = useRef<number | null>(null);
 
@@ -1383,9 +1411,11 @@ function ActivityRing({
 
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate);
-        } else if (rank === 1) {
-          // Winner confetti!
-          setShowConfetti(true);
+        } else {
+          setShowMedal(true);
+          if (rank === 1) {
+            setShowConfetti(true);
+          }
         }
       };
 
@@ -1478,8 +1508,17 @@ function ActivityRing({
         </Box>
       </Box>
 
-      {/* Medal/Ranking display */}
-      <Flex justify="center" align="center" gap="2">
+      {/* Medal/Ranking display - fades in when animation completes */}
+      <Flex 
+        justify="center" 
+        align="center" 
+        gap="2"
+        style={{
+          opacity: showMedal ? 1 : 0,
+          transform: showMedal ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.4s ease-out, transform 0.4s ease-out",
+        }}
+      >
         {(() => {
           const percentValue = Math.round(percentage * 100);
           
@@ -1549,6 +1588,7 @@ function PowerRing({
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showMedal, setShowMedal] = useState(false);
   const hasStartedRef = useRef(false);
   const animationRef = useRef<number | null>(null);
 
@@ -1573,8 +1613,11 @@ function PowerRing({
 
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate);
-        } else if (rank === 1) {
-          setShowConfetti(true);
+        } else {
+          setShowMedal(true);
+          if (rank === 1) {
+            setShowConfetti(true);
+          }
         }
       };
 
@@ -1667,8 +1710,17 @@ function PowerRing({
         </Box>
       </Box>
 
-      {/* Medal/Ranking display */}
-      <Flex justify="center" align="center" gap="2">
+      {/* Medal/Ranking display - fades in when animation completes */}
+      <Flex 
+        justify="center" 
+        align="center" 
+        gap="2"
+        style={{
+          opacity: showMedal ? 1 : 0,
+          transform: showMedal ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.4s ease-out, transform 0.4s ease-out",
+        }}
+      >
         {(() => {
           const percentValue = Math.round(percentage * 100);
           
