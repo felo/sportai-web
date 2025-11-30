@@ -173,21 +173,39 @@ export function getGoldCount(
   ].filter(r => r === 1).length;
 }
 
-// Sort players by overall ranking and return with overall rank
+// Sort players alphabetically by name and return with overall rank
 export function getSortedPlayersWithOverallRank(
   rankings: PlayerRankings
 ): Array<ValidPlayer & { overallRank: number }> {
-  const sortedPlayers = [...rankings.validPlayers].sort((a, b) => {
-    const pointsA = getOverallRankPoints(a.player_id, rankings);
-    const pointsB = getOverallRankPoints(b.player_id, rankings);
-    if (pointsB !== pointsA) return pointsB - pointsA;
-    return getGoldCount(b.player_id, rankings) - getGoldCount(a.player_id, rankings);
+  // First calculate overall ranks based on points (for medal display)
+  const playersWithPoints = rankings.validPlayers.map(player => ({
+    player,
+    points: getOverallRankPoints(player.player_id, rankings),
+    goldCount: getGoldCount(player.player_id, rankings),
+  }));
+  
+  // Sort by points to determine ranks
+  playersWithPoints.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    return b.goldCount - a.goldCount;
   });
+  
+  // Assign overall ranks
+  const rankMap: Record<number, number> = {};
+  playersWithPoints.forEach((p, index) => {
+    rankMap[p.player.player_id] = index + 1;
+  });
+  
+  // Now sort alphabetically by displayName for display order
+  const sortedAlphabetically = [...rankings.validPlayers].sort((a, b) => 
+    a.displayName.localeCompare(b.displayName)
+  );
 
-  return sortedPlayers.map((player, index) => ({
+  return sortedAlphabetically.map((player) => ({
     ...player,
-    overallRank: index + 1,
+    overallRank: rankMap[player.player_id],
   }));
 }
+
 
 

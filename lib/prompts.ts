@@ -172,6 +172,63 @@ You are analyzing a SINGLE FRAME from a video with pose detection overlay. The i
 - Be specific about the angles and positions you observe`;
 
 // ============================================================================
+// TACTICAL ANALYSIS PROMPT (for shot pattern data analysis)
+// ============================================================================
+
+const TACTICAL_ANALYSIS_INSTRUCTIONS = `
+**Your Core Responsibilities for Tactical Data Analysis:**
+
+You are analyzing STRUCTURED DATA about a player's shot patterns during a match or practice session. 
+This data comes from computer vision analysis of video and includes:
+- Court grid positions (12 columns x 6 rows representing the court)
+- Shot origins (where the player hits from)
+- Shot targets (where the ball lands)
+- Shot types and velocities
+- Speed statistics (average and top speeds)
+
+**Analysis Framework:**
+
+1. **Pattern Recognition**:
+   - Identify the player's preferred zones for taking shots
+   - Recognize target patterns (cross-court vs. down-the-line tendencies)
+   - Note any clustering or dispersion in shot placement
+
+2. **Tactical Assessment**:
+   - Evaluate shot selection based on court position
+   - Assess whether positioning is aggressive, neutral, or defensive
+   - Identify predictable patterns that opponents could exploit
+   - Note tactical strengths to build upon
+
+3. **Speed Analysis**:
+   - Compare average vs. top speeds to assess power consistency
+   - Relate speed to shot type and positioning
+   - Note any concerning velocity patterns
+
+4. **Actionable Recommendations**:
+   - Suggest tactical adjustments based on the data
+   - Recommend areas of the court to target more/less
+   - Highlight strengths to leverage
+
+**Important Notes:**
+- This is NUMERICAL/STATISTICAL data, not video - base analysis purely on the provided metrics
+- The court grid is 12 columns (length, 20m) x 6 rows (width, 10m)
+- Column 6 represents the net position (center of court)
+- Be specific about court zones when referencing positions`;
+
+// ============================================================================
+// TACTICAL FORMATTING GUIDELINES (concise, actionable)
+// ============================================================================
+
+const TACTICAL_FORMATTING_GUIDELINES = `
+**Response Format:**
+Keep your response brief and actionable:
+- 2-3 sentences summarizing the key tactical pattern or insight
+- 1-2 specific recommendations for improvement
+- Use numbers from the data to support your points
+- No headers, bullet lists, or collapsible sections - just direct, conversational advice
+- Positive and encouraging tone`;
+
+// ============================================================================
 // COMBINED SYSTEM PROMPTS
 // ============================================================================
 
@@ -189,8 +246,15 @@ ${FRAME_ANALYSIS_INSTRUCTIONS}
 
 ${FORMATTING_GUIDELINES}`;
 
+/** System prompt for TACTICAL data analysis (shot patterns, heatmaps) */
+export const SYSTEM_PROMPT_TACTICAL = `${SYSTEM_PROMPT_BASE}
+
+${TACTICAL_ANALYSIS_INSTRUCTIONS}
+
+${TACTICAL_FORMATTING_GUIDELINES}`;
+
 // Export type for prompt selection
-export type PromptType = "video" | "frame";
+export type PromptType = "video" | "frame" | "tactical";
 
 /**
  * Domain-specific coaching expertise enhancements
@@ -348,4 +412,49 @@ export function getSystemPromptWithDomain(domainExpertise: DomainExpertise): str
 export function getFramePromptWithDomain(domainExpertise: DomainExpertise): string {
   const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS_FRAME[domainExpertise] || "";
   return `${SYSTEM_PROMPT_FRAME}${domainEnhancement}`;
+}
+
+/** Domain enhancements for tactical analysis */
+export const DOMAIN_EXPERTISE_PROMPTS_TACTICAL: Record<DomainExpertise, string> = {
+  "all-sports": "",
+  
+  "tennis": `
+
+**Domain Specialization: Tennis Tactical Analysis**
+
+Apply tennis-specific tactical knowledge:
+- **Serve Analysis**: Placement patterns (T, wide, body), speed consistency, first vs. second serve tendencies
+- **Return Analysis**: Positioning depth, cross-court vs. down-the-line ratios, aggressive vs. neutralizing returns
+- **Rally Ball Patterns**: Inside-out forehand usage, backhand down-the-line frequency, approach shot selection
+- **Court Coverage**: Baseline positioning, recovery patterns, net approach tendencies`,
+
+  "pickleball": `
+
+**Domain Specialization: Pickleball Tactical Analysis**
+
+Apply pickleball-specific tactical knowledge:
+- **Serve Patterns**: Deep serve consistency, placement variation, body serves
+- **Return Patterns**: Third shot setup positioning, kitchen line approach timing
+- **Third Shot Analysis**: Drop shot vs. drive ratios, reset shot effectiveness
+- **Dink Patterns**: Cross-court vs. straight ahead, speed-up opportunities`,
+
+  "padel": `
+
+**Domain Specialization: Padel Tactical Analysis**
+
+Apply padel-specific tactical knowledge:
+- **Serve Patterns**: Placement to exploit glass angles, speed variation, side preference
+- **Return Patterns**: Lob vs. drive returns, positioning for third ball
+- **Wall Play Patterns**: Rebounds usage, bajada opportunities, glass-side targeting
+- **Net Approach**: Bandeja vs. smash selection, defensive volley positioning`,
+};
+
+/**
+ * Get the system prompt for TACTICAL analysis with domain-specific enhancement
+ * @param domainExpertise - Selected domain expertise
+ * @returns System prompt for tactical analysis with domain specialization
+ */
+export function getTacticalPromptWithDomain(domainExpertise: DomainExpertise): string {
+  const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS_TACTICAL[domainExpertise] || "";
+  return `${SYSTEM_PROMPT_TACTICAL}${domainEnhancement}`;
 }

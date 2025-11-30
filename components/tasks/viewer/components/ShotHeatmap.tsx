@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Flex, Text, Heading, Card, Badge, Button } from "@radix-ui/themes";
+import { Box, Flex, Text, Heading, Card, Badge } from "@radix-ui/themes";
 import { RocketIcon, LightningBoltIcon } from "@radix-ui/react-icons";
-import buttonStyles from "@/styles/buttons.module.css";
 import { OVERLAY_COLORS } from "../constants";
 import { formatSwingType } from "../utils";
+import type { BallSequenceType } from "@/types/tactical-analysis";
+import type { DomainExpertise } from "@/utils/storage";
 
 // Trail colors (same as PadelCourt2D)
 const TRAIL_COLORS = {
@@ -229,10 +230,17 @@ interface PlayerShotCardProps {
   shotLabel: string; // "Serve", "Return", "Third ball"
   originLabel: string; // "Serve position", "Return position", etc.
   countLabel: string; // "serve", "return", "shot"
+  ballType?: BallSequenceType; // For tactical analysis
+  sport?: DomainExpertise; // For domain-specific analysis
 }
 
 // Reusable player shot card component
-export function PlayerShotCard({ data, shotLabel, originLabel, countLabel }: PlayerShotCardProps) {
+export function PlayerShotCard({ 
+  data, 
+  shotLabel, 
+  originLabel, 
+  countLabel,
+}: PlayerShotCardProps) {
   const [hoveredCell, setHoveredCell] = useState<{ col: number; row: number } | null>(null);
   
   const maxOrigin = Math.max(...data.origins.flat(), 1);
@@ -505,19 +513,6 @@ export function PlayerShotCard({ data, shotLabel, originLabel, countLabel }: Pla
           </Flex>
         </Flex>
 
-        {/* Analyse Button */}
-        <Flex justify="center" pt="3">
-          <Button
-            className={buttonStyles.actionButton}
-            size="2"
-            onClick={() => {
-              // TODO: Implement analysis for this player's shot data
-              console.log(`Analyse ${data.displayName}'s ${shotLabel} patterns`);
-            }}
-          >
-            Analyse
-          </Button>
-        </Flex>
       </Flex>
     </Card>
   );
@@ -529,11 +524,23 @@ interface ShotHeatmapProps {
   originLabel: string;
   countLabel: string;
   emptyMessage: string;
+  ballType?: BallSequenceType;
+  sport?: DomainExpertise;
 }
 
 // Reusable shot heatmap container
-export function ShotHeatmap({ data, shotLabel, originLabel, countLabel, emptyMessage }: ShotHeatmapProps) {
-  const playersWithShots = data.filter(d => d.totalShots > 0);
+export function ShotHeatmap({ 
+  data, 
+  shotLabel, 
+  originLabel, 
+  countLabel, 
+  emptyMessage,
+  ballType = "serve",
+  sport = "padel",
+}: ShotHeatmapProps) {
+  const playersWithShots = data
+    .filter(d => d.totalShots > 0)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const totalShots = playersWithShots.reduce((sum, p) => sum + p.totalShots, 0);
 
   if (playersWithShots.length === 0 || totalShots === 0) {
@@ -559,7 +566,15 @@ export function ShotHeatmap({ data, shotLabel, originLabel, countLabel, emptyMes
         }}
       >
         {playersWithShots.map((playerData) => (
-          <PlayerShotCard key={playerData.playerId} data={playerData} shotLabel={shotLabel} originLabel={originLabel} countLabel={countLabel} />
+          <PlayerShotCard 
+            key={playerData.playerId} 
+            data={playerData} 
+            shotLabel={shotLabel} 
+            originLabel={originLabel} 
+            countLabel={countLabel}
+            ballType={ballType}
+            sport={sport}
+          />
         ))}
       </Box>
 

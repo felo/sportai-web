@@ -38,3 +38,4 @@ export function HighlightsTab({ highlights, videoRef }: HighlightsTabProps) {
 }
 
 
+

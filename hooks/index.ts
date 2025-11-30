@@ -10,6 +10,7 @@ export { useProjectileDetection } from "./useProjectileDetection";
 export { useSAM2Detection } from "./useSAM2Detection";
 export { useFloatingVideo } from "./useFloatingVideo";
 export { useFrameAnalysis } from "./useFrameAnalysis";
+export { useTacticalAnalysis } from "./useTacticalAnalysis";
 
 // Sidebar hooks
 export { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "./sidebar";

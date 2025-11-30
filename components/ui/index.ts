@@ -22,6 +22,8 @@ export type { SettingsSectionHeaderProps } from "./layout/SettingsSectionHeader"
 export { SettingsSection } from "./layout/SettingsSection";
 export type { SettingsSectionProps } from "./layout/SettingsSection";
 
+export { CollapsibleSection } from "./layout/CollapsibleSection";
+
 // Feedback
 export { LoadingState } from "./feedback/LoadingState";
 export type { LoadingStateProps } from "./feedback/LoadingState";

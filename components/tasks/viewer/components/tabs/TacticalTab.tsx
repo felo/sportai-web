@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Flex, Text, Heading } from "@radix-ui/themes";
+import { Box, Flex, Text, Heading, Button } from "@radix-ui/themes";
 import { TargetIcon } from "@radix-ui/react-icons";
 import { StatisticsResult, BallBounce } from "../../types";
 import { ShotHeatmap } from "../ShotHeatmap";
+import type { BallSequenceType } from "@/types/tactical-analysis";
+import { convertToTacticalData } from "@/types/tactical-analysis";
+import { useTacticalAnalysis } from "@/hooks/useTacticalAnalysis";
+import { MarkdownWithSwings } from "@/components/markdown";
+import { CollapsibleSection } from "@/components/ui";
+import { StreamingIndicator } from "@/components/chat";
+import buttonStyles from "@/styles/buttons.module.css";
 // import { BounceHeatmap } from "../BounceHeatmap";
 // import { RallyNetwork } from "../RallyNetwork";
 import { 
@@ -22,12 +29,20 @@ interface TacticalTabProps {
 }
 
 // Ball sequence configuration
-const BALL_TABS = [
-  { id: 1, label: "1st", name: "Serve", description: "Where each player serves from and to", originLabel: "Serve position", countLabel: "serve" },
-  { id: 2, label: "2nd", name: "Return", description: "Where each player returns serves", originLabel: "Return position", countLabel: "return" },
-  { id: 3, label: "3rd", name: "Third Ball", description: "Server's first shot after return", originLabel: "Shot position", countLabel: "shot" },
-  { id: 4, label: "4th", name: "Fourth Ball", description: "Returner's second shot", originLabel: "Shot position", countLabel: "shot" },
-  { id: 5, label: "5th", name: "Fifth Ball", description: "Server's second shot after serve", originLabel: "Shot position", countLabel: "shot" },
+const BALL_TABS: Array<{
+  id: number;
+  label: string;
+  name: string;
+  description: string;
+  originLabel: string;
+  countLabel: string;
+  ballType: BallSequenceType;
+}> = [
+  { id: 1, label: "1st", name: "Serve", description: "Where each player serves from and to", originLabel: "Serve position", countLabel: "serve", ballType: "serve" },
+  { id: 2, label: "2nd", name: "Return", description: "Where each player returns serves", originLabel: "Return position", countLabel: "return", ballType: "return" },
+  { id: 3, label: "3rd", name: "Third Ball", description: "Server's first shot after return", originLabel: "Shot position", countLabel: "shot", ballType: "third-ball" },
+  { id: 4, label: "4th", name: "Fourth Ball", description: "Returner's second shot", originLabel: "Shot position", countLabel: "shot", ballType: "fourth-ball" },
+  { id: 5, label: "5th", name: "Fifth Ball", description: "Server's second shot after serve", originLabel: "Shot position", countLabel: "shot", ballType: "fifth-ball" },
 ];
 
 export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = {} }: TacticalTabProps) {
@@ -40,6 +55,11 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
   const fourthBallData = useFourthBallData({ result, playerDisplayNames });
   const fifthBallData = useFifthBallData({ result, playerDisplayNames });
 
+  // Tactical analysis hook for "Analyse All"
+  const { analyzeAll, isAnalyzing, analysis, error } = useTacticalAnalysis({
+    sport: "padel",
+  });
+
   // Map ball number to data
   const ballDataMap: Record<number, typeof serveData> = {
     1: serveData,
@@ -47,6 +67,44 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
     3: thirdBallData,
     4: fourthBallData,
     5: fifthBallData,
+  };
+
+  // Handle Analyse All button click
+  const handleAnalyseAll = async () => {
+    // Build data for all players
+    const allPlayerIds = new Set<number>();
+    
+    // Collect all unique player IDs
+    [...serveData, ...returnData, ...thirdBallData, ...fourthBallData, ...fifthBallData].forEach(d => {
+      if (d.totalShots > 0) allPlayerIds.add(d.playerId);
+    });
+    
+    // Build players array with all ball types for each player
+    const players = Array.from(allPlayerIds).map(playerId => {
+      const servePlayer = serveData.find(d => d.playerId === playerId);
+      const returnPlayer = returnData.find(d => d.playerId === playerId);
+      const thirdPlayer = thirdBallData.find(d => d.playerId === playerId);
+      const fourthPlayer = fourthBallData.find(d => d.playerId === playerId);
+      const fifthPlayer = fifthBallData.find(d => d.playerId === playerId);
+      
+      const playerName = servePlayer?.displayName || returnPlayer?.displayName || `Player ${playerId}`;
+      
+      const ballTypes = [
+        servePlayer && servePlayer.totalShots > 0 ? { ballType: "serve" as BallSequenceType, ballLabel: "Serve", playerData: convertToTacticalData(servePlayer) } : null,
+        returnPlayer && returnPlayer.totalShots > 0 ? { ballType: "return" as BallSequenceType, ballLabel: "Return", playerData: convertToTacticalData(returnPlayer) } : null,
+        thirdPlayer && thirdPlayer.totalShots > 0 ? { ballType: "third-ball" as BallSequenceType, ballLabel: "Third Ball", playerData: convertToTacticalData(thirdPlayer) } : null,
+        fourthPlayer && fourthPlayer.totalShots > 0 ? { ballType: "fourth-ball" as BallSequenceType, ballLabel: "Fourth Ball", playerData: convertToTacticalData(fourthPlayer) } : null,
+        fifthPlayer && fifthPlayer.totalShots > 0 ? { ballType: "fifth-ball" as BallSequenceType, ballLabel: "Fifth Ball", playerData: convertToTacticalData(fifthPlayer) } : null,
+      ].filter(Boolean) as Array<{ ballType: BallSequenceType; ballLabel: string; playerData: ReturnType<typeof convertToTacticalData> }>;
+      
+      return {
+        playerName,
+        playerId,
+        ballTypes,
+      };
+    }).filter(p => p.ballTypes.length > 0);
+
+    await analyzeAll({ players });
   };
 
   if (!result) {
@@ -74,10 +132,56 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
       <Flex direction="column" gap="4">
         {/* Ball Sequence Analysis */}
         <Box>
-          <Heading size="3" weight="medium" mb="3">Ball Sequence Analysis</Heading>
-          <Text size="2" color="gray" mb="3">
-            Analyze shot patterns through the rally sequence
-          </Text>
+          <Flex justify="between" align="center" mb="3">
+            <Box>
+              <Heading size="3" weight="medium">Ball Sequence Analysis</Heading>
+              <Text size="2" color="gray">
+                Analyze shot patterns through the rally sequence
+              </Text>
+            </Box>
+            <Button
+              className={isAnalyzing ? buttonStyles.actionButtonLoading : buttonStyles.actionButton}
+              size="2"
+              onClick={handleAnalyseAll}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <>
+                  Analysing
+                  <span className={buttonStyles.loadingDots}>
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </>
+              ) : (
+                "Analyse Ball Sequence"
+              )}
+            </Button>
+          </Flex>
+
+          {/* Analyse All Result Section */}
+          {(analysis || isAnalyzing || error) && (
+            <Box style={{ marginBottom: "16px" }}>
+              <CollapsibleSection
+                title="🎯 Complete Tactical Analysis"
+                defaultOpen
+              >
+                {error ? (
+                  <Text size="2" color="red">{error}</Text>
+                ) : analysis ? (
+                  <>
+                    <Box className="prose dark:prose-invert" style={{ maxWidth: "none", fontSize: "14px" }}>
+                      <MarkdownWithSwings>{analysis}</MarkdownWithSwings>
+                    </Box>
+                    {isAnalyzing && <StreamingIndicator />}
+                  </>
+                ) : isAnalyzing ? (
+                  <StreamingIndicator />
+                ) : null}
+              </CollapsibleSection>
+            </Box>
+          )}
           
           {/* Ball tabs */}
           <Flex gap="1" mb="4">
@@ -148,6 +252,8 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
                 originLabel={currentTab.originLabel}
                 countLabel={currentTab.countLabel}
                 emptyMessage={`No ${currentTab.name.toLowerCase()} data available`}
+                ballType={currentTab.ballType}
+                sport="padel"
               />
             </Flex>
           </Box>

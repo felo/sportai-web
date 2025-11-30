@@ -251,6 +251,16 @@ html[data-theme="dark"] .radix-themes,
   }
 }
 
+/* Pulse animation for loading indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 /* Bounce particle animation for summary stats */
 @keyframes bounceParticle {
   0% {

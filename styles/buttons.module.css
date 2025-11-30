@@ -29,6 +29,69 @@
   color: var(--gray-9) !important;
 }
 
+/* Loading state - keeps button looking active with shimmer */
+.actionButtonLoading {
+  border-radius: 9999px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease-out !important;
+  border: 2px solid rgba(255, 255, 255, 0.6) !important;
+  text-transform: uppercase !important;
+  background: linear-gradient(
+    90deg,
+    #5B8A65 0%,
+    #7ADB8F 25%,
+    #95E5A6 50%,
+    #7ADB8F 75%,
+    #5B8A65 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 2s ease-in-out infinite !important;
+  color: #1C1C1C !important;
+  cursor: wait !important;
+  box-shadow: 
+    0 0 15px rgba(122, 219, 143, 0.4),
+    0 0 30px rgba(122, 219, 143, 0.2) !important;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Animated dots for loading text */
+.loadingDots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.loadingDots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #1C1C1C;
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+.loadingDots span:nth-child(1) { animation-delay: 0s; }
+.loadingDots span:nth-child(2) { animation-delay: 0.2s; }
+.loadingDots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 60%, 100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
 /* Red variant for destructive actions */
 .actionButtonRed {
   border-radius: 9999px !important;
