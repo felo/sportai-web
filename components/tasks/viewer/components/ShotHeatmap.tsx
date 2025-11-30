@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Flex, Text, Heading, Card, Badge } from "@radix-ui/themes";
+import { Box, Flex, Text, Heading, Card, Badge, Button } from "@radix-ui/themes";
 import { RocketIcon, LightningBoltIcon } from "@radix-ui/react-icons";
+import buttonStyles from "@/styles/buttons.module.css";
 import { OVERLAY_COLORS } from "../constants";
 import { formatSwingType } from "../utils";
 
@@ -502,6 +503,20 @@ export function PlayerShotCard({ data, shotLabel, originLabel, countLabel }: Pla
               {data.topSpeed > 0 && <Text size="2" weight="regular" color="gray"> km/h</Text>}
             </Text>
           </Flex>
+        </Flex>
+
+        {/* Analyse Button */}
+        <Flex justify="center" pt="3">
+          <Button
+            className={buttonStyles.actionButton}
+            size="2"
+            onClick={() => {
+              // TODO: Implement analysis for this player's shot data
+              console.log(`Analyse ${data.displayName}'s ${shotLabel} patterns`);
+            }}
+          >
+            Analyse
+          </Button>
         </Flex>
       </Flex>
     </Card>
