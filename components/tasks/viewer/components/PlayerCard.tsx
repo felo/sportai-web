@@ -27,6 +27,47 @@ const MEDAL_START_DELAY = 500;   // Base delay before all medals start (all play
 const SMALL_MEDAL_STAGGER = 350;  // Time between each small medal reveal
 const BIG_MEDAL_DELAY = 500;      // Time after last small medal before big medal
 
+// Consolation prize for players with no category medals
+function ConsolationPrize({ playerIndex }: { playerIndex: number }) {
+  const [isRevealed, setIsRevealed] = useState(false);
+  
+  const treats = [
+    { emoji: "🍫", label: "Chocolate" },
+    { emoji: "🍬", label: "Candy" },
+    { emoji: "🍭", label: "Lollipop" },
+    { emoji: "🧁", label: "Cupcake" },
+    { emoji: "🍩", label: "Donut" },
+    { emoji: "🍪", label: "Cookie" },
+  ];
+  
+  const treatIndex = (playerIndex - 1) % treats.length;
+  const { emoji, label } = treats[treatIndex];
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setIsRevealed(true), MEDAL_START_DELAY);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return (
+    <Flex 
+      direction="column" 
+      align="center" 
+      gap="1"
+      style={{
+        opacity: isRevealed ? 1 : 0,
+        transform: isRevealed ? "scale(1) translateY(0)" : "scale(0.8) translateY(5px)",
+        transition: "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      }}
+    >
+      <Text size="1" color="gray" style={{ textAlign: "center" }}>Consolation prize</Text>
+      <Flex direction="column" align="center" gap="0" style={{ marginTop: 4 }}>
+        <Text style={{ fontSize: 24, lineHeight: 1 }}>{emoji}</Text>
+        <Text size="1" color="gray" style={{ fontSize: 9, marginTop: 2 }}>{label}</Text>
+      </Flex>
+    </Flex>
+  );
+}
+
 // Medal component for individual category medals with animated reveal
 function SmallMedal({ rank, label, revealDelay = 0 }: { rank: number; label: string; revealDelay?: number }) {
   const [isRevealed, setIsRevealed] = useState(false);
@@ -113,34 +154,65 @@ function OverallMedal({ rank, revealDelay = 0 }: { rank: number; revealDelay?: n
   
   // "Honorable Mention" for ranks > 3
   if (!medal) {
+    const funnyOptions = [
+      { emoji: "🦆", label: "Quack Star" },
+      { emoji: "🧸", label: "Cuddle Champ" },
+      { emoji: "🦄", label: "Unicorn Mode" },
+      { emoji: "🐢", label: "Slow & Steady" },
+      { emoji: "🌵", label: "Prickly Player" },
+      { emoji: "🍀", label: "Lucky Charm" },
+      { emoji: "🎈", label: "High Spirits" },
+      { emoji: "🦊", label: "Sly Move" },
+      { emoji: "🐙", label: "Multi-tasker" },
+      { emoji: "🌟", label: "Rising Star" },
+    ];
+    // Use rank as seed for consistent selection per player position
+    const optionIndex = (rank - 4) % funnyOptions.length;
+    const { emoji, label } = funnyOptions[optionIndex];
+    
     return (
       <Flex 
         direction="column" 
         align="center" 
-        gap="1"
+        gap="0"
         style={{
           opacity: isRevealed ? 1 : 0,
           transform: isRevealed ? "scale(1) translateY(0)" : "scale(0.3) translateY(20px)",
           transition: "all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          paddingTop: 12,
         }}
       >
-        <Box
+        <Box style={{ width: 56, height: 64, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #E5E7EB, #9CA3AF)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+              border: "3px solid #D1D5DB",
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>{emoji}</Text>
+          </Box>
+        </Box>
+        <Text 
+          size="2" 
+          weight="medium" 
+          color="gray" 
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #E5E7EB, #9CA3AF)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
-            border: "3px solid #D1D5DB",
+            width: 80,
+            fontSize: label.length > 12 ? 11 : label.length > 10 ? 12 : 14,
+            lineHeight: 1.2,
+            whiteSpace: "nowrap",
+            textAlign: "center",
+            marginTop: -4,
           }}
         >
-          <Text size="4" style={{ fontSize: 20 }}>⭐</Text>
-        </Box>
-        <Text size="2" weight="medium" color="gray" align="center">
-          Rising Star
+          {label}
         </Text>
       </Flex>
     );
@@ -163,7 +235,7 @@ function OverallMedal({ rank, revealDelay = 0 }: { rank: number; revealDelay?: n
       
       <Box
         style={{
-          animation: isRevealed && rank === 1 ? "medal-glow 1.5s ease-in-out infinite" : undefined,
+          animation: isRevealed && rank === 1 ? "medal-glow 3s ease-in-out infinite" : undefined,
         }}
       >
         <svg width="56" height="64" viewBox="0 0 56 64" fill="none">
@@ -218,6 +290,9 @@ function OverallMedal({ rank, revealDelay = 0 }: { rank: number; revealDelay?: n
           opacity: showNumber ? 1 : 0,
           transform: showNumber ? "translateY(0)" : "translateY(10px)",
           transition: "all 0.4s ease-out 0.1s",
+          width: 80,
+          whiteSpace: "nowrap",
+          textAlign: "center",
         }}
       >
         {medal.label}
@@ -266,8 +341,8 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
   const bigMedalDelay = MEDAL_START_DELAY + (earnedMedals.length * SMALL_MEDAL_STAGGER) + BIG_MEDAL_DELAY;
 
   return (
-    <Card style={{ border: "1px solid var(--gray-6)" }}>
-      <Flex direction="column" gap="3" p="4">
+    <Card style={{ border: "1px solid var(--gray-6)", height: "100%" }}>
+      <Flex direction="column" gap="3" p="4" style={{ height: "100%" }}>
         {/* Player header with photo and name centered */}
         <Flex direction="column" align="center" gap="2">
           <Box
@@ -288,7 +363,12 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
               <img
                 src={portrait}
                 alt={displayName}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  objectFit: "cover",
+                  objectPosition: "top", // Align to top so face is visible
+                }}
               />
             ) : (
               <Text size="5" weight="bold" style={{ color: "white" }}>
@@ -320,7 +400,7 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
                 </Flex>
               </>
             ) : (
-              <Text size="1" color="gray" style={{ textAlign: "center", opacity: 0.5 }}>No medals yet</Text>
+              <ConsolationPrize playerIndex={displayIndex} />
             )}
           </Flex>
           

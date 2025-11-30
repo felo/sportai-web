@@ -7,8 +7,8 @@ import { Task, StatisticsResult, BallBounce } from "../../types";
 import { TaskStatusCard } from "../index";
 import { formatSwingType } from "../../utils";
 import { getSwingTypeColor, CHART_THEME } from "../../constants";
-import { useAnimatedProgress } from "../../hooks";
-import { Confetti } from "../shared";
+import { ProgressRing } from "../shared";
+import type { ProgressRingGradient } from "../shared";
 
 interface SummaryTabProps {
   task: Task;
@@ -31,6 +31,7 @@ export function SummaryTab({
 
   const players = result.players || [];
   const rallies = result.rallies || [];
+  const teamSessions = result.team_sessions || [];
   const filteredPlayers = players.filter((p) => p.swing_count >= 10);
   const totalSwings = filteredPlayers.reduce(
     (sum, p) => sum + p.swing_count,
@@ -38,6 +39,68 @@ export function SummaryTab({
   );
   const bounceCount =
     enhancedBallBounces?.length ?? result.ball_bounces?.length ?? 0;
+
+  // Calculate team count from team_sessions
+  // Count unique team compositions with exactly 2 players (doubles format)
+  const uniqueTeams = new Set<string>();
+  teamSessions.forEach(session => {
+    if (session.team_front?.length === 2) {
+      // Sort player IDs to normalize team composition regardless of order
+      uniqueTeams.add(JSON.stringify([...session.team_front].sort((a, b) => a - b)));
+    }
+    if (session.team_back?.length === 2) {
+      uniqueTeams.add(JSON.stringify([...session.team_back].sort((a, b) => a - b)));
+    }
+  });
+  const teamCount = uniqueTeams.size;
+
+  // Calculate total time spent in rallies (Active Play)
+  const totalRallyDuration = rallies.reduce((sum, [start, end]) => sum + (end - start), 0);
+
+  // Calculate total distance covered by all players
+  const totalDistanceCovered = filteredPlayers.reduce((sum, p) => sum + (p.covered_distance || 0), 0);
+  
+  // Calculate average distance per player
+  const avgDistancePerPlayer = filteredPlayers.length > 0 
+    ? totalDistanceCovered / filteredPlayers.length 
+    : 0;
+
+  // Calculate average rally duration
+  const avgRallyDuration = rallies.length > 0 
+    ? totalRallyDuration / rallies.length 
+    : 0;
+
+  // Calculate average shots per rally
+  const avgShotsPerRally = rallies.length > 0 
+    ? totalSwings / rallies.length 
+    : 0;
+
+  // Calculate rally intensity (shots per second of active play)
+  const avgRallyIntensity = totalRallyDuration > 0 
+    ? totalSwings / totalRallyDuration 
+    : 0;
+
+  // Calculate max rally intensity
+  const maxRallyIntensity = rallies.reduce((max, [start, end]) => {
+    const duration = end - start;
+    if (duration <= 0) return max;
+    // Count shots in this rally
+    const shotsInRally = filteredPlayers.reduce((sum, p) => 
+      sum + (p.swings?.filter(s => {
+        const hitTime = s.ball_hit?.timestamp ?? s.start.timestamp;
+        return hitTime >= start && hitTime <= end;
+      }).length || 0), 0
+    );
+    const intensity = shotsInRally / duration;
+    return Math.max(max, intensity);
+  }, 0);
+
+  // Calculate sprint statistics
+  const allSprints = filteredPlayers.map(p => p.fastest_sprint || 0).filter(s => s > 0);
+  const maxSprintSpeed = allSprints.length > 0 ? Math.max(...allSprints) : 0;
+  const avgSprintSpeed = allSprints.length > 0 
+    ? allSprints.reduce((a, b) => a + b, 0) / allSprints.length 
+    : 0;
 
   // Aggregate swing type distribution
   const aggregatedSwingTypes: Record<string, number> = {};
@@ -73,8 +136,45 @@ export function SummaryTab({
       ? allSpeeds.reduce((a, b) => a + b, 0) / allSpeeds.length
       : 0;
 
+  // Count serves and volleys
+  const serveCount = filteredPlayers.reduce((sum, p) => 
+    sum + (p.swings?.filter(s => s.serve).length || 0), 0
+  );
+  const volleyCount = filteredPlayers.reduce((sum, p) => 
+    sum + (p.swings?.filter(s => s.volley).length || 0), 0
+  );
+
+  // Calculate serve speeds
+  const serveSpeeds = filteredPlayers
+    .flatMap(p => p.swings?.filter(s => s.serve).map(s => s.ball_speed) || [])
+    .filter(s => s > 0);
+  const maxServeSpeed = serveSpeeds.length > 0 ? Math.max(...serveSpeeds) : 0;
+  const avgServeSpeed = serveSpeeds.length > 0 
+    ? serveSpeeds.reduce((a, b) => a + b, 0) / serveSpeeds.length 
+    : 0;
+
+  // Calculate volley speeds
+  const volleySpeeds = filteredPlayers
+    .flatMap(p => p.swings?.filter(s => s.volley).map(s => s.ball_speed) || [])
+    .filter(s => s > 0);
+  const maxVolleySpeed = volleySpeeds.length > 0 ? Math.max(...volleySpeeds) : 0;
+  const avgVolleySpeed = volleySpeeds.length > 0 
+    ? volleySpeeds.reduce((a, b) => a + b, 0) / volleySpeeds.length 
+    : 0;
+
+  // Calculate ground stroke speeds (not serve and not volley)
+  const groundStrokeSpeeds = filteredPlayers
+    .flatMap(p => p.swings?.filter(s => !s.serve && !s.volley).map(s => s.ball_speed) || [])
+    .filter(s => s > 0);
+  const maxGroundStrokeSpeed = groundStrokeSpeeds.length > 0 ? Math.max(...groundStrokeSpeeds) : 0;
+  const avgGroundStrokeSpeed = groundStrokeSpeeds.length > 0 
+    ? groundStrokeSpeeds.reduce((a, b) => a + b, 0) / groundStrokeSpeeds.length 
+    : 0;
+  const groundStrokeCount = totalSwingCount - serveCount - volleyCount;
+
   const hasSwingData = swingTypeData.length > 0;
   const hasSpeedData = allSpeeds.length > 0;
+  const hasSprintData = allSprints.length > 0;
 
   // Categorize bounces
   const bounceCounts = {
@@ -101,134 +201,137 @@ export function SummaryTab({
 
   return (
     <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
-      {/* Quick Stats Row */}
-      <Grid columns={{ initial: "2", sm: "4" }} gap="3" mb="4">
+      {/* Quick Stats Row 1 */}
+      <Grid columns={{ initial: "2", sm: "3", md: "6" }} gap="3" mb="4">
+        <QuickStatCard label="Teams" value={teamCount} />
+        <QuickStatCard label="Rallies" value={rallies.length} />
+        <QuickStatCard label="Total Swings" value={totalSwings} />
         <QuickStatCard
-          label="Players"
-          value={filteredPlayers.length}
-          color="mint"
-        />
-        <QuickStatCard label="Rallies" value={rallies.length} color="blue" />
-        <QuickStatCard
-          label="Total Swings"
-          value={totalSwings}
-          color="purple"
+          label="Distance Covered"
+          value={totalDistanceCovered}
+          formatValue={(v) => v > 0 ? `${(v / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : "-"}
         />
         <QuickStatCard
-          label="Match Duration"
-          value={task.video_length ? formatDuration(task.video_length) : "-"}
-          color="orange"
-          isText
+          label="Active Play"
+          value={totalRallyDuration}
+          formatValue={(v) => v > 0 ? formatDuration(v) : "-"}
+        />
+        <QuickStatCard
+          label="Avg. Distance"
+          value={avgDistancePerPlayer}
+          formatValue={(v) => v > 0 ? `${Math.round(v)} m` : "-"}
         />
       </Grid>
 
-      {/* Main Cards Grid */}
-      <Grid columns={{ initial: "1", md: "3" }} gap="4">
+      {/* Quick Stats Row 2 - Rally Stats */}
+      <Grid columns={{ initial: "2", sm: "4" }} gap="3" mb="4">
+        <QuickStatCard
+          label="Avg. Rally Length"
+          value={avgRallyDuration}
+          formatValue={(v) => v > 0 ? `${v.toFixed(1)}s` : "-"}
+        />
+        <QuickStatCard
+          label="Avg. Shots/Rally"
+          value={avgShotsPerRally}
+          formatValue={(v) => v > 0 ? v.toFixed(1) : "-"}
+        />
+        <QuickStatCard
+          label="Rally Intensity (Avg)"
+          value={avgRallyIntensity}
+          formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
+        />
+        <QuickStatCard
+          label="Rally Intensity (Max)"
+          value={maxRallyIntensity}
+          formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
+        />
+      </Grid>
+
+      {/* Main Cards Grid - Row 1: Speeds & Serves */}
+      <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4">
         {/* Shot Power Card */}
-        <Card
-          style={{
-            border: "1px solid var(--orange-6)",
-            background:
-              "linear-gradient(135deg, var(--orange-2) 0%, var(--gray-1) 100%)",
-          }}
-        >
+        <Card style={{ border: "1px solid var(--gray-5)" }}>
           <Flex direction="column" gap="3" p="4">
-            <Flex align="center" gap="2">
-              <Box
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg, var(--orange-9) 0%, var(--red-9) 100%)",
-                  boxShadow: "0 0 8px var(--orange-a6)",
-                }}
-              />
-              <Heading size="3" weight="medium">
-                Overall Shot Power
-              </Heading>
-            </Flex>
+            <Heading size="3" weight="medium">
+              Overall Shot Power
+            </Heading>
             {hasSpeedData ? (
-              <ShotPowerSpeedometer
+              <SpeedometerDisplay
                 maxSpeed={maxBallSpeed}
                 avgSpeed={avgBallSpeed}
+                label="Shot"
+                unit="km/h"
               />
             ) : (
-              <Flex
-                align="center"
-                justify="center"
-                style={{ height: 200, color: "var(--gray-9)" }}
-              >
-                <Text size="2">No speed data available</Text>
-              </Flex>
+              <EmptyState message="No speed data available" />
             )}
           </Flex>
         </Card>
 
-        {/* Swing Types Card */}
-        <Card
-          style={{
-            border: "1px solid var(--purple-6)",
-            background:
-              "linear-gradient(135deg, var(--purple-2) 0%, var(--gray-1) 100%)",
-          }}
-        >
+        {/* Sprint Speed Card */}
+        <Card style={{ border: "1px solid var(--gray-5)" }}>
           <Flex direction="column" gap="3" p="4">
-            <Flex align="center" gap="2">
-              <Box
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg, var(--purple-9) 0%, var(--pink-9) 100%)",
-                  boxShadow: "0 0 8px var(--purple-a6)",
-                }}
+            <Heading size="3" weight="medium">
+              Overall Sprint Speed
+            </Heading>
+            {hasSprintData ? (
+              <SpeedometerDisplay
+                maxSpeed={maxSprintSpeed}
+                avgSpeed={avgSprintSpeed}
+                label="Sprint"
+                unit="km/h"
+                colorScheme="sprint"
               />
-              <Heading size="3" weight="medium">
-                Swing Types
-              </Heading>
-            </Flex>
+            ) : (
+              <EmptyState message="No sprint data available" />
+            )}
+          </Flex>
+        </Card>
+
+        {/* Serves & Volleys Card */}
+        <Card style={{ border: "1px solid var(--gray-5)" }}>
+          <Flex direction="column" gap="3" p="4">
+            <Heading size="3" weight="medium">
+              Serves & Volleys
+            </Heading>
+            <ServesVolleysDisplay
+              serveCount={serveCount}
+              volleyCount={volleyCount}
+              groundStrokeCount={groundStrokeCount}
+              totalSwings={totalSwingCount}
+              avgServeSpeed={avgServeSpeed}
+              maxServeSpeed={maxServeSpeed}
+              avgVolleySpeed={avgVolleySpeed}
+              maxVolleySpeed={maxVolleySpeed}
+              avgGroundStrokeSpeed={avgGroundStrokeSpeed}
+              maxGroundStrokeSpeed={maxGroundStrokeSpeed}
+            />
+          </Flex>
+        </Card>
+      </Grid>
+
+      {/* Main Cards Grid - Row 2 */}
+      <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4">
+        {/* Swing Types Card */}
+        <Card style={{ border: "1px solid var(--gray-5)" }}>
+          <Flex direction="column" gap="3" p="4">
+            <Heading size="3" weight="medium">
+              Swing Types
+            </Heading>
             {hasSwingData ? (
               <SwingTypesChart data={swingTypeData} totalSwings={totalSwingCount} />
             ) : (
-              <Flex
-                align="center"
-                justify="center"
-                style={{ height: 200, color: "var(--gray-9)" }}
-              >
-                <Text size="2">No swing data available</Text>
-              </Flex>
+              <EmptyState message="No swing data available" />
             )}
           </Flex>
         </Card>
 
-        {/* Bounces Card - Exciting! */}
-        <Card
-          style={{
-            border: "1px solid var(--mint-6)",
-            background:
-              "linear-gradient(135deg, var(--mint-2) 0%, var(--gray-1) 100%)",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
+        {/* Bounces Card */}
+        <Card style={{ border: "1px solid var(--gray-5)" }}>
           <Flex direction="column" gap="3" p="4">
-            <Flex align="center" gap="2">
-              <Box
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg, var(--mint-9) 0%, var(--cyan-9) 100%)",
-                  boxShadow: "0 0 8px var(--mint-a6)",
-                }}
-              />
-              <Heading size="3" weight="medium">
-                Ball Bounces
-              </Heading>
-            </Flex>
+            <Heading size="3" weight="medium">
+              Ball Bounces
+            </Heading>
             <ExcitingBouncesDisplay
               total={bounceCount}
               floor={bounceCounts.floor}
@@ -238,32 +341,52 @@ export function SummaryTab({
             />
           </Flex>
         </Card>
-      </Grid>
 
-      {/* Confidence Card (if available) */}
-      {result.confidences && (
-        <Box mt="4">
+        {/* Confidence Card */}
+        {result.confidences ? (
           <ConfidenceDisplay confidences={result.confidences.final_confidences} />
-        </Box>
-      )}
+        ) : (
+          <Card style={{ border: "1px solid var(--gray-5)" }}>
+            <Flex direction="column" gap="3" p="4">
+              <Heading size="3" weight="medium">
+                AI Detection Confidence
+              </Heading>
+              <EmptyState message="No confidence data available" />
+            </Flex>
+          </Card>
+        )}
+      </Grid>
     </Box>
   );
 }
 
-// Quick stat card
+// Empty state component
+function EmptyState({ message }: { message: string }) {
+  return (
+    <Flex
+      align="center"
+      justify="center"
+      style={{ height: 200, color: "var(--gray-9)" }}
+    >
+      <Text size="2">{message}</Text>
+    </Flex>
+  );
+}
+
+// Quick stat card with optional subtitle
 function QuickStatCard({
   label,
   value,
-  color,
-  isText,
+  formatValue,
+  subtitle,
 }: {
   label: string;
-  value: number | string;
-  color: "mint" | "blue" | "purple" | "orange";
-  isText?: boolean;
+  value: number;
+  formatValue?: (value: number) => string;
+  subtitle?: string;
 }) {
   return (
-    <Card style={{ border: `1px solid var(--${color}-5)` }}>
+    <Card style={{ border: "1px solid var(--gray-5)" }}>
       <Flex direction="column" gap="1" p="3" align="center">
         <Text size="1" color="gray">
           {label}
@@ -271,17 +394,28 @@ function QuickStatCard({
         <Text
           size="5"
           weight="bold"
-          style={{ color: `var(--${color}-11)`, fontVariantNumeric: "tabular-nums" }}
+          style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          {isText ? value : <AnimatedNumber value={value as number} />}
+          <AnimatedNumber value={value} formatValue={formatValue} />
         </Text>
+        {subtitle && (
+          <Text size="1" color="gray" style={{ opacity: 0.7 }}>
+            {subtitle}
+          </Text>
+        )}
       </Flex>
     </Card>
   );
 }
 
 // Animated number component
-function AnimatedNumber({ value }: { value: number }) {
+function AnimatedNumber({ 
+  value, 
+  formatValue 
+}: { 
+  value: number;
+  formatValue?: (value: number) => string;
+}) {
   const [display, setDisplay] = useState(0);
   const hasStartedRef = useRef(false);
 
@@ -295,7 +429,7 @@ function AnimatedNumber({ value }: { value: number }) {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
-        setDisplay(Math.round(value * eased));
+        setDisplay(value * eased);
 
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -306,7 +440,10 @@ function AnimatedNumber({ value }: { value: number }) {
     }
   }, [value]);
 
-  return <>{display}</>;
+  if (formatValue) {
+    return <>{formatValue(display)}</>;
+  }
+  return <>{Math.round(display)}</>;
 }
 
 // Format duration in mm:ss
@@ -316,13 +453,19 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-// Shot Power Speedometer
-function ShotPowerSpeedometer({
+// Reusable Speedometer Component for both Shot Power and Sprint Speed
+function SpeedometerDisplay({
   maxSpeed,
   avgSpeed,
+  label,
+  unit,
+  colorScheme = "shot",
 }: {
   maxSpeed: number;
   avgSpeed: number;
+  label: string;
+  unit: string;
+  colorScheme?: "shot" | "sprint";
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const hasStartedRef = useRef(false);
@@ -359,7 +502,11 @@ function ShotPowerSpeedometer({
   const startAngle = -140;
   const endAngle = 140;
   const angleRange = endAngle - startAngle;
-  const maxValue = Math.max(150, Math.ceil(maxSpeed / 10) * 10 + 10);
+  
+  // Different max values for shot vs sprint
+  const maxValue = colorScheme === "sprint" 
+    ? Math.max(40, Math.ceil(maxSpeed / 5) * 5 + 5)
+    : Math.max(150, Math.ceil(maxSpeed / 10) * 10 + 10);
 
   const animatedMax = animationProgress * maxSpeed;
   const animatedAvg = animationProgress * avgSpeed;
@@ -382,12 +529,18 @@ function ShotPowerSpeedometer({
     return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
   };
 
-  const ticks = [0, 30, 60, 90, 120, 150];
+  // Different tick marks for sprint vs shot
+  const ticks = colorScheme === "sprint" 
+    ? [0, 10, 20, 30, 40]
+    : [0, 30, 60, 90, 120, 150];
+
+  // Different colors for sprint
+  const avgColor = colorScheme === "sprint" ? "#3B82F6" : "#10B981";
+  const avgColorVar = colorScheme === "sprint" ? "var(--blue-11)" : "var(--mint-11)";
 
   return (
     <Flex direction="column" align="center" gap="2">
       <Box style={{ position: "relative" }}>
-        {/* SVG elements require hex values as CSS variables aren't reliably supported in SVG gradients */}
         <svg
           width={size}
           height={size * 0.65}
@@ -401,13 +554,25 @@ function ShotPowerSpeedometer({
               x2="100%"
               y2="50%"
             >
-              {/* Gradient: mint → orange → red (matches design system colors) */}
-              <stop offset="0%" stopColor="#10B981" />
-              <stop offset="25%" stopColor="#7ADB8F" />
-              <stop offset="45%" stopColor="#F59E0B" />
-              <stop offset="65%" stopColor="#F97316" />
-              <stop offset="85%" stopColor="#EF4444" />
-              <stop offset="100%" stopColor="#DC2626" />
+              {colorScheme === "sprint" ? (
+                <>
+                  <stop offset="0%" stopColor="#3B82F6" />
+                  <stop offset="25%" stopColor="#60A5FA" />
+                  <stop offset="45%" stopColor="#F59E0B" />
+                  <stop offset="65%" stopColor="#F97316" />
+                  <stop offset="85%" stopColor="#EF4444" />
+                  <stop offset="100%" stopColor="#DC2626" />
+                </>
+              ) : (
+                <>
+                  <stop offset="0%" stopColor="#10B981" />
+                  <stop offset="25%" stopColor="#7ADB8F" />
+                  <stop offset="45%" stopColor="#F59E0B" />
+                  <stop offset="65%" stopColor="#F97316" />
+                  <stop offset="85%" stopColor="#EF4444" />
+                  <stop offset="100%" stopColor="#DC2626" />
+                </>
+              )}
             </linearGradient>
             <filter
               id={`${id.current}-glow`}
@@ -475,7 +640,7 @@ function ShotPowerSpeedometer({
             );
           })}
 
-          {/* Avg needle (mint-9) - SVG requires hex for fill */}
+          {/* Avg needle */}
           <g
             style={{
               transform: `rotate(${avgAngle}deg)`,
@@ -484,19 +649,19 @@ function ShotPowerSpeedometer({
           >
             <polygon
               points={`${cx},${cy - 42} ${cx - 3},${cy} ${cx + 3},${cy}`}
-              fill="#10B981"
+              fill={avgColor}
             />
             <circle
               cx={cx}
               cy={cy}
               r="5"
-              fill="#10B981"
+              fill={avgColor}
               stroke="white"
               strokeWidth="1.5"
             />
           </g>
 
-          {/* Max needle (red-9) - SVG requires hex for fill */}
+          {/* Max needle */}
           <g
             style={{
               transform: `rotate(${needleAngle}deg)`,
@@ -521,48 +686,215 @@ function ShotPowerSpeedometer({
       </Box>
 
       {/* Stats */}
-      <Flex justify="center" gap="4" align="center">
-        <Flex align="center" gap="1">
-          <Box
-            style={{
-              width: 0,
-              height: 0,
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderBottom: "8px solid var(--mint-9)",
-            }}
-          />
-          <Text size="2" color="gray">
-            Avg:{" "}
+      <Flex justify="center" gap="6" align="stretch" style={{ width: "100%" }}>
+        <Flex 
+          direction="column" 
+          align="center" 
+          gap="1"
+          style={{ 
+            flex: 1,
+            padding: "12px",
+            background: "var(--gray-a2)",
+            borderRadius: "var(--radius-3)",
+          }}
+        >
+          <Flex align="center" gap="2">
+            <Box
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: "5px solid transparent",
+                borderRight: "5px solid transparent",
+                borderBottom: `10px solid ${avgColor}`,
+              }}
+            />
+            <Text size="1" color="gray" weight="medium" style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Average
+            </Text>
+          </Flex>
+          <Flex align="baseline" gap="1">
             <Text
               weight="bold"
-              style={{ color: "var(--mint-11)", fontSize: 14 }}
+              style={{ 
+                color: avgColorVar, 
+                fontSize: 32,
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1,
+              }}
             >
               {displayAvg}
-            </Text>{" "}
-            km/h
-          </Text>
+            </Text>
+            <Text size="2" color="gray">{unit}</Text>
+          </Flex>
         </Flex>
-        <Flex align="center" gap="1">
-          <Box
-            style={{
-              width: 0,
-              height: 0,
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderBottom: "8px solid var(--red-9)",
-            }}
-          />
-          <Text size="2" color="gray">
-            Max:{" "}
+        <Flex 
+          direction="column" 
+          align="center" 
+          gap="1"
+          style={{ 
+            flex: 1,
+            padding: "12px",
+            background: "var(--gray-a2)",
+            borderRadius: "var(--radius-3)",
+          }}
+        >
+          <Flex align="center" gap="2">
+            <Box
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: "5px solid transparent",
+                borderRight: "5px solid transparent",
+                borderBottom: "10px solid var(--red-9)",
+              }}
+            />
+            <Text size="1" color="gray" weight="medium" style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Maximum
+            </Text>
+          </Flex>
+          <Flex align="baseline" gap="1">
             <Text
               weight="bold"
-              style={{ color: "var(--orange-11)", fontSize: 14 }}
+              style={{ 
+                color: "var(--orange-11)", 
+                fontSize: 32,
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1,
+              }}
             >
               {displayMax}
-            </Text>{" "}
-            km/h
+            </Text>
+            <Text size="2" color="gray">{unit}</Text>
+          </Flex>
+        </Flex>
+      </Flex>
+    </Flex>
+  );
+}
+
+// Serves & Volleys Display Component
+function ServesVolleysDisplay({
+  serveCount,
+  volleyCount,
+  groundStrokeCount,
+  totalSwings,
+  avgServeSpeed,
+  maxServeSpeed,
+  avgVolleySpeed,
+  maxVolleySpeed,
+  avgGroundStrokeSpeed,
+  maxGroundStrokeSpeed,
+}: {
+  serveCount: number;
+  volleyCount: number;
+  groundStrokeCount: number;
+  totalSwings: number;
+  avgServeSpeed: number;
+  maxServeSpeed: number;
+  avgVolleySpeed: number;
+  maxVolleySpeed: number;
+  avgGroundStrokeSpeed: number;
+  maxGroundStrokeSpeed: number;
+}) {
+  const [animationProgress, setAnimationProgress] = useState(0);
+  const hasStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasStartedRef.current) {
+      hasStartedRef.current = true;
+      const startTime = performance.now();
+      const duration = 1500;
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setAnimationProgress(eased);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+
+      setTimeout(() => requestAnimationFrame(animate), 200);
+    }
+  }, []);
+
+  const displayServes = Math.round(serveCount * animationProgress);
+  const displayVolleys = Math.round(volleyCount * animationProgress);
+  const servePercentage = totalSwings > 0 ? (serveCount / totalSwings) * 100 : 0;
+  const volleyPercentage = totalSwings > 0 ? (volleyCount / totalSwings) * 100 : 0;
+  const groundStrokePercentage = totalSwings > 0 ? (groundStrokeCount / totalSwings) * 100 : 0;
+
+  return (
+    <Flex direction="column" gap="4" style={{ paddingTop: 8 }}>
+      {/* Serves */}
+      <Flex direction="column" gap="2">
+        <Flex justify="between" align="center">
+          <Flex align="center" gap="2">
+            <Text style={{ fontSize: 20 }}>🎾</Text>
+            <Text size="2" weight="medium">Serves</Text>
+          </Flex>
+          <Text size="4" weight="bold" style={{ color: "var(--purple-11)", fontVariantNumeric: "tabular-nums" }}>
+            {displayServes}
           </Text>
+        </Flex>
+        <Flex justify="between">
+          <Text size="1" color="gray">{Math.round(servePercentage)}% of swings</Text>
+          {avgServeSpeed > 0 && (
+            <Text size="1" color="gray">
+              Avg: {Math.round(avgServeSpeed * animationProgress)} km/h
+              {maxServeSpeed > 0 && ` • Max: ${Math.round(maxServeSpeed * animationProgress)} km/h`}
+            </Text>
+          )}
+        </Flex>
+      </Flex>
+
+      <Separator size="4" style={{ opacity: 0.3 }} />
+
+      {/* Volleys */}
+      <Flex direction="column" gap="2">
+        <Flex justify="between" align="center">
+          <Flex align="center" gap="2">
+            <Text style={{ fontSize: 20 }}>🏐</Text>
+            <Text size="2" weight="medium">Volleys</Text>
+          </Flex>
+          <Text size="4" weight="bold" style={{ color: "var(--orange-11)", fontVariantNumeric: "tabular-nums" }}>
+            {displayVolleys}
+          </Text>
+        </Flex>
+        <Flex justify="between">
+          <Text size="1" color="gray">{Math.round(volleyPercentage)}% of swings</Text>
+          {avgVolleySpeed > 0 && (
+            <Text size="1" color="gray">
+              Avg: {Math.round(avgVolleySpeed * animationProgress)} km/h
+              {maxVolleySpeed > 0 && ` • Max: ${Math.round(maxVolleySpeed * animationProgress)} km/h`}
+            </Text>
+          )}
+        </Flex>
+      </Flex>
+
+      <Separator size="4" style={{ opacity: 0.3 }} />
+
+      {/* Ground Strokes */}
+      <Flex direction="column" gap="2">
+        <Flex justify="between" align="center">
+          <Flex align="center" gap="2">
+            <Text style={{ fontSize: 20 }}>🎯</Text>
+            <Text size="2" weight="medium">Ground Strokes</Text>
+          </Flex>
+          <Text size="4" weight="bold" style={{ color: "var(--mint-11)", fontVariantNumeric: "tabular-nums" }}>
+            {Math.round(groundStrokeCount * animationProgress)}
+          </Text>
+        </Flex>
+        <Flex justify="between">
+          <Text size="1" color="gray">{Math.round(groundStrokePercentage)}% of swings</Text>
+          {avgGroundStrokeSpeed > 0 && (
+            <Text size="1" color="gray">
+              Avg: {Math.round(avgGroundStrokeSpeed * animationProgress)} km/h
+              {maxGroundStrokeSpeed > 0 && ` • Max: ${Math.round(maxGroundStrokeSpeed * animationProgress)} km/h`}
+            </Text>
+          )}
         </Flex>
       </Flex>
     </Flex>
@@ -600,7 +932,7 @@ function SwingTypesChart({
 
       setTimeout(() => requestAnimationFrame(animate), 200);
 
-      // Piano bounce effect - uses inline rgba for dynamic DOM manipulation
+      // Piano bounce effect
       setTimeout(() => {
         if (!containerRef.current) return;
         const paths = containerRef.current.querySelectorAll(
@@ -831,9 +1163,9 @@ function ExcitingBouncesDisplay({
           color="mint"
         />
         <BounceTypeStat
-          label="Wall Bounces"
+          label="Glass Bounces"
           value={Math.round(wall * animationProgress)}
-          icon="🧱"
+          icon="🪟"
           color="orange"
         />
         <BounceTypeStat
@@ -907,41 +1239,102 @@ function BounceParticle({ delay, x, y }: { delay: number; x: number; y: number }
   );
 }
 
-// Confidence display
+// Confidence gradient
+const CONFIDENCE_GRADIENT: ProgressRingGradient = {
+  stops: [
+    { offset: "0%", color: "#10B981" },
+    { offset: "33%", color: "#84CC16" },
+    { offset: "66%", color: "#F59E0B" },
+    { offset: "100%", color: "#EF4444" },
+  ],
+};
+
+function getConfidenceGradient(): ProgressRingGradient {
+  return CONFIDENCE_GRADIENT;
+}
+
+// Confidence display using ProgressRing
 function ConfidenceDisplay({
   confidences,
 }: {
   confidences: { pose: number; swing: number; ball: number; final: number };
 }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <Card style={{ border: "1px solid var(--gray-6)" }}>
+    <Card ref={containerRef} style={{ border: "1px solid var(--gray-5)" }}>
       <Flex direction="column" gap="3" p="4">
-        <Heading size="3" weight="medium">Detection Confidence</Heading>
-        <Grid columns="4" gap="3">
-          <ConfidenceStat label="Pose" value={confidences.pose} />
-          <ConfidenceStat label="Swing" value={confidences.swing} />
-          <ConfidenceStat label="Ball" value={confidences.ball} />
-          <ConfidenceStat label="Overall" value={confidences.final} isMain />
+        <Heading size="3" weight="medium">AI Detection Confidence</Heading>
+        <Grid columns="2" gap="2" style={{ justifyItems: "center" }}>
+          <ProgressRing
+            value={Math.round(confidences.pose * 100)}
+            maxValue={100}
+            isVisible={isVisible}
+            playerId={1}
+            gradient={getConfidenceGradient()}
+            icon="🧍"
+            unit="Pose"
+            size={100}
+            strokeWidth={8}
+            hideMedalDisplay
+          />
+          <ProgressRing
+            value={Math.round(confidences.swing * 100)}
+            maxValue={100}
+            isVisible={isVisible}
+            playerId={2}
+            gradient={getConfidenceGradient()}
+            icon="🏓"
+            unit="Swing"
+            size={100}
+            strokeWidth={8}
+            hideMedalDisplay
+          />
+          <ProgressRing
+            value={Math.round(confidences.ball * 100)}
+            maxValue={100}
+            isVisible={isVisible}
+            playerId={3}
+            gradient={getConfidenceGradient()}
+            icon="🎾"
+            unit="Ball"
+            size={100}
+            strokeWidth={8}
+            hideMedalDisplay
+          />
+          <ProgressRing
+            value={Math.round(confidences.final * 100)}
+            maxValue={100}
+            isVisible={isVisible}
+            playerId={4}
+            gradient={getConfidenceGradient()}
+            icon="🤖"
+            unit="Overall"
+            size={100}
+            strokeWidth={8}
+            hideMedalDisplay
+          />
         </Grid>
       </Flex>
     </Card>
-  );
-}
-
-function ConfidenceStat({ label, value, isMain }: { label: string; value: number; isMain?: boolean }) {
-  const percentage = Math.round(value * 100);
-  const color = percentage >= 80 ? "mint" : percentage >= 60 ? "orange" : "red";
-  
-  return (
-    <Flex direction="column" align="center" gap="1">
-      <Text size="1" color="gray">{label}</Text>
-      <Text 
-        size={isMain ? "5" : "3"} 
-        weight={isMain ? "bold" : "medium"} 
-        style={{ color: isMain ? `var(--${color}-11)` : undefined }}
-      >
-        {percentage}%
-      </Text>
-    </Flex>
   );
 }

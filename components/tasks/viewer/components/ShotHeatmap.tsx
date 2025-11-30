@@ -98,13 +98,15 @@ interface CellTooltipProps {
 }
 
 function CellTooltip({ originDetails, landingDetails, col, row, visible, originLabel }: CellTooltipProps) {
-  if (!visible || (originDetails.length === 0 && landingDetails.length === 0)) return null;
+  if (!visible) return null;
 
   const { velocity } = OVERLAY_COLORS;
+  const hasData = originDetails.length > 0 || landingDetails.length > 0;
   
-  // Calculate court position in meters
-  const courtY = ((col + 0.5) / GRID_COLS) * COURT.length; // 0-20m
-  const courtX = ((row + 0.5) / GRID_ROWS) * COURT.width;  // 0-10m
+  // Calculate court position in meters (center of cell)
+  // col maps to length (0-20m), row maps to width (0-10m)
+  const courtLengthPos = ((col + 0.5) / GRID_COLS) * COURT.length; // 0-20m
+  const courtWidthPos = ((row + 0.5) / GRID_ROWS) * COURT.width;   // 0-10m
   
   // Smart positioning: adjust based on cell position in grid
   // Left edge: align tooltip to the right
@@ -161,18 +163,23 @@ function CellTooltip({ originDetails, landingDetails, col, row, visible, originL
           backgroundColor: velocity.backgroundColor,
           border: `2px solid ${velocity.borderColor}`,
           borderRadius: velocity.borderRadius,
-          padding: "8px 12px",
+          padding: hasData ? "8px 12px" : "6px 10px",
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
           whiteSpace: "nowrap",
-          minWidth: "120px",
+          minWidth: hasData ? "120px" : "auto",
         }}
       >
-        {/* Court position */}
+        {/* Grid coordinate and court position - shown for all cells */}
         <Text
           size="1"
-          style={{ color: "rgba(255, 255, 255, 0.6)", display: "block", marginBottom: "4px" }}
+          style={{ 
+            color: "rgba(255, 255, 255, 0.6)", 
+            display: "block", 
+            marginBottom: hasData ? "4px" : "0",
+          }}
         >
-          📍 {courtY.toFixed(1)}m × {courtX.toFixed(1)}m
+          <Text style={{ fontFamily: "monospace", color: "rgba(255, 255, 255, 0.8)" }}>({col},{row})</Text>
+          {" · "}📍 {courtLengthPos.toFixed(1)}m × {courtWidthPos.toFixed(1)}m
         </Text>
 
         {/* Origin shots */}
@@ -317,6 +324,8 @@ export function PlayerShotCard({
                   const landingValue = data.landings[y][x];
                   const originIntensity = originValue / maxOrigin;
                   const landingIntensity = landingValue / maxLanding;
+                  const hasData = originValue > 0 || landingValue > 0;
+                  const isHovered = hoveredCell?.col === x && hoveredCell?.row === y;
                   
                   let bgColor = "var(--gray-4)";
                   if (originIntensity > 0 && landingIntensity > 0) {
@@ -338,6 +347,10 @@ export function PlayerShotCard({
                         backgroundColor: bgColor,
                         borderRadius: "2px",
                         borderLeft: isNetColumn ? "2px solid var(--gray-8)" : undefined,
+                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                        transform: isHovered && hasData ? "scale(1.15)" : "scale(1)",
+                        boxShadow: isHovered && hasData ? "0 0 10px 2px rgba(255,255,255,0.4)" : "none",
+                        zIndex: isHovered && hasData ? 5 : 1,
                       }}
                     />
                   );
@@ -419,9 +432,22 @@ export function PlayerShotCard({
                 row.map((originValue, x) => {
                   const landingValue = data.landings[y][x];
                   const hasData = originValue > 0 || landingValue > 0;
+                  const isHovered = hoveredCell?.col === x && hoveredCell?.row === y;
                   
                   return (
-                    <Flex key={`num-${x}-${y}`} align="center" justify="center" style={{ width: "100%", height: "100%" }}>
+                    <Flex 
+                      key={`num-${x}-${y}`} 
+                      align="center" 
+                      justify="center" 
+                      style={{ 
+                        width: "100%", 
+                        height: "100%",
+                        transition: "transform 0.15s ease, filter 0.15s ease",
+                        transform: isHovered && hasData ? "scale(1.3)" : "scale(1)",
+                        filter: isHovered && hasData ? "drop-shadow(0 0 6px rgba(255,255,255,0.8))" : "none",
+                        zIndex: isHovered ? 10 : 1,
+                      }}
+                    >
                       {hasData && (
                         <Text size="1" weight="bold" style={{ color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.8), 0 0 6px rgba(0,0,0,0.5)", fontSize: "11px" }}>
                           {originValue > 0 ? originValue : landingValue}
@@ -455,18 +481,31 @@ export function PlayerShotCard({
                   const originDetails = data.originDetails?.[y]?.[x] || [];
                   const landingDetails = data.landingDetails?.[y]?.[x] || [];
                   
+                  // Different hover styles for cells with/without data
+                  const hoverStyle = isHovered 
+                    ? hasData 
+                      ? { 
+                          boxShadow: "0 0 8px 2px rgba(255,255,255,0.5), inset 0 0 4px rgba(255,255,255,0.3)",
+                          background: "rgba(255,255,255,0.15)",
+                        }
+                      : { 
+                          boxShadow: "0 0 6px 1px rgba(255,255,255,0.3)",
+                          background: "rgba(0,0,0,0.25)",
+                        }
+                    : { background: "transparent" };
+                  
                   return (
                     <Box
                       key={`hover-${x}-${y}`}
-                      onMouseEnter={() => hasData && setHoveredCell({ col: x, row: y })}
+                      onMouseEnter={() => setHoveredCell({ col: x, row: y })}
                       onMouseLeave={() => setHoveredCell(null)}
                       style={{
                         position: "relative",
-                        cursor: hasData ? "pointer" : "default",
-                        background: isHovered ? "rgba(255,255,255,0.1)" : "transparent",
+                        cursor: "pointer",
                         borderRadius: "2px",
-                        transition: "background 0.1s ease",
+                        transition: "all 0.15s ease",
                         overflow: "visible", // Allow tooltip to overflow
+                        ...hoverStyle,
                       }}
                     >
                       {/* Tooltip */}
@@ -490,7 +529,6 @@ export function PlayerShotCard({
         <Flex gap="4" justify="center" pt="2" style={{ borderTop: "1px solid var(--gray-5)" }}>
           <Flex direction="column" align="center" gap="1">
             <Flex align="center" gap="1">
-              <RocketIcon width={14} height={14} style={{ color: "var(--gray-10)" }} />
               <Text size="1" color="gray">Avg Speed</Text>
             </Flex>
             <Text size="4" weight="bold">
@@ -560,7 +598,7 @@ export function ShotHeatmap({
       <Box
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: "16px",
           overflow: "visible",
         }}

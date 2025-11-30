@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useRef, useMemo } from "react";
+import { useState, use, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Card, Text } from "@radix-ui/themes";
 import {
@@ -10,6 +10,7 @@ import {
   StarIcon,
   TargetIcon,
   MixIcon,
+  GroupIcon,
 } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useVideoPlayback, useEventTooltip } from "./hooks";
@@ -20,6 +21,7 @@ import {
   useAllSwings,
   useRallySelection,
 } from "./hooks";
+import { usePlayerPortraits } from "./usePlayerPortraits";
 import type { TimelineFilterState } from "./components";
 import {
   LoadingState,
@@ -29,6 +31,7 @@ import {
   RalliesTab,
   SummaryTab,
   PlayersTab,
+  TeamsTab,
   HighlightsTab,
   TacticalTab,
   TechniqueTab,
@@ -39,7 +42,7 @@ interface TaskViewerProps {
   paramsPromise: Promise<{ taskId: string }>;
 }
 
-type TabId = "rallies" | "summary" | "players" | "highlights" | "tactical" | "technique";
+type TabId = "rallies" | "summary" | "players" | "teams" | "highlights" | "tactical" | "technique";
 
 export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const params = use(paramsPromise);
@@ -64,7 +67,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   // UI State
   const [selectedRallyIndex, setSelectedRallyIndex] = useState<number | null>(null);
   const [isVideoFullWidth, setIsVideoFullWidth] = useState(false);
-  const [useVidstack, setUseVidstack] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("rallies");
   const [playerNames, setPlayerNames] = useState<Record<number, string>>({});
   const [calibrationMatrix, setCalibrationMatrix] = useState<number[][] | null>(null);
@@ -80,8 +82,11 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     rallyBuffer: 1,
   });
 
-  // Portraits disabled due to CORS issues
-  const portraits: Record<number, string> = {};
+  // Extract player portraits from video frames using a hidden video element
+  const { portraits } = usePlayerPortraits(
+    result?.thumbnail_crops,
+    task?.video_url
+  );
 
   // Video playback tracking
   const currentTime = useVideoPlayback(videoRef);
@@ -131,6 +136,21 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     ) || 300;
   }, [task?.video_length, result?.rallies, enhancedBallBounces]);
 
+  // Calculate team count from team_sessions (only count teams with 2 players)
+  const teamCount = useMemo(() => {
+    const teamSessions = result?.team_sessions || [];
+    const uniqueTeams = new Set<string>();
+    teamSessions.forEach(session => {
+      if (session.team_front?.length === 2) {
+        uniqueTeams.add(JSON.stringify([...session.team_front].sort((a, b) => a - b)));
+      }
+      if (session.team_back?.length === 2) {
+        uniqueTeams.add(JSON.stringify([...session.team_back].sort((a, b) => a - b)));
+      }
+    });
+    return uniqueTeams.size;
+  }, [result?.team_sessions]);
+
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(() => [
     { id: "rallies", label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
@@ -142,6 +162,12 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
       badge: validPlayers.length > 0 ? validPlayers.length : undefined 
     },
     { 
+      id: "teams", 
+      label: "Team Stats", 
+      icon: <GroupIcon width={16} height={16} />, 
+      badge: teamCount > 0 ? teamCount : undefined 
+    },
+    { 
       id: "highlights", 
       label: "Highlights", 
       icon: <StarIcon width={16} height={16} />, 
@@ -149,7 +175,14 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     },
     { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
     { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
-  ], [validPlayers.length, result?.highlights?.length]);
+  ], [validPlayers.length, teamCount, result?.highlights?.length]);
+
+  // Pause video when switching away from rallies tab
+  useEffect(() => {
+    if (activeTab !== "rallies" && videoRef.current) {
+      videoRef.current.pause();
+    }
+  }, [activeTab]);
 
   // Loading state
   if (authLoading || loading) {
@@ -213,7 +246,8 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
       {/* Tab Content */}
       <Box style={{ padding: "var(--space-4)", maxWidth: "1400px", margin: "0 auto", paddingBottom: "var(--space-6)" }}>
-        {activeTab === "rallies" && (
+        {/* RalliesTab is always mounted but hidden when not active to preserve video state */}
+        <Box style={{ display: activeTab === "rallies" ? "block" : "none" }}>
           <RalliesTab
             task={task}
             result={result}
@@ -224,8 +258,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             onRallySelect={handleRallySelect}
             isVideoFullWidth={isVideoFullWidth}
             onVideoFullWidthChange={setIsVideoFullWidth}
-            useVidstack={useVidstack}
-            onUseVidstackChange={setUseVidstack}
             timelineFilters={timelineFilters}
             onTimelineFiltersChange={setTimelineFilters}
             inferSwingBounces={inferSwingBounces}
@@ -241,7 +273,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             allSwings={allSwings}
             activeEventTooltip={activeEventTooltip}
           />
-        )}
+        </Box>
 
         {activeTab === "summary" && (
           <SummaryTab
@@ -255,6 +287,14 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
           <PlayersTab
             rankings={rankings}
             portraits={portraits}
+          />
+        )}
+
+        {activeTab === "teams" && (
+          <TeamsTab
+            result={result}
+            portraits={portraits}
+            playerDisplayNames={playerDisplayNames}
           />
         )}
 

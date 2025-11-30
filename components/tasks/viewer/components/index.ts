@@ -1,7 +1,6 @@
 export { LoadingState } from "./LoadingState";
 export { ErrorState } from "./ErrorState";
 export { TaskHeader } from "./TaskHeader";
-export { VideoPlayer } from "./VideoPlayer";
 export { VidstackPlayer, useVidstackPlayer } from "./VidstackPlayer";
 export { VideoSettings } from "./VideoSettings";
 export { ResizeHandle } from "./ResizeHandle";
@@ -33,5 +32,5 @@ export { Confetti, Medal, MedalDisplay, ProgressRing, RING_GRADIENTS, RING_ICONS
 export type { MedalConfig, ProgressRingProps, ProgressRingGradient } from "./shared";
 
 // Tab content components
-export { RalliesTab, SummaryTab, PlayersTab, HighlightsTab, TacticalTab, TechniqueTab } from "./tabs";
+export { RalliesTab, SummaryTab, PlayersTab, TeamsTab, HighlightsTab, TacticalTab, TechniqueTab } from "./tabs";
 

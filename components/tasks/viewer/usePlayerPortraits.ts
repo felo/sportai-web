@@ -1,60 +1,78 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import type { ThumbnailCrop } from "./types";
 
-interface PlayerSwing {
-  ball_hit: { timestamp: number };
-  confidence: number;
-  annotations: Array<{
-    bbox: [number, number, number, number]; // [x1, y1, x2, y2] normalized
-    box_confidence: number;
-  }>;
+/**
+ * Crop size variants available in thumbnail_crops.
+ * 0: face only (smallest)
+ * 1: head + chest
+ * 2: head + torso
+ * 3: full person (largest)
+ */
+export type CropSize = 0 | 1 | 2 | 3;
+
+interface UsePlayerPortraitsOptions {
+  /** Which crop size to use (0-3, default: 3 for full person - shows most context) */
+  cropSize?: CropSize;
 }
 
-interface Player {
-  player_id: number;
-  swings: PlayerSwing[];
-}
-
+/**
+ * Hook to extract player portrait images from video frames using the API's
+ * thumbnail_crops data which provides pre-selected best frames per player.
+ * 
+ * Uses a hidden video element to avoid seeking the visible player.
+ * 
+ * @see https://sportai.mintlify.app/api-reference/statistics/padel/result#thumbnail-crops
+ */
 export function usePlayerPortraits(
-  players: Player[],
-  videoElement: HTMLVideoElement | null
+  thumbnailCrops: Record<string, ThumbnailCrop[]> | undefined,
+  videoUrl: string | undefined,
+  options: UsePlayerPortraitsOptions = {}
 ) {
+  const { cropSize = 3 } = options; // Default to full person (largest, shows most context)
   const [portraits, setPortraits] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const extractionStartedRef = useRef(false);
 
   useEffect(() => {
-    if (!videoElement || !players || players.length === 0) return;
+    if (!videoUrl || !thumbnailCrops || Object.keys(thumbnailCrops).length === 0) return;
+    
+    // Prevent duplicate extractions
+    if (extractionStartedRef.current) return;
+    extractionStartedRef.current = true;
 
-    const extractPortraits = async () => {
+    const extractPortraits = async (hiddenVideo: HTMLVideoElement) => {
       setLoading(true);
       const newPortraits: Record<number, string> = {};
 
-      for (const player of players) {
+      for (const [playerIdStr, crops] of Object.entries(thumbnailCrops)) {
+        const playerId = parseInt(playerIdStr, 10);
+        if (isNaN(playerId) || !crops || crops.length === 0) continue;
+
         try {
-          // Find the best swing (highest confidence with valid bbox)
-          const bestSwing = player.swings
-            .filter(s => s.annotations && s.annotations.length > 0)
-            .sort((a, b) => b.confidence - a.confidence)[0];
+          // Use the best thumbnail (first one, highest score)
+          const bestCrop = crops[0];
+          if (!bestCrop?.bbox || bestCrop.bbox.length <= cropSize) continue;
 
-          if (!bestSwing || !bestSwing.annotations[0]) continue;
+          const bbox = bestCrop.bbox[cropSize];
+          if (!bbox || bbox.length !== 4) continue;
 
-          const annotation = bestSwing.annotations[0];
-          const timestamp = bestSwing.ball_hit.timestamp;
-          const bbox = annotation.bbox;
+          const timestamp = bestCrop.timestamp;
 
-          // Seek to timestamp
-          videoElement.currentTime = timestamp;
+          // Seek hidden video to timestamp
+          hiddenVideo.currentTime = timestamp;
           
           // Wait for video to seek
           await new Promise<void>((resolve) => {
             const onSeeked = () => {
-              videoElement.removeEventListener("seeked", onSeeked);
+              hiddenVideo.removeEventListener("seeked", onSeeked);
               resolve();
             };
-            videoElement.addEventListener("seeked", onSeeked);
+            hiddenVideo.addEventListener("seeked", onSeeked);
           });
 
           // Small delay to ensure frame is rendered
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 50));
 
           // Create canvas for extraction
           const canvas = document.createElement("canvas");
@@ -62,16 +80,19 @@ export function usePlayerPortraits(
           if (!ctx) continue;
 
           // Get video dimensions
-          const videoWidth = videoElement.videoWidth;
-          const videoHeight = videoElement.videoHeight;
+          const videoWidth = hiddenVideo.videoWidth;
+          const videoHeight = hiddenVideo.videoHeight;
 
-          // Convert normalized bbox to pixel coordinates
+          // Convert normalized bbox [xmin, ymin, xmax, ymax] to pixel coordinates
           const x1 = bbox[0] * videoWidth;
           const y1 = bbox[1] * videoHeight;
           const x2 = bbox[2] * videoWidth;
           const y2 = bbox[3] * videoHeight;
           const width = x2 - x1;
           const height = y2 - y1;
+
+          // Ensure valid dimensions
+          if (width <= 0 || height <= 0) continue;
 
           // Set canvas size to bbox size
           canvas.width = width;
@@ -80,21 +101,21 @@ export function usePlayerPortraits(
           try {
             // Draw the cropped region
             ctx.drawImage(
-              videoElement,
+              hiddenVideo,
               x1, y1, width, height,  // source
               0, 0, width, height      // destination
             );
 
             // Convert to data URL (will throw if CORS blocked)
             const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-            newPortraits[player.player_id] = dataUrl;
+            newPortraits[playerId] = dataUrl;
           } catch (corsError) {
             // Canvas is tainted by cross-origin video - silently skip
-            console.warn(`CORS blocked portrait extraction for player ${player.player_id}`);
+            console.warn(`CORS blocked portrait extraction for player ${playerId}`);
             break; // Exit loop, no point trying other players
           }
         } catch (error) {
-          console.error(`Failed to extract portrait for player ${player.player_id}:`, error);
+          console.error(`Failed to extract portrait for player ${playerId}:`, error);
         }
       }
 
@@ -102,19 +123,36 @@ export function usePlayerPortraits(
       setLoading(false);
     };
 
-    // Only extract if video is loaded and ready
-    if (videoElement.readyState >= 2) {
-      extractPortraits();
+    // Create hidden video element for extraction (doesn't affect visible player)
+    const hiddenVideo = document.createElement("video");
+    hiddenVideo.style.display = "none";
+    hiddenVideo.crossOrigin = "anonymous";
+    hiddenVideo.muted = true;
+    hiddenVideo.preload = "auto";
+    hiddenVideo.src = videoUrl;
+    document.body.appendChild(hiddenVideo);
+    hiddenVideoRef.current = hiddenVideo;
+
+    const onLoadedData = () => {
+      extractPortraits(hiddenVideo);
+    };
+
+    if (hiddenVideo.readyState >= 2) {
+      extractPortraits(hiddenVideo);
     } else {
-      const onLoadedData = () => {
-        extractPortraits();
-        videoElement.removeEventListener("loadeddata", onLoadedData);
-      };
-      videoElement.addEventListener("loadeddata", onLoadedData);
-      return () => videoElement.removeEventListener("loadeddata", onLoadedData);
+      hiddenVideo.addEventListener("loadeddata", onLoadedData);
     }
-  }, [players, videoElement]);
+
+    // Cleanup: remove hidden video element
+    return () => {
+      hiddenVideo.removeEventListener("loadeddata", onLoadedData);
+      hiddenVideo.pause();
+      hiddenVideo.src = "";
+      hiddenVideo.remove();
+      hiddenVideoRef.current = null;
+      extractionStartedRef.current = false;
+    };
+  }, [thumbnailCrops, videoUrl, cropSize]);
 
   return { portraits, loading };
 }
-

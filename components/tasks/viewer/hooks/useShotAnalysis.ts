@@ -341,3 +341,42 @@ export function useFifthBallData({ result, playerDisplayNames = {} }: UseShotAna
   return useNthBallData({ result, playerDisplayNames }, 5);
 }
 
+/**
+ * Hook to extract ALL shots data (for summary heatmap)
+ */
+export function useAllShotsData({ result, playerDisplayNames = {} }: UseShotAnalysisOptions): PlayerShotData[] {
+  return useMemo(() => {
+    if (!result) return [];
+    
+    const players = result.players || [];
+    const ballBounces = result.ball_bounces || [];
+
+    const validPlayers = players
+      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .sort((a, b) => b.swing_count - a.swing_count);
+
+    if (validPlayers.length === 0) return [];
+
+    const dataMap = initializePlayerDataMap(validPlayers, playerDisplayNames);
+    const allSwings: SwingWithPlayer[] = [];
+
+    // Process ALL swings for each player
+    validPlayers.forEach(player => {
+      const playerSwings = (player.swings || [])
+        .map(s => ({ ...s, player_id: player.player_id }));
+      
+      playerSwings.forEach(swing => {
+        const playerData = dataMap[swing.player_id];
+        if (playerData) {
+          processSwingLanding(swing, ballBounces, playerData);
+          allSwings.push(swing);
+        }
+      });
+    });
+
+    calculateAverageSpeeds(dataMap, allSwings);
+
+    return Object.values(dataMap);
+  }, [result, playerDisplayNames]);
+}
+

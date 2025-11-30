@@ -235,25 +235,59 @@ export function BallTrackerOverlay({
       const position = findNearestBallPosition(ballPositions, currentTime, timeThreshold);
       const trail = getTrailPositions(ballPositions, currentTime, TRAIL_DURATION);
 
-      // Update canvas size to match parent (with high-DPI support)
-      const parent = canvas.parentElement;
+      // Calculate the actual video rendering area (accounting for object-fit: contain letterboxing)
       const dpr = window.devicePixelRatio || 1;
-      if (parent) {
-        const rect = parent.getBoundingClientRect();
-        const targetWidth = rect.width * dpr;
-        const targetHeight = rect.height * dpr;
+      let logicalWidth = 0;
+      let logicalHeight = 0;
+      let offsetX = 0;
+      let offsetY = 0;
+      
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      const containerWidth = video.clientWidth;
+      const containerHeight = video.clientHeight;
+      
+      if (videoWidth && videoHeight && containerWidth && containerHeight) {
+        const videoAspect = videoWidth / videoHeight;
+        const containerAspect = containerWidth / containerHeight;
         
-        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-          canvas.width = targetWidth;
-          canvas.height = targetHeight;
-          // Scale context to account for DPR
-          ctx.scale(dpr, dpr);
+        if (containerAspect > videoAspect) {
+          // Container is wider than video - letterbox on sides
+          logicalHeight = containerHeight;
+          logicalWidth = containerHeight * videoAspect;
+          offsetX = (containerWidth - logicalWidth) / 2;
+          offsetY = 0;
+        } else {
+          // Container is taller than video - letterbox on top/bottom
+          logicalWidth = containerWidth;
+          logicalHeight = containerWidth / videoAspect;
+          offsetX = 0;
+          offsetY = (containerHeight - logicalHeight) / 2;
+        }
+      } else {
+        // Fallback to parent dimensions if video dimensions not available
+        const parent = canvas.parentElement;
+        if (parent) {
+          const rect = parent.getBoundingClientRect();
+          logicalWidth = rect.width;
+          logicalHeight = rect.height;
         }
       }
       
-      // Get logical dimensions for drawing
-      const logicalWidth = canvas.width / dpr;
-      const logicalHeight = canvas.height / dpr;
+      // Update canvas size and position
+      const targetWidth = logicalWidth * dpr;
+      const targetHeight = logicalHeight * dpr;
+      
+      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        canvas.style.width = `${logicalWidth}px`;
+        canvas.style.height = `${logicalHeight}px`;
+        canvas.style.left = `${offsetX}px`;
+        canvas.style.top = `${offsetY}px`;
+        // Scale context to account for DPR
+        ctx.scale(dpr, dpr);
+      }
 
       // Clear canvas
       ctx.clearRect(0, 0, logicalWidth, logicalHeight);

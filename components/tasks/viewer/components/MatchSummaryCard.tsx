@@ -51,6 +51,15 @@ export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCa
   const filteredPlayers = players.filter(p => p.swing_count >= 10);
   const totalSwings = filteredPlayers.reduce((sum, p) => sum + p.swing_count, 0);
   const bounceCount = enhancedBallBounces?.length ?? ballBounces.length;
+  
+  // Calculate total distance covered by all players (in meters)
+  const totalDistance = filteredPlayers.reduce((sum, p) => sum + (p.covered_distance || 0), 0);
+  
+  // Calculate total rally duration (sum of all rally durations in seconds)
+  const totalRallyDuration = rallies.reduce((sum, rally) => {
+    const [start, end] = rally;
+    return sum + (end - start);
+  }, 0);
 
   // Aggregate swing type distribution
   const aggregatedSwingTypes: Record<string, number> = {};
@@ -91,7 +100,7 @@ export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCa
         <Heading size="4" weight="medium">
           Match Summary
         </Heading>
-        <Grid columns="2" gap="3">
+        <Grid columns="3" gap="3">
           <Box>
             <Text size="1" color="gray">
               Players
@@ -122,6 +131,26 @@ export function MatchSummaryCard({ result, enhancedBallBounces }: MatchSummaryCa
             </Text>
             <Text size="3" weight="bold">
               {bounceCount}
+            </Text>
+          </Box>
+          <Box>
+            <Text size="1" color="gray">
+              Total Distance
+            </Text>
+            <Text size="3" weight="bold">
+              {totalDistance >= 1000 
+                ? `${(totalDistance / 1000).toFixed(1)} km` 
+                : `${Math.round(totalDistance)} m`}
+            </Text>
+          </Box>
+          <Box>
+            <Text size="1" color="gray">
+              Rally Duration
+            </Text>
+            <Text size="3" weight="bold">
+              {totalRallyDuration >= 60 
+                ? `${Math.floor(totalRallyDuration / 60)}m ${Math.round(totalRallyDuration % 60)}s`
+                : `${Math.round(totalRallyDuration)}s`}
             </Text>
           </Box>
         </Grid>

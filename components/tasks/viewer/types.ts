@@ -70,14 +70,47 @@ export interface PlayerPosition {
   Y: number; // Court coordinates (meters)
 }
 
+/**
+ * Thumbnail crop data for a single frame.
+ * Each thumbnail has 4 bbox variants (smallest to largest):
+ * 0: face only, 1: head+chest, 2: head+torso, 3: full person
+ */
+export interface ThumbnailCrop {
+  bbox: [number, number, number, number][]; // 4 variants: [xmin, ymin, xmax, ymax] normalized
+  frame_nr: number;
+  timestamp: number;
+  score: number; // Quality score (higher is better)
+}
+
+/**
+ * Player stats within a single team session
+ */
+export interface TeamSessionPlayer {
+  player_id: number;
+  swings: Swing[];
+  swing_type_distribution: Record<string, number>;
+  swing_count: number;
+  covered_distance: number;
+  fastest_sprint: number;
+  fastest_sprint_timestamp: number;
+  activity_score: number;
+  location_heatmap: number[][] | null;
+}
+
+/**
+ * A team session represents a period where teams are in specific positions
+ */
+export interface TeamSession {
+  start_time: number;
+  end_time: number;
+  team_front: number[];
+  team_back: number[];
+  players: TeamSessionPlayer[];
+}
+
 export interface StatisticsResult {
   players: Player[];
-  team_sessions: Array<{
-    start_time: number;
-    end_time: number;
-    front_team: number[];
-    back_team: number[];
-  }>;
+  team_sessions: TeamSession[];
   highlights: Highlight[];
   rallies: [number, number][];
   bounce_heatmap: number[][];
@@ -96,6 +129,9 @@ export interface StatisticsResult {
       final: number;
     };
   };
+  // Player thumbnail crops - keyed by player_id (as string)
+  // Each player has up to 5 best thumbnail frames with 4 crop size variants
+  thumbnail_crops?: Record<string, ThumbnailCrop[]>;
 }
 
 export interface SwingWithPlayer extends Swing {

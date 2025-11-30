@@ -184,7 +184,48 @@ html[data-theme="dark"] [data-media-player] .vds-fullscreen-button:hover,
 [data-media-player] .vds-thumbnail {
   border-radius: 4px;
   border: 2px solid currentColor;
+  border-bottom: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Fix black line under thumbnail preview */
+[data-media-player] .vds-slider-preview {
+  background: transparent !important;
+  gap: 0 !important;
+}
+
+[data-media-player] .vds-slider-preview > * {
+  background: transparent !important;
+}
+
+[data-media-player] .vds-slider-value {
+  background: var(--media-tooltip-bg, #1C1C1C);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-top: 4px;
+}
+
+/* Ensure thumbnail container doesn't have extra space */
+[data-media-player] .vds-slider-thumbnail {
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
+  border: none !important;
+}
+
+/* Remove any gaps or backgrounds in the thumbnail preview stack */
+[data-media-player] .vds-thumbnail {
+  margin-bottom: 0 !important;
+}
+
+[data-media-player] .vds-thumbnail img {
+  display: block;
+}
+
+/* Chapter/time slider preview - ensure no dark backgrounds */
+[data-media-player] .vds-time-slider .vds-slider-preview,
+[data-media-player] .vds-time-slider .vds-slider-preview * {
+  background-color: transparent !important;
 }
 
 /* Chapter title on hover */

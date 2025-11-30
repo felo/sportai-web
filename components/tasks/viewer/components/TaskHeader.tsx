@@ -1,6 +1,6 @@
 "use client";
 
-import { Flex, Text, Badge, Spinner } from "@radix-ui/themes";
+import { Flex, Text, Badge } from "@radix-ui/themes";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
 import buttonStyles from "@/styles/buttons.module.css";
@@ -47,14 +47,12 @@ export function TaskHeader({
       </Flex>
 
       <Flex align="center" gap="3">
-        {task.status === "completed" && !result && (
+        {task.status === "completed" && !result && !loadingResult && (
           <button
             className={buttonStyles.actionButtonSquare}
             onClick={onLoadResult}
-            disabled={loadingResult}
           >
-            {loadingResult ? <Spinner size="1" /> : <Text></Text>}
-            {loadingResult ? "Loading..." : "Load"}
+            Load
           </button>
         )}
       </Flex>

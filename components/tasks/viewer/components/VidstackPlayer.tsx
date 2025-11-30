@@ -157,6 +157,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     const [showCalibration, setShowCalibration] = useState(false);
     const [videoDuration, setVideoDuration] = useState<number | undefined>();
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isVideoReady, setIsVideoReady] = useState(false);
     
     // Vidstack player ref
     const playerRef = useRef<MediaPlayerInstance>(null);
@@ -236,6 +237,27 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
         document.removeEventListener("fullscreenchange", handleFullscreenChange);
       };
     }, []);
+    
+    // Track when video is ready (can play)
+    useEffect(() => {
+      const player = playerRef.current;
+      if (!player) return;
+      
+      const handleCanPlay = () => {
+        setIsVideoReady(true);
+      };
+      
+      // Check if already ready
+      if (player.state.canPlay) {
+        setIsVideoReady(true);
+      }
+      
+      player.addEventListener("can-play", handleCanPlay);
+      
+      return () => {
+        player.removeEventListener("can-play", handleCanPlay);
+      };
+    }, []);
 
     return (
       <Box
@@ -254,7 +276,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
           ref={playerRef}
           src={videoUrl}
           viewType="video"
-          crossOrigin
+          crossOrigin="anonymous"
           playsInline
           keyShortcuts={{
             togglePaused: "k Space",
@@ -304,7 +326,8 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
           />
         </MediaPlayer>
 
-        {/* Top Left Button Group - Custom controls overlay */}
+        {/* Top Left Button Group - Custom controls overlay (only show when video is ready) */}
+        {isVideoReady && (
         <Box 
           style={{ 
             position: "absolute", 
@@ -377,17 +400,16 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             </Tooltip>
           )}
         </Box>
+        )}
 
-        {/* Settings Button - Top Right */}
+        {/* Settings Button - Top Right (only show when video is ready) */}
+        {isVideoReady && (
         <Box 
           style={{ 
             position: "absolute", 
             top: "12px", 
             right: "12px", 
             zIndex: 100,
-            opacity: showButtons ? 1 : 0,
-            transition: "opacity 0.2s ease-in-out",
-            pointerEvents: showButtons ? "auto" : "none",
           }}
         >
           <Tooltip content="Video overlay settings">
@@ -395,12 +417,14 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
               size="1"
               variant="solid"
               style={{
-                backgroundColor: "#7ADB8F",
-                color: "#1C1C1C",
+                backgroundColor: showVideoSettings ? "#7ADB8F" : "rgba(0, 0, 0, 0.6)",
+                color: showVideoSettings ? "#1C1C1C" : "white",
                 border: "2px solid white",
                 borderRadius: "var(--radius-3)",
                 width: 28,
                 height: 28,
+                backdropFilter: "blur(4px)",
+                transition: "background-color 0.2s ease-in-out",
               }}
               onClick={() => setShowVideoSettings(!showVideoSettings)}
             >
@@ -408,6 +432,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             </IconButton>
           </Tooltip>
         </Box>
+        )}
 
         {showVideoSettings && (
           <VideoSettings

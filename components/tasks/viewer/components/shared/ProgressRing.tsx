@@ -34,6 +34,8 @@ export interface ProgressRingProps {
   size?: number;
   /** Stroke width (default: 12) */
   strokeWidth?: number;
+  /** Hide the medal/percentage display below the ring */
+  hideMedalDisplay?: boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export function ProgressRing({
   winnerNickname,
   size = 160,
   strokeWidth = 12,
+  hideMedalDisplay = false,
 }: ProgressRingProps) {
   const percentage = maxValue > 0 ? value / maxValue : 0;
   
@@ -188,12 +191,14 @@ export function ProgressRing({
       </Box>
 
       {/* Medal display */}
-      <MedalDisplay
-        rank={rank}
-        percentOfLeader={Math.round(percentage * 100)}
-        winnerNickname={winnerNickname}
-        visible={isComplete}
-      />
+      {!hideMedalDisplay && (
+        <MedalDisplay
+          rank={rank}
+          percentOfLeader={Math.round(percentage * 100)}
+          winnerNickname={winnerNickname}
+          visible={isComplete}
+        />
+      )}
     </Flex>
   );
 }

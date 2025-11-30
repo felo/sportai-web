@@ -13,7 +13,8 @@ export type BallSequenceType =
   | "return"      // 2nd ball  
   | "third-ball"  // 3rd ball (server's first after return)
   | "fourth-ball" // 4th ball (returner's second)
-  | "fifth-ball"; // 5th ball (server's second after serve)
+  | "fifth-ball"  // 5th ball (server's second after serve)
+  | "all-shots";  // All shots combined (for overview analysis)
 
 /**
  * Shot placement zone on court grid
