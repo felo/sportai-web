@@ -15,7 +15,13 @@ interface TaskHeaderProps {
   onLoadResult: () => void;
 }
 
-export function TaskHeader({ task, result, loadingResult, onBack, onLoadResult }: TaskHeaderProps) {
+export function TaskHeader({ 
+  task, 
+  result, 
+  loadingResult, 
+  onBack, 
+  onLoadResult,
+}: TaskHeaderProps) {
   return (
     <Flex justify="between" align="center" mb="5">
       <Flex align="center" gap="4">
@@ -40,16 +46,18 @@ export function TaskHeader({ task, result, loadingResult, onBack, onLoadResult }
         </Flex>
       </Flex>
 
-      {task.status === "completed" && !result && (
-        <button
-          className={buttonStyles.actionButtonSquare}
-          onClick={onLoadResult}
-          disabled={loadingResult}
-        >
-          {loadingResult ? <Spinner size="1" /> : <Text></Text>}
-          {loadingResult ? "Loading..." : "Load"}
-        </button>
-      )}
+      <Flex align="center" gap="3">
+        {task.status === "completed" && !result && (
+          <button
+            className={buttonStyles.actionButtonSquare}
+            onClick={onLoadResult}
+            disabled={loadingResult}
+          >
+            {loadingResult ? <Spinner size="1" /> : <Text></Text>}
+            {loadingResult ? "Loading..." : "Load"}
+          </button>
+        )}
+      </Flex>
     </Flex>
   );
 }

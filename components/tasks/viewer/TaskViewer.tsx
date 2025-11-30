@@ -2,7 +2,15 @@
 
 import { useState, useEffect, use, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Card, Text, Flex } from "@radix-ui/themes";
+import { Box, Card, Text, Flex, Button, Badge, Grid, Heading } from "@radix-ui/themes";
+import {
+  PlayIcon,
+  BarChartIcon,
+  PersonIcon,
+  StarIcon,
+  TargetIcon,
+  MixIcon,
+} from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Task, StatisticsResult, BallBounce } from "./types";
 import { useVideoPlayback, useEventTooltip } from "./hooks";
@@ -12,12 +20,20 @@ import {
   ErrorState,
   TaskHeader,
   VideoPlayer,
+  VidstackPlayer,
   RallyTimeline,
   MainTimeline,
-  MatchInsights,
   PadelCourt2D,
   VideoCourtLayout,
+  MatchSummaryCard,
+  ConfidenceCard,
+  PlayerCard,
+  HighlightsCard,
+  BounceHeatmap,
+  TaskStatusCard,
+  TimelineFilter,
 } from "./components";
+import type { TimelineFilterState } from "./components";
 
 interface TaskViewerProps {
   paramsPromise: Promise<{ taskId: string }>;
@@ -40,6 +56,15 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [inferAudioBounces, setInferAudioBounces] = useState(false); // Disabled until CORS is configured
   const [playerNames, setPlayerNames] = useState<Record<number, string>>({});
   const [calibrationMatrix, setCalibrationMatrix] = useState<number[][] | null>(null);
+  // Toggle between Vidstack (default) and legacy VideoPlayer
+  const [useVidstack, setUseVidstack] = useState(true);
+  // Timeline filters
+  const [timelineFilters, setTimelineFilters] = useState<TimelineFilterState>({
+    showOnlyRallies: true, // Default to showing only rallies
+    rallyBuffer: 1, // Default 1 second before rally start
+  });
+  // Top-level navigation tabs
+  const [activeTab, setActiveTab] = useState<"rallies" | "summary" | "players" | "highlights" | "tactical" | "technique">("rallies");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const rallyTimelineRef = useRef<HTMLDivElement>(null);
@@ -67,6 +92,121 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
       map[player.player_id] = player.displayName;
     });
     return map;
+  }, [validPlayers]);
+
+  // Calculate max distance covered among all valid players (for relative visualization)
+  const maxDistanceCovered = useMemo(() => {
+    if (validPlayers.length === 0) return 0;
+    return Math.max(...validPlayers.map(p => p.covered_distance));
+  }, [validPlayers]);
+
+  // Calculate distance rankings (1st, 2nd, 3rd) for each player
+  const distanceRankings = useMemo((): Record<number, number> => {
+    if (validPlayers.length === 0) return {};
+    
+    const playerDistances = validPlayers.map(p => ({
+      playerId: p.player_id,
+      distance: p.covered_distance || 0
+    })).filter(p => p.distance > 0);
+    
+    // Sort by distance descending
+    playerDistances.sort((a, b) => b.distance - a.distance);
+    
+    // Assign ranks (1, 2, 3)
+    const rankings: Record<number, number> = {};
+    playerDistances.forEach((p, index) => {
+      if (index < 3) {
+        rankings[p.playerId] = index + 1;
+      }
+    });
+    
+    return rankings;
+  }, [validPlayers]);
+
+  // Calculate max ball speed among all valid players (for leader badge)
+  const maxBallSpeed = useMemo(() => {
+    if (validPlayers.length === 0) return 0;
+    return Math.max(...validPlayers.map(p => {
+      if (!p.swings || p.swings.length === 0) return 0;
+      return Math.max(...p.swings.map(s => s.ball_speed));
+    }));
+  }, [validPlayers]);
+
+  // Calculate ball speed rankings (1st, 2nd, 3rd) for each player
+  const ballSpeedRankings = useMemo((): Record<number, number> => {
+    if (validPlayers.length === 0) return {};
+    
+    const playerSpeeds = validPlayers.map(p => ({
+      playerId: p.player_id,
+      maxSpeed: p.swings && p.swings.length > 0 
+        ? Math.max(...p.swings.map(s => s.ball_speed))
+        : 0
+    })).filter(p => p.maxSpeed > 0);
+    
+    // Sort by speed descending
+    playerSpeeds.sort((a, b) => b.maxSpeed - a.maxSpeed);
+    
+    // Assign ranks (1, 2, 3)
+    const rankings: Record<number, number> = {};
+    playerSpeeds.forEach((p, index) => {
+      if (index < 3) {
+        rankings[p.playerId] = index + 1;
+      }
+    });
+    
+    return rankings;
+  }, [validPlayers]);
+
+  // Calculate max sprint speed and rankings
+  const maxSprintSpeed = useMemo(() => {
+    if (validPlayers.length === 0) return 0;
+    return Math.max(...validPlayers.map(p => p.fastest_sprint || 0));
+  }, [validPlayers]);
+
+  const sprintRankings = useMemo((): Record<number, number> => {
+    if (validPlayers.length === 0) return {};
+    
+    const playerSprints = validPlayers.map(p => ({
+      playerId: p.player_id,
+      sprint: p.fastest_sprint || 0
+    })).filter(p => p.sprint > 0);
+    
+    playerSprints.sort((a, b) => b.sprint - a.sprint);
+    
+    const rankings: Record<number, number> = {};
+    playerSprints.forEach((p, index) => {
+      if (index < 3) {
+        rankings[p.playerId] = index + 1;
+      }
+    });
+    
+    return rankings;
+  }, [validPlayers]);
+
+  // Calculate swing count rankings (most active player)
+  const maxSwings = useMemo(() => {
+    if (validPlayers.length === 0) return 0;
+    return Math.max(...validPlayers.map(p => p.swings?.length || 0));
+  }, [validPlayers]);
+
+  const swingsRankings = useMemo((): Record<number, number> => {
+    if (validPlayers.length === 0) return {};
+    
+    const playerSwings = validPlayers.map(p => ({
+      playerId: p.player_id,
+      swingCount: p.swings?.length || 0
+    })).filter(p => p.swingCount > 0);
+    
+    playerSwings.sort((a, b) => b.swingCount - a.swingCount);
+    
+    const rankings: Record<number, number> = {};
+    playerSwings.forEach((p, index) => {
+      if (index < 3) {
+        rankings[p.playerId] = index + 1;
+      }
+    });
+    
+    return rankings;
   }, [validPlayers]);
 
   const currentTime = useVideoPlayback(videoRef);
@@ -280,6 +420,30 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     return allBounces;
   }, [result, allSwings, inferSwingBounces, inferTrajectoryBounces]);
 
+  // Calculate total video duration (for position indicators)
+  const totalDuration = useMemo(() => {
+    const rallies = result?.rallies || [];
+    const bounces = enhancedBallBounces || [];
+    const lastRally = rallies[rallies.length - 1];
+    const lastBounce = bounces[bounces.length - 1];
+    
+    return Math.max(
+      task?.video_length || 0,
+      lastRally ? lastRally[1] : 0,
+      lastBounce ? lastBounce.timestamp : 0
+    ) || 300;
+  }, [task?.video_length, result?.rallies, enhancedBallBounces]);
+
+  // Auto-select first rally when result loads and showOnlyRallies is enabled
+  useEffect(() => {
+    if (!result?.rallies || result.rallies.length === 0) return;
+    if (!timelineFilters.showOnlyRallies) return;
+    if (selectedRallyIndex !== null) return; // Already have a selection
+    
+    // Auto-select the first rally
+    setSelectedRallyIndex(0);
+  }, [result?.rallies, timelineFilters.showOnlyRallies, selectedRallyIndex]);
+
   // Auto-select rally when playhead enters it
   useEffect(() => {
     if (!result || !result.rallies) return;
@@ -297,6 +461,55 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     }
     // Note: We don't auto-deselect when leaving a rally, user can close manually
   }, [currentTime, result, selectedRallyIndex]);
+
+  // Auto-skip between rallies when "show only rallies" filter is enabled
+  useEffect(() => {
+    if (!timelineFilters.showOnlyRallies || !result?.rallies || !videoRef.current) return;
+    
+    const rallies = result.rallies;
+    if (rallies.length === 0) return;
+    
+    // Check if video is playing
+    const video = videoRef.current;
+    if (video.paused) return;
+    
+    const buffer = timelineFilters.rallyBuffer;
+    
+    // Find if we're currently inside a rally (including buffer zone before)
+    const currentRallyIndex = rallies.findIndex(
+      ([start, end]) => currentTime >= Math.max(0, start - buffer) && currentTime <= end
+    );
+    
+    if (currentRallyIndex !== -1) {
+      // We're inside a rally (or its buffer) - check if we're about to exit
+      const [, rallyEnd] = rallies[currentRallyIndex];
+      const timeToEnd = rallyEnd - currentTime;
+      
+      // If we're within 0.1s of the rally end, prepare to skip
+      if (timeToEnd <= 0.1 && timeToEnd > 0) {
+        const nextRallyIndex = currentRallyIndex + 1;
+        if (nextRallyIndex < rallies.length) {
+          // Skip to next rally (with buffer)
+          const [nextRallyStart] = rallies[nextRallyIndex];
+          video.currentTime = Math.max(0, nextRallyStart - buffer);
+        }
+        // If no more rallies, video will naturally end or loop
+      }
+    } else {
+      // We're outside a rally - find the next rally to skip to
+      const nextRallyIndex = rallies.findIndex(([start]) => start > currentTime);
+      
+      if (nextRallyIndex !== -1) {
+        // Skip to the next rally (with buffer)
+        const [nextRallyStart] = rallies[nextRallyIndex];
+        video.currentTime = Math.max(0, nextRallyStart - buffer);
+      } else if (currentTime < Math.max(0, rallies[0][0] - buffer)) {
+        // We're before the first rally's buffer zone - skip to it
+        video.currentTime = Math.max(0, rallies[0][0] - buffer);
+      }
+      // If after last rally, let video play to end naturally
+    }
+  }, [currentTime, timelineFilters.showOnlyRallies, timelineFilters.rallyBuffer, result?.rallies]);
 
   // Fetch task details
   useEffect(() => {
@@ -386,108 +599,506 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
   if (!task) return null;
 
+  // Tab definitions
+  const tabs = [
+    { id: "rallies" as const, label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
+    { id: "summary" as const, label: "Match Summary", icon: <BarChartIcon width={16} height={16} /> },
+    { id: "players" as const, label: "Player Stats", icon: <PersonIcon width={16} height={16} />, badge: validPlayers.length > 0 ? validPlayers.length : undefined },
+    { id: "highlights" as const, label: "Highlights", icon: <StarIcon width={16} height={16} />, badge: result?.highlights?.length || undefined },
+    { id: "tactical" as const, label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
+    { id: "technique" as const, label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
+  ];
+
   return (
     <Box
       style={{
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: "var(--gray-1)", 
-      padding: "var(--space-4)",
-      overflowY: "auto",
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "var(--gray-1)",
+        overflowY: "auto",
       }}
     >
-      <Box style={{ maxWidth: "1400px", margin: "0 auto", paddingBottom: "var(--space-6)" }}>
-        <TaskHeader
-          task={task}
-          result={result}
-          loadingResult={loadingResult}
-          onBack={() => router.push("/tasks")}
-          onLoadResult={fetchResult}
-        />
+      {/* Header */}
+      <Box style={{ padding: "var(--space-4)", paddingBottom: 0 }}>
+        <Box style={{ maxWidth: "1400px", margin: "0 auto" }}>
+          <TaskHeader
+            task={task}
+            result={result}
+            loadingResult={loadingResult}
+            onBack={() => router.push("/tasks")}
+            onLoadResult={fetchResult}
+          />
+        </Box>
+      </Box>
 
-        {error && (
-          <Card style={{ marginBottom: "var(--space-4)", backgroundColor: "var(--red-3)" }}>
+      {/* Tab Navigation - Full width */}
+      <Box
+        style={{
+          borderBottom: "1px solid var(--gray-5)",
+          backgroundColor: "var(--gray-2)",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+        }}
+      >
+        <Box style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 var(--space-4)" }}>
+          <Flex
+            gap="0"
+            style={{
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const isDisabled = tab.disabled;
+
+              return (
+                <Box
+                  key={tab.id}
+                  onClick={() => !isDisabled && setActiveTab(tab.id)}
+                  style={{
+                    padding: "14px 24px",
+                    cursor: isDisabled ? "not-allowed" : "pointer",
+                    borderBottom: isActive ? "2px solid var(--mint-9)" : "2px solid transparent",
+                    backgroundColor: isActive ? "var(--gray-1)" : "transparent",
+                    opacity: isDisabled ? 0.4 : 1,
+                    transition: "all 0.15s ease",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive && !isDisabled) {
+                      e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive && !isDisabled) {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }
+                  }}
+                >
+                  <Flex align="center" gap="2">
+                    <Box style={{ color: isActive ? "var(--mint-11)" : "var(--gray-10)", display: "flex", alignItems: "center" }}>
+                      {tab.icon}
+                    </Box>
+                    <Text size="2" weight={isActive ? "medium" : "regular"} style={{ color: isActive ? "var(--gray-12)" : "var(--gray-11)", whiteSpace: "nowrap" }}>
+                      {tab.label}
+                    </Text>
+                    {tab.badge !== undefined && (
+                      <Badge size="1" color={isActive ? "mint" : "gray"} variant="soft">
+                        {tab.badge}
+                      </Badge>
+                    )}
+                    {isDisabled && (
+                      <Badge size="1" color="gray" variant="outline">Soon</Badge>
+                    )}
+                  </Flex>
+                </Box>
+              );
+            })}
+          </Flex>
+        </Box>
+      </Box>
+
+      {error && (
+        <Box style={{ padding: "var(--space-4)", maxWidth: "1400px", margin: "0 auto" }}>
+          <Card style={{ backgroundColor: "var(--red-3)" }}>
             <Text color="red">{error}</Text>
           </Card>
-        )}
+        </Box>
+      )}
 
-        {/* Video + Court Layout */}
-        <VideoCourtLayout
-          isFullWidth={isVideoFullWidth}
-          showCourt={task.sport === "padel"}
-          videoPlayer={
-            <VideoPlayer
-              ref={videoRef}
-              videoUrl={task.video_url}
-              ballPositions={result?.ball_positions}
-              ballBounces={enhancedBallBounces}
-              swings={allSwings}
+      {/* Tab Content */}
+      <Box style={{ padding: "var(--space-4)", maxWidth: "1400px", margin: "0 auto", paddingBottom: "var(--space-6)" }}>
+        
+        {/* ==================== RALLIES TAB ==================== */}
+        {activeTab === "rallies" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            {/* Player Toggle & Timeline Filters */}
+            <Flex gap="2" align="center" justify="between" style={{ marginBottom: "var(--space-3)" }}>
+              <Flex gap="2" align="center">
+                <Button size="1" variant={useVidstack ? "solid" : "soft"} onClick={() => setUseVidstack(true)}>
+                  Vidstack Player
+                </Button>
+                <Button size="1" variant={useVidstack ? "soft" : "outline"} color="gray" onClick={() => setUseVidstack(false)}>
+                  Legacy Player
+                </Button>
+              </Flex>
+              
+              {/* Timeline Filter */}
+              {result && (
+                <TimelineFilter
+                  filters={timelineFilters}
+                  onFilterChange={setTimelineFilters}
+                  hasRallies={result.rallies && result.rallies.length > 0}
+                />
+              )}
+            </Flex>
+
+            {/* Video + Court Layout */}
+            <VideoCourtLayout
               isFullWidth={isVideoFullWidth}
-              onFullWidthChange={setIsVideoFullWidth}
-              inferSwingBounces={inferSwingBounces}
-              onInferSwingBouncesChange={setInferSwingBounces}
-              inferTrajectoryBounces={inferTrajectoryBounces}
-              onInferTrajectoryBouncesChange={setInferTrajectoryBounces}
-              inferAudioBounces={inferAudioBounces}
-              onInferAudioBouncesChange={setInferAudioBounces}
-              playerDisplayNames={playerDisplayNames}
-              showCalibrationButton={task.sport === "padel"}
-              isCalibrated={calibrationMatrix !== null}
-              onCalibrationComplete={setCalibrationMatrix}
+              showCourt={task.sport === "padel"}
+              videoPlayer={
+                useVidstack ? (
+                  <VidstackPlayer
+                    ref={videoRef}
+                    videoUrl={task.video_url}
+                    ballPositions={result?.ball_positions}
+                    ballBounces={enhancedBallBounces}
+                    swings={allSwings}
+                    rallies={result?.rallies}
+                    isFullWidth={isVideoFullWidth}
+                    onFullWidthChange={setIsVideoFullWidth}
+                    inferSwingBounces={inferSwingBounces}
+                    onInferSwingBouncesChange={setInferSwingBounces}
+                    inferTrajectoryBounces={inferTrajectoryBounces}
+                    onInferTrajectoryBouncesChange={setInferTrajectoryBounces}
+                    inferAudioBounces={inferAudioBounces}
+                    onInferAudioBouncesChange={setInferAudioBounces}
+                    playerDisplayNames={playerDisplayNames}
+                    showCalibrationButton={task.sport === "padel"}
+                    isCalibrated={calibrationMatrix !== null}
+                    onCalibrationComplete={setCalibrationMatrix}
+                  />
+                ) : (
+                  <VideoPlayer
+                    ref={videoRef}
+                    videoUrl={task.video_url}
+                    ballPositions={result?.ball_positions}
+                    ballBounces={enhancedBallBounces}
+                    swings={allSwings}
+                    isFullWidth={isVideoFullWidth}
+                    onFullWidthChange={setIsVideoFullWidth}
+                    inferSwingBounces={inferSwingBounces}
+                    onInferSwingBouncesChange={setInferSwingBounces}
+                    inferTrajectoryBounces={inferTrajectoryBounces}
+                    onInferTrajectoryBouncesChange={setInferTrajectoryBounces}
+                    inferAudioBounces={inferAudioBounces}
+                    onInferAudioBouncesChange={setInferAudioBounces}
+                    playerDisplayNames={playerDisplayNames}
+                    showCalibrationButton={task.sport === "padel"}
+                    isCalibrated={calibrationMatrix !== null}
+                    onCalibrationComplete={setCalibrationMatrix}
+                  />
+                )
+              }
+              courtComponent={
+                <PadelCourt2D
+                  currentTime={currentTime}
+                  ballBounces={enhancedBallBounces}
+                  rallies={result?.rallies}
+                  playerPositions={result?.player_positions}
+                  swings={allSwings}
+                  playerDisplayNames={playerDisplayNames}
+                  calibrationMatrix={calibrationMatrix}
+                  showBounces={true}
+                  showPlayers={true}
+                />
+              }
             />
-          }
-          courtComponent={
-            <PadelCourt2D 
-              currentTime={currentTime}
-              ballBounces={enhancedBallBounces}
-              rallies={result?.rallies}
-              playerPositions={result?.player_positions}
-              swings={allSwings}
-              playerDisplayNames={playerDisplayNames}
-              calibrationMatrix={calibrationMatrix}
-              showBounces={true}
-              showPlayers={true}
-            />
-          }
-        />
 
-        {result && selectedRallyIndex !== null && (
-          <RallyTimeline
-            result={result}
-            selectedRallyIndex={selectedRallyIndex}
-            currentTime={currentTime}
-            activeEventTooltip={activeEventTooltip}
-            videoRef={videoRef}
-            rallyTimelineRef={rallyTimelineRef}
-            onClose={() => setSelectedRallyIndex(null)}
-            enhancedBallBounces={enhancedBallBounces}
-            playerDisplayNames={playerDisplayNames}
-          />
+            {result && selectedRallyIndex !== null && (
+              <RallyTimeline
+                result={result}
+                selectedRallyIndex={selectedRallyIndex}
+                currentTime={currentTime}
+                activeEventTooltip={activeEventTooltip}
+                videoRef={videoRef}
+                rallyTimelineRef={rallyTimelineRef}
+                onClose={() => setSelectedRallyIndex(null)}
+                enhancedBallBounces={enhancedBallBounces}
+                playerDisplayNames={playerDisplayNames}
+              />
+            )}
+
+            {result && (
+              <MainTimeline
+                result={result}
+                task={task}
+                currentTime={currentTime}
+                selectedRallyIndex={selectedRallyIndex}
+                videoRef={videoRef}
+                onRallySelect={setSelectedRallyIndex}
+                enhancedBallBounces={enhancedBallBounces}
+                showOnlyRallies={timelineFilters.showOnlyRallies}
+                rallyBuffer={timelineFilters.rallyBuffer}
+              />
+            )}
+          </Box>
         )}
 
-        {result && (
-          <MainTimeline
-            result={result}
-            task={task}
-            currentTime={currentTime}
-            selectedRallyIndex={selectedRallyIndex}
-            videoRef={videoRef}
-            onRallySelect={setSelectedRallyIndex}
-            enhancedBallBounces={enhancedBallBounces}
-          />
+        {/* ==================== MATCH SUMMARY TAB ==================== */}
+        {activeTab === "summary" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            {!result ? (
+              <TaskStatusCard task={task} />
+            ) : (
+              <Grid columns={{ initial: "1", md: "2" }} gap="4">
+                <MatchSummaryCard result={result} enhancedBallBounces={enhancedBallBounces} />
+                {result.confidences && (
+                  <ConfidenceCard confidences={result.confidences.final_confidences} />
+                )}
+              </Grid>
+            )}
+          </Box>
         )}
 
-        <MatchInsights
-          result={result}
-          task={task}
-          videoRef={videoRef}
-          portraits={portraits}
-          enhancedBallBounces={enhancedBallBounces}
-          playerDisplayNames={playerDisplayNames}
-        />
+        {/* ==================== PLAYER STATS TAB ==================== */}
+        {activeTab === "players" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            {validPlayers.length === 0 ? (
+              <Flex align="center" justify="center" direction="column" gap="3" style={{ padding: "60px 20px" }}>
+                <PersonIcon width={48} height={48} style={{ color: "var(--gray-8)" }} />
+                <Text size="3" color="gray">No player data available yet</Text>
+                <Text size="2" color="gray">Player statistics will appear here once the analysis is complete</Text>
+              </Flex>
+            ) : (
+              <Box style={{ position: "relative" }}>
+                {/* Left edge indicator - shows more content */}
+                <Box
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 48,
+                    background: "linear-gradient(to right, var(--gray-3), transparent)",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Box style={{ 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: "50%", 
+                    background: "var(--gray-5)", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    opacity: 0.8,
+                  }}>
+                    <Text size="2" style={{ color: "var(--gray-11)" }}>←</Text>
+                  </Box>
+                </Box>
+                {/* Right edge indicator - shows more content */}
+                <Box
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 48,
+                    background: "linear-gradient(to left, var(--gray-3), transparent)",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Box style={{ 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: "50%", 
+                    background: "var(--gray-5)", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    opacity: 0.8,
+                  }}>
+                    <Text size="2" style={{ color: "var(--gray-11)" }}>→</Text>
+                  </Box>
+                </Box>
+                <Box
+                  style={{
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    paddingBottom: 16,
+                    paddingLeft: 48,
+                    paddingRight: 48,
+                    scrollSnapType: "x mandatory",
+                    cursor: "grab",
+                    scrollBehavior: "smooth",
+                  }}
+                  onMouseDown={(e) => {
+                    const container = e.currentTarget;
+                    container.style.cursor = "grabbing";
+                    container.style.scrollSnapType = "none";
+                    const startX = e.pageX - container.offsetLeft;
+                    const scrollLeft = container.scrollLeft;
+                    
+                    const onMouseMove = (e: MouseEvent) => {
+                      e.preventDefault();
+                      const x = e.pageX - container.offsetLeft;
+                      const walk = (x - startX) * 1.5;
+                      container.scrollLeft = scrollLeft - walk;
+                    };
+                    
+                    const onMouseUp = () => {
+                      container.style.cursor = "grab";
+                      // Re-enable snap with a slight delay for smooth transition
+                      setTimeout(() => {
+                        container.style.scrollSnapType = "x mandatory";
+                      }, 50);
+                      document.removeEventListener("mousemove", onMouseMove);
+                      document.removeEventListener("mouseup", onMouseUp);
+                    };
+                    
+                    document.addEventListener("mousemove", onMouseMove);
+                    document.addEventListener("mouseup", onMouseUp);
+                  }}
+                >
+                <Flex gap="4" style={{ width: "max-content" }}>
+                  {/* Sort players by overall ranking (winner to honorable mention) */}
+                  {(() => {
+                    // Calculate medal points for each player (1st=3pts, 2nd=2pts, 3rd=1pt)
+                    const getRankPoints = (playerId: number) => {
+                      const ranks = [
+                        distanceRankings[playerId],
+                        sprintRankings[playerId],
+                        ballSpeedRankings[playerId],
+                        swingsRankings[playerId]
+                      ].filter(r => r !== undefined && r <= 3) as number[];
+                      return ranks.reduce((sum, r) => sum + (4 - r), 0);
+                    };
+                    const getGoldCount = (playerId: number) => {
+                      return [distanceRankings[playerId], sprintRankings[playerId], ballSpeedRankings[playerId], swingsRankings[playerId]]
+                        .filter(r => r === 1).length;
+                    };
+
+                    // Sort and assign overall ranks
+                    const sortedPlayers = [...validPlayers].sort((a, b) => {
+                      const pointsA = getRankPoints(a.player_id);
+                      const pointsB = getRankPoints(b.player_id);
+                      if (pointsB !== pointsA) return pointsB - pointsA;
+                      return getGoldCount(b.player_id) - getGoldCount(a.player_id);
+                    });
+
+                    // Create overall ranking map (1st, 2nd, 3rd, 4+ = honorable mention)
+                    const overallRankings: Record<number, number> = {};
+                    sortedPlayers.forEach((p, index) => {
+                      overallRankings[p.player_id] = index + 1;
+                    });
+
+                    return sortedPlayers.map((player) => (
+                      <Box key={player.player_id} style={{ maxWidth: 320, flexShrink: 0, scrollSnapAlign: "center" }}>
+                        <PlayerCard
+                          player={player}
+                          displayIndex={player.displayIndex}
+                          displayName={player.displayName}
+                          portrait={portraits[player.player_id]}
+                          maxDistance={maxDistanceCovered}
+                          distanceRank={distanceRankings[player.player_id]}
+                          maxBallSpeed={maxBallSpeed}
+                          ballSpeedRank={ballSpeedRankings[player.player_id]}
+                          maxSprintSpeed={maxSprintSpeed}
+                          sprintRank={sprintRankings[player.player_id]}
+                          swingsRank={swingsRankings[player.player_id]}
+                          maxSwings={maxSwings}
+                          overallRank={overallRankings[player.player_id]}
+                        />
+                      </Box>
+                    ));
+                  })()}
+                </Flex>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* ==================== HIGHLIGHTS TAB ==================== */}
+        {activeTab === "highlights" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            {!result || !result.highlights || result.highlights.length === 0 ? (
+              <Flex align="center" justify="center" direction="column" gap="3" style={{ padding: "60px 20px" }}>
+                <StarIcon width={48} height={48} style={{ color: "var(--gray-8)" }} />
+                <Text size="3" color="gray">No highlights detected</Text>
+                <Text size="2" color="gray">Key moments from the match will appear here</Text>
+              </Flex>
+            ) : (
+              <HighlightsCard highlights={result.highlights} videoRef={videoRef} />
+            )}
+          </Box>
+        )}
+
+        {/* ==================== TACTICAL TAB ==================== */}
+        {activeTab === "tactical" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            {!result ? (
+              <Flex align="center" justify="center" direction="column" gap="3" style={{ padding: "60px 20px" }}>
+                <TargetIcon width={48} height={48} style={{ color: "var(--gray-8)" }} />
+                <Text size="3" color="gray">Tactical analysis not available</Text>
+              </Flex>
+            ) : (
+              <Flex direction="column" gap="4">
+                <Box>
+                  <Heading size="3" weight="medium" mb="3">Court Coverage</Heading>
+                  <Text size="2" color="gray" mb="4">Ball bounce distribution across the court</Text>
+                  {result.bounce_heatmap ? (
+                    <BounceHeatmap
+                      heatmap={result.bounce_heatmap}
+                      totalBounces={(enhancedBallBounces || result.ball_bounces || []).length}
+                    />
+                  ) : (
+                    <Card style={{ padding: "40px", textAlign: "center" }}>
+                      <Text color="gray">No bounce heatmap data available</Text>
+                    </Card>
+                  )}
+                </Box>
+
+                <Grid columns={{ initial: "1", md: "2" }} gap="4">
+                  <Card style={{ border: "1px solid var(--gray-5)", opacity: 0.6 }}>
+                    <Flex direction="column" gap="2" p="4" align="center" justify="center" style={{ minHeight: "150px" }}>
+                      <Text size="2" color="gray" weight="medium">Rally Patterns</Text>
+                      <Badge color="gray" variant="outline">Coming Soon</Badge>
+                    </Flex>
+                  </Card>
+                  <Card style={{ border: "1px solid var(--gray-5)", opacity: 0.6 }}>
+                    <Flex direction="column" gap="2" p="4" align="center" justify="center" style={{ minHeight: "150px" }}>
+                      <Text size="2" color="gray" weight="medium">Shot Placement</Text>
+                      <Badge color="gray" variant="outline">Coming Soon</Badge>
+                    </Flex>
+                  </Card>
+                </Grid>
+              </Flex>
+            )}
+          </Box>
+        )}
+
+        {/* ==================== TECHNIQUE TAB ==================== */}
+        {activeTab === "technique" && (
+          <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+            <Flex align="center" justify="center" direction="column" gap="4" style={{ padding: "60px 20px" }}>
+              <Box
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: "50%",
+                  backgroundColor: "var(--gray-3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <MixIcon width={40} height={40} style={{ color: "var(--gray-8)" }} />
+              </Box>
+              <Heading size="4" weight="medium" style={{ color: "var(--gray-11)" }}>Technique Analysis</Heading>
+              <Text size="2" color="gray" align="center" style={{ maxWidth: 400 }}>
+                Detailed swing analysis, form breakdowns, and technique comparisons will be available in a future update.
+              </Text>
+              <Badge color="mint" variant="soft" size="2">Coming Soon</Badge>
+            </Flex>
+          </Box>
+        )}
       </Box>
     </Box>
   );

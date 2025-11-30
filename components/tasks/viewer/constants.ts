@@ -43,7 +43,7 @@ export const CONFIG = {
   PLAYHEAD_UPDATE_INTERVAL: 50,
   
   // Timeline interaction
-  RALLY_START_OFFSET_SECONDS: 2, // Show N seconds before rally start (to see serve)
+  RALLY_START_OFFSET_SECONDS: 1, // Show N seconds before rally start (to see serve)
   EVENT_DETECTION_THRESHOLD: 0.3, // Seconds tolerance for event glow
   EVENT_TOOLTIP_THRESHOLD: 0.15, // Seconds tolerance for auto-showing tooltip
   EVENT_TOOLTIP_DURATION: 2000, // How long tooltip stays visible (ms)

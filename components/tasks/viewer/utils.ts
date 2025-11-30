@@ -1,7 +1,35 @@
+// Pretty names for swing types
+const SWING_TYPE_NAMES: Record<string, string> = {
+  forehand: "Forehand",
+  backhand: "Backhand",
+  backhand_one_hand: "Backhand (1H)",
+  backhand_two_hand: "Backhand (2H)",
+  serve: "Serve",
+  volley: "Volley",
+  overhead: "Overhead",
+  smash: "Smash",
+  lob: "Lob",
+  drop: "Drop Shot",
+  dropshot: "Drop Shot",
+  slice: "Slice",
+  topspin: "Topspin",
+  flat: "Flat",
+  kick: "Kick Serve",
+  other: "Other",
+  unknown: "Unknown",
+};
+
 export function formatSwingType(swingType: string): string {
+  // Check for exact match first
+  const lower = swingType.toLowerCase();
+  if (SWING_TYPE_NAMES[lower]) {
+    return SWING_TYPE_NAMES[lower];
+  }
+  
+  // Fallback: title case with underscores replaced
   return swingType
     .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 

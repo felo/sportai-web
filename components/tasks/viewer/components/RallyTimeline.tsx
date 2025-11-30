@@ -1,13 +1,162 @@
 "use client";
 
-import { RefObject, useState } from "react";
-import { Box, Flex, Heading, Badge, Text, Tooltip, Card, Switch } from "@radix-ui/themes";
+import { RefObject, useState, useRef, useCallback } from "react";
+import { Box, Flex, Heading, Badge, Text, Card, Switch, Tooltip } from "@radix-ui/themes";
 import { Cross2Icon, SpeakerLoudIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
-import { CONFIG, FEATURE_FLAGS } from "../constants";
-import { StatisticsResult, ActiveEventTooltip, BallBounce } from "../types";
+import { CONFIG, FEATURE_FLAGS, OVERLAY_COLORS } from "../constants";
+import { StatisticsResult, ActiveEventTooltip, BallBounce, Swing } from "../types";
 import { formatSwingType, formatDuration, getPlayerIndex } from "../utils";
 import { AudioWaveform } from "./AudioWaveform";
+import { DraggablePlayhead } from "./DraggablePlayhead";
+
+// Custom tooltip that matches the video overlay swing cards
+interface SwingTooltipProps {
+  swing: Swing & { player_id: number };
+  playerName: string;
+  position: number; // percentage
+  visible: boolean;
+}
+
+function SwingTooltip({ swing, playerName, position, visible }: SwingTooltipProps) {
+  if (!visible) return null;
+  
+  const speed = Math.round(swing.ball_speed || 0);
+  const swingType = formatSwingType(swing.swing_type);
+  const { velocity } = OVERLAY_COLORS;
+  
+  return (
+    <Box
+      style={{
+        position: "absolute",
+        left: `${position}%`,
+        bottom: "calc(100% + 12px)",
+        transform: "translateX(-50%)",
+        zIndex: 1000,
+        pointerEvents: "none",
+        animation: "fadeIn 0.15s ease-out",
+      }}
+    >
+      {/* Tooltip content */}
+      <Box
+        style={{
+          backgroundColor: velocity.backgroundColor,
+          border: `2px solid ${velocity.borderColor}`,
+          borderRadius: velocity.borderRadius,
+          padding: "8px 12px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {/* Player name and swing type */}
+        <Text
+          size="1"
+          style={{
+            color: "rgba(255, 255, 255, 0.7)",
+            display: "block",
+            marginBottom: "2px",
+          }}
+        >
+          {playerName} · {swingType}
+        </Text>
+        
+        {/* Speed */}
+        {speed > 0 && (
+          <Flex align="baseline" gap="1">
+            <Text
+              size="4"
+              weight="bold"
+              style={{ color: velocity.textColor }}
+            >
+              {speed}
+            </Text>
+            <Text
+              size="2"
+              style={{ color: velocity.unitColor }}
+            >
+              km/h
+            </Text>
+          </Flex>
+        )}
+      </Box>
+      
+      {/* Arrow pointing down */}
+      <Box
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "100%",
+          transform: "translateX(-50%)",
+          width: 0,
+          height: 0,
+          borderLeft: "8px solid transparent",
+          borderRight: "8px solid transparent",
+          borderTop: `8px solid ${velocity.borderColor}`,
+        }}
+      />
+    </Box>
+  );
+}
+
+// Custom tooltip for bounces
+interface BounceTooltipProps {
+  bounce: BallBounce;
+  position: number;
+  visible: boolean;
+}
+
+function BounceTooltip({ bounce, position, visible }: BounceTooltipProps) {
+  if (!visible) return null;
+  
+  const { velocity } = OVERLAY_COLORS;
+  const bounceLabel = bounce.type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  
+  return (
+    <Box
+      style={{
+        position: "absolute",
+        left: `${position}%`,
+        bottom: "calc(100% + 12px)",
+        transform: "translateX(-50%)",
+        zIndex: 1000,
+        pointerEvents: "none",
+        animation: "fadeIn 0.15s ease-out",
+      }}
+    >
+      <Box
+        style={{
+          backgroundColor: velocity.backgroundColor,
+          border: `2px solid ${velocity.borderColor}`,
+          borderRadius: velocity.borderRadius,
+          padding: "6px 10px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <Text size="2" style={{ color: velocity.textColor }}>
+          {bounceLabel}
+        </Text>
+        <Text size="1" style={{ color: "rgba(255,255,255,0.6)", marginLeft: "6px" }}>
+          {formatDuration(bounce.timestamp)}
+        </Text>
+      </Box>
+      
+      <Box
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "100%",
+          transform: "translateX(-50%)",
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderTop: `6px solid ${velocity.borderColor}`,
+        }}
+      />
+    </Box>
+  );
+}
 
 interface RallyTimelineProps {
   result: StatisticsResult;
@@ -33,6 +182,8 @@ export function RallyTimeline({
   playerDisplayNames = {},
 }: RallyTimelineProps) {
   const [showAudioWaveform, setShowAudioWaveform] = useState(false);
+  const [hoveredSwingIdx, setHoveredSwingIdx] = useState<number | null>(null);
+  const [hoveredBounceIdx, setHoveredBounceIdx] = useState<number | null>(null);
   
   const rallies = result.rallies || [];
   const players = result.players || [];
@@ -68,6 +219,21 @@ export function RallyTimeline({
     seekTo(targetTime);
   };
 
+  // Timeline ref for drag operations
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  // Convert percentage to time (for drag operations)
+  const positionToTime = useCallback((percentage: number): number => {
+    return rallyStart + percentage * rallyDuration;
+  }, [rallyStart, rallyDuration]);
+
+  // Playhead position as percentage
+  const playheadPosition = ((currentTime - rallyStart) / rallyDuration) * 100;
+  const isPlayheadVisible = currentTime >= rallyStart && currentTime <= rallyEnd;
+  
+  // Elapsed time within the rally
+  const elapsedInRally = Math.max(0, Math.min(currentTime - rallyStart, rallyDuration));
+
   return (
     <Box style={{ animation: "slideDown 0.5s ease-out", overflow: "hidden" }}>
       <Card style={{ border: "1px solid var(--mint-9)", marginBottom: "var(--space-3)" }}>
@@ -78,9 +244,11 @@ export function RallyTimeline({
                 Rally {selectedRallyIndex + 1}
               </Heading>
               <Badge color="mint">{formatDuration(rallyDuration)}</Badge>
-              <Text size="2" color="gray">
-                {rallySwings.length} swings • {rallyBounces.length} bounces
-              </Text>
+              <Box display={{ initial: "none", sm: "block" }}>
+                <Text size="2" color="gray">
+                  {rallySwings.length} swings • {rallyBounces.length} bounces
+                </Text>
+              </Box>
             </Flex>
             <Flex align="center" gap="3">
               <Flex gap="3">
@@ -116,7 +284,7 @@ export function RallyTimeline({
           </Flex>
 
           <Box
-            ref={rallyTimelineRef as React.RefObject<HTMLDivElement>}
+            ref={timelineContainerRef}
             onClick={handleTimelineClick}
             style={{
               height: "44px",
@@ -145,18 +313,27 @@ export function RallyTimeline({
               const playerIndex = getPlayerIndex(players, swing.player_id);
               const playerName = playerDisplayNames[swing.player_id] || `P${playerIndex}`;
               const isNearPlayhead = Math.abs(currentTime - swing.ball_hit.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
+              const isHovered = hoveredSwingIdx === idx;
 
               return (
-                <Tooltip
-                  key={`swing-${idx}`}
-                  content={`${playerName} ${formatSwingType(swing.swing_type)} – ${formatDuration(swing.ball_hit.timestamp)}`}
-                >
+                <Box key={`swing-${idx}`}>
+                  {/* Custom Tooltip */}
+                  <SwingTooltip
+                    swing={swing}
+                    playerName={playerName}
+                    position={position}
+                    visible={isHovered}
+                  />
+                  
+                  {/* Swing marker */}
                   <Box
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
                       seekTo(swing.ball_hit.timestamp);
                     }}
                     onMouseEnter={(e) => {
+                      setHoveredSwingIdx(idx);
+                      setHoveredBounceIdx(null);
                       const inner = e.currentTarget.querySelector("[data-swing-inner]") as HTMLElement;
                       if (inner) {
                         inner.style.transform = "scaleX(1.5)";
@@ -164,6 +341,7 @@ export function RallyTimeline({
                       }
                     }}
                     onMouseLeave={(e) => {
+                      setHoveredSwingIdx(null);
                       const inner = e.currentTarget.querySelector("[data-swing-inner]") as HTMLElement;
                       if (inner) {
                         inner.style.transform = "scaleX(1)";
@@ -178,7 +356,7 @@ export function RallyTimeline({
                       height: "100%",
                       transform: "translateX(-50%)",
                       cursor: "pointer",
-                      zIndex: 10,
+                      zIndex: isHovered ? 100 : 10,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -197,7 +375,7 @@ export function RallyTimeline({
                       }}
                     />
                   </Box>
-                </Tooltip>
+                </Box>
               );
             })}
 
@@ -206,34 +384,45 @@ export function RallyTimeline({
               const relativeTime = bounce.timestamp - rallyStart;
               const position = (relativeTime / rallyDuration) * 100;
               const isNearPlayhead = Math.abs(currentTime - bounce.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
+              const isHovered = hoveredBounceIdx === idx;
               
               // Determine color based on bounce type
               // Inferred types → Yellow, Swings → Purple, Floor → Orange
               const isInferred = bounce.type.startsWith("inferred");
-              const isSwing = bounce.type === "swing";
+              const isSwingBounce = bounce.type === "swing";
               const bounceColor = isInferred 
                 ? "var(--yellow-9)"  // Yellow for all inferred types
-                : isSwing 
+                : isSwingBounce 
                   ? "var(--purple-9)"  // Purple for swings
                   : bounce.type === "floor" 
                     ? "var(--orange-9)"  // Orange for floor
                     : "var(--purple-9)"; // Purple for others
               const glowColor = isInferred
                 ? "rgba(234, 179, 8, 0.8)"  // Yellow glow
-                : isSwing 
+                : isSwingBounce 
                   ? "rgba(168, 85, 247, 0.8)"  // Purple glow
                   : bounce.type === "floor" 
                     ? "rgba(245, 158, 11, 0.8)"  // Orange glow
                     : "rgba(168, 85, 247, 0.8)"; // Purple glow
 
               return (
-                <Tooltip key={`bounce-${idx}`} content={`${bounce.type} bounce – ${formatDuration(bounce.timestamp)}`}>
+                <Box key={`bounce-${idx}`}>
+                  {/* Custom Tooltip */}
+                  <BounceTooltip
+                    bounce={bounce}
+                    position={position}
+                    visible={isHovered}
+                  />
+                  
+                  {/* Bounce marker */}
                   <Box
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
                       seekTo(bounce.timestamp);
                     }}
                     onMouseEnter={(e) => {
+                      setHoveredBounceIdx(idx);
+                      setHoveredSwingIdx(null);
                       const inner = e.currentTarget.querySelector("[data-bounce-inner]") as HTMLElement;
                       if (inner) {
                         inner.style.transform = "scale(1.5)";
@@ -241,6 +430,7 @@ export function RallyTimeline({
                       }
                     }}
                     onMouseLeave={(e) => {
+                      setHoveredBounceIdx(null);
                       const inner = e.currentTarget.querySelector("[data-bounce-inner]") as HTMLElement;
                       if (inner) {
                         inner.style.transform = "scale(1)";
@@ -255,7 +445,7 @@ export function RallyTimeline({
                       height: "100%",
                       transform: "translateX(-50%)",
                       cursor: "pointer",
-                      zIndex: 5,
+                      zIndex: isHovered ? 100 : 5,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -275,49 +465,25 @@ export function RallyTimeline({
                       }}
                     />
                   </Box>
-                </Tooltip>
+                </Box>
               );
             })}
 
-            {/* Playhead */}
-            {currentTime >= rallyStart && currentTime <= rallyEnd && (
-              <>
-                <Box
-                  style={{
-                    position: "absolute",
-                    left: `${((currentTime - rallyStart) / rallyDuration) * 100}%`,
-                    top: 0,
-                    width: "2px",
-                    height: "100%",
-                    backgroundColor: "var(--red-9)",
-                    zIndex: 20,
-                    pointerEvents: "none",
-                  }}
-                />
-                <Box
-                  style={{
-                    position: "absolute",
-                    left: `${((currentTime - rallyStart) / rallyDuration) * 100}%`,
-                    top: "-20px",
-                    transform: "translateX(-50%)",
-                    backgroundColor: "var(--red-9)",
-                    color: "white",
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    fontSize: "10px",
-                    whiteSpace: "nowrap",
-                    zIndex: 21,
-                    pointerEvents: "none",
-                  }}
-                >
-                  {formatDuration(currentTime)}
-                </Box>
-              </>
+            {/* Playhead - draggable */}
+            {isPlayheadVisible && (
+              <DraggablePlayhead
+                currentTime={currentTime}
+                position={playheadPosition}
+                onSeek={seekTo}
+                positionToTime={positionToTime}
+                timelineRef={timelineContainerRef}
+                displayTime={elapsedInRally}
+              />
             )}
 
             {/* Active event tooltip */}
-            {activeEventTooltip && rallyTimelineRef.current && (() => {
-              const rect = rallyTimelineRef.current!.getBoundingClientRect();
+            {activeEventTooltip && timelineContainerRef.current && (() => {
+              const rect = timelineContainerRef.current!.getBoundingClientRect();
               const leftPos = rect.left + (rect.width * activeEventTooltip.position) / 100;
               const topPos = rect.top - 50;
 
@@ -348,6 +514,7 @@ export function RallyTimeline({
           </Box>
         </Flex>
       </Card>
+
     </Box>
   );
 }

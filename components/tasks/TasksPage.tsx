@@ -14,7 +14,7 @@ import {
   Card,
   Select,
 } from "@radix-ui/themes";
-import { ArrowLeftIcon, PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon } from "@radix-ui/react-icons";
+import { ArrowLeftIcon, PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 const TASK_TYPES = [
@@ -101,6 +101,43 @@ export function TasksPage() {
   
   const [fetchingResult, setFetchingResult] = useState<string | null>(null);
   
+  // Fetch result from SportAI API and store in S3 (without downloading)
+  // Always uses force=true to bypass cache and get fresh data from SportAI
+  const fetchResult = async (taskId: string) => {
+    if (!user) return;
+    
+    setFetchingResult(taskId);
+    setError(null);
+    
+    try {
+      // Always force refresh to get latest data from SportAI API
+      const response = await fetch(`/api/tasks/${taskId}/result?force=true`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      
+      if (response.status === 202) {
+        throw new Error("Task is still being processed on SportAI servers");
+      }
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to fetch result");
+      }
+      
+      // Result fetched and stored in S3
+      // Update task in state to show it now has a result
+      setTasks(prev => 
+        prev.map(t => t.id === taskId ? { ...t, result_s3_key: `task-results/${taskId}.json` } : t)
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch result");
+    } finally {
+      setFetchingResult(null);
+    }
+  };
+  
+  // Fetch and immediately download result
   const fetchAndDownloadResult = async (taskId: string) => {
     if (!user) return;
     
@@ -567,43 +604,59 @@ export function TasksPage() {
                     </Table.Cell>
                     <Table.Cell>
                       <Flex gap="2" align="center">
+                        {/* Get Result button - fetch from SportAI API (for all completed tasks) */}
                         {task.status === "completed" && (
+                          <Button
+                            variant={task.result_s3_key ? "soft" : "solid"}
+                            size="1"
+                            color="mint"
+                            onClick={() => fetchResult(task.id)}
+                            disabled={fetchingResult === task.id}
+                            title={task.result_s3_key ? "Re-fetch result from SportAI" : "Fetch result from SportAI"}
+                          >
+                            {fetchingResult === task.id ? (
+                              <Spinner size="1" />
+                            ) : (
+                              <UpdateIcon />
+                            )}
+                            {task.result_s3_key ? "Refresh" : "Get Result"}
+                          </Button>
+                        )}
+                        
+                        {/* View button - only for tasks with results stored */}
+                        {task.status === "completed" && task.result_s3_key && (
                           <Button
                             variant="soft"
                             size="1"
-                            color="mint"
                             onClick={() => router.push(`/tasks/${task.id}`)}
                           >
                             <EyeOpenIcon />
                             View
                           </Button>
                         )}
-                        {task.result_s3_key ? (
+                        
+                        {/* Download button - for tasks with results stored */}
+                        {task.result_s3_key && (
                           <Button
                             variant="ghost"
                             size="1"
                             color="gray"
                             onClick={() => downloadResult(task.id)}
+                            title="Download JSON"
                           >
                             <DownloadIcon />
                           </Button>
-                        ) : task.status === "completed" ? (
-                          <Button
-                            variant="ghost"
-                            size="1"
-                            color="gray"
-                            onClick={() => fetchAndDownloadResult(task.id)}
-                            disabled={fetchingResult === task.id}
-                          >
-                            {fetchingResult === task.id ? <Spinner size="1" /> : <DownloadIcon />}
-                          </Button>
-                        ) : task.error_message ? (
+                        )}
+                        
+                        {/* Error message for failed tasks */}
+                        {task.status === "failed" && task.error_message && (
                           <Text size="1" color="red" style={{ maxWidth: "150px", display: "block" }}>
                             {task.error_message}
                           </Text>
-                        ) : (
-                          "-"
                         )}
+                        
+                        {/* Placeholder for pending/processing tasks */}
+                        {(task.status === "pending" || task.status === "processing") && "-"}
                       </Flex>
                     </Table.Cell>
                   </Table.Row>

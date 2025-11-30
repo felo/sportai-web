@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, forwardRef, useRef, useCallback } from "react";
+import { useState, forwardRef, useRef, useCallback, useEffect } from "react";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
 import { GearIcon, EnterFullScreenIcon, ExitFullScreenIcon, GridIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { VideoSettings } from "./VideoSettings";
@@ -73,6 +73,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     const [showPose, setShowPose] = useState(false); // Default OFF
     const [isHovered, setIsHovered] = useState(false);
     const [showCalibration, setShowCalibration] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     
     // Internal ref for ball tracker
     const internalVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -89,6 +90,19 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
 
     // Show buttons when hovered or when settings panel is open
     const showButtons = isHovered || showVideoSettings;
+    
+    // Track fullscreen state
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        setIsFullscreen(!!document.fullscreenElement);
+      };
+      
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      
+      return () => {
+        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      };
+    }, []);
     
     // Frame skip functions (assuming ~30fps, 1 frame ≈ 0.033s)
     const FRAME_DURATION = 1 / 30;
@@ -277,6 +291,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
               showPlayerBoxes={showPlayerBoxes}
               showPose={showPose}
               playerDisplayNames={playerDisplayNames}
+              isFullscreen={isFullscreen}
             />
           )}
 

@@ -3,6 +3,7 @@
 import { useRef, useEffect, RefObject } from "react";
 import { OVERLAY_COLORS } from "../constants";
 import { POSE_CONNECTIONS } from "@/types/pose";
+import { formatSwingType } from "../utils";
 
 // ============================================================================
 // POSE SKELETON CONFIGURATION - Tweak these to adjust skeleton size
@@ -81,6 +82,8 @@ interface BallTrackerOverlayProps {
   showPose?: boolean;
   /** Map of player_id to display name (e.g., { 0: "Player 1", 3: "Player 2" }) */
   playerDisplayNames?: Record<number, string>;
+  /** Whether the player is in fullscreen mode (scales overlay 2x) */
+  isFullscreen?: boolean;
 }
 
 // Binary search to find index near a timestamp
@@ -186,10 +189,14 @@ export function BallTrackerOverlay({
   showPlayerBoxes = false,
   showPose = false,
   playerDisplayNames = {},
+  isFullscreen = false,
 }: BallTrackerOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const lastPausedRef = useRef<boolean>(true);
+
+  // Scale factor for fullscreen mode (2x all overlay items)
+  const scale = isFullscreen ? 2 : 1;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -201,16 +208,19 @@ export function BallTrackerOverlay({
     if (!ctx) return;
 
     const TRAIL_DURATION = 0.5; // seconds of trail to show
-    const TRAIL_MIN_WIDTH = 0.5;
-    const TRAIL_MAX_WIDTH = 4;
+    const TRAIL_MIN_WIDTH = 0.5 * scale;
+    const TRAIL_MAX_WIDTH = 4 * scale;
     
-    // Perspective constants (same as indicator)
-    const minRadius = 0.25;
-    const maxRadius = 8;
+    // Perspective constants (same as indicator) - scaled for fullscreen
+    const minRadius = 0.25 * scale;
+    const maxRadius = 8 * scale;
     
-    // Ripple settings from config
+    // Ripple settings from config - scaled for fullscreen
     const rippleConfig = OVERLAY_COLORS.ripple;
     const rippleDuration = rippleConfig.durationMs / 1000; // Convert to seconds
+    const rippleMinRadius = rippleConfig.minRadius * scale;
+    const rippleMaxRadius = rippleConfig.maxRadius * scale;
+    const rippleLineWidth = rippleConfig.lineWidth * scale;
     
     // Helper to calculate perspective scale for a Y position
     const getPerspectiveScale = (y: number): number => {
@@ -361,10 +371,8 @@ export function BallTrackerOverlay({
             // Calculate perspective scale based on Y position
             const perspectiveScale = getPerspectiveScale(bouncePosition.Y);
             
-            // Animate radius from min to max
-            const baseMinRadius = rippleConfig.minRadius;
-            const baseMaxRadius = rippleConfig.maxRadius;
-            const currentRadius = (baseMinRadius + (baseMaxRadius - baseMinRadius) * progress) * perspectiveScale;
+            // Animate radius from min to max (using scaled values)
+            const currentRadius = (rippleMinRadius + (rippleMaxRadius - rippleMinRadius) * progress) * perspectiveScale;
             
             // Fade out opacity as ripple expands
             const opacity = rippleConfig.startOpacity * (1 - progress);
@@ -372,8 +380,8 @@ export function BallTrackerOverlay({
             // Get color based on bounce type
             const color = getBounceColor(bounce.type);
             
-            // Scale line width with perspective
-            const lineWidth = rippleConfig.lineWidth * perspectiveScale;
+            // Scale line width with perspective (using scaled value)
+            const lineWidth = rippleLineWidth * perspectiveScale;
             
             // Draw the ripple ring
             ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
@@ -401,6 +409,12 @@ export function BallTrackerOverlay({
       if (showVelocity && swings.length > 0 && ballPositions.length > 0) {
         const velocityConfig = OVERLAY_COLORS.velocity;
         const displayDuration = velocityConfig.displayDurationMs / 1000;
+        
+        // Scale velocity display for fullscreen
+        const velFontSize = velocityConfig.fontSize * scale;
+        const velPadding = velocityConfig.padding * scale;
+        const velBorderRadius = velocityConfig.borderRadius * scale;
+        const velOffset = velocityConfig.offsetFromBall * scale;
         
         for (const swing of swings) {
           // Skip swings with no ball speed
@@ -433,7 +447,7 @@ export function BallTrackerOverlay({
             const ballY = swingBallPos.Y * logicalHeight;
             
             // Determine position to avoid player (prefer above the ball, offset to side)
-            const offsetDistance = velocityConfig.offsetFromBall;
+            const offsetDistance = velOffset;
             let boxX = ballX;
             let boxY: number;
             
@@ -462,19 +476,16 @@ export function BallTrackerOverlay({
               boxY = ballY - offsetDistance;
             }
             
-            // Format swing type (e.g., "forehand_drive" -> "Forehand Drive")
-            const swingTypeFormatted = swing.swing_type
-              .split('_')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
+            // Format swing type using shared utility
+            const swingTypeFormatted = formatSwingType(swing.swing_type);
             
             // Format velocity text (no perspective scaling - must stay readable!)
             const speed = Math.round(swing.ball_speed);
             const speedText = `${speed}`;
             const unit = "km/h";
             
-            // Calculate text dimensions (fixed size for readability)
-            const fontSize = velocityConfig.fontSize;
+            // Calculate text dimensions (scaled for fullscreen)
+            const fontSize = velFontSize;
             const typeFontSize = fontSize * 0.6;
             const unitFontSize = fontSize * 0.65;
             
@@ -488,7 +499,7 @@ export function BallTrackerOverlay({
             ctx.font = `${unitFontSize}px system-ui, -apple-system, sans-serif`;
             const unitMetrics = ctx.measureText(unit);
             
-            const padding = velocityConfig.padding;
+            const padding = velPadding;
             const speedRowWidth = speedMetrics.width + unitMetrics.width + padding * 0.5;
             const totalWidth = Math.max(typeMetrics.width, speedRowWidth) + padding * 2;
             const boxHeight = typeFontSize + fontSize + padding * 2.5;
@@ -500,13 +511,13 @@ export function BallTrackerOverlay({
             // Draw background box
             const boxLeft = boxX - totalWidth / 2;
             const boxTop = boxY - boxHeight / 2;
-            const borderRadius = velocityConfig.borderRadius;
+            const borderRadius = velBorderRadius;
             
             ctx.globalAlpha = opacity;
             
             // Draw connecting line from ball to box
             ctx.strokeStyle = velocityConfig.borderColor;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1.5 * scale;
             ctx.beginPath();
             ctx.moveTo(ballX, ballY);
             ctx.lineTo(boxX, boxY);
@@ -515,7 +526,7 @@ export function BallTrackerOverlay({
             // Draw small dot at ball end of line
             ctx.fillStyle = velocityConfig.borderColor;
             ctx.beginPath();
-            ctx.arc(ballX, ballY, 3, 0, Math.PI * 2);
+            ctx.arc(ballX, ballY, 3 * scale, 0, Math.PI * 2);
             ctx.fill();
             
             // Draw rounded rectangle background
@@ -866,7 +877,7 @@ export function BallTrackerOverlay({
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose]);
+  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose, scale]);
 
   return (
     <canvas

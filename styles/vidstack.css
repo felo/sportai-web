@@ -1,0 +1,245 @@
+/* Vidstack Custom Theme - SportAI Brand Colors */
+/* Light mode: #025940 (dark green) | Dark mode: #7ADB8F (light green) */
+/* Base styles are imported directly in the component */
+
+/* ============================================
+   LIGHT MODE (Default)
+   ============================================ */
+
+[data-media-player] {
+  /* Primary brand color - dark green in light mode */
+  --media-brand: #025940;
+  --media-focus: #025940;
+  
+  /* Slider/progress track colors */
+  --media-slider-track-fill-bg: #025940;
+  --media-slider-value-bg: #025940;
+  --media-slider-preview-bg: rgba(2, 89, 64, 0.1);
+  
+  /* Time slider specific */
+  --media-time-slider-track-fill-bg: #025940;
+  
+  /* Chapter markers */
+  --media-slider-chapter-title-color: #025940;
+  
+  /* Tooltip styling */
+  --media-tooltip-bg: #1C1C1C;
+  --media-tooltip-color: #FFFFFF;
+  
+  /* Menu styling */
+  --media-menu-bg: rgba(255, 255, 255, 0.95);
+  --media-menu-border: 1px solid rgba(0, 0, 0, 0.1);
+  --media-menu-item-hover-bg: rgba(2, 89, 64, 0.1);
+  
+  /* Focus rings */
+  --media-focus-ring: 0 0 0 2px rgba(2, 89, 64, 0.5);
+  
+  /* Border radius to match Radix UI */
+  --media-border-radius: var(--radius-3, 8px);
+  
+  /* Font family to match your app */
+  font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Buffering progress color */
+[data-media-player] .vds-time-slider .vds-slider-progress {
+  background-color: rgba(2, 89, 64, 0.3);
+}
+
+/* Play button accent */
+[data-media-player] .vds-play-button:hover {
+  background-color: rgba(2, 89, 64, 0.1);
+}
+
+/* Active/selected states */
+[data-media-player] [data-active] {
+  color: #025940;
+}
+
+[data-media-player] .vds-menu-item[aria-checked="true"]::before {
+  background-color: #025940;
+}
+
+/* Chapter markers on timeline */
+[data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
+  background-color: #025940;
+}
+
+/* PiP button styling */
+[data-media-player] .vds-pip-button:hover {
+  background-color: rgba(2, 89, 64, 0.1);
+}
+
+/* Fullscreen button styling */
+[data-media-player] .vds-fullscreen-button:hover {
+  background-color: rgba(2, 89, 64, 0.1);
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+
+html[data-theme="dark"] [data-media-player],
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] {
+  /* Primary brand color - light green in dark mode */
+  --media-brand: #7ADB8F;
+  --media-focus: #7ADB8F;
+  
+  /* Slider/progress track colors */
+  --media-slider-track-fill-bg: #7ADB8F;
+  --media-slider-value-bg: #7ADB8F;
+  --media-slider-preview-bg: rgba(122, 219, 143, 0.15);
+  
+  /* Time slider specific */
+  --media-time-slider-track-fill-bg: #7ADB8F;
+  
+  /* Chapter markers */
+  --media-slider-chapter-title-color: #7ADB8F;
+  
+  /* Tooltip styling */
+  --media-tooltip-bg: #2E2E2E;
+  --media-tooltip-color: #EEEEEE;
+  
+  /* Menu styling */
+  --media-menu-bg: rgba(46, 46, 46, 0.98);
+  --media-menu-border: 1px solid rgba(255, 255, 255, 0.1);
+  --media-menu-item-hover-bg: rgba(122, 219, 143, 0.15);
+  
+  /* Focus rings */
+  --media-focus-ring: 0 0 0 2px rgba(122, 219, 143, 0.5);
+  
+  /* Control bar background */
+  --media-controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+}
+
+/* Dark mode buffering progress color */
+html[data-theme="dark"] [data-media-player] .vds-time-slider .vds-slider-progress,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-time-slider .vds-slider-progress {
+  background-color: rgba(122, 219, 143, 0.3);
+}
+
+/* Dark mode active states */
+html[data-theme="dark"] [data-media-player] [data-active],
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] [data-active] {
+  color: #7ADB8F;
+}
+
+html[data-theme="dark"] [data-media-player] .vds-menu-item[aria-checked="true"]::before,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-menu-item[aria-checked="true"]::before {
+  background-color: #7ADB8F;
+}
+
+/* Dark mode chapter markers */
+html[data-theme="dark"] [data-media-player] .vds-slider-chapters .vds-slider-chapter::after,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
+  background-color: #7ADB8F;
+}
+
+/* Dark mode hover states */
+html[data-theme="dark"] [data-media-player] .vds-play-button:hover,
+html[data-theme="dark"] [data-media-player] .vds-pip-button:hover,
+html[data-theme="dark"] [data-media-player] .vds-fullscreen-button:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-play-button:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-pip-button:hover,
+[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-fullscreen-button:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+}
+
+/* ============================================
+   LAYOUT ENHANCEMENTS
+   ============================================ */
+
+/* Make player fill container */
+[data-media-player] {
+  width: 100%;
+  height: 100%;
+}
+
+[data-media-player] video {
+  object-fit: contain;
+  border-radius: var(--radius-3, 8px);
+}
+
+/* Smoother transitions */
+[data-media-player] .vds-controls {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Timeline chapters styling */
+[data-media-player] .vds-slider-chapters {
+  gap: 2px;
+}
+
+[data-media-player] .vds-slider-chapter {
+  border-radius: 2px;
+}
+
+/* Speed menu improvements */
+[data-media-player] .vds-menu-items {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Thumbnail preview styling */
+[data-media-player] .vds-thumbnail {
+  border-radius: 4px;
+  border: 2px solid currentColor;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Chapter title on hover */
+[data-media-player] .vds-slider-chapter-title {
+  font-size: 12px;
+  font-weight: 500;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Time display styling */
+[data-media-player] .vds-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* Volume slider */
+[data-media-player] .vds-volume-slider {
+  --media-slider-track-fill-bg: currentColor;
+}
+
+/* PiP window styling */
+::backdrop {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   KEYBOARD SHORTCUTS INDICATOR
+   ============================================ */
+
+[data-media-player] .vds-gesture {
+  --gesture-icon-size: 64px;
+}
+
+[data-media-player] .vds-gesture[data-type="seek-forward"],
+[data-media-player] .vds-gesture[data-type="seek-backward"] {
+  opacity: 0.9;
+}
+
+/* ============================================
+   CUSTOM OVERLAY SUPPORT
+   ============================================ */
+
+/* Ensure overlays can be placed above video but below controls */
+[data-media-player] [data-overlay] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Make sure controls are above everything */
+[data-media-player] .vds-controls {
+  z-index: 50;
+}
+

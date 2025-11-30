@@ -52,6 +52,9 @@ function getS3Client(): S3Client | null {
 /**
  * POST /api/tasks/[taskId]/result
  * Fetch result from SportAI, store in our S3, and return download URL
+ * 
+ * Query params:
+ * - force: If "true", bypass cache and re-fetch from SportAI API
  */
 export async function POST(
   request: NextRequest,
@@ -59,6 +62,10 @@ export async function POST(
 ) {
   const { taskId } = await params;
   const requestId = `task_result_${Date.now()}`;
+  
+  // Check for force refresh
+  const { searchParams } = new URL(request.url);
+  const forceRefresh = searchParams.get("force") === "true";
   
   try {
     const authHeader = request.headers.get("Authorization");
@@ -89,8 +96,8 @@ export async function POST(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     
-    // If we already have the result stored, just return a download URL
-    if (task.result_s3_key) {
+    // If we already have the result stored AND not forcing refresh, return cached URL
+    if (task.result_s3_key && !forceRefresh) {
       const s3Client = getS3Client();
       if (s3Client) {
         const command = new GetObjectCommand({
@@ -104,6 +111,10 @@ export async function POST(
           cached: true,
         });
       }
+    }
+    
+    if (forceRefresh) {
+      logger.info(`[${requestId}] Force refresh requested for task ${taskId}`);
     }
     
     if (!task.sportai_task_id) {
