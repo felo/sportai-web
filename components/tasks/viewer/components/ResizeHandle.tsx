@@ -46,3 +46,4 @@ export function ResizeHandle({ side, isResizing, videoWidth, onResizeStart }: Re
   );
 }
 
+

@@ -18,6 +18,7 @@
     "@nivo/bar": "^0.99.0",
     "@nivo/core": "^0.99.0",
     "@nivo/line": "^0.99.0",
+    "@nivo/network": "^0.99.0",
     "@nivo/pie": "^0.99.0",
     "@nivo/radar": "^0.99.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",

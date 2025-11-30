@@ -15,6 +15,10 @@ export { PlayerCard } from "./PlayerCard";
 export { PlayerCharts } from "./PlayerCharts";
 export { AnalysisTabs } from "./AnalysisTabs";
 export { BounceHeatmap } from "./BounceHeatmap";
+export { ServeHeatmap } from "./ServeHeatmap";
+export { ReturnHeatmap } from "./ReturnHeatmap";
+export { ThirdBallHeatmap } from "./ThirdBallHeatmap";
+export { RallyNetwork } from "./RallyNetwork";
 export { ConfidenceCard } from "./ConfidenceCard";
 export { TaskStatusCard } from "./TaskStatusCard";
 export { PadelCourt2D } from "./PadelCourt2D";
@@ -22,4 +26,13 @@ export { VideoCourtLayout } from "./VideoCourtLayout";
 export { TimelineFilter } from "./TimelineFilter";
 export type { TimelineFilterState } from "./TimelineFilter";
 export { DraggablePlayhead } from "./DraggablePlayhead";
+export { TabNavigation } from "./TabNavigation";
+export type { TabDefinition } from "./TabNavigation";
+
+// Shared components
+export { Confetti, Medal, MedalDisplay, ProgressRing, RING_GRADIENTS, RING_ICONS, MEDAL_CONFIGS } from "./shared";
+export type { MedalConfig, ProgressRingProps, ProgressRingGradient } from "./shared";
+
+// Tab content components
+export { RalliesTab, SummaryTab, PlayersTab, HighlightsTab, TacticalTab, TechniqueTab } from "./tabs";
 

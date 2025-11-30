@@ -7,6 +7,139 @@ export const FEATURE_FLAGS = {
 };
 
 // ===========================================
+// SWING TYPE COLORS - Consistent across all charts
+// ===========================================
+export const SWING_TYPE_COLORS: Record<string, string> = {
+  forehand: "#10B981",        // Emerald
+  backhand: "#06B6D4",        // Cyan
+  backhand_one_hand: "#06B6D4",
+  backhand_two_hand: "#0EA5E9", // Sky
+  backhand_2h: "#0EA5E9",
+  serve: "#8B5CF6",           // Purple
+  volley: "#F59E0B",          // Amber
+  overhead: "#84CC16",        // Lime
+  smash: "#84CC16",
+  drop: "#EC4899",            // Pink
+  dropshot: "#EC4899",
+  slice: "#14B8A6",           // Teal
+  lob: "#6366F1",             // Indigo
+  flat: "#A855F7",            // Purple variant
+  kick: "#D946EF",            // Fuchsia
+  topspin: "#14B8A6",
+  other: "#6B7280",           // Gray
+  unknown: "#9CA3AF",         // Light gray
+};
+
+// Fallback colors for unrecognized swing types
+export const SWING_TYPE_FALLBACK_COLORS = [
+  "#10B981", "#3B82F6", "#8B5CF6", "#F59E0B",
+  "#06B6D4", "#6366F1", "#14B8A6", "#84CC16",
+];
+
+/**
+ * Get color for a swing type with fallback
+ */
+export function getSwingTypeColor(swingType: string, fallbackIndex: number = 0): string {
+  const normalized = swingType.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  return SWING_TYPE_COLORS[normalized] || SWING_TYPE_FALLBACK_COLORS[fallbackIndex % SWING_TYPE_FALLBACK_COLORS.length];
+}
+
+// ===========================================
+// CHART THEME - Nivo/D3 compatible
+// ===========================================
+export const CHART_THEME = {
+  background: "transparent",
+  text: {
+    fontSize: 11,
+    fill: "var(--gray-11)",
+  },
+  axis: {
+    domain: {
+      line: {
+        stroke: "var(--gray-6)",
+        strokeWidth: 1,
+      },
+    },
+    ticks: {
+      line: {
+        stroke: "var(--gray-6)",
+        strokeWidth: 1,
+      },
+      text: {
+        fontSize: 10,
+        fill: "var(--gray-10)",
+      },
+    },
+    legend: {
+      text: {
+        fontSize: 11,
+        fill: "var(--gray-11)",
+        fontWeight: 500,
+      },
+    },
+  },
+  grid: {
+    line: {
+      stroke: "var(--gray-4)",
+      strokeWidth: 1,
+    },
+  },
+  legends: {
+    text: {
+      fontSize: 11,
+      fill: "var(--gray-11)",
+    },
+  },
+  tooltip: {
+    container: {
+      background: "var(--gray-2)",
+      color: "var(--gray-12)",
+      fontSize: 12,
+      borderRadius: 8,
+      boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+      border: "1px solid var(--gray-6)",
+    },
+  },
+};
+
+// ===========================================
+// WINNER NICKNAMES - Fun titles for leaders
+// ===========================================
+export const WINNER_NICKNAMES = {
+  most_shots: [
+    "Rally Monster", "Shot Factory", "Tap-Tap Titan", "Rally Machine",
+    "Ball Cyclone", "Volley Vortex", "Endless Rallyer", "Hit Storm",
+    "Shot Engine", "Rally Goblin",
+  ],
+  fastest_sprint: [
+    "Lightning Legs", "Turbo Dash", "Flash Step", "Speed Demon",
+    "Quickfire Stride", "Rocket Runner", "Blitz Feet", "Turbo Sneakers",
+    "Flash Motion", "Sprint Wizard",
+  ],
+  most_distance: [
+    "Court Explorer", "Endless Runner", "Energy Machine", "Marathon Maker",
+    "Distance Dynamo", "Court Wanderer", "Stamina Sprinter", "Mileage Master",
+    "Roaming Rocket", "Track Trotter",
+  ],
+  hardest_shot: [
+    "Smash Cannon", "Rocket Racket", "Boom Ball", "Power Blaster",
+    "Thunder Smash", "Ball Crusher", "Impact Titan", "Velocity Vandal",
+    "Smash Reactor", "Shockwave Shot",
+  ],
+} as const;
+
+export type WinnerCategory = keyof typeof WINNER_NICKNAMES;
+
+/**
+ * Get a random nickname for a winner category (stable per session using seed)
+ */
+export function getRandomNickname(category: WinnerCategory, seed: number): string {
+  const nicknames = WINNER_NICKNAMES[category];
+  const index = Math.abs(seed) % nicknames.length;
+  return nicknames[index];
+}
+
+// ===========================================
 // PLAYER SETTINGS
 // ===========================================
 export const PLAYER_CONFIG = {

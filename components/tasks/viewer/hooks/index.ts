@@ -1,4 +1,13 @@
 export { useVideoPlayback } from "./useVideoPlayback";
 export { useEventTooltip } from "./useEventTooltip";
 export { useAudioAnalysis, useRealtimeVolume } from "./useAudioAnalysis";
+export { useTaskFetching } from "./useTaskFetching";
+export { usePlayerRankings, getSortedPlayersWithOverallRank, getOverallRankPoints, getGoldCount } from "./usePlayerRankings";
+export type { ValidPlayer, PlayerRankings } from "./usePlayerRankings";
+export { useEnhancedBounces, useAllSwings } from "./useEnhancedBounces";
+export { useRallySelection } from "./useRallySelection";
+export { useAnimatedProgress, useAnimatedNumber } from "./useAnimatedProgress";
+export type { AnimatedProgressOptions, AnimatedProgressResult } from "./useAnimatedProgress";
+export { useInView } from "./useInView";
+export type { UseInViewOptions, UseInViewResult } from "./useInView";
 
