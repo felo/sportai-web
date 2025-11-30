@@ -10,4 +10,5 @@ export { useAnimatedProgress, useAnimatedNumber } from "./useAnimatedProgress";
 export type { AnimatedProgressOptions, AnimatedProgressResult } from "./useAnimatedProgress";
 export { useInView } from "./useInView";
 export type { UseInViewOptions, UseInViewResult } from "./useInView";
+export { useServeData, useReturnData, useThirdBallData, useFourthBallData, useFifthBallData } from "./useShotAnalysis";
 

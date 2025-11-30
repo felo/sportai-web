@@ -31,6 +31,7 @@ export interface Swing {
   volley: boolean;
   serve: boolean;
   ball_hit: { timestamp: number; frame_nr: number };
+  ball_hit_location?: [number, number]; // Player court position [X, Y] in meters when ball was hit
   confidence?: number;
   annotations?: SwingAnnotation[];
   is_in_rally?: boolean; // Only show swings that are part of a rally
