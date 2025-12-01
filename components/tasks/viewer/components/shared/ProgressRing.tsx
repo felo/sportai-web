@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { useAnimatedProgress } from "../../hooks/useAnimatedProgress";
 import { Confetti } from "./Confetti";
@@ -36,6 +36,10 @@ export interface ProgressRingProps {
   strokeWidth?: number;
   /** Hide the medal/percentage display below the ring */
   hideMedalDisplay?: boolean;
+  /** Whether this ring is a winner (should show confetti) */
+  isWinner?: boolean;
+  /** Delay before showing confetti (ms) */
+  confettiDelay?: number;
 }
 
 /**
@@ -55,14 +59,27 @@ export function ProgressRing({
   size = 160,
   strokeWidth = 12,
   hideMedalDisplay = false,
+  isWinner = false,
+  confettiDelay = 0,
 }: ProgressRingProps) {
   const percentage = maxValue > 0 ? value / maxValue : 0;
+  const [showWinnerConfetti, setShowWinnerConfetti] = useState(false);
   
   const { progress, isComplete } = useAnimatedProgress({
     isVisible,
     percentage,
     onComplete: undefined,
   });
+
+  // Trigger winner confetti after delay
+  useEffect(() => {
+    if (isWinner && isComplete && confettiDelay > 0) {
+      const timer = setTimeout(() => setShowWinnerConfetti(true), confettiDelay);
+      return () => clearTimeout(timer);
+    } else if (isWinner && isComplete && confettiDelay === 0) {
+      setShowWinnerConfetti(true);
+    }
+  }, [isWinner, isComplete, confettiDelay]);
 
   const cx = size / 2;
   const cy = size / 2;
@@ -78,7 +95,7 @@ export function ProgressRing({
   return (
     <Flex direction="column" align="center" gap="2">
       <Box style={{ position: "relative" }}>
-        <Confetti trigger={isComplete && rank === 1} />
+        <Confetti trigger={(isComplete && rank === 1) || showWinnerConfetti} />
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <defs>
             <linearGradient

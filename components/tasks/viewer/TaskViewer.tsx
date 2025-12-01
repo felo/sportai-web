@@ -10,8 +10,19 @@ import {
   StarIcon,
   TargetIcon,
   MixIcon,
-  GroupIcon,
 } from "@radix-ui/react-icons";
+
+// Custom two-person team icon matching Radix style
+const TeamIcon = ({ width = 16, height = 16 }: { width?: number; height?: number }) => (
+  <svg width={width} height={height} viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M5.5 3C4.67157 3 4 3.67157 4 4.5C4 5.32843 4.67157 6 5.5 6C6.32843 6 7 5.32843 7 4.5C7 3.67157 6.32843 3 5.5 3ZM9.5 3C8.67157 3 8 3.67157 8 4.5C8 5.32843 8.67157 6 9.5 6C10.3284 6 11 5.32843 11 4.5C11 3.67157 10.3284 3 9.5 3ZM3 10C3 8.34315 4.34315 7 6 7H6.5C7.16667 7 7.75 7.25 8.25 7.5C8.75 7.25 9.33333 7 10 7H10.5C12.1569 7 13 8.34315 13 10V11.5C13 11.7761 12.7761 12 12.5 12H2.5C2.22386 12 2 11.7761 2 11.5V10C2 9.5 2.5 9 3 10Z"
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+    />
+  </svg>
+);
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useVideoPlayback, useEventTooltip } from "./hooks";
 import {
@@ -164,7 +175,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     { 
       id: "teams", 
       label: "Team Stats", 
-      icon: <GroupIcon width={16} height={16} />, 
+      icon: <TeamIcon width={16} height={16} />, 
       badge: teamCount > 0 ? teamCount : undefined 
     },
     { 
@@ -295,6 +306,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             result={result}
             portraits={portraits}
             playerDisplayNames={playerDisplayNames}
+            rankings={rankings}
           />
         )}
 

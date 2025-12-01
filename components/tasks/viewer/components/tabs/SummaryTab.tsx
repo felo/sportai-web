@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, createContext, useContext } from "react";
 import { Box, Grid, Flex, Heading, Text, Card, Separator } from "@radix-ui/themes";
 import { ResponsivePie } from "@nivo/pie";
 import { Task, StatisticsResult, BallBounce } from "../../types";
@@ -9,6 +9,28 @@ import { formatSwingType } from "../../utils";
 import { getSwingTypeColor, CHART_THEME } from "../../constants";
 import { ProgressRing } from "../shared";
 import type { ProgressRingGradient } from "../shared";
+
+// Animation timing constants
+const CARD_FADE_DURATION = 400; // ms per card fade-in
+const CARD_STAGGER_DELAY = 80; // ms between each row
+const TOTAL_ROWS = 5; // Quick stats row 1 & 2, Main cards rows 1-3
+
+// Context to control when counting starts
+const CountingContext = createContext(false);
+
+// CSS keyframes for card fade-in from top
+const cardFadeKeyframes = `
+@keyframes cardFadeInFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+`;
 
 interface SummaryTabProps {
   task: Task;
@@ -176,6 +198,26 @@ export function SummaryTab({
   const hasSpeedData = allSpeeds.length > 0;
   const hasSprintData = allSprints.length > 0;
 
+  // Animation state
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const [startCounting, setStartCounting] = useState(false);
+
+  // Trigger card fade-in, then start counting after all cards visible
+  useEffect(() => {
+    // Start fade-in immediately
+    const fadeTimer = setTimeout(() => setCardsVisible(true), 50);
+    
+    // Start counting after all cards have faded in
+    const countTimer = setTimeout(() => {
+      setStartCounting(true);
+    }, 50 + (TOTAL_ROWS - 1) * CARD_STAGGER_DELAY + CARD_FADE_DURATION + 100);
+    
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(countTimer);
+    };
+  }, []);
+
   // Categorize bounces
   const bounceCounts = {
     floor: 0,
@@ -199,164 +241,189 @@ export function SummaryTab({
     }
   });
 
+  // Helper to get animation style for each row
+  // Cards start hidden and only appear through the animation
+  const getRowAnimation = (rowIndex: number) => ({
+    opacity: 0,
+    transform: "translateY(-20px)",
+    animation: cardsVisible 
+      ? `cardFadeInFromTop ${CARD_FADE_DURATION}ms ease-out ${rowIndex * CARD_STAGGER_DELAY}ms forwards`
+      : "none",
+  });
+
   return (
-    <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
-      {/* Quick Stats Row 1 */}
-      <Grid columns={{ initial: "2", sm: "3", md: "6" }} gap="3" mb="4">
-        <QuickStatCard label="Teams" value={teamCount} />
-        <QuickStatCard label="Rallies" value={rallies.length} />
-        <QuickStatCard label="Total Swings" value={totalSwings} />
-        <QuickStatCard
-          label="Distance Covered"
-          value={totalDistanceCovered}
-          formatValue={(v) => v > 0 ? `${(v / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : "-"}
-        />
-        <QuickStatCard
-          label="Active Play"
-          value={totalRallyDuration}
-          formatValue={(v) => v > 0 ? formatDuration(v) : "-"}
-        />
-        <QuickStatCard
-          label="Avg. Distance"
-          value={avgDistancePerPlayer}
-          formatValue={(v) => v > 0 ? `${Math.round(v)} m` : "-"}
-        />
-      </Grid>
+    <CountingContext.Provider value={startCounting}>
+      <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
+        {/* Inject keyframes */}
+        <style dangerouslySetInnerHTML={{ __html: cardFadeKeyframes }} />
+        
+        {/* Quick Stats Row 1 */}
+        <Grid 
+          columns={{ initial: "2", sm: "3", md: "6" }} 
+          gap="3" 
+          mb="4"
+          style={getRowAnimation(0)}
+        >
+          <QuickStatCard label="Teams" value={teamCount} />
+          <QuickStatCard label="Rallies" value={rallies.length} />
+          <QuickStatCard label="Total Swings" value={totalSwings} />
+          <QuickStatCard
+            label="Distance Covered"
+            value={totalDistanceCovered}
+            formatValue={(v) => v > 0 ? `${(v / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : "-"}
+          />
+          <QuickStatCard
+            label="Active Play"
+            value={totalRallyDuration}
+            formatValue={(v) => v > 0 ? formatDuration(v) : "-"}
+          />
+          <QuickStatCard
+            label="Avg. Distance"
+            value={avgDistancePerPlayer}
+            formatValue={(v) => v > 0 ? `${Math.round(v)} m` : "-"}
+          />
+        </Grid>
 
-      {/* Quick Stats Row 2 - Rally Stats */}
-      <Grid columns={{ initial: "2", sm: "4" }} gap="3" mb="4">
-        <QuickStatCard
-          label="Avg. Rally Length"
-          value={avgRallyDuration}
-          formatValue={(v) => v > 0 ? `${v.toFixed(1)}s` : "-"}
-        />
-        <QuickStatCard
-          label="Avg. Shots/Rally"
-          value={avgShotsPerRally}
-          formatValue={(v) => v > 0 ? v.toFixed(1) : "-"}
-        />
-        <QuickStatCard
-          label="Rally Intensity (Avg)"
-          value={avgRallyIntensity}
-          formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
-        />
-        <QuickStatCard
-          label="Rally Intensity (Max)"
-          value={maxRallyIntensity}
-          formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
-        />
-      </Grid>
+        {/* Quick Stats Row 2 - Rally Stats */}
+        <Grid 
+          columns={{ initial: "2", sm: "4" }} 
+          gap="3" 
+          mb="4"
+          style={getRowAnimation(1)}
+        >
+          <QuickStatCard
+            label="Avg. Rally Length"
+            value={avgRallyDuration}
+            formatValue={(v) => v > 0 ? `${v.toFixed(1)}s` : "-"}
+          />
+          <QuickStatCard
+            label="Avg. Shots/Rally"
+            value={avgShotsPerRally}
+            formatValue={(v) => v > 0 ? v.toFixed(1) : "-"}
+          />
+          <QuickStatCard
+            label="Rally Intensity (Avg)"
+            value={avgRallyIntensity}
+            formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
+          />
+          <QuickStatCard
+            label="Rally Intensity (Max)"
+            value={maxRallyIntensity}
+            formatValue={(v) => v > 0 ? `${v.toFixed(2)} shots/s` : "-"}
+          />
+        </Grid>
 
-      {/* Main Cards Grid - Row 1: Speeds & Serves */}
-      <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4">
-        {/* Shot Power Card */}
-        <Card style={{ border: "1px solid var(--gray-5)" }}>
-          <Flex direction="column" gap="3" p="4">
-            <Heading size="3" weight="medium">
-              Overall Shot Power
-            </Heading>
-            {hasSpeedData ? (
-              <SpeedometerDisplay
-                maxSpeed={maxBallSpeed}
-                avgSpeed={avgBallSpeed}
-                label="Shot"
-                unit="km/h"
-              />
-            ) : (
-              <EmptyState message="No speed data available" />
-            )}
-          </Flex>
-        </Card>
-
-        {/* Sprint Speed Card */}
-        <Card style={{ border: "1px solid var(--gray-5)" }}>
-          <Flex direction="column" gap="3" p="4">
-            <Heading size="3" weight="medium">
-              Overall Sprint Speed
-            </Heading>
-            {hasSprintData ? (
-              <SpeedometerDisplay
-                maxSpeed={maxSprintSpeed}
-                avgSpeed={avgSprintSpeed}
-                label="Sprint"
-                unit="km/h"
-                colorScheme="sprint"
-              />
-            ) : (
-              <EmptyState message="No sprint data available" />
-            )}
-          </Flex>
-        </Card>
-
-        {/* Serves & Volleys Card */}
-        <Card style={{ border: "1px solid var(--gray-5)" }}>
-          <Flex direction="column" gap="3" p="4">
-            <Heading size="3" weight="medium">
-              Serves & Volleys
-            </Heading>
-            <ServesVolleysDisplay
-              serveCount={serveCount}
-              volleyCount={volleyCount}
-              groundStrokeCount={groundStrokeCount}
-              totalSwings={totalSwingCount}
-              avgServeSpeed={avgServeSpeed}
-              maxServeSpeed={maxServeSpeed}
-              avgVolleySpeed={avgVolleySpeed}
-              maxVolleySpeed={maxVolleySpeed}
-              avgGroundStrokeSpeed={avgGroundStrokeSpeed}
-              maxGroundStrokeSpeed={maxGroundStrokeSpeed}
-            />
-          </Flex>
-        </Card>
-      </Grid>
-
-      {/* Main Cards Grid - Row 2 */}
-      <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4">
-        {/* Swing Types Card */}
-        <Card style={{ border: "1px solid var(--gray-5)" }}>
-          <Flex direction="column" gap="3" p="4">
-            <Heading size="3" weight="medium">
-              Swing Types
-            </Heading>
-            {hasSwingData ? (
-              <SwingTypesChart data={swingTypeData} totalSwings={totalSwingCount} />
-            ) : (
-              <EmptyState message="No swing data available" />
-            )}
-          </Flex>
-        </Card>
-
-        {/* Bounces Card */}
-        <Card style={{ border: "1px solid var(--gray-5)" }}>
-          <Flex direction="column" gap="3" p="4">
-            <Heading size="3" weight="medium">
-              Ball Bounces
-            </Heading>
-            <ExcitingBouncesDisplay
-              total={bounceCount}
-              floor={bounceCounts.floor}
-              wall={bounceCounts.wall}
-              swing={bounceCounts.swing}
-              other={bounceCounts.other}
-            />
-          </Flex>
-        </Card>
-
-        {/* Confidence Card */}
-        {result.confidences ? (
-          <ConfidenceDisplay confidences={result.confidences.final_confidences} />
-        ) : (
+        {/* Main Cards Grid - Row 1: Speeds & Serves */}
+        <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4" style={getRowAnimation(2)}>
+          {/* Shot Power Card */}
           <Card style={{ border: "1px solid var(--gray-5)" }}>
             <Flex direction="column" gap="3" p="4">
               <Heading size="3" weight="medium">
-                AI Detection Confidence
+                Overall Shot Power
               </Heading>
-              <EmptyState message="No confidence data available" />
+              {hasSpeedData ? (
+                <SpeedometerDisplay
+                  maxSpeed={maxBallSpeed}
+                  avgSpeed={avgBallSpeed}
+                  label="Shot"
+                  unit="km/h"
+                />
+              ) : (
+                <EmptyState message="No speed data available" />
+              )}
             </Flex>
           </Card>
-        )}
-      </Grid>
-    </Box>
+
+          {/* Sprint Speed Card */}
+          <Card style={{ border: "1px solid var(--gray-5)" }}>
+            <Flex direction="column" gap="3" p="4">
+              <Heading size="3" weight="medium">
+                Overall Sprint Speed
+              </Heading>
+              {hasSprintData ? (
+                <SpeedometerDisplay
+                  maxSpeed={maxSprintSpeed}
+                  avgSpeed={avgSprintSpeed}
+                  label="Sprint"
+                  unit="km/h"
+                  colorScheme="sprint"
+                />
+              ) : (
+                <EmptyState message="No sprint data available" />
+              )}
+            </Flex>
+          </Card>
+
+          {/* Serves & Volleys Card */}
+          <Card style={{ border: "1px solid var(--gray-5)" }}>
+            <Flex direction="column" gap="3" p="4">
+              <Heading size="3" weight="medium">
+                Serves & Volleys
+              </Heading>
+              <ServesVolleysDisplay
+                serveCount={serveCount}
+                volleyCount={volleyCount}
+                groundStrokeCount={groundStrokeCount}
+                totalSwings={totalSwingCount}
+                avgServeSpeed={avgServeSpeed}
+                maxServeSpeed={maxServeSpeed}
+                avgVolleySpeed={avgVolleySpeed}
+                maxVolleySpeed={maxVolleySpeed}
+                avgGroundStrokeSpeed={avgGroundStrokeSpeed}
+                maxGroundStrokeSpeed={maxGroundStrokeSpeed}
+              />
+            </Flex>
+          </Card>
+        </Grid>
+
+        {/* Main Cards Grid - Row 2 */}
+        <Grid columns={{ initial: "1", md: "3" }} gap="4" mb="4" style={getRowAnimation(3)}>
+          {/* Swing Types Card */}
+          <Card style={{ border: "1px solid var(--gray-5)" }}>
+            <Flex direction="column" gap="3" p="4">
+              <Heading size="3" weight="medium">
+                Swing Types
+              </Heading>
+              {hasSwingData ? (
+                <SwingTypesChart data={swingTypeData} totalSwings={totalSwingCount} />
+              ) : (
+                <EmptyState message="No swing data available" />
+              )}
+            </Flex>
+          </Card>
+
+          {/* Bounces Card */}
+          <Card style={{ border: "1px solid var(--gray-5)" }}>
+            <Flex direction="column" gap="3" p="4">
+              <Heading size="3" weight="medium">
+                Ball Bounces
+              </Heading>
+              <ExcitingBouncesDisplay
+                total={bounceCount}
+                floor={bounceCounts.floor}
+                wall={bounceCounts.wall}
+                swing={bounceCounts.swing}
+                other={bounceCounts.other}
+              />
+            </Flex>
+          </Card>
+
+          {/* Confidence Card */}
+          {result.confidences ? (
+            <ConfidenceDisplay confidences={result.confidences.final_confidences} />
+          ) : (
+            <Card style={{ border: "1px solid var(--gray-5)" }}>
+              <Flex direction="column" gap="3" p="4">
+                <Heading size="3" weight="medium">
+                  AI Detection Confidence
+                </Heading>
+                <EmptyState message="No confidence data available" />
+              </Flex>
+            </Card>
+          )}
+        </Grid>
+      </Box>
+    </CountingContext.Provider>
   );
 }
 
@@ -418,9 +485,11 @@ function AnimatedNumber({
 }) {
   const [display, setDisplay] = useState(0);
   const hasStartedRef = useRef(false);
+  const startCounting = useContext(CountingContext);
 
   useEffect(() => {
-    if (!hasStartedRef.current) {
+    // Only start counting when context says so
+    if (startCounting && !hasStartedRef.current) {
       hasStartedRef.current = true;
       const startTime = performance.now();
       const duration = 1200;
@@ -436,9 +505,9 @@ function AnimatedNumber({
         }
       };
 
-      setTimeout(() => requestAnimationFrame(animate), 100);
+      requestAnimationFrame(animate);
     }
-  }, [value]);
+  }, [value, startCounting]);
 
   if (formatValue) {
     return <>{formatValue(display)}</>;
@@ -470,9 +539,10 @@ function SpeedometerDisplay({
   const [animationProgress, setAnimationProgress] = useState(0);
   const hasStartedRef = useRef(false);
   const id = useRef(`speed-${Math.random().toString(36).substr(2, 9)}`);
+  const startCounting = useContext(CountingContext);
 
   useEffect(() => {
-    if (!hasStartedRef.current) {
+    if (startCounting && !hasStartedRef.current) {
       hasStartedRef.current = true;
       const startTime = performance.now();
       const duration = 2000;
@@ -488,9 +558,9 @@ function SpeedometerDisplay({
         }
       };
 
-      setTimeout(() => requestAnimationFrame(animate), 150);
+      requestAnimationFrame(animate);
     }
-  }, []);
+  }, [startCounting]);
 
   const displayMax = Math.round(maxSpeed * animationProgress);
   const displayAvg = Math.round(avgSpeed * animationProgress);
@@ -504,8 +574,9 @@ function SpeedometerDisplay({
   const angleRange = endAngle - startAngle;
   
   // Different max values for shot vs sprint
+  // Sprint speed is capped at 30 km/h (typical max for racket sports)
   const maxValue = colorScheme === "sprint" 
-    ? Math.max(40, Math.ceil(maxSpeed / 5) * 5 + 5)
+    ? 30
     : Math.max(150, Math.ceil(maxSpeed / 10) * 10 + 10);
 
   const animatedMax = animationProgress * maxSpeed;
@@ -531,12 +602,12 @@ function SpeedometerDisplay({
 
   // Different tick marks for sprint vs shot
   const ticks = colorScheme === "sprint" 
-    ? [0, 10, 20, 30, 40]
+    ? [0, 10, 20, 30]
     : [0, 30, 60, 90, 120, 150];
 
-  // Different colors for sprint
-  const avgColor = colorScheme === "sprint" ? "#3B82F6" : "#10B981";
-  const avgColorVar = colorScheme === "sprint" ? "var(--blue-11)" : "var(--mint-11)";
+  // Unified average needle color (blue)
+  const avgColor = "#3B82F6";
+  const avgColorVar = "var(--blue-11)";
 
   return (
     <Flex direction="column" align="center" gap="2">
@@ -554,25 +625,13 @@ function SpeedometerDisplay({
               x2="100%"
               y2="50%"
             >
-              {colorScheme === "sprint" ? (
-                <>
-                  <stop offset="0%" stopColor="#3B82F6" />
-                  <stop offset="25%" stopColor="#60A5FA" />
-                  <stop offset="45%" stopColor="#F59E0B" />
-                  <stop offset="65%" stopColor="#F97316" />
-                  <stop offset="85%" stopColor="#EF4444" />
-                  <stop offset="100%" stopColor="#DC2626" />
-                </>
-              ) : (
-                <>
-                  <stop offset="0%" stopColor="#10B981" />
-                  <stop offset="25%" stopColor="#7ADB8F" />
-                  <stop offset="45%" stopColor="#F59E0B" />
-                  <stop offset="65%" stopColor="#F97316" />
-                  <stop offset="85%" stopColor="#EF4444" />
-                  <stop offset="100%" stopColor="#DC2626" />
-                </>
-              )}
+              {/* Unified color gradient: blue → light blue → amber → orange → red */}
+              <stop offset="0%" stopColor="#3B82F6" />
+              <stop offset="25%" stopColor="#60A5FA" />
+              <stop offset="45%" stopColor="#F59E0B" />
+              <stop offset="65%" stopColor="#F97316" />
+              <stop offset="85%" stopColor="#EF4444" />
+              <stop offset="100%" stopColor="#DC2626" />
             </linearGradient>
             <filter
               id={`${id.current}-glow`}
@@ -798,9 +857,10 @@ function ServesVolleysDisplay({
 }) {
   const [animationProgress, setAnimationProgress] = useState(0);
   const hasStartedRef = useRef(false);
+  const startCounting = useContext(CountingContext);
 
   useEffect(() => {
-    if (!hasStartedRef.current) {
+    if (startCounting && !hasStartedRef.current) {
       hasStartedRef.current = true;
       const startTime = performance.now();
       const duration = 1500;
@@ -816,9 +876,9 @@ function ServesVolleysDisplay({
         }
       };
 
-      setTimeout(() => requestAnimationFrame(animate), 200);
+      requestAnimationFrame(animate);
     }
-  }, []);
+  }, [startCounting]);
 
   const displayServes = Math.round(serveCount * animationProgress);
   const displayVolleys = Math.round(volleyCount * animationProgress);
@@ -912,9 +972,10 @@ function SwingTypesChart({
   const [animationProgress, setAnimationProgress] = useState(0);
   const hasStartedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startCounting = useContext(CountingContext);
 
   useEffect(() => {
-    if (!hasStartedRef.current && data.length > 0) {
+    if (startCounting && !hasStartedRef.current && data.length > 0) {
       hasStartedRef.current = true;
       const startTime = performance.now();
       const duration = 1800;
@@ -930,7 +991,7 @@ function SwingTypesChart({
         }
       };
 
-      setTimeout(() => requestAnimationFrame(animate), 200);
+      requestAnimationFrame(animate);
 
       // Piano bounce effect
       setTimeout(() => {
@@ -953,7 +1014,7 @@ function SwingTypesChart({
         });
       }, 100);
     }
-  }, [data.length]);
+  }, [data.length, startCounting]);
 
   if (data.length === 0) return null;
 
@@ -1087,9 +1148,10 @@ function ExcitingBouncesDisplay({
   const [animationProgress, setAnimationProgress] = useState(0);
   const [showParticles, setShowParticles] = useState(false);
   const hasStartedRef = useRef(false);
+  const startCounting = useContext(CountingContext);
 
   useEffect(() => {
-    if (!hasStartedRef.current) {
+    if (startCounting && !hasStartedRef.current) {
       hasStartedRef.current = true;
       const startTime = performance.now();
       const duration = 1500;
@@ -1111,9 +1173,9 @@ function ExcitingBouncesDisplay({
         }
       };
 
-      setTimeout(() => requestAnimationFrame(animate), 200);
+      requestAnimationFrame(animate);
     }
-  }, []);
+  }, [startCounting]);
 
   const displayTotal = Math.round(total * animationProgress);
 
@@ -1253,6 +1315,47 @@ function getConfidenceGradient(): ProgressRingGradient {
   return CONFIDENCE_GRADIENT;
 }
 
+// Fun messages about AI improvement - randomly selected per render
+const AI_IMPROVEMENT_MESSAGES = [
+  "SportAI gets smarter with every match – like a coach who never sleeps ☕",
+  "Still in training! SportAI watches more matches than your most dedicated fan 📺",
+  "These scores improve with every rally. SportAI never skips training day 💪",
+  "SportAI is doing its homework on every match – rain or shine, no rest days 🤖",
+  "Like a rookie turning pro, SportAI learns something new from every game 🎾",
+  "Work in progress – SportAI is grinding harder than a baseline warrior 🏃",
+];
+
+function AIImprovementMessage() {
+  const [isVisible, setIsVisible] = useState(false);
+  
+  // Use useMemo to keep the same message during component lifecycle
+  const message = useMemo(() => {
+    const randomIndex = Math.floor(Math.random() * AI_IMPROVEMENT_MESSAGES.length);
+    return AI_IMPROVEMENT_MESSAGES[randomIndex];
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <Text 
+      size="1" 
+      color="gray" 
+      style={{ 
+        textAlign: "center", 
+        fontStyle: "italic", 
+        marginTop: 8,
+        opacity: isVisible ? 1 : 0,
+        transition: "opacity 0.6s ease-in-out",
+      }}
+    >
+      {message}
+    </Text>
+  );
+}
+
 // Confidence display using ProgressRing
 function ConfidenceDisplay({
   confidences,
@@ -1334,6 +1437,7 @@ function ConfidenceDisplay({
             hideMedalDisplay
           />
         </Grid>
+        <AIImprovementMessage />
       </Flex>
     </Card>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useId } from "react";
 import { Box, Flex, Text, Heading, Card, Badge } from "@radix-ui/themes";
 import { RocketIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import { OVERLAY_COLORS } from "../constants";
@@ -241,6 +241,42 @@ interface PlayerShotCardProps {
   sport?: DomainExpertise; // For domain-specific analysis
 }
 
+// CSS keyframes for cell bounce animation
+const cellBounceKeyframes = `
+@keyframes cellBounceIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+`;
+
+// Animation timing constants
+const CELL_ANIMATION_DURATION = 600; // ms per cell bounce
+const CELL_STAGGER_DELAY = 40; // ms between diagonal steps
+const TRAJECTORY_ANIMATION_DURATION = 500; // ms per trajectory draw
+const TRAJECTORY_TOTAL_TIME = 2000; // total time for all trajectories to complete (2 seconds)
+const NUMBERS_FADE_DURATION = 400; // ms for numbers to fade in
+
+// Calculate stagger delay based on number of trajectories to fit within total time
+function getTrajectoryStagger(numTrajectories: number): number {
+  if (numTrajectories <= 1) return 0;
+  // Ensure all trajectories complete within TRAJECTORY_TOTAL_TIME
+  // Last trajectory starts at (n-1) * stagger and finishes at (n-1) * stagger + duration
+  const availableTime = TRAJECTORY_TOTAL_TIME - TRAJECTORY_ANIMATION_DURATION;
+  return Math.max(30, availableTime / (numTrajectories - 1)); // minimum 30ms stagger
+}
+
 // Reusable player shot card component
 export function PlayerShotCard({ 
   data, 
@@ -249,6 +285,38 @@ export function PlayerShotCard({
   countLabel,
 }: PlayerShotCardProps) {
   const [hoveredCell, setHoveredCell] = useState<{ col: number; row: number } | null>(null);
+  const [cellsAnimating, setCellsAnimating] = useState(false);
+  const [cellsComplete, setCellsComplete] = useState(false);
+  const [trajectoriesComplete, setTrajectoriesComplete] = useState(false);
+  const uniqueId = useId();
+  
+  // Phase 1: Trigger cell animation after mount
+  useEffect(() => {
+    const timer = setTimeout(() => setCellsAnimating(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Phase 2: Mark cells complete, then trajectories will start
+  useEffect(() => {
+    if (cellsAnimating) {
+      // Max delay is (GRID_COLS - 1 + GRID_ROWS - 1) * stagger + animation duration
+      const maxCellDelay = (GRID_COLS + GRID_ROWS - 2) * CELL_STAGGER_DELAY + CELL_ANIMATION_DURATION;
+      const timer = setTimeout(() => setCellsComplete(true), maxCellDelay + 100);
+      return () => clearTimeout(timer);
+    }
+  }, [cellsAnimating]);
+  
+  // Phase 3: Mark trajectories complete after they finish
+  useEffect(() => {
+    if (cellsComplete && data.pairs.length > 0) {
+      // All trajectories complete within TRAJECTORY_TOTAL_TIME
+      const timer = setTimeout(() => setTrajectoriesComplete(true), TRAJECTORY_TOTAL_TIME + 100);
+      return () => clearTimeout(timer);
+    } else if (cellsComplete && data.pairs.length === 0) {
+      // No trajectories, go straight to showing numbers
+      setTrajectoriesComplete(true);
+    }
+  }, [cellsComplete, data.pairs.length]);
   
   const maxOrigin = Math.max(...data.origins.flat(), 1);
   const maxLanding = Math.max(...data.landings.flat(), 1);
@@ -308,6 +376,9 @@ export function PlayerShotCard({
               overflow: "visible", // Allow tooltips to overflow
             }}
           >
+            {/* Inject keyframes */}
+            <style dangerouslySetInnerHTML={{ __html: cellBounceKeyframes }} />
+            
             {/* Background cells layer */}
             <Box
               style={{
@@ -340,6 +411,9 @@ export function PlayerShotCard({
                   
                   const isNetColumn = x === Math.floor(GRID_COLS / 2);
                   
+                  // Stagger delay: top-left to bottom-right (x + y creates diagonal wave)
+                  const cellDelay = (x + y) * CELL_STAGGER_DELAY;
+                  
                   return (
                     <Box
                       key={`bg-${x}-${y}`}
@@ -347,10 +421,20 @@ export function PlayerShotCard({
                         backgroundColor: bgColor,
                         borderRadius: "2px",
                         borderLeft: isNetColumn ? "2px solid var(--gray-8)" : undefined,
-                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                        transform: isHovered && hasData ? "scale(1.15)" : "scale(1)",
+                        // Start invisible - animation will reveal with bounce
+                        opacity: cellsComplete ? 1 : 0,
+                        transform: cellsComplete 
+                          ? (isHovered && hasData ? "scale(1.15)" : "scale(1)") 
+                          : "scale(0)",
                         boxShadow: isHovered && hasData ? "0 0 10px 2px rgba(255,255,255,0.4)" : "none",
                         zIndex: isHovered && hasData ? 5 : 1,
+                        // Use keyframe animation for initial bounce, then switch to hover transition
+                        animation: cellsAnimating && !cellsComplete 
+                          ? `cellBounceIn ${CELL_ANIMATION_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1) ${cellDelay}ms forwards`
+                          : "none",
+                        transition: cellsComplete 
+                          ? "transform 0.15s ease, box-shadow 0.15s ease"
+                          : "none",
                       }}
                     />
                   );
@@ -383,7 +467,7 @@ export function PlayerShotCard({
                   return (
                     <linearGradient
                       key={`grad-${idx}`}
-                      id={`shot-gradient-${data.playerId}-${idx}`}
+                      id={`shot-gradient-${uniqueId}-${data.playerId}-${idx}`}
                       x1={x1} y1={y1} x2={x2} y2={y2}
                       gradientUnits="userSpaceOnUse"
                     >
@@ -393,29 +477,83 @@ export function PlayerShotCard({
                   );
                 })}
               </defs>
-              {data.pairs.map((pair, idx) => {
-                const x1 = (pair.originCol + 0.5) * cellWidth;
-                const y1 = (pair.originRow + 0.5) * cellHeight;
-                const x2 = (pair.landingCol + 0.5) * cellWidth;
-                const y2 = (pair.landingRow + 0.5) * cellHeight;
+              {(() => {
+                // Calculate stagger based on total trajectories to fit within 2 seconds
+                const trajectoryStagger = getTrajectoryStagger(data.pairs.length);
                 
-                const midX = (x1 + x2) / 2;
-                const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-                const arcHeight = Math.min(15, distance * 0.3);
-                const midY = (y1 + y2) / 2 - arcHeight;
-                
-                const arcPath = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
-                
-                return (
-                  <g key={idx} opacity={0.85}>
-                    <path d={arcPath} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="1.2" strokeLinecap="round" />
-                    <path d={arcPath} fill="none" stroke={`url(#shot-gradient-${data.playerId}-${idx})`} strokeWidth="0.8" strokeLinecap="round" />
-                  </g>
-                );
-              })}
+                return data.pairs.map((pair, idx) => {
+                  const x1 = (pair.originCol + 0.5) * cellWidth;
+                  const y1 = (pair.originRow + 0.5) * cellHeight;
+                  const x2 = (pair.landingCol + 0.5) * cellWidth;
+                  const y2 = (pair.landingRow + 0.5) * cellHeight;
+                  
+                  const midX = (x1 + x2) / 2;
+                  const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                  const arcHeight = Math.min(15, distance * 0.3);
+                  const midY = (y1 + y2) / 2 - arcHeight;
+                  
+                  const arcPath = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
+                  
+                  // Approximate arc length for animation (slightly longer than straight distance)
+                  const arcLength = distance * 1.2;
+                  
+                  // Stagger delay: dynamically calculated to fit all trajectories in 2 seconds
+                  const animationDelay = idx * trajectoryStagger;
+                  
+                  return (
+                    <g key={idx} opacity={0.85}>
+                      {/* Shadow path */}
+                      <path 
+                        d={arcPath} 
+                        fill="none" 
+                        stroke="rgba(0,0,0,0.3)" 
+                        strokeWidth="1.2" 
+                        strokeLinecap="round"
+                        strokeDasharray={arcLength}
+                        strokeDashoffset={cellsComplete ? 0 : arcLength}
+                        style={{
+                          transition: cellsComplete 
+                            ? `stroke-dashoffset ${TRAJECTORY_ANIMATION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${animationDelay}ms`
+                            : "none",
+                        }}
+                      />
+                      {/* Gradient path */}
+                      <path 
+                        d={arcPath} 
+                        fill="none" 
+                        stroke={`url(#shot-gradient-${uniqueId}-${data.playerId}-${idx})`} 
+                        strokeWidth="0.8" 
+                        strokeLinecap="round"
+                        strokeDasharray={arcLength}
+                        strokeDashoffset={cellsComplete ? 0 : arcLength}
+                        style={{
+                          transition: cellsComplete 
+                            ? `stroke-dashoffset ${TRAJECTORY_ANIMATION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${animationDelay}ms`
+                            : "none",
+                        }}
+                      />
+                      {/* Animated dot at the end of trajectory */}
+                      <circle
+                        cx={x2}
+                        cy={y2}
+                        r="1.5"
+                        fill="rgba(122, 219, 143, 0.9)"
+                        style={{
+                          opacity: cellsComplete ? 1 : 0,
+                          transform: cellsComplete ? 'scale(1)' : 'scale(0)',
+                          transformOrigin: `${x2}px ${y2}px`,
+                          transition: cellsComplete 
+                            ? `opacity 200ms ease ${animationDelay + TRAJECTORY_ANIMATION_DURATION - 100}ms, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1) ${animationDelay + TRAJECTORY_ANIMATION_DURATION - 100}ms`
+                            : "none",
+                        }}
+                      />
+                    </g>
+                  );
+                });
+              })()}
             </svg>
             
-            {/* Numbers overlay */}
+            {/* Numbers overlay - fades in after trajectories complete */}
             <Box
               style={{
                 position: "absolute",
@@ -426,6 +564,8 @@ export function PlayerShotCard({
                 gap: "2px",
                 pointerEvents: "none",
                 zIndex: 3,
+                opacity: trajectoriesComplete ? 1 : 0,
+                transition: `opacity ${NUMBERS_FADE_DURATION}ms ease`,
               }}
             >
               {data.origins.flatMap((row, y) =>
@@ -442,7 +582,7 @@ export function PlayerShotCard({
                       style={{ 
                         width: "100%", 
                         height: "100%",
-                        transition: "transform 0.15s ease, filter 0.15s ease",
+                        transition: trajectoriesComplete ? "transform 0.15s ease, filter 0.15s ease" : "none",
                         transform: isHovered && hasData ? "scale(1.3)" : "scale(1)",
                         filter: isHovered && hasData ? "drop-shadow(0 0 6px rgba(255,255,255,0.8))" : "none",
                         zIndex: isHovered ? 10 : 1,

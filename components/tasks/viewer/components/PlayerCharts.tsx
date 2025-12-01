@@ -492,31 +492,9 @@ export function PlayerCharts({
           )}
         </Flex>
 
-        {/* Bottom row: Sprint and Distance */}
+        {/* Bottom row: Distance and Sprint */}
         {(hasSprintData || hasDistanceData) && (
           <Flex gap="4" wrap="wrap" align="stretch">
-            {/* Sprint */}
-            {hasSprintData && (
-              <Flex direction="column" style={{ flex: "1 1 180px", minWidth: 180 }}>
-                <Heading size="2" weight="medium" mb="2" style={{ color: "var(--gray-11)", textAlign: "center" }}>
-                  Sprint
-                </Heading>
-                <Box style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                  <ProgressRing
-                    value={player.fastest_sprint}
-                    maxValue={maxSprintSpeed || player.fastest_sprint}
-                    isVisible={hasAnimated}
-                    rank={sprintRank}
-                    playerId={player.player_id}
-                    gradient={RING_GRADIENTS.sprint}
-                    icon={RING_ICONS.sprint}
-                    unit="km/h"
-                    winnerNickname={sprintRank === 1 ? getRandomNickname("fastest_sprint", player.player_id) : undefined}
-                  />
-                </Box>
-              </Flex>
-            )}
-
             {/* Distance */}
             {hasDistanceData && (
               <Flex direction="column" style={{ flex: "1 1 180px", minWidth: 180 }}>
@@ -534,6 +512,28 @@ export function PlayerCharts({
                     icon={RING_ICONS.distance}
                     unit="meters"
                     winnerNickname={distanceRank === 1 ? getRandomNickname("most_distance", player.player_id) : undefined}
+                  />
+                </Box>
+              </Flex>
+            )}
+
+            {/* Sprint */}
+            {hasSprintData && (
+              <Flex direction="column" style={{ flex: "1 1 180px", minWidth: 180 }}>
+                <Heading size="2" weight="medium" mb="2" style={{ color: "var(--gray-11)", textAlign: "center" }}>
+                  Sprint
+                </Heading>
+                <Box style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                  <ProgressRing
+                    value={player.fastest_sprint}
+                    maxValue={maxSprintSpeed || player.fastest_sprint}
+                    isVisible={hasAnimated}
+                    rank={sprintRank}
+                    playerId={player.player_id}
+                    gradient={RING_GRADIENTS.sprint}
+                    icon={RING_ICONS.sprint}
+                    unit="km/h"
+                    winnerNickname={sprintRank === 1 ? getRandomNickname("fastest_sprint", player.player_id) : undefined}
                   />
                 </Box>
               </Flex>
