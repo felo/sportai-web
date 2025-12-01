@@ -14,8 +14,13 @@ import {
   Card,
   Select,
 } from "@radix-ui/themes";
-import { ArrowLeftIcon, PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { Sidebar } from "@/components/sidebar";
+import { useSidebar } from "@/components/SidebarContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { PageHeader } from "@/components/ui";
+import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 
 const TASK_TYPES = [
   { value: "statistics", label: "Statistics" },
@@ -49,6 +54,8 @@ interface Task {
 export function TasksPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { isCollapsed, isInitialLoad } = useSidebar();
+  const isMobile = useIsMobile();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -409,44 +416,67 @@ export function TasksPage() {
     return `~${formatDuration(remainingSeconds)}`;
   };
   
+  // Handle creating a new chat and navigating to it
+  const handleNewChat = useCallback(async () => {
+    const newChat = await createNewChat();
+    setCurrentChatId(newChat.id);
+    router.push("/");
+  }, [router]);
+  
   if (authLoading || loading) {
     return (
-      <Box style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spinner size="3" />
-      </Box>
+      <>
+        <Sidebar />
+        <PageHeader title="Library" onNewChat={handleNewChat} />
+        <Box 
+          style={{ 
+            height: "100vh", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            paddingTop: isMobile ? "calc(57px + env(safe-area-inset-top))" : "57px",
+            marginLeft: isMobile ? 0 : isCollapsed ? "64px" : "280px",
+            transition: isInitialLoad ? "none" : "margin-left 0.2s ease-in-out",
+          }}
+        >
+          <Spinner size="3" />
+        </Box>
+      </>
     );
   }
   
   if (!user) return null;
   
+  const refreshButton = (
+    <Button variant="soft" onClick={async () => {
+      await fetchTasks();
+      // Small delay then check status
+      setTimeout(checkAllActiveTasks, 500);
+    }}>
+      <ReloadIcon />
+      Refresh
+    </Button>
+  );
+
   return (
-    <Box
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "var(--gray-1)",
-        padding: "24px",
-      }}
-    >
-      <Box style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        {/* Header */}
-        <Flex justify="between" align="center" mb="6">
-          <Flex align="center" gap="4">
-            <Button variant="ghost" onClick={() => router.push("/")}>
-              <ArrowLeftIcon />
-              Back to Chat
-            </Button>
-            <Text size="6" weight="bold">SportAI Tasks</Text>
-          </Flex>
-          
-          <Button variant="soft" onClick={async () => {
-            await fetchTasks();
-            // Small delay then check status
-            setTimeout(checkAllActiveTasks, 500);
-          }}>
-            <ReloadIcon />
-            Refresh
-          </Button>
-        </Flex>
+    <>
+      <Sidebar />
+      <PageHeader 
+        title="Library" 
+        actions={refreshButton}
+        onNewChat={handleNewChat}
+      />
+      <Box
+        style={{
+          minHeight: "100vh",
+          backgroundColor: "var(--gray-1)",
+          padding: "24px",
+          paddingTop: isMobile ? "calc(57px + 24px + env(safe-area-inset-top))" : "calc(57px + 24px)",
+          marginLeft: isMobile ? 0 : isCollapsed ? "64px" : "280px",
+          transition: isInitialLoad ? "none" : "margin-left 0.2s ease-in-out",
+        }}
+      >
+        <Box style={{ maxWidth: "1200px", margin: "0 auto" }}>
         
         {/* Error Display */}
         {error && (
@@ -665,8 +695,9 @@ export function TasksPage() {
             </Table.Root>
           )}
         </Card>
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 }
 

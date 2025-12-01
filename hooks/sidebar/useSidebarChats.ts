@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   getCurrentChatId,
   setCurrentChatId as saveCurrentChatId,
@@ -24,9 +25,15 @@ export function useSidebarChats({
   onClearChat,
   closeSidebar,
 }: UseSidebarChatsOptions = {}): SidebarChatsState {
+  const router = useRouter();
+  const pathname = usePathname();
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Check if we're on the main chat page
+  const isOnChatPage = pathname === "/";
 
   // Helper to load chats from the appropriate source
   const refreshChats = useCallback(async () => {
@@ -39,7 +46,9 @@ export function useSidebarChats({
     // Initial load: Sync from Supabase, then load chats
     // This is the ONLY time we hit the network on mount
     syncChatsFromSupabase().then(() => {
-      refreshChats(); // Fast: reads from localStorage
+      refreshChats().then(() => {
+        setIsLoading(false);
+      });
     });
     setCurrentChatId(getCurrentChatId());
 
@@ -93,14 +102,19 @@ export function useSidebarChats({
     const newChat = await createNewChat();
     saveCurrentChatId(newChat.id);
     closeSidebar?.();
+    
+    // Navigate to chat page if not already there
+    if (!isOnChatPage) {
+      router.push("/");
+    }
     // State will be updated via event handler
-  }, [onChatSwitchAttempt, closeSidebar]);
+  }, [onChatSwitchAttempt, closeSidebar, isOnChatPage, router]);
 
   // Switch to a different chat
   const handleSwitchChat = useCallback(
     async (chatId: string) => {
-      // Don't switch if already on this chat
-      if (currentChatId === chatId) {
+      // Don't switch if already on this chat and on chat page
+      if (currentChatId === chatId && isOnChatPage) {
         closeSidebar?.();
         return;
       }
@@ -113,8 +127,8 @@ export function useSidebarChats({
         }
       }
 
-      // If switching from a chat with no messages, delete it
-      if (currentChatId) {
+      // If switching from a chat with no messages, delete it (only when on chat page)
+      if (currentChatId && isOnChatPage) {
         // Fast: read from localStorage only
         const allChats = await loadChats();
         const currentChat = allChats.find((c) => c.id === currentChatId);
@@ -139,9 +153,14 @@ export function useSidebarChats({
       }
       saveCurrentChatId(chatId);
       closeSidebar?.();
+      
+      // Navigate to chat page if not already there
+      if (!isOnChatPage) {
+        router.push("/");
+      }
       // State will be updated via event handler
     },
-    [currentChatId, onChatSwitchAttempt, onClearChat, closeSidebar, refreshChats]
+    [currentChatId, onChatSwitchAttempt, onClearChat, closeSidebar, refreshChats, isOnChatPage, router]
   );
 
   // Delete a chat
@@ -198,6 +217,7 @@ export function useSidebarChats({
     currentChatId,
     hoveredChatId,
     setHoveredChatId,
+    isLoading,
     handleCreateChat,
     handleDeleteChat,
     handleSwitchChat,

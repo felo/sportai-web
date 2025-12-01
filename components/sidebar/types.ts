@@ -16,6 +16,7 @@ export interface SidebarChatsState {
   currentChatId: string | undefined;
   hoveredChatId: string | null;
   setHoveredChatId: (id: string | null) => void;
+  isLoading: boolean;
   handleCreateChat: () => Promise<void>;
   handleDeleteChat: (chatId: string) => Promise<void>;
   handleSwitchChat: (chatId: string) => Promise<void>;
@@ -73,6 +74,7 @@ export interface ChatListProps {
   hoveredChatId: string | null;
   isMobile: boolean;
   chatsExpanded: boolean;
+  isLoading?: boolean;
   onToggleExpanded: () => void;
   onHoverChat: (chatId: string | null) => void;
   onChatClick: (chatId: string) => void;
@@ -83,6 +85,12 @@ export interface ChatListProps {
 // New chat button props
 export interface NewChatButtonProps {
   onClick: () => void;
+}
+
+// Library button props
+export interface LibraryButtonProps {
+  onClick?: () => void;
+  isActive?: boolean;
 }
 
 // Navigation props

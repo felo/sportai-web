@@ -12,7 +12,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, isInitialLoad, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const sidebarWidth = isCollapsed ? "64px" : "280px";
 
@@ -77,7 +77,7 @@ export function ChatHeader({ messageCount, onNewChat }: ChatHeaderProps) {
         alignItems: "center",
         justifyContent: "space-between",
         boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
-        transition: "left 0.2s ease-in-out",
+        transition: isInitialLoad ? "none" : "left 0.2s ease-in-out",
       }}
     >
       {/* Logo with Morph to New Chat Button on Hover */}

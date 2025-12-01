@@ -6,6 +6,7 @@ export { ChatList } from "./ChatList";
 export { ChatListGrouped } from "./ChatListGrouped";
 export { ChatListItem } from "./ChatListItem";
 export { NewChatButton } from "./NewChatButton";
+export { LibraryButton } from "./LibraryButton";
 export { SidebarContent } from "./SidebarContent";
 export { SidebarDialogs } from "./SidebarDialogs";
 export { SidebarNavigation } from "./SidebarNavigation";
@@ -20,6 +21,7 @@ export type {
   ChatListProps,
   ChatListItemProps,
   NewChatButtonProps,
+  LibraryButtonProps,
   SidebarNavigationProps,
   SidebarDialogsProps,
 } from "./types";

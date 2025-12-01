@@ -76,7 +76,7 @@ export function AIChatForm() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastDetectedVideoRef = useRef<File | null>(null);
-  const { isCollapsed: isSidebarCollapsed } = useSidebar();
+  const { isCollapsed: isSidebarCollapsed, isInitialLoad: isSidebarInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
 
   const {
@@ -1306,7 +1306,7 @@ export function AIChatForm() {
 
       {/* Content wrapper - accounts for sidebar width and centers content */}
       <div
-        className={`content-wrapper ${!isSidebarCollapsed ? 'sidebar-expanded' : ''}`}
+        className={`content-wrapper ${!isSidebarCollapsed ? 'sidebar-expanded' : ''} ${isSidebarInitialLoad ? 'no-transition' : ''}`}
       >
         {/* Scrollable content area - centered and responsive */}
         <div

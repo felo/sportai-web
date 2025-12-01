@@ -498,6 +498,11 @@ html[data-theme="dark"] .radix-themes [data-radix-menu-content] [data-highlighte
   transition: margin-left 0.2s ease-in-out, width 0.2s ease-in-out;
 }
 
+/* Disable transitions during initial page load */
+.content-wrapper.no-transition {
+  transition: none;
+}
+
 @media (min-width: 768px) {
   .content-wrapper {
     /* Desktop with collapsed sidebar (default initial state) */

@@ -15,7 +15,7 @@ import type { SidebarProps } from "./types";
 import type { Chat } from "@/types/chat";
 
 export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchAttempt }: SidebarProps) {
-  const { isCollapsed, toggleSidebar, closeSidebar } = useSidebar();
+  const { isCollapsed, isInitialLoad, toggleSidebar, closeSidebar } = useSidebar();
   const isMobile = useIsMobile();
 
   // Business logic hooks
@@ -118,6 +118,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               currentChatId={chatsState.currentChatId}
               hoveredChatId={chatsState.hoveredChatId}
               isMobile={true}
+              isLoading={chatsState.isLoading}
               onHoverChat={chatsState.setHoveredChatId}
               onCreateChat={chatsState.handleCreateChat}
               onSwitchChat={chatsState.handleSwitchChat}
@@ -192,7 +193,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         width: isCollapsed ? "64px" : "280px",
         backgroundColor: "var(--gray-2)",
         borderRight: "1px solid var(--gray-6)",
-        transition: "width 0.2s ease-in-out",
+        transition: isInitialLoad ? "none" : "width 0.2s ease-in-out",
         zIndex: 10,
         display: "flex",
         flexDirection: "column",
@@ -269,6 +270,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               currentChatId={chatsState.currentChatId}
               hoveredChatId={chatsState.hoveredChatId}
               isMobile={false}
+              isLoading={chatsState.isLoading}
               onHoverChat={chatsState.setHoveredChatId}
               onCreateChat={chatsState.handleCreateChat}
               onSwitchChat={chatsState.handleSwitchChat}

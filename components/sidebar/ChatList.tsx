@@ -1,6 +1,6 @@
 "use client";
 
-import { Flex, Button, Text } from "@radix-ui/themes";
+import { Flex, Button, Text, Spinner } from "@radix-ui/themes";
 import { ChevronDownIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { EmptyState } from "@/components/ui";
 import { ChatListItem } from "./ChatListItem";
@@ -16,6 +16,7 @@ export function ChatList({
   hoveredChatId,
   isMobile,
   chatsExpanded,
+  isLoading,
   onToggleExpanded,
   onHoverChat,
   onChatClick,
@@ -50,7 +51,11 @@ export function ChatList({
           gap="1"
           style={{ paddingTop: "var(--space-2)", paddingBottom: "var(--space-2)" }}
         >
-          {chats.length === 0 ? (
+          {isLoading ? (
+            <Flex align="center" justify="center" py="4">
+              <Spinner size="2" />
+            </Flex>
+          ) : chats.length === 0 ? (
             <EmptyState message="No chats yet" />
           ) : shouldGroup ? (
             <ChatListGrouped
