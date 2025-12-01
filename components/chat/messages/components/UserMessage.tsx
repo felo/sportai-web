@@ -510,6 +510,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                       }}
                       // Skip preprocessing when floating - just playback, no heavy analysis
                       skipPreprocessing={!!shouldPortal}
+                      // Only allow preprocessing if technique LITE eligible (side camera + < 20s video)
+                      allowPreprocessing={message.isTechniqueLiteEligible ?? false}
                     />
                   );
                   

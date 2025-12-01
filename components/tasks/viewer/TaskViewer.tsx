@@ -182,7 +182,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
       id: "highlights", 
       label: "Highlights", 
       icon: <StarIcon width={16} height={16} />, 
-      badge: result?.highlights?.length || undefined 
+      disabled: true 
     },
     { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
     { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },

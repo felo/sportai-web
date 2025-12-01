@@ -52,6 +52,9 @@ interface VideoPoseViewerProps {
   onVideoMetadataLoaded?: (width: number, height: number) => void;
   // Compact mode - hides button text, used when video is floating/docked
   compactMode?: boolean;
+  // Allow preprocessing - when false, only real-time pose detection is available
+  // Used for technique LITE eligibility control (side camera + < 20s video)
+  allowPreprocessing?: boolean;
 }
 
 // Helper to determine if crossOrigin should be used for a URL
@@ -102,6 +105,7 @@ export function VideoPoseViewer({
   onPoseEnabledChange,
   onVideoMetadataLoaded,
   compactMode = false,
+  allowPreprocessing = true, // Default true for backward compatibility
 }: VideoPoseViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1973,7 +1977,7 @@ export function VideoPoseViewer({
 
   // Auto-start preprocessing when AI overlay is enabled and model is loaded
   // FPS detection is built into startAutoPreprocess, so we start immediately
-  // Skip preprocessing in compact/floating mode
+  // Skip preprocessing in compact/floating mode or if not allowed (not technique LITE eligible)
   useEffect(() => {
     // All conditions for preprocessing
     const canPreprocess = isPoseEnabled && 
@@ -1982,7 +1986,20 @@ export function VideoPoseViewer({
                           !usePreprocessing && 
                           preprocessedPoses.size === 0 && 
                           isVideoMetadataLoaded &&
-                          !compactMode; // Don't preprocess in floating mode
+                          !compactMode && // Don't preprocess in floating mode
+                          allowPreprocessing; // Only preprocess if allowed (technique LITE eligible)
+    
+    console.log("🔍 Preprocessing check:", {
+      isPoseEnabled,
+      isLoading,
+      isBackgroundPreprocessing,
+      usePreprocessing,
+      preprocessedPosesSize: preprocessedPoses.size,
+      isVideoMetadataLoaded,
+      compactMode,
+      allowPreprocessing,
+      canPreprocess,
+    });
     
     if (!canPreprocess) return;
     
@@ -1993,7 +2010,7 @@ export function VideoPoseViewer({
     }, 100); // Small delay to ensure UI is ready
     return () => clearTimeout(timer);
     
-  }, [isPoseEnabled, isLoading, isBackgroundPreprocessing, usePreprocessing, preprocessedPoses.size, isVideoMetadataLoaded, startAutoPreprocess, compactMode]);
+  }, [isPoseEnabled, isLoading, isBackgroundPreprocessing, usePreprocessing, preprocessedPoses.size, isVideoMetadataLoaded, startAutoPreprocess, compactMode, allowPreprocessing]);
 
   // Cancel background preprocessing when AI overlay is disabled
   useEffect(() => {

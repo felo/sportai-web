@@ -29,6 +29,9 @@ export interface VideoPoseViewerProps {
   onVideoMetadataLoaded?: (width: number, height: number) => void;
   // Compact mode - hides button text, used when video is floating/docked
   compactMode?: boolean;
+  // Allow preprocessing - when false, only real-time pose detection is available
+  // Used for technique LITE eligibility control (side camera + < 20s video)
+  allowPreprocessing?: boolean;
 }
 
 

@@ -13,14 +13,18 @@ import {
   Spinner,
   Card,
   Select,
+  Tabs,
+  SegmentedControl,
 } from "@radix-ui/themes";
-import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon, ViewGridIcon, ListBulletIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Sidebar } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
+import { getDeveloperMode } from "@/utils/storage";
+import { TaskGridView } from "./TaskGridView";
 
 const TASK_TYPES = [
   { value: "statistics", label: "Statistics" },
@@ -66,6 +70,20 @@ export function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Load developer mode and listen for changes
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+  }, []);
   
   const copyToClipboard = async (text: string, type: "id" | "url") => {
     await navigator.clipboard.writeText(text);
@@ -455,12 +473,15 @@ export function TasksPage() {
       />
       <Box
         style={{
-          minHeight: "100vh",
+          height: "100vh",
           backgroundColor: "var(--gray-1)",
           padding: "24px",
           paddingTop: isMobile ? "calc(57px + 24px + env(safe-area-inset-top))" : "calc(57px + 24px)",
+          paddingBottom: "48px",
           marginLeft: isMobile ? 0 : isCollapsed ? "64px" : "280px",
           transition: isInitialLoad ? "none" : "margin-left 0.2s ease-in-out",
+          overflowY: "auto",
+          overflowX: "hidden",
         }}
       >
         <Box style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -528,7 +549,43 @@ export function TasksPage() {
           </form>
         </Card>
         
-        {/* Tasks Table */}
+        {/* View Toggle */}
+        <Flex justify="between" align="center" mb="3">
+          <Text size="3" weight="medium" color="gray">
+            {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+          </Text>
+          <SegmentedControl.Root 
+            value={viewMode} 
+            onValueChange={(value) => setViewMode(value as "list" | "grid")}
+            size="1"
+          >
+            <SegmentedControl.Item value="grid">
+              <Flex align="center" gap="1">
+                <ViewGridIcon width={14} height={14} />
+                <Text size="1">Grid</Text>
+              </Flex>
+            </SegmentedControl.Item>
+            <SegmentedControl.Item value="list">
+              <Flex align="center" gap="1">
+                <ListBulletIcon width={14} height={14} />
+                <Text size="1">List</Text>
+              </Flex>
+            </SegmentedControl.Item>
+          </SegmentedControl.Root>
+        </Flex>
+        
+        {/* Grid View */}
+        {viewMode === "grid" && (
+          <TaskGridView
+            tasks={tasks}
+            onTaskClick={(taskId) => router.push(`/library/${taskId}`)}
+            onFetchResult={fetchResult}
+            fetchingResult={fetchingResult}
+          />
+        )}
+        
+        {/* List View (Table) */}
+        {viewMode === "list" && (
         <Card>
           {tasks.length === 0 ? (
             <Flex align="center" justify="center" py="8">
@@ -538,14 +595,14 @@ export function TasksPage() {
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.ColumnHeaderCell>Task ID</Table.ColumnHeaderCell>
+                  {developerMode && <Table.ColumnHeaderCell>Task ID</Table.ColumnHeaderCell>}
                   <Table.ColumnHeaderCell>Sport</Table.ColumnHeaderCell>
                   <Table.ColumnHeaderCell>Type</Table.ColumnHeaderCell>
                   <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Video URL</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Length</Table.ColumnHeaderCell>
+                  {developerMode && <Table.ColumnHeaderCell>Video URL</Table.ColumnHeaderCell>}
+                  {developerMode && <Table.ColumnHeaderCell>Length</Table.ColumnHeaderCell>}
                   <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Elapsed</Table.ColumnHeaderCell>
+                  {developerMode && <Table.ColumnHeaderCell>Elapsed</Table.ColumnHeaderCell>}
                   <Table.ColumnHeaderCell>Time Left</Table.ColumnHeaderCell>
                   <Table.ColumnHeaderCell>Result</Table.ColumnHeaderCell>
                 </Table.Row>
@@ -553,63 +610,69 @@ export function TasksPage() {
               <Table.Body>
                 {tasks.map((task) => (
                   <Table.Row key={task.id}>
-                    <Table.Cell>
-                      <Flex align="center" gap="1">
-                        <Text size="1" style={{ fontFamily: "monospace" }}>
-                          {(task.sportai_task_id || task.id).slice(0, 6)}
-                        </Text>
-                        <Button
-                          variant="ghost"
-                          size="1"
-                          onClick={() => copyToClipboard(task.sportai_task_id || task.id, "id")}
-                          style={{ padding: "2px", minWidth: "auto", marginLeft: "4px" }}
-                        >
-                          {copiedId === (task.sportai_task_id || task.id) 
-                            ? <CheckIcon style={{ color: "var(--green-9)" }} />
-                            : <CopyIcon />}
-                        </Button>
-                      </Flex>
-                    </Table.Cell>
+                    {developerMode && (
+                      <Table.Cell>
+                        <Flex align="center" gap="1">
+                          <Text size="1" style={{ fontFamily: "monospace" }}>
+                            {(task.sportai_task_id || task.id).slice(0, 6)}
+                          </Text>
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            onClick={() => copyToClipboard(task.sportai_task_id || task.id, "id")}
+                            style={{ padding: "2px", minWidth: "auto", marginLeft: "4px" }}
+                          >
+                            {copiedId === (task.sportai_task_id || task.id) 
+                              ? <CheckIcon style={{ color: "var(--green-9)" }} />
+                              : <CopyIcon />}
+                          </Button>
+                        </Flex>
+                      </Table.Cell>
+                    )}
                     <Table.Cell>{getSportBadge(task.sport)}</Table.Cell>
                     <Table.Cell>{getTypeBadge(task.task_type)}</Table.Cell>
                     <Table.Cell>{getStatusBadge(task.status)}</Table.Cell>
-                    <Table.Cell>
-                      <Flex align="center" gap="1">
-                        <a
-                          href={task.video_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ 
-                            maxWidth: "200px", 
-                            overflow: "hidden", 
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            direction: "rtl",
-                            textAlign: "left",
-                            fontSize: "var(--font-size-2)",
-                            color: "var(--accent-11)",
-                            textDecoration: "none",
-                          }}
-                        >
-                          {task.video_url}
-                        </a>
-                        <Button
-                          variant="ghost"
-                          size="1"
-                          onClick={() => copyToClipboard(task.video_url, "url")}
-                          style={{ padding: "2px", minWidth: "auto", marginLeft: "4px" }}
-                        >
-                          {copiedUrl === task.video_url 
-                            ? <CheckIcon style={{ color: "var(--green-9)" }} />
-                            : <CopyIcon />}
-                        </Button>
-                      </Flex>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {task.video_length ? formatDuration(Math.round(task.video_length)) : "-"}
-                    </Table.Cell>
+                    {developerMode && (
+                      <Table.Cell>
+                        <Flex align="center" gap="1">
+                          <a
+                            href={task.video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ 
+                              maxWidth: "200px", 
+                              overflow: "hidden", 
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              direction: "rtl",
+                              textAlign: "left",
+                              fontSize: "var(--font-size-2)",
+                              color: "var(--accent-11)",
+                              textDecoration: "none",
+                            }}
+                          >
+                            {task.video_url}
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="1"
+                            onClick={() => copyToClipboard(task.video_url, "url")}
+                            style={{ padding: "2px", minWidth: "auto", marginLeft: "4px" }}
+                          >
+                            {copiedUrl === task.video_url 
+                              ? <CheckIcon style={{ color: "var(--green-9)" }} />
+                              : <CopyIcon />}
+                          </Button>
+                        </Flex>
+                      </Table.Cell>
+                    )}
+                    {developerMode && (
+                      <Table.Cell>
+                        {task.video_length ? formatDuration(Math.round(task.video_length)) : "-"}
+                      </Table.Cell>
+                    )}
                     <Table.Cell>{formatDate(task.created_at)}</Table.Cell>
-                    <Table.Cell>{formatElapsed(task)}</Table.Cell>
+                    {developerMode && <Table.Cell>{formatElapsed(task)}</Table.Cell>}
                     <Table.Cell>
                       {task.status === "completed" ? (
                         <Text color="green" size="2">Done</Text>
@@ -682,6 +745,7 @@ export function TasksPage() {
             </Table.Root>
           )}
         </Card>
+        )}
         </Box>
       </Box>
     </>

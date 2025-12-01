@@ -20,6 +20,9 @@ interface MessageListProps {
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
   onRetryMessage?: (messageId: string) => void;
   retryingMessageId?: string | null;
+  // Analysis options handlers for PRO eligibility
+  onSelectProPlusQuick?: (messageId: string) => void;
+  onSelectQuickOnly?: (messageId: string) => void;
 }
 
 export function MessageList({
@@ -34,6 +37,8 @@ export function MessageList({
   onUpdateMessage,
   onRetryMessage,
   retryingMessageId,
+  onSelectProPlusQuick,
+  onSelectQuickOnly,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -108,6 +113,8 @@ export function MessageList({
           onUpdateMessage={onUpdateMessage}
           onRetryMessage={onRetryMessage}
           isRetrying={retryingMessageId === message.id}
+          onSelectProPlusQuick={onSelectProPlusQuick}
+          onSelectQuickOnly={onSelectQuickOnly}
         />
       ))}
 

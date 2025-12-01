@@ -46,6 +46,9 @@ interface VideoPoseViewerProps {
   onPoseDataSaved?: (s3Key: string) => void;
   // Skip preprocessing - used when video is floating (just playback, no analysis)
   skipPreprocessing?: boolean;
+  // Allow preprocessing - when false, only real-time pose detection is available
+  // Used for technique LITE eligibility control (side camera + < 20s video)
+  allowPreprocessing?: boolean;
 }
 
 // Minimal loading placeholder - matches video dimensions exactly

@@ -143,7 +143,12 @@ export function getRandomNickname(category: WinnerCategory, seed: number): strin
 // PLAYER SETTINGS
 // ===========================================
 export const PLAYER_CONFIG = {
-  // Minimum swings to be considered a "valid" player
+  // Dynamic threshold config (scales with video content)
+  MIN_SWINGS_PERCENTAGE: 0.075,  // 7.5% of top player's shots
+  MIN_SWINGS_ABSOLUTE: 3,        // Never go below 3 shots  
+  MAX_SWINGS_THRESHOLD: 15,      // Cap for very long videos
+  
+  // Legacy static threshold (deprecated - use getDynamicSwingsThreshold instead)
   MIN_SWINGS_THRESHOLD: 10,
   
   // Colors for each player (used for heatmaps, dots, boxes)
@@ -170,6 +175,32 @@ export const PLAYER_CONFIG = {
     },
   ],
 };
+
+/**
+ * Calculate dynamic minimum swings threshold based on max player's swing count.
+ * Scales with video content: short videos have lower thresholds.
+ * 
+ * Examples:
+ * - 2-min clip, top player has 8 shots → threshold = 3 (floor)
+ * - 10-min video, top player has 60 shots → threshold = 4 (7.5% of 60)
+ * - 30-min match, top player has 200 shots → threshold = 15 (cap)
+ * 
+ * @param players - Array of players with swing_count
+ * @returns Dynamic threshold value
+ */
+export function getDynamicSwingsThreshold(
+  players: Array<{ swing_count: number }>
+): number {
+  if (!players || players.length === 0) return PLAYER_CONFIG.MIN_SWINGS_ABSOLUTE;
+  
+  const maxSwings = Math.max(...players.map(p => p.swing_count));
+  const percentageBased = Math.floor(maxSwings * PLAYER_CONFIG.MIN_SWINGS_PERCENTAGE);
+  
+  return Math.min(
+    PLAYER_CONFIG.MAX_SWINGS_THRESHOLD,
+    Math.max(PLAYER_CONFIG.MIN_SWINGS_ABSOLUTE, percentageBased)
+  );
+}
 
 export const CONFIG = {
   // Video playback update frequency (ms)

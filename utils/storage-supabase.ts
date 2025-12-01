@@ -27,6 +27,16 @@ function dbChatToChat(dbChat: DbChat, messages: Message[] = []): Chat {
  * Convert database message to Message type
  */
 function dbMessageToMessage(dbMsg: DbMessage): Message {
+  // Extract isTechniqueLiteEligible from pose_data if stored there
+  const poseData = dbMsg.pose_data as any;
+  const isTechniqueLiteEligible = poseData?.isTechniqueLiteEligible;
+  
+  // Remove isTechniqueLiteEligible from poseData to keep it clean
+  const cleanPoseData = poseData ? (() => {
+    const { isTechniqueLiteEligible: _, ...rest } = poseData;
+    return Object.keys(rest).length > 0 ? rest : undefined;
+  })() : undefined;
+  
   return {
     id: dbMsg.id,
     role: dbMsg.role as "user" | "assistant",
@@ -41,10 +51,11 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     responseDuration: dbMsg.response_duration || undefined,
     modelSettings: dbMsg.model_settings ? (dbMsg.model_settings as any) : undefined,
     ttsUsage: dbMsg.tts_usage ? (dbMsg.tts_usage as any) : undefined,
-    poseData: dbMsg.pose_data ? (dbMsg.pose_data as any) : undefined,
+    poseData: cleanPoseData,
     poseDataS3Key: dbMsg.pose_data_s3_key || undefined,
     videoFile: null,
     videoPreview: null,
+    isTechniqueLiteEligible: isTechniqueLiteEligible ?? undefined,
   };
 }
 
@@ -71,6 +82,14 @@ function chatToDbInsert(chat: Chat, userId: string): DbChatInsert {
  * @param sequenceNumber - The position of this message in the chat (0-indexed)
  */
 function messageToDbInsert(message: Message, chatId: string, sequenceNumber: number): DbMessageInsert {
+  // Include isTechniqueLiteEligible in pose_data for persistence
+  const poseDataWithEligibility = message.poseData || message.isTechniqueLiteEligible !== undefined
+    ? {
+        ...(message.poseData || {}),
+        isTechniqueLiteEligible: message.isTechniqueLiteEligible,
+      }
+    : null;
+    
   return {
     id: message.id,
     chat_id: chatId,
@@ -87,7 +106,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     response_duration: message.responseDuration || null,
     model_settings: message.modelSettings ? (message.modelSettings as any) : null,
     tts_usage: message.ttsUsage ? (message.ttsUsage as any) : null,
-    pose_data: message.poseData ? (message.poseData as any) : null,
+    pose_data: poseDataWithEligibility as any,
     pose_data_s3_key: message.poseDataS3Key || null,
   };
 }

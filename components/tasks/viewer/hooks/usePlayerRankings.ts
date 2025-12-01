@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Player, StatisticsResult } from "../types";
-import { PLAYER_CONFIG } from "../constants";
+import { getDynamicSwingsThreshold } from "../constants";
 
 export interface ValidPlayer extends Player {
   displayIndex: number;
@@ -40,18 +40,23 @@ export function usePlayerRankings(
   result: StatisticsResult | null,
   playerNames: Record<number, string>
 ): PlayerRankings {
-  // Get valid players with display info (filtered by minimum swings)
+  // Calculate dynamic threshold based on max player's swing count
+  const dynamicThreshold = useMemo(() => {
+    return getDynamicSwingsThreshold(result?.players || []);
+  }, [result?.players]);
+
+  // Get valid players with display info (filtered by dynamic threshold)
   const validPlayers = useMemo((): ValidPlayer[] => {
     if (!result || !result.players) return [];
     return result.players
-      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .filter(p => p.swing_count >= dynamicThreshold)
       .sort((a, b) => b.swing_count - a.swing_count)
       .map((player, index) => ({
         ...player,
         displayIndex: index + 1,
         displayName: playerNames[player.player_id] || `Player ${index + 1}`,
       }));
-  }, [result, playerNames]);
+  }, [result, playerNames, dynamicThreshold]);
 
   // Create player_id -> displayName mapping for overlays
   const playerDisplayNames = useMemo((): Record<number, string> => {

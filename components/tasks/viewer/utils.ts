@@ -48,11 +48,12 @@ export function getSportColor(sport: string): "cyan" | "orange" | "green" {
   return colors[sport] || "cyan";
 }
 
-import { PLAYER_CONFIG } from "./constants";
+import { PLAYER_CONFIG, getDynamicSwingsThreshold } from "./constants";
 
 export function getFilteredPlayers(players: { player_id: number; swing_count: number }[]) {
+  const threshold = getDynamicSwingsThreshold(players);
   return players
-    .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+    .filter(p => p.swing_count >= threshold)
     .sort((a, b) => b.swing_count - a.swing_count);
 }
 
@@ -86,7 +87,14 @@ export function getPlayerColor(displayIndex: number) {
 }
 
 // Check if a player is valid (enough swings)
-export function isValidPlayer(player: { swing_count: number }): boolean {
-  return player.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD;
+// Note: For accurate validation, prefer using getDynamicSwingsThreshold with full players array
+export function isValidPlayer(
+  player: { swing_count: number },
+  allPlayers?: Array<{ swing_count: number }>
+): boolean {
+  const threshold = allPlayers 
+    ? getDynamicSwingsThreshold(allPlayers) 
+    : PLAYER_CONFIG.MIN_SWINGS_ABSOLUTE;
+  return player.swing_count >= threshold;
 }
 

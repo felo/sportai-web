@@ -8,6 +8,161 @@ export interface VideoValidationResult {
   error?: string;
 }
 
+// ============================================================================
+// Video URL Detection
+// ============================================================================
+
+// Supported video file extensions for URL detection
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.wmv', '.flv'];
+
+/**
+ * Extract all URLs from a text string
+ */
+export function extractUrls(text: string): string[] {
+  // Match URLs - basic pattern that catches most common URLs
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+  return text.match(urlRegex) || [];
+}
+
+/**
+ * Check if a URL points to a video file based on its extension
+ */
+export function isVideoUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    // Remove query params for extension check
+    const pathWithoutQuery = pathname.split('?')[0];
+    // Check for video extensions
+    return VIDEO_EXTENSIONS.some(ext => pathWithoutQuery.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract video URLs from text
+ * Returns an array of URLs that appear to be video files
+ */
+export function extractVideoUrls(text: string): string[] {
+  const urls = extractUrls(text);
+  return urls.filter(isVideoUrl);
+}
+
+/**
+ * Video URL validation result
+ */
+export interface VideoUrlValidation {
+  valid: boolean;
+  url: string;
+  accessible: boolean;
+  contentType?: string;
+  contentLength?: number;
+  error?: string;
+  errorType?: 'cors' | 'auth' | 'not-found' | 'not-video' | 'too-large' | 'timeout' | 'network';
+}
+
+/**
+ * Validate that a video URL is accessible and points to a valid video
+ * Uses a HEAD request to check without downloading the entire file
+ */
+export async function validateVideoUrl(url: string): Promise<VideoUrlValidation> {
+  const result: VideoUrlValidation = {
+    valid: false,
+    url,
+    accessible: false,
+  };
+
+  try {
+    // First, try a HEAD request to check accessibility without downloading
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    try {
+      const response = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        mode: 'cors',
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          result.error = 'This video requires authentication';
+          result.errorType = 'auth';
+        } else if (response.status === 404) {
+          result.error = 'Video not found at this URL';
+          result.errorType = 'not-found';
+        } else {
+          result.error = `Failed to access video (HTTP ${response.status})`;
+          result.errorType = 'network';
+        }
+        return result;
+      }
+
+      result.accessible = true;
+
+      // Check content type
+      const contentType = response.headers.get('content-type');
+      if (contentType) {
+        result.contentType = contentType;
+        if (!contentType.startsWith('video/') && !contentType.includes('octet-stream')) {
+          // Some servers return octet-stream for videos, so we'll still try
+          // if it has a video extension
+          if (!isVideoUrl(url)) {
+            result.error = 'This URL does not point to a video file';
+            result.errorType = 'not-video';
+            return result;
+          }
+        }
+      }
+
+      // Check content length
+      const contentLength = response.headers.get('content-length');
+      if (contentLength) {
+        const sizeBytes = parseInt(contentLength, 10);
+        result.contentLength = sizeBytes;
+        
+        if (sizeBytes > MAX_VIDEO_SIZE_BYTES) {
+          const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1);
+          result.error = `Video is too large (${sizeMB}MB). Maximum size is ${MAX_VIDEO_SIZE_MB}MB.`;
+          result.errorType = 'too-large';
+          return result;
+        }
+      }
+
+      result.valid = true;
+      return result;
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError') {
+          result.error = 'Video server is taking too long to respond';
+          result.errorType = 'timeout';
+        } else if (fetchError.message.includes('CORS') || fetchError.message.includes('cors')) {
+          // CORS error - the URL might still work server-side
+          result.error = 'Cannot verify this video directly (CORS restricted)';
+          result.errorType = 'cors';
+          // Mark as valid anyway - we'll try to use it
+          result.valid = true;
+          result.accessible = true;
+        } else {
+          result.error = 'Could not access this video URL';
+          result.errorType = 'network';
+        }
+      }
+      return result;
+    }
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : 'Unknown error validating URL';
+    result.errorType = 'network';
+    return result;
+  }
+}
+
 // Supported image MIME types
 const SUPPORTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -531,6 +686,153 @@ export async function downloadVideoFromUrl(url: string): Promise<File> {
 }
 
 /**
+ * Extract the first frame from a video file as a JPEG blob, along with duration
+ * Returns a low-resolution image (~640px wide) for efficient API calls
+ * 
+ * @param file - Video file to extract frame from
+ * @param maxWidth - Maximum width of the output image (default 640px)
+ * @param quality - JPEG quality 0-1 (default 0.8)
+ * @returns Promise with frameBlob and durationSeconds
+ */
+export async function extractFirstFrameWithDuration(
+  file: File,
+  maxWidth: number = 640,
+  quality: number = 0.8
+): Promise<VideoFrameExtractionResult> {
+  return new Promise((resolve, reject) => {
+    // Skip if it's an image file - just return the image itself with no duration
+    if (isImageFile(file)) {
+      file.arrayBuffer()
+        .then(buffer => resolve({ 
+          frameBlob: new Blob([buffer], { type: file.type }),
+          durationSeconds: null 
+        }))
+        .catch(reject);
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    
+    let resolved = false;
+    let videoDuration: number | null = null;
+    
+    // Timeout after 10 seconds
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        reject(new Error('Timeout extracting first frame from video'));
+      }
+    }, 10000);
+    
+    const cleanup = () => {
+      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('error', onError);
+      video.removeEventListener('seeked', onSeeked);
+      if (video.src) {
+        URL.revokeObjectURL(video.src);
+      }
+      video.src = '';
+    };
+    
+    const extractFrame = () => {
+      try {
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        if (!videoWidth || !videoHeight) {
+          throw new Error('Could not determine video dimensions');
+        }
+        
+        // Calculate scaled dimensions maintaining aspect ratio
+        let width = videoWidth;
+        let height = videoHeight;
+        
+        if (width > maxWidth) {
+          const scale = maxWidth / width;
+          width = maxWidth;
+          height = Math.round(height * scale);
+        }
+        
+        // Ensure even dimensions (required for some codecs)
+        width = width % 2 === 0 ? width : width - 1;
+        height = height % 2 === 0 ? height : height - 1;
+        
+        // Create canvas and draw the frame
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Could not create canvas context');
+        }
+        
+        ctx.drawImage(video, 0, 0, width, height);
+        
+        // Convert to JPEG blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              console.log(`[extractFirstFrameWithDuration] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
+              resolve({ frameBlob: blob, durationSeconds: videoDuration });
+            } else {
+              reject(new Error('Failed to create blob from canvas'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch (err) {
+        reject(err);
+      }
+    };
+    
+    const onSeeked = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      extractFrame();
+      cleanup();
+    };
+    
+    const onLoadedData = () => {
+      // Capture duration when metadata is available
+      if (isFinite(video.duration) && video.duration > 0) {
+        videoDuration = video.duration;
+        console.log(`[extractFirstFrameWithDuration] Video duration: ${videoDuration}s`);
+      }
+      // Video has enough data to display first frame
+      // Seek to a tiny offset to ensure frame is ready
+      video.currentTime = 0.001;
+    };
+    
+    const onError = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('Error loading video for frame extraction'));
+    };
+    
+    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('seeked', onSeeked);
+    video.addEventListener('error', onError);
+    
+    // Handle case where video is already loaded (cached)
+    if (video.readyState >= 2) {
+      video.currentTime = 0.001;
+    }
+    
+    const url = URL.createObjectURL(file);
+    video.src = url;
+  });
+}
+
+/**
  * Extract the first frame from a video file as a JPEG blob
  * Returns a low-resolution image (~640px wide) for efficient API calls
  * 
@@ -538,6 +840,7 @@ export async function downloadVideoFromUrl(url: string): Promise<File> {
  * @param maxWidth - Maximum width of the output image (default 640px)
  * @param quality - JPEG quality 0-1 (default 0.8)
  * @returns Promise<Blob> - JPEG blob of the first frame
+ * @deprecated Use extractFirstFrameWithDuration instead to also get duration
  */
 export async function extractFirstFrame(
   file: File,
@@ -667,6 +970,200 @@ export async function extractFirstFrame(
     
     const url = URL.createObjectURL(file);
     video.src = url;
+  });
+}
+
+/**
+ * Result from extracting first frame from a video URL
+ */
+export interface VideoFrameExtractionResult {
+  frameBlob: Blob | null;
+  durationSeconds: number | null;
+}
+
+/**
+ * Estimate PRO analysis processing time based on video duration
+ * - Videos up to 20 minutes: ~5-10 minutes
+ * - Videos over 20 minutes: ~70% of video duration
+ * 
+ * @param durationSeconds - Video duration in seconds
+ * @returns Human-readable estimate string
+ */
+export function estimateProAnalysisTime(durationSeconds: number | null): string {
+  if (!durationSeconds || durationSeconds <= 0) {
+    return "~5-10 minutes"; // Default when duration unknown
+  }
+  
+  const durationMinutes = durationSeconds / 60;
+  
+  if (durationMinutes <= 20) {
+    return "~5-10 minutes";
+  }
+  
+  // For longer videos: 70% of video duration
+  const estimatedMinutes = Math.ceil(durationMinutes * 0.7);
+  
+  if (estimatedMinutes < 60) {
+    return `~${estimatedMinutes} minutes`;
+  }
+  
+  // Format as hours and minutes for very long videos
+  const hours = Math.floor(estimatedMinutes / 60);
+  const mins = estimatedMinutes % 60;
+  if (mins === 0) {
+    return `~${hours} hour${hours > 1 ? 's' : ''}`;
+  }
+  return `~${hours}h ${mins}m`;
+}
+
+/**
+ * Extract the first frame from a video URL as a JPEG blob
+ * This attempts client-side extraction which may fail due to CORS.
+ * Returns null values if CORS blocks the request, allowing fallback to server-side.
+ * 
+ * @param videoUrl - URL of the video to extract frame from
+ * @param maxWidth - Maximum width of the output image (default 640px)
+ * @param quality - JPEG quality 0-1 (default 0.8)
+ * @returns Promise with frameBlob and durationSeconds (either may be null if CORS blocked)
+ */
+export async function extractFirstFrameFromUrl(
+  videoUrl: string,
+  maxWidth: number = 640,
+  quality: number = 0.8
+): Promise<VideoFrameExtractionResult> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    // Enable CORS - will fail for non-CORS URLs
+    video.crossOrigin = 'anonymous';
+    
+    let resolved = false;
+    let videoDuration: number | null = null;
+    
+    // Timeout after 15 seconds (URLs may be slower than local files)
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        console.warn('[extractFirstFrameFromUrl] Timeout loading video URL');
+        resolve({ frameBlob: null, durationSeconds: videoDuration });
+      }
+    }, 15000);
+    
+    const cleanup = () => {
+      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('error', onError);
+      video.removeEventListener('seeked', onSeeked);
+      video.src = '';
+    };
+    
+    const extractFrame = () => {
+      try {
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        if (!videoWidth || !videoHeight) {
+          console.warn('[extractFirstFrameFromUrl] Could not determine video dimensions');
+          resolve({ frameBlob: null, durationSeconds: videoDuration });
+          return;
+        }
+        
+        // Calculate scaled dimensions maintaining aspect ratio
+        let width = videoWidth;
+        let height = videoHeight;
+        
+        if (width > maxWidth) {
+          const scale = maxWidth / width;
+          width = maxWidth;
+          height = Math.round(height * scale);
+        }
+        
+        // Ensure even dimensions
+        width = width % 2 === 0 ? width : width - 1;
+        height = height % 2 === 0 ? height : height - 1;
+        
+        // Create canvas and draw the frame
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          console.warn('[extractFirstFrameFromUrl] Could not create canvas context');
+          resolve({ frameBlob: null, durationSeconds: videoDuration });
+          return;
+        }
+        
+        // This will throw a security error if CORS is blocked
+        try {
+          ctx.drawImage(video, 0, 0, width, height);
+        } catch (corsError) {
+          console.warn('[extractFirstFrameFromUrl] CORS blocked canvas access:', corsError);
+          resolve({ frameBlob: null, durationSeconds: videoDuration });
+          return;
+        }
+        
+        // Convert to JPEG blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              console.log(`[extractFirstFrameFromUrl] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
+              resolve({ frameBlob: blob, durationSeconds: videoDuration });
+            } else {
+              console.warn('[extractFirstFrameFromUrl] Failed to create blob from canvas');
+              resolve({ frameBlob: null, durationSeconds: videoDuration });
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch (err) {
+        console.warn('[extractFirstFrameFromUrl] Error extracting frame:', err);
+        resolve({ frameBlob: null, durationSeconds: videoDuration });
+      }
+    };
+    
+    const onSeeked = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      extractFrame();
+      cleanup();
+    };
+    
+    const onLoadedData = () => {
+      // Capture duration when metadata is available
+      if (isFinite(video.duration) && video.duration > 0) {
+        videoDuration = video.duration;
+        console.log(`[extractFirstFrameFromUrl] Video duration: ${videoDuration}s`);
+      }
+      // Video has enough data to display first frame
+      // Seek to a tiny offset to ensure frame is ready
+      video.currentTime = 0.001;
+    };
+    
+    const onError = (e: Event) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      cleanup();
+      // CORS errors often manifest as video load errors
+      console.warn('[extractFirstFrameFromUrl] Error loading video URL (likely CORS):', e);
+      resolve({ frameBlob: null, durationSeconds: videoDuration });
+    };
+    
+    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('seeked', onSeeked);
+    video.addEventListener('error', onError);
+    
+    // Handle case where video is already loaded (cached)
+    if (video.readyState >= 2) {
+      video.currentTime = 0.001;
+    }
+    
+    video.src = videoUrl;
   });
 }
 

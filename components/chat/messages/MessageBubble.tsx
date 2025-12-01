@@ -7,7 +7,7 @@ import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/stor
 import { calculatePricing } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -43,9 +43,12 @@ interface MessageBubbleProps {
   onUpdateMessage?: (messageId: string, updates: Partial<Message>) => void;
   onRetryMessage?: (messageId: string) => void;
   isRetrying?: boolean;
+  // Analysis options handlers
+  onSelectProPlusQuick?: (messageId: string) => void;
+  onSelectQuickOnly?: (messageId: string) => void;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -467,26 +470,39 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
 
           {message.role === "assistant" && (
             <Box style={{ maxWidth: "none" }}>
-              <AssistantMessage
-                messageId={message.id}
-                chatId={getCurrentChatId() || undefined}
-                content={message.content}
-                isStreaming={message.isStreaming}
-                isIncomplete={message.isIncomplete}
-                thinkingMessage={getThinkingMessage(thinkingMessageIndex, {
-                  hasVideo: userSentVideo,
-                  isFirstMessage: false, // First message without video → treat as quick
-                  isComplexQuery: isComplexQuery,
-                })}
-                onAskForHelp={onAskForHelp}
-                onTTSUsage={handleTTSUsage}
-                onFeedbackSubmitted={() => setShowFeedbackToast(true)}
-                onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
-                isRetrying={isRetrying}
-              />
-              
-              {/* PRO Membership Upsell */}
-              <ProUpsellBanner show={showProUpsell} />
+              {/* Analysis Options Message (PRO eligibility choice) */}
+              {message.messageType === "analysis_options" && message.analysisOptions ? (
+                <AnalysisOptionsMessage
+                  preAnalysis={message.analysisOptions.preAnalysis}
+                  selectedOption={message.analysisOptions.selectedOption}
+                  onSelectProPlusQuick={() => onSelectProPlusQuick?.(message.id)}
+                  onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
+                  isLoading={message.isStreaming}
+                />
+              ) : (
+                <>
+                  <AssistantMessage
+                    messageId={message.id}
+                    chatId={getCurrentChatId() || undefined}
+                    content={message.content}
+                    isStreaming={message.isStreaming}
+                    isIncomplete={message.isIncomplete}
+                    thinkingMessage={getThinkingMessage(thinkingMessageIndex, {
+                      hasVideo: userSentVideo,
+                      isFirstMessage: false, // First message without video → treat as quick
+                      isComplexQuery: isComplexQuery,
+                    })}
+                    onAskForHelp={onAskForHelp}
+                    onTTSUsage={handleTTSUsage}
+                    onFeedbackSubmitted={() => setShowFeedbackToast(true)}
+                    onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
+                    isRetrying={isRetrying}
+                  />
+                  
+                  {/* PRO Membership Upsell */}
+                  <ProUpsellBanner show={showProUpsell} />
+                </>
+              )}
               
               {/* Developer mode token information */}
               <DeveloperInfo

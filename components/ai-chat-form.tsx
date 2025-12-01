@@ -26,9 +26,9 @@ import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat, loadChat } from "@/utils/storage-unified";
-import type { Message } from "@/types/chat";
+import type { Message, VideoPreAnalysis } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
-import { getMediaType, downloadVideoFromUrl, extractFirstFrame, isImageFile } from "@/utils/video-utils";
+import { getMediaType, downloadVideoFromUrl, extractFirstFrame, extractFirstFrameFromUrl, extractFirstFrameWithDuration, isImageFile } from "@/utils/video-utils";
 import {
   sharedSwings,
   tennisSwings,
@@ -72,6 +72,11 @@ export function AIChatForm() {
   // Video sport auto-detection state
   const [videoSportDetected, setVideoSportDetected] = useState<DomainExpertise | null>(null);
   const [isDetectingSport, setIsDetectingSport] = useState(false);
+  // Video URL detection state (when user pastes a video URL instead of uploading)
+  const [detectedVideoUrl, setDetectedVideoUrl] = useState<string | null>(null);
+  // Video pre-analysis state (sport detection, camera angle, PRO eligibility)
+  const [videoPreAnalysis, setVideoPreAnalysis] = useState<VideoPreAnalysis | null>(null);
+  const lastAnalyzedUrlRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -406,14 +411,18 @@ export function AIChatForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoFile]); // Only depend on videoFile to avoid loops
 
-  // Auto-detect sport from video first frame
+  // Auto-detect sport and eligibility from video first frame (for uploaded files)
   useEffect(() => {
     // Skip if no video, already detecting, or same video as last detection
     if (!videoFile || isDetectingSport || videoFile === lastDetectedVideoRef.current) {
+      // Clear pre-analysis if video is removed
+      if (!videoFile && videoPreAnalysis) {
+        setVideoPreAnalysis(null);
+      }
       return;
     }
     
-    // Skip sport detection for images - they don't need it (user likely knows the context)
+    // Skip for images - they don't need eligibility detection
     if (isImageFile(videoFile)) {
       return;
     }
@@ -421,59 +430,289 @@ export function AIChatForm() {
     // Mark this video as being processed
     lastDetectedVideoRef.current = videoFile;
     
-    const detectSport = async () => {
+    const analyzeVideoFile = async () => {
       setIsDetectingSport(true);
       setVideoSportDetected(null);
       
+      // Set analyzing state
+      setVideoPreAnalysis({
+        sport: "other",
+        cameraAngle: "other",
+        fullCourtVisible: false,
+        confidence: 0,
+        isProEligible: false,
+        isAnalyzing: true,
+      });
+      
       try {
-        console.log("[SportDetect] Extracting first frame from video...");
-        const frameBlob = await extractFirstFrame(videoFile, 640, 0.7);
+        console.log("[VideoFileAnalysis] Extracting first frame and duration from video...");
+        const { frameBlob, durationSeconds } = await extractFirstFrameWithDuration(videoFile, 640, 0.7);
         
-        console.log("[SportDetect] Sending frame to detection API...");
+        if (!frameBlob) {
+          console.log("[VideoFileAnalysis] Failed to extract frame");
+          setVideoPreAnalysis({
+            sport: "other",
+            cameraAngle: "other",
+            fullCourtVisible: false,
+            confidence: 0,
+            isProEligible: false,
+            isAnalyzing: false,
+            proEligibilityReason: "Could not extract frame from video",
+            durationSeconds: durationSeconds,
+            isTechniqueLiteEligible: false,
+            techniqueLiteEligibilityReason: "Could not analyze video.",
+          });
+          return;
+        }
+        
+        console.log("[VideoFileAnalysis] Frame extracted, duration:", durationSeconds, "s, sending to eligibility API...");
+        
+        // Send to eligibility analysis API
         const formData = new FormData();
         formData.append("image", frameBlob, "frame.jpg");
         
-        const response = await fetch("/api/detect-sport", {
+        const response = await fetch("/api/analyze-video-eligibility", {
           method: "POST",
           body: formData,
         });
         
         if (!response.ok) {
-          throw new Error("Sport detection API failed");
+          throw new Error("Eligibility analysis API failed");
         }
         
         const data = await response.json();
-        const detectedSport = data.sport as "tennis" | "pickleball" | "padel" | "other";
+        console.log("[VideoFileAnalysis] Analysis result:", data);
         
-        console.log("[SportDetect] Detected sport:", detectedSport);
+        // Calculate Technique LITE eligibility (ground-level camera + < 20 seconds)
+        // Ground-level angles: side, ground_behind, diagonal (not elevated_back_court or overhead)
+        const isGroundLevelCamera = ["side", "ground_behind", "diagonal"].includes(data.cameraAngle);
+        const isTechniqueLiteEligible = 
+          isGroundLevelCamera && 
+          durationSeconds !== null && 
+          durationSeconds < 20;
         
-        // Only switch if a specific sport was detected (not "other")
-        if (detectedSport !== "other" && detectedSport !== domainExpertise) {
-          // Update domain expertise
-          setDomainExpertise(detectedSport);
+        console.log("[VideoFileAnalysis] Technique LITE check:", {
+          cameraAngle: data.cameraAngle,
+          isGroundLevelCamera,
+          durationSeconds,
+          isTechniqueLiteEligible,
+        });
+        
+        let techniqueLiteEligibilityReason: string | undefined;
+        if (isTechniqueLiteEligible) {
+          techniqueLiteEligibilityReason = "Perfect for technique analysis! Ground-level camera with short clip.";
+        } else if (!isGroundLevelCamera) {
+          techniqueLiteEligibilityReason = "Technique LITE requires a ground-level camera angle (side, behind, or diagonal).";
+        } else if (durationSeconds === null || durationSeconds >= 20) {
+          techniqueLiteEligibilityReason = "Technique LITE requires videos under 20 seconds.";
+        }
+        
+        // Update pre-analysis state
+        setVideoPreAnalysis({
+          sport: data.sport,
+          cameraAngle: data.cameraAngle,
+          fullCourtVisible: data.fullCourtVisible,
+          confidence: data.confidence,
+          isProEligible: data.isProEligible,
+          proEligibilityReason: data.proEligibilityReason,
+          isAnalyzing: false,
+          durationSeconds: durationSeconds,
+          isTechniqueLiteEligible,
+          techniqueLiteEligibilityReason,
+        });
+        
+        // Also update domain expertise if a specific sport was detected
+        if (data.sport !== "other" && data.sport !== domainExpertise) {
+          setDomainExpertise(data.sport);
           const currentChatId = getCurrentChatId();
           if (currentChatId) {
-            updateChatSettings(currentChatId, { domainExpertise: detectedSport });
+            updateChatSettings(currentChatId, { domainExpertise: data.sport });
           }
           
-          // Signal ChatInput to show glow effect
-          setVideoSportDetected(detectedSport);
-          
-          // Clear the signal after glow animation duration
-          setTimeout(() => {
-            setVideoSportDetected(null);
-          }, 2500);
+          // Signal glow effect
+          setVideoSportDetected(data.sport);
+          setTimeout(() => setVideoSportDetected(null), 2500);
         }
+        
       } catch (err) {
-        console.error("[SportDetect] Failed to detect sport:", err);
-        // Fail silently - sport detection is optional
+        console.error("[VideoFileAnalysis] Failed:", err);
+        setVideoPreAnalysis({
+          sport: "other",
+          cameraAngle: "other",
+          fullCourtVisible: false,
+          confidence: 0,
+          isProEligible: false,
+          isAnalyzing: false,
+          proEligibilityReason: "Analysis failed",
+          isTechniqueLiteEligible: false,
+          techniqueLiteEligibilityReason: "Analysis failed.",
+        });
       } finally {
         setIsDetectingSport(false);
       }
     };
     
-    detectSport();
-  }, [videoFile, isDetectingSport, domainExpertise]);
+    analyzeVideoFile();
+  }, [videoFile, isDetectingSport, domainExpertise, videoPreAnalysis]);
+
+  // Auto-detect sport and PRO eligibility from pasted video URL
+  useEffect(() => {
+    console.log("[VideoUrlAnalysis] Effect triggered:", {
+      detectedVideoUrl,
+      lastAnalyzedUrl: lastAnalyzedUrlRef.current,
+      videoFile: !!videoFile,
+      videoPreAnalysis: !!videoPreAnalysis,
+    });
+    
+    // Skip if no URL
+    if (!detectedVideoUrl) {
+      // Clear pre-analysis if URL is removed (but NOT if we have a video file - that has its own analysis)
+      if (videoPreAnalysis && !videoFile) {
+        setVideoPreAnalysis(null);
+      }
+      console.log("[VideoUrlAnalysis] Skipping - no URL");
+      return;
+    }
+    
+    // Skip if already analyzing
+    if (videoPreAnalysis?.isAnalyzing) {
+      console.log("[VideoUrlAnalysis] Skipping - already analyzing");
+      return;
+    }
+    
+    // Skip if same URL AND we already have a result
+    // Re-analyze if result is missing (was cleared after submission)
+    if (detectedVideoUrl === lastAnalyzedUrlRef.current && videoPreAnalysis) {
+      console.log("[VideoUrlAnalysis] Skipping - same URL and already have result");
+      return;
+    }
+    
+    lastAnalyzedUrlRef.current = detectedVideoUrl;
+    console.log("[VideoUrlAnalysis] Starting analysis for URL:", detectedVideoUrl);
+    
+    const analyzeVideoUrl = async () => {
+      // Set analyzing state
+      setVideoPreAnalysis({
+        sport: "other",
+        cameraAngle: "other",
+        fullCourtVisible: false,
+        confidence: 0,
+        isProEligible: false,
+        isAnalyzing: true,
+      });
+      
+      try {
+        console.log("[VideoUrlAnalysis] Analyzing video URL:", detectedVideoUrl);
+        
+        // Try to extract first frame and duration client-side
+        const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(detectedVideoUrl, 640, 0.7);
+        
+        if (!frameBlob) {
+          console.log("[VideoUrlAnalysis] Client-side extraction failed (CORS), using fallback analysis");
+          // For now, just set as unknown - we'll analyze when user submits
+          // In future: could add server-side frame extraction
+          setVideoPreAnalysis({
+            sport: "other",
+            cameraAngle: "other",
+            fullCourtVisible: false,
+            confidence: 0,
+            isProEligible: false,
+            isAnalyzing: false,
+            proEligibilityReason: "Could not preview video due to access restrictions",
+            durationSeconds: durationSeconds, // May have duration even if frame extraction failed
+            isTechniqueLiteEligible: false,
+            techniqueLiteEligibilityReason: "Could not analyze video due to access restrictions.",
+          });
+          return;
+        }
+        
+        console.log("[VideoUrlAnalysis] Frame extracted, duration:", durationSeconds, "s, sending to eligibility API...");
+        
+        // Send to eligibility analysis API
+        const formData = new FormData();
+        formData.append("image", frameBlob, "frame.jpg");
+        
+        const response = await fetch("/api/analyze-video-eligibility", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error("Eligibility analysis API failed");
+        }
+        
+        const data = await response.json();
+        console.log("[VideoUrlAnalysis] Analysis result:", data);
+        
+        // Calculate Technique LITE eligibility (ground-level camera + < 20 seconds)
+        // Ground-level angles: side, ground_behind, diagonal (not elevated_back_court or overhead)
+        const isGroundLevelCamera = ["side", "ground_behind", "diagonal"].includes(data.cameraAngle);
+        const isTechniqueLiteEligible = 
+          isGroundLevelCamera && 
+          durationSeconds !== null && 
+          durationSeconds < 20;
+        
+        console.log("[VideoUrlAnalysis] Technique LITE check:", {
+          cameraAngle: data.cameraAngle,
+          isGroundLevelCamera,
+          durationSeconds,
+          isTechniqueLiteEligible,
+        });
+        
+        let techniqueLiteEligibilityReason: string | undefined;
+        if (isTechniqueLiteEligible) {
+          techniqueLiteEligibilityReason = "Perfect for technique analysis! Ground-level camera with short clip.";
+        } else if (!isGroundLevelCamera) {
+          techniqueLiteEligibilityReason = "Technique LITE requires a ground-level camera angle (side, behind, or diagonal).";
+        } else if (durationSeconds === null || durationSeconds >= 20) {
+          techniqueLiteEligibilityReason = "Technique LITE requires videos under 20 seconds.";
+        }
+        
+        // Update pre-analysis state
+        setVideoPreAnalysis({
+          sport: data.sport,
+          cameraAngle: data.cameraAngle,
+          fullCourtVisible: data.fullCourtVisible,
+          confidence: data.confidence,
+          isProEligible: data.isProEligible,
+          proEligibilityReason: data.proEligibilityReason,
+          isAnalyzing: false,
+          durationSeconds: durationSeconds,
+          isTechniqueLiteEligible,
+          techniqueLiteEligibilityReason,
+        });
+        
+        // Also update domain expertise if a specific sport was detected
+        if (data.sport !== "other" && data.sport !== domainExpertise) {
+          setDomainExpertise(data.sport);
+          const currentChatId = getCurrentChatId();
+          if (currentChatId) {
+            updateChatSettings(currentChatId, { domainExpertise: data.sport });
+          }
+          
+          // Signal glow effect
+          setVideoSportDetected(data.sport);
+          setTimeout(() => setVideoSportDetected(null), 2500);
+        }
+        
+      } catch (err) {
+        console.error("[VideoUrlAnalysis] Failed:", err);
+        setVideoPreAnalysis({
+          sport: "other",
+          cameraAngle: "other",
+          fullCourtVisible: false,
+          confidence: 0,
+          isProEligible: false,
+          isAnalyzing: false,
+          proEligibilityReason: "Analysis failed",
+          isTechniqueLiteEligible: false,
+          techniqueLiteEligibilityReason: "Analysis failed.",
+        });
+      }
+    };
+    
+    analyzeVideoUrl();
+  }, [detectedVideoUrl, domainExpertise, videoPreAnalysis, videoFile]);
 
   const error = videoError || apiError;
 
@@ -857,6 +1096,190 @@ export function AIChatForm() {
     }
   };
 
+  /**
+   * Handle user selecting "PRO + Quick Chat" analysis option
+   * Starts both PRO analysis task and quick chat analysis
+   */
+  const handleSelectProPlusQuick = async (messageId: string) => {
+    console.log("[AIChatForm] PRO + Quick selected for message:", messageId);
+    
+    // Find the analysis options message
+    const optionsMessage = messages.find(m => m.id === messageId);
+    if (!optionsMessage?.analysisOptions) {
+      console.error("[AIChatForm] Could not find analysis options message");
+      return;
+    }
+    
+    // Update the message to show selection
+    updateMessage(messageId, {
+      analysisOptions: {
+        ...optionsMessage.analysisOptions,
+        selectedOption: "pro_plus_quick",
+      },
+    });
+    
+    // Find the video URL from previous user message
+    let videoUrl: string | null = null;
+    const msgIndex = messages.findIndex(m => m.id === messageId);
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      const prevMsg = messages[i];
+      if (prevMsg.role === "user" && prevMsg.videoUrl) {
+        videoUrl = prevMsg.videoUrl;
+        break;
+      }
+    }
+    
+    if (!videoUrl) {
+      console.error("[AIChatForm] Could not find video URL for PRO analysis");
+      // Still start quick analysis
+      await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+      return;
+    }
+    
+    // Start PRO analysis task in background
+    // TODO: Implement PRO task creation with the tasks API
+    console.log("[AIChatForm] Starting PRO analysis for URL:", videoUrl);
+    
+    // Start quick analysis
+    await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+  };
+
+  /**
+   * Handle user selecting "Quick Chat Only" analysis option
+   */
+  const handleSelectQuickOnly = async (messageId: string) => {
+    console.log("[AIChatForm] Quick Only selected for message:", messageId);
+    
+    // Find the analysis options message
+    const optionsMessage = messages.find(m => m.id === messageId);
+    if (!optionsMessage?.analysisOptions) {
+      console.error("[AIChatForm] Could not find analysis options message");
+      return;
+    }
+    
+    // Update the message to show selection
+    updateMessage(messageId, {
+      analysisOptions: {
+        ...optionsMessage.analysisOptions,
+        selectedOption: "quick_only",
+      },
+    });
+    
+    // Start quick analysis
+    await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+  };
+
+  /**
+   * Start quick AI analysis after user selects an option
+   */
+  const startQuickAnalysis = async (optionsMessageId: string, sport: string) => {
+    // Find the video URL from previous user messages
+    let videoUrl: string | null = null;
+    let userPrompt = "";
+    const msgIndex = messages.findIndex(m => m.id === optionsMessageId);
+    
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      const prevMsg = messages[i];
+      if (prevMsg.role === "assistant") break;
+      if (prevMsg.role === "user") {
+        if (prevMsg.videoUrl && !videoUrl) {
+          videoUrl = prevMsg.videoUrl;
+        }
+        if (prevMsg.content && !userPrompt) {
+          userPrompt = prevMsg.content;
+        }
+      }
+    }
+    
+    if (!videoUrl) {
+      console.error("[AIChatForm] Could not find video URL for quick analysis");
+      return;
+    }
+    
+    if (!userPrompt) {
+      userPrompt = "Please analyse this video for me.";
+    }
+    
+    // Create a new assistant message for the actual analysis
+    const assistantMessageId = generateMessageId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+    };
+    addMessage(assistantMessage);
+    
+    setLoading(true);
+    setProgressStage("analyzing");
+    
+    // Create abort controller
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    try {
+      // Build form data with video URL
+      const formData = new FormData();
+      formData.append("prompt", userPrompt);
+      formData.append("videoUrl", videoUrl);
+      formData.append("thinkingMode", thinkingMode);
+      formData.append("mediaResolution", mediaResolution);
+      formData.append("domainExpertise", sport as DomainExpertise);
+      
+      const response = await fetch("/api/llm", {
+        method: "POST",
+        headers: { "x-stream": "true" },
+        body: formData,
+        signal: abortController.signal,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to analyze video");
+      }
+      
+      // Stream the response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
+      
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedText += chunk;
+          
+          updateMessage(assistantMessageId, { 
+            content: accumulatedText,
+            isStreaming: true,
+          });
+        }
+        
+        // Mark as complete
+        updateMessage(assistantMessageId, {
+          isStreaming: false,
+        });
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        console.log("[AIChatForm] Quick analysis was cancelled");
+      } else {
+        console.error("[AIChatForm] Quick analysis failed:", err);
+        updateMessage(assistantMessageId, {
+          content: "Sorry, I encountered an error analyzing your video. Please try again.",
+          isStreaming: false,
+          isIncomplete: true,
+        });
+      }
+    } finally {
+      setLoading(false);
+      setProgressStage("idle");
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleAskForHelp = (termName: string, swing?: { name: string; sport: string; description: string }) => {
     let question = '';
     const lowerTermName = termName.toLowerCase();
@@ -918,14 +1341,18 @@ export function AIChatForm() {
     // Use override prompt if provided (e.g., from "Ask AI for help"), otherwise use state prompt
     const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
     
-    if ((!effectivePrompt.trim() && !videoFile) || loading) return;
+    // Allow submission if: has text, has file, or has a detected video URL
+    const hasValidInput = effectivePrompt.trim() || videoFile || detectedVideoUrl;
+    if (!hasValidInput || loading) return;
 
-    // Use prompt if provided, otherwise use default prompt for video-only submissions
+    // Capture the video URL before clearing
+    const currentVideoUrl = detectedVideoUrl;
+
+    // Use prompt if provided, otherwise use default prompt for video/URL submissions
     // Update prompt state if we're using the default so UI reflects what will be sent
     let currentPrompt = effectivePrompt.trim();
-    if (!currentPrompt && videoFile) {
-      const mediaType = getMediaType(videoFile);
-      currentPrompt = `Please analyse this ${mediaType} for me.`;
+    if (!currentPrompt && (videoFile || currentVideoUrl)) {
+      currentPrompt = "Please analyse this video for me.";
       setPrompt(currentPrompt); // Update state so UI shows the prompt
     }
     const currentVideoFile = videoFile;
@@ -1017,7 +1444,14 @@ export function AIChatForm() {
     console.log("[AIChatForm] Setting loading state to true");
     setLoading(true);
     setUploadProgress(0);
-    setProgressStage(currentVideoFile ? "uploading" : "processing");
+    // Set appropriate progress stage based on input type
+    if (currentVideoFile) {
+      setProgressStage("uploading");
+    } else if (currentVideoUrl) {
+      setProgressStage("processing"); // Will update to analyzing after validation
+    } else {
+      setProgressStage("processing");
+    }
 
     let videoMessageId: string | null = null;
     
@@ -1038,12 +1472,13 @@ export function AIChatForm() {
     
     console.log("[AIChatForm] Creating user messages...", {
       hasVideo: !!currentVideoFile,
+      hasVideoUrl: !!currentVideoUrl,
       hasPrompt: !!currentPrompt.trim(),
     });
     
-    // If both video and text are present, create two separate messages
-    if (currentVideoFile && currentPrompt.trim()) {
-      console.log("[AIChatForm] Creating two messages: video + text");
+    // If both video (file or URL) and text are present, create two separate messages
+    if ((currentVideoFile || currentVideoUrl) && currentPrompt.trim()) {
+      console.log("[AIChatForm] Creating two messages: video/URL + text");
       // First message: video only
       videoMessageId = generateMessageId();
       const videoTokens = calculateUserMessageTokens("", currentVideoFile);
@@ -1051,13 +1486,19 @@ export function AIChatForm() {
         id: videoMessageId,
         role: "user",
         content: "",
-        videoFile: currentVideoFile,
+        videoFile: currentVideoFile || null,
         videoPreview: currentVideoPreview,
+        videoUrl: currentVideoUrl || undefined, // Store the URL directly if it's a URL submission
         videoPlaybackSpeed: videoPlaybackSpeed,
         inputTokens: videoTokens,
         poseData: poseData,
+        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
       };
-      console.log("[AIChatForm] Adding video message:", videoMessageId);
+      console.log("[AIChatForm] Adding video message:", videoMessageId, {
+        isTechniqueLiteEligible: videoMessage.isTechniqueLiteEligible,
+        videoPreAnalysisEligible: videoPreAnalysis?.isTechniqueLiteEligible,
+        videoPreAnalysisState: videoPreAnalysis,
+      });
       addMessage(videoMessage);
       
       // Second message: text only
@@ -1073,8 +1514,22 @@ export function AIChatForm() {
       };
       console.log("[AIChatForm] Adding text message:", textMessageId);
       addMessage(textMessage);
+    } else if (currentVideoUrl && !currentVideoFile) {
+      // Video URL only (no file uploaded)
+      console.log("[AIChatForm] Creating single message with video URL");
+      videoMessageId = generateMessageId();
+      const userMessage: Message = {
+        id: videoMessageId,
+        role: "user",
+        content: currentPrompt,
+        videoUrl: currentVideoUrl,
+        inputTokens: estimateTextTokens(currentPrompt),
+        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
+      };
+      console.log("[AIChatForm] Adding video URL message:", videoMessageId);
+      addMessage(userMessage);
     } else {
-      // Single message: either video or text
+      // Single message: either video file or text only
       console.log("[AIChatForm] Creating single message");
       const userMessageId = generateMessageId();
       if (currentVideoFile) {
@@ -1090,11 +1545,14 @@ export function AIChatForm() {
         videoPlaybackSpeed: currentVideoFile ? videoPlaybackSpeed : undefined,
         inputTokens: userTokens,
         poseData: currentVideoFile ? poseData : undefined,
+        isTechniqueLiteEligible: currentVideoFile ? (videoPreAnalysis?.isTechniqueLiteEligible ?? false) : undefined,
       };
       console.log("[AIChatForm] Adding user message:", userMessageId, {
         hasVideo: !!userMessage.videoFile,
         hasPreview: !!userMessage.videoPreview,
         contentLength: userMessage.content.length,
+        isTechniqueLiteEligible: userMessage.isTechniqueLiteEligible,
+        videoPreAnalysisEligible: videoPreAnalysis?.isTechniqueLiteEligible,
       });
       addMessage(userMessage);
     }
@@ -1106,6 +1564,9 @@ export function AIChatForm() {
     // Don't revoke blob URL yet - it's still referenced in the message
     // It will be revoked when S3 URL is available or when message is removed
     clearVideo(true); // Keep blob URL since it's in the message
+    setDetectedVideoUrl(null); // Clear detected video URL
+    setVideoPreAnalysis(null); // Clear video pre-analysis
+    lastAnalyzedUrlRef.current = null; // Reset URL tracking
     setVideoError(null);
     setApiError(null);
     setPoseData(undefined); // Reset pose data after sending
@@ -1170,7 +1631,96 @@ export function AIChatForm() {
         return;
       }
 
-      if (!currentVideoFile) {
+      if (currentVideoUrl && !currentVideoFile) {
+        // Video URL analysis
+        console.log("[AIChatForm] Processing video URL:", currentVideoUrl);
+        
+        // Check if we have pre-analysis data and it's PRO eligible
+        if (videoPreAnalysis && videoPreAnalysis.sport === "padel") {
+          // Show analysis options message instead of immediately starting analysis
+          console.log("[AIChatForm] Showing analysis options for padel video");
+          
+          // Update the assistant message to be an analysis options message
+          updateMessage(assistantMessageId, {
+            messageType: "analysis_options",
+            content: "", // No text content for options message
+            analysisOptions: {
+              preAnalysis: videoPreAnalysis,
+              selectedOption: null,
+            },
+            isStreaming: false,
+          });
+          
+          // Don't start analysis yet - wait for user to select an option
+          setLoading(false);
+          setProgressStage("idle");
+          return;
+        }
+        
+        // No PRO eligibility or not padel - proceed with quick analysis directly
+        console.log("[AIChatForm] Starting quick analysis for video URL:", currentVideoUrl);
+        setProgressStage("analyzing");
+        
+        // Build form data with video URL
+        const formData = new FormData();
+        formData.append("prompt", currentPrompt);
+        formData.append("videoUrl", currentVideoUrl);
+        formData.append("thinkingMode", thinkingMode);
+        formData.append("mediaResolution", mediaResolution);
+        formData.append("domainExpertise", domainExpertise);
+        
+        // Add conversation history if available
+        if (conversationHistory.length > 0) {
+          const { getConversationContext } = await import("@/utils/context-utils");
+          const context = getConversationContext(conversationHistory);
+          if (context.length > 0) {
+            formData.append("history", JSON.stringify(context));
+          }
+        }
+        
+        const response = await fetch("/api/llm", {
+          method: "POST",
+          headers: { "x-stream": "true" },
+          body: formData,
+          signal: abortController.signal,
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to analyze video");
+        }
+        
+        // Stream the response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = "";
+        
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedText += chunk;
+            
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) {
+              updateMessage(assistantMessageId, { 
+                content: accumulatedText,
+                isStreaming: true,
+              });
+            }
+          }
+          
+          // Mark as complete
+          const chatId = getCurrentChatId();
+          if (chatId === requestChatId) {
+            updateMessage(assistantMessageId, {
+              isStreaming: false,
+            });
+          }
+        }
+      } else if (!currentVideoFile) {
         // Streaming for text-only
         await sendTextOnlyQuery(
           currentPrompt,
@@ -1343,6 +1893,8 @@ export function AIChatForm() {
                   onUpdateMessage={updateMessage}
                   onRetryMessage={handleRetryMessage}
                   retryingMessageId={retryingMessageId}
+                  onSelectProPlusQuick={handleSelectProPlusQuick}
+                  onSelectQuickOnly={handleSelectQuickOnly}
                 />
               )}
             </div>
@@ -1410,6 +1962,8 @@ export function AIChatForm() {
             disableTooltips={hasJustDropped}
             hideDisclaimer={showingVideoSizeError}
             videoSportDetected={videoSportDetected}
+            onVideoUrlDetected={setDetectedVideoUrl}
+            videoPreAnalysis={videoPreAnalysis}
           />
         </div>
       </div>

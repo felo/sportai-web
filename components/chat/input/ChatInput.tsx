@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
-import { ArrowUpIcon, PlusIcon, StopIcon } from "@radix-ui/react-icons";
+import { TextArea, Tooltip, Box, Flex, Callout, Text, Select, Badge } from "@radix-ui/themes";
+import { ArrowUpIcon, PlusIcon, StopIcon, ExclamationTriangleIcon, VideoIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "../viewers/VideoPreview";
-import type { ProgressStage } from "@/types/chat";
+import type { ProgressStage, VideoPreAnalysis } from "@/types/chat";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { extractVideoUrls } from "@/utils/video-utils";
 
 interface ChatInputProps {
   prompt: string;
@@ -31,6 +32,10 @@ interface ChatInputProps {
   hideDisclaimer?: boolean; // Hide the "contact us" disclaimer
   // Video sport auto-detection - triggers glow effect when sport is detected from video
   videoSportDetected?: DomainExpertise | null;
+  // Video URL detection - callback when a video URL is detected in the input
+  onVideoUrlDetected?: (url: string | null) => void;
+  // Video pre-analysis for PRO eligibility
+  videoPreAnalysis?: VideoPreAnalysis | null;
 }
 
 export function ChatInput({
@@ -55,8 +60,13 @@ export function ChatInput({
   disableTooltips = false,
   hideDisclaimer = false,
   videoSportDetected = null,
+  onVideoUrlDetected,
+  videoPreAnalysis = null,
 }: ChatInputProps) {
   const isMobile = useIsMobile();
+  
+  // Video URL detection state
+  const [detectedVideoUrls, setDetectedVideoUrls] = useState<string[]>([]);
   
   // Debug logging
   useEffect(() => {
@@ -141,6 +151,14 @@ export function ChatInput({
       fileInputRef.current.value = "";
     }
   }, [videoFile]);
+
+  // Clear video URL detection when a file is uploaded
+  useEffect(() => {
+    if (videoFile) {
+      setDetectedVideoUrls([]);
+      onVideoUrlDetected?.(null);
+    }
+  }, [videoFile, onVideoUrlDetected]);
 
   useEffect(() => {
     // Set initial height to base height
@@ -289,6 +307,23 @@ export function ChatInput({
     // Detect sport names and auto-switch
     detectAndSwitchSport(newValue);
     
+    // Detect video URLs in the text (only if no file is uploaded)
+    if (!videoFile) {
+      const videoUrls = extractVideoUrls(newValue);
+      setDetectedVideoUrls(videoUrls);
+      
+      // Notify parent: only if exactly one video URL (ready for analysis)
+      if (videoUrls.length === 1) {
+        onVideoUrlDetected?.(videoUrls[0]);
+      } else {
+        onVideoUrlDetected?.(null);
+      }
+    } else {
+      // Clear URL detection when a file is uploaded
+      setDetectedVideoUrls([]);
+      onVideoUrlDetected?.(null);
+    }
+    
     // Use requestAnimationFrame to ensure DOM is updated before measuring
     requestAnimationFrame(() => {
       if (textareaRef.current) {
@@ -372,6 +407,52 @@ export function ChatInput({
               onRemove={onVideoRemove}
               disableTooltips={disableTooltips}
             />
+          )}
+
+          {/* Video URL detection indicator with PRO badge */}
+          {!videoFile && detectedVideoUrls.length === 1 && (
+            <Flex 
+              align="center" 
+              gap="2" 
+              py="2" 
+              px="3"
+              style={{
+                backgroundColor: videoPreAnalysis?.isProEligible ? "var(--amber-3)" : "var(--green-3)",
+                borderRadius: "var(--radius-2)",
+                border: videoPreAnalysis?.isProEligible ? "1px solid var(--amber-6)" : "1px solid var(--green-6)",
+              }}
+            >
+              <VideoIcon width="16" height="16" color={videoPreAnalysis?.isProEligible ? "var(--amber-11)" : "var(--green-11)"} />
+              <Text size="2" color={videoPreAnalysis?.isProEligible ? "amber" : "green"} style={{ flex: 1 }}>
+                {videoPreAnalysis?.isAnalyzing ? (
+                  "⏳ Checking eligibility..."
+                ) : videoPreAnalysis?.sport && videoPreAnalysis.sport !== "other" ? (
+                  <>
+                    {videoPreAnalysis.sport === "padel" ? "🏸" : videoPreAnalysis.sport === "tennis" ? "🎾" : "🏓"}{" "}
+                    {videoPreAnalysis.sport.charAt(0).toUpperCase() + videoPreAnalysis.sport.slice(1)} detected
+                  </>
+                ) : (
+                  "Video URL detected"
+                )}
+              </Text>
+              {videoPreAnalysis?.isProEligible && (
+                <Badge color="amber" variant="solid" size="1" style={{ fontWeight: 600 }}>
+                  PRO ✓
+                </Badge>
+              )}
+            </Flex>
+          )}
+
+          {/* Multiple video URLs warning */}
+          {!videoFile && detectedVideoUrls.length > 1 && (
+            <Callout.Root color="orange" size="1">
+              <Callout.Icon>
+                <ExclamationTriangleIcon />
+              </Callout.Icon>
+              <Callout.Text>
+                {detectedVideoUrls.length} video URLs detected. Only one video can be analyzed at a time. Please remove extra URLs.
+              </Callout.Text>
+            </Callout.Root>
           )}
 
           <Box
@@ -673,42 +754,52 @@ export function ChatInput({
                 )
               ) : (
                 <Tooltip content="Send message" open={disableTooltips ? false : undefined}>
-                  <button
-                    type="submit"
-                    disabled={!prompt.trim() && !videoFile}
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "9999px",
-                      backgroundColor: (!prompt.trim() && !videoFile) ? "var(--gray-4)" : "#7ADB8F",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: (!prompt.trim() && !videoFile) ? "not-allowed" : "pointer",
-                      transition: "all 0.3s ease-out",
-                      border: (!prompt.trim() && !videoFile) ? "none" : "2px solid white",
-                      opacity: (!prompt.trim() && !videoFile) ? 0.5 : 1,
-                      boxShadow: (!prompt.trim() && !videoFile) ? "none" : "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                    }}
-                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      if (prompt.trim() || videoFile) {
-                        e.currentTarget.style.backgroundColor = "#95E5A6";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
-                      }
-                    }}
-                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      if (prompt.trim() || videoFile) {
-                        e.currentTarget.style.backgroundColor = "#7ADB8F";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
-                      }
-                    }}
-                  >
-                    <ArrowUpIcon width="18" height="18" color={(!prompt.trim() && !videoFile) ? "var(--gray-9)" : "#1C1C1C"} />
-                  </button>
+                  {(() => {
+                    // Can submit if: has text OR has file OR has exactly one video URL (not multiple)
+                    const hasValidVideoUrl = detectedVideoUrls.length === 1;
+                    const canSubmit = prompt.trim() || videoFile || hasValidVideoUrl;
+                    // Disable if multiple URLs detected
+                    const isDisabled = !canSubmit || detectedVideoUrls.length > 1;
+                    
+                    return (
+                      <button
+                        type="submit"
+                        disabled={isDisabled}
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "9999px",
+                          backgroundColor: isDisabled ? "var(--gray-4)" : "#7ADB8F",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: isDisabled ? "not-allowed" : "pointer",
+                          transition: "all 0.3s ease-out",
+                          border: isDisabled ? "none" : "2px solid white",
+                          opacity: isDisabled ? 0.5 : 1,
+                          boxShadow: isDisabled ? "none" : "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+                          textTransform: "uppercase",
+                          fontWeight: 600,
+                        }}
+                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                          if (!isDisabled) {
+                            e.currentTarget.style.backgroundColor = "#95E5A6";
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
+                          }
+                        }}
+                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                          if (!isDisabled) {
+                            e.currentTarget.style.backgroundColor = "#7ADB8F";
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
+                          }
+                        }}
+                      >
+                        <ArrowUpIcon width="18" height="18" color={isDisabled ? "var(--gray-9)" : "#1C1C1C"} />
+                      </button>
+                    );
+                  })()}
                 </Tooltip>
               )}
             </Flex>

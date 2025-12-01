@@ -16,7 +16,7 @@ import { PlayerCard } from "./PlayerCard";
 import { BounceHeatmap } from "./BounceHeatmap";
 import { ConfidenceCard } from "./ConfidenceCard";
 import { TaskStatusCard } from "./TaskStatusCard";
-import { PLAYER_CONFIG } from "../constants";
+import { getDynamicSwingsThreshold } from "../constants";
 
 interface AnalysisTabsProps {
   result: StatisticsResult | null;
@@ -48,9 +48,12 @@ export function AnalysisTabs({
   const [activeTab, setActiveTab] = useState<TabId>("summary");
 
   const filteredPlayers: Player[] = result?.players
-    ? result.players
-        .filter((p) => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
-        .sort((a, b) => b.swing_count - a.swing_count)
+    ? (() => {
+        const threshold = getDynamicSwingsThreshold(result.players);
+        return result.players
+          .filter((p) => p.swing_count >= threshold)
+          .sort((a, b) => b.swing_count - a.swing_count);
+      })()
     : [];
 
   const highlightsCount = result?.highlights?.length || 0;

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { StatisticsResult, SwingWithPlayer, BallBounce } from "../types";
-import { PLAYER_CONFIG } from "../constants";
+import { getDynamicSwingsThreshold } from "../constants";
 import { 
   PlayerShotData, 
   CellShotInfo,
@@ -180,8 +180,9 @@ export function useServeData({ result, playerDisplayNames = {} }: UseShotAnalysi
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
+    const threshold = getDynamicSwingsThreshold(players);
     const validPlayers = players
-      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .filter(p => p.swing_count >= threshold)
       .sort((a, b) => b.swing_count - a.swing_count);
 
     if (validPlayers.length === 0) return [];
@@ -220,8 +221,9 @@ export function useReturnData({ result, playerDisplayNames = {} }: UseShotAnalys
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
+    const threshold = getDynamicSwingsThreshold(players);
     const validPlayers = players
-      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .filter(p => p.swing_count >= threshold)
       .sort((a, b) => b.swing_count - a.swing_count);
 
     if (validPlayers.length === 0) return [];
@@ -272,8 +274,9 @@ function useNthBallData(
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
+    const threshold = getDynamicSwingsThreshold(players);
     const validPlayers = players
-      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .filter(p => p.swing_count >= threshold)
       .sort((a, b) => b.swing_count - a.swing_count);
 
     if (validPlayers.length === 0) return [];
@@ -351,8 +354,9 @@ export function useAllShotsData({ result, playerDisplayNames = {} }: UseShotAnal
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
+    const threshold = getDynamicSwingsThreshold(players);
     const validPlayers = players
-      .filter(p => p.swing_count >= PLAYER_CONFIG.MIN_SWINGS_THRESHOLD)
+      .filter(p => p.swing_count >= threshold)
       .sort((a, b) => b.swing_count - a.swing_count);
 
     if (validPlayers.length === 0) return [];
