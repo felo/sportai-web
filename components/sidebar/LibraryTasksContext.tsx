@@ -13,6 +13,7 @@ interface LibraryTasksContextValue {
   markTaskAsSeen: (taskId: string) => void;
   isTaskNew: (taskId: string) => boolean;
   isLoading: boolean;
+  refresh: () => void;
 }
 
 const LibraryTasksContext = createContext<LibraryTasksContextValue>({
@@ -22,6 +23,7 @@ const LibraryTasksContext = createContext<LibraryTasksContextValue>({
   markTaskAsSeen: () => {},
   isTaskNew: () => false,
   isLoading: true,
+  refresh: () => {},
 });
 
 export function useLibraryTasks() {
@@ -170,7 +172,7 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
 
   return (
     <LibraryTasksContext.Provider
-      value={{ processingCount, newCompletedCount, markTasksAsSeen, markTaskAsSeen, isTaskNew, isLoading }}
+      value={{ processingCount, newCompletedCount, markTasksAsSeen, markTaskAsSeen, isTaskNew, isLoading, refresh: fetchTaskStatus }}
     >
       {children}
     </LibraryTasksContext.Provider>

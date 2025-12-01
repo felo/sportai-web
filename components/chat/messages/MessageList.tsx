@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Text } from "@radix-ui/themes";
 import { MessageBubble } from "./MessageBubble";
 import { ProgressIndicator } from "../feedback/ProgressIndicator";
+import { ScrollSpacer } from "./ScrollSpacer";
 import { URLs } from "@/lib/config";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Message, ProgressStage } from "@/types/chat";
@@ -50,10 +51,11 @@ export function MessageList({
   
   return (
     <div 
-      className="flex-1 pb-24 space-y-6" 
+      className="flex-1 space-y-6" 
       style={{ 
         paddingTop: isMobile ? "calc(57px + env(safe-area-inset-top) + 1rem)" : "1.5rem", // Account for header + safe area
         paddingLeft: isMobile ? "1rem" : "1rem",
+        paddingBottom: "1rem",
       }}
       role="log" 
       aria-label="Chat messages"
@@ -126,7 +128,11 @@ export function MessageList({
         />
       )}
 
+      {/* Ref for scrollToBottom functionality */}
       <div ref={messagesEndRef} aria-hidden="true" />
+      
+      {/* Dynamic spacer: allows last message to scroll to top but prevents over-scrolling (like ChatGPT) */}
+      <ScrollSpacer scrollContainerRef={scrollContainerRef} />
     </div>
   );
 }

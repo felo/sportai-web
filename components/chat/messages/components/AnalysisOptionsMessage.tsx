@@ -361,15 +361,6 @@ export function AnalysisOptionsMessage({
             </Box>
           )}
 
-          {/* Status message after selection */}
-          {selectedOption && (
-            <Text size="2" color="gray" style={{ display: "block" }}>
-              {selectedOption === "pro_plus_quick" 
-                ? "🚀 Starting PRO analysis... You'll receive detailed statistics when ready." 
-                : "⚡ Starting instant analysis..."}
-            </Text>
-          )}
-
           {/* Cursor blink animation */}
           <style jsx>{`
             @keyframes blink {

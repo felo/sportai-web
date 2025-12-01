@@ -23,6 +23,7 @@ import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoCo
 import { FloatingVideoPortal } from "@/components/chat/viewers/FloatingVideoPortal";
 import { Sidebar } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
+import { useLibraryTasks } from "@/components/sidebar/LibraryTasksContext";
 import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise, generateAIChatTitle, updateChatSettings } from "@/utils/storage";
@@ -99,6 +100,7 @@ export function AIChatForm() {
   const { isCollapsed: isSidebarCollapsed, isInitialLoad: isSidebarInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { refresh: refreshLibraryTasks } = useLibraryTasks();
 
   const {
     videoFile,
@@ -122,6 +124,7 @@ export function AIChatForm() {
     setProgressStage,
     setUploadProgress,
     scrollToBottom,
+    scrollMessageToTop,
     addMessage,
     updateMessage,
     removeMessage,
@@ -1253,6 +1256,8 @@ export function AIChatForm() {
           const { task } = await response.json();
           console.log("[AIChatForm] ✅ PRO analysis task created:", task.id);
           taskCreated = true;
+          // Immediately refresh library badge to show new processing task
+          refreshLibraryTasks();
         } else {
           const errorData = await response.json().catch(() => ({}));
           console.error("[AIChatForm] Failed to create PRO analysis task:", errorData);
@@ -1619,6 +1624,7 @@ export function AIChatForm() {
     }
 
     let videoMessageId: string | null = null;
+    let lastUserMessageId: string | null = null; // Track last user message for scroll positioning
     
     // Calculate input tokens for user messages
     const calculateUserMessageTokens = (content: string, videoFile: File | null): number => {
@@ -1670,6 +1676,7 @@ export function AIChatForm() {
       
       // Second message: text only
       const textMessageId = generateMessageId();
+      lastUserMessageId = textMessageId; // This is the last user message
       const textTokens = calculateUserMessageTokens(currentPrompt, null);
       const textMessage: Message = {
         id: textMessageId,
@@ -1685,6 +1692,7 @@ export function AIChatForm() {
       // Video URL only (no file uploaded)
       console.log("[AIChatForm] Creating single message with video URL");
       videoMessageId = generateMessageId();
+      lastUserMessageId = videoMessageId; // This is the last user message
       const userMessage: Message = {
         id: videoMessageId,
         role: "user",
@@ -1701,6 +1709,7 @@ export function AIChatForm() {
       // Single message: either video file or text only
       console.log("[AIChatForm] Creating single message");
       const userMessageId = generateMessageId();
+      lastUserMessageId = userMessageId; // This is the last user message
       if (currentVideoFile) {
         videoMessageId = userMessageId;
       }
@@ -1776,7 +1785,7 @@ export function AIChatForm() {
       }
     }, 0);
 
-    // Scroll to bottom immediately after adding messages, then disable auto-scroll
+    // Scroll user message to top so response appears below
     // Use requestAnimationFrame to ensure DOM is updated
     // Skip initial scroll if we're about to show a video size limit error
     const willShowSizeLimitError = !!(currentVideoFile && 
@@ -1787,8 +1796,9 @@ export function AIChatForm() {
     setShowingVideoSizeError(willShowSizeLimitError);
     
     requestAnimationFrame(() => {
-      if (!willShowSizeLimitError) {
-        scrollToBottom();
+      if (!willShowSizeLimitError && lastUserMessageId) {
+        // Scroll user message to top, leaving space for AI response below
+        scrollMessageToTop(lastUserMessageId);
       }
       setShouldAutoScroll(false); // Disable auto-scroll during response generation
     });
@@ -2125,7 +2135,7 @@ export function AIChatForm() {
 
           {/* Messages area - this is the scrolling container with fade overlay */}
           <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-            <div ref={scrollContainerRef} style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
+            <div ref={scrollContainerRef} data-scroll-container="true" style={{ height: "100%", overflowY: "auto", minHeight: 0 }}>
               {messages.length === 0 && !loading ? (
                 <StarterPrompts 
                   onPromptSelect={handleStarterPromptSelect}

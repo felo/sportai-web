@@ -38,8 +38,8 @@ export function getSportEmoji(sport: string): string {
 export function getCameraAngleLabel(cameraAngle: string): string {
   switch (cameraAngle) {
     case "elevated_back_court": return "Back court view";
-    case "side": return "Side view";
-    case "ground_behind": return "Behind view";
+    case "side": return "Ground level view";
+    case "ground_behind": return "Ground level view";
     case "diagonal": return "Diagonal view";
     case "overhead": return "Overhead view";
     default: return cameraAngle;

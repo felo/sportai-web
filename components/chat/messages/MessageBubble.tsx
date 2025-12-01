@@ -355,6 +355,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
         justify={message.role === "user" ? "end" : "start"}
         role="article"
         aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
+        data-message-id={message.id}
       >
         {message.role === "assistant" && !isMobile && (
           <Box style={{ position: "relative", flexShrink: 0 }}>

@@ -314,6 +314,40 @@ export function useAIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  // Scroll a specific message to the top of the viewport
+  // This is used when AI starts responding - puts user message at top with response below
+  const scrollMessageToTop = useCallback((messageId: string) => {
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageElement) {
+      // Get the scroll container (parent that scrolls)
+      const scrollContainer = messageElement.closest('[data-scroll-container="true"]') as HTMLElement;
+      if (scrollContainer) {
+        // Find the previous message to calculate how far to scroll
+        const allMessages = scrollContainer.querySelectorAll('[data-message-id]');
+        const messageArray = Array.from(allMessages);
+        const currentIndex = messageArray.findIndex(el => el.getAttribute('data-message-id') === messageId);
+        
+        let scrollTarget: number;
+        
+        if (currentIndex > 0) {
+          // There's a previous message - scroll so it's completely hidden
+          const previousMessage = messageArray[currentIndex - 1] as HTMLElement;
+          // Scroll to position just after the previous message ends (hiding it completely)
+          scrollTarget = previousMessage.offsetTop + previousMessage.offsetHeight + 24; // 24px gap between messages
+        } else {
+          // First message - just scroll to show it at top with small padding
+          const messageEl = messageElement as HTMLElement;
+          scrollTarget = messageEl.offsetTop - 16;
+        }
+        
+        scrollContainer.scrollTo({ top: Math.max(0, scrollTarget), behavior: "smooth" });
+      } else {
+        // Fallback to scrollIntoView if no scroll container found
+        messageElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, []);
+
   const addMessage = useCallback((message: Message) => {
     console.log("[useAIChat] ===== ADD MESSAGE =====", {
       id: message.id,
@@ -386,6 +420,7 @@ export function useAIChat() {
     setProgressStage,
     setUploadProgress,
     scrollToBottom,
+    scrollMessageToTop,
     addMessage,
     updateMessage,
     removeMessage,
