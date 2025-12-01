@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { taskType, sport = "padel", videoUrl, videoLength, params = {} } = body;
+    const { taskType, sport = "padel", videoUrl, thumbnailUrl, thumbnailS3Key, videoLength, params = {} } = body;
     
     if (!taskType) {
       return NextResponse.json(
@@ -189,6 +189,8 @@ export async function POST(request: NextRequest) {
         sport,
         sportai_task_id: sportaiTaskId,
         video_url: videoUrl,
+        thumbnail_url: thumbnailUrl || null,
+        thumbnail_s3_key: thumbnailS3Key || null,
         video_length: videoLength || null,
         status: "processing",
         estimated_compute_time,

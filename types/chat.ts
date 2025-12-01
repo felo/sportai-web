@@ -15,6 +15,8 @@ export type Message = {
   videoPreview?: string | null;
   videoUrl?: string | null; // S3 URL for video playback
   videoS3Key?: string | null; // S3 key for regenerating presigned URLs
+  thumbnailUrl?: string | null; // S3 URL for video thumbnail (first frame)
+  thumbnailS3Key?: string | null; // S3 key for thumbnail
   videoPlaybackSpeed?: number; // Video playback speed (0.25, 0.5, 1.0, 1.5, 2.0, etc.)
   videoDimensions?: { width: number; height: number }; // Cached video dimensions to prevent layout shift
   inputTokens?: number; // Input tokens used for this message
@@ -28,6 +30,9 @@ export type Message = {
   analysisOptions?: {
     preAnalysis: VideoPreAnalysis;
     selectedOption?: "pro_plus_quick" | "quick_only" | null;
+    // Store these directly to avoid stale closure issues when user clicks button
+    videoUrl?: string;
+    userPrompt?: string;
   };
   modelSettings?: {
     thinkingMode: string;
@@ -99,5 +104,8 @@ export type VideoPreAnalysis = {
   // Technique LITE eligibility (side camera + < 20 seconds)
   isTechniqueLiteEligible?: boolean;
   techniqueLiteEligibilityReason?: string;
+  // Thumbnail from first frame (stored in S3)
+  thumbnailUrl?: string | null;
+  thumbnailS3Key?: string | null;
 };
 

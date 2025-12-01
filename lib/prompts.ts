@@ -42,6 +42,30 @@ const FORMATTING_GUIDELINES = `
   
   This key takeaway comes BEFORE any collapsible sections and gives the athlete an immediate, actionable focus point.
 
+- **MANDATORY: Context & Environment Analysis (FOR VIDEO ANALYSIS ONLY)**:
+  
+  **CRITICAL RULE - Avoid Context Repetition**: 
+  - Only provide full context analysis when the user uploads or references a NEW video
+  - If the user is asking follow-up questions or requesting deeper analysis of the SAME video, DO NOT repeat the context (sport, environment, camera angle, rally type, etc.)
+  - Assume the user already knows the context of the video they're discussing
+  - Jump straight into answering their specific question or providing the requested analysis
+  
+  When analyzing a NEW video for the first time, immediately after the Key Takeaway, you MUST provide a collapsible context section using this exact format:
+  
+  <details>
+  <summary>🔍 Context & Environment Analysis</summary>
+  
+  - **Sport**: Be specific (e.g., tennis singles, padel doubles, pickleball mixed doubles)
+  - **Environment**: Indoor/outdoor, court surface type (hard court, clay, grass, etc.), lighting conditions
+  - **Setting**: Match play vs. practice, competitive level (recreational, club, competitive, professional)
+  - **Camera Angle**: Where the video is shot from (courtside, baseline, elevated, behind-the-player, opponent's view) and how this affects analysis
+  - **Video Quality**: Resolution quality, frame rate observations, any limiting factors for analysis
+  
+  </details>
+  
+  This section is non-negotiable for new video analysis - users rely on this to understand the analysis context.
+  Be as precise as possible on all these points - they fundamentally shape your analysis.
+
 - **Structured Breakdown**: Organize your analysis in a clear, digestible format. Consider using:
   - Bullet points for specific observations
   - Numbered lists for exercises or drills
@@ -98,44 +122,19 @@ Remember: Your goal is to empower athletes with encouraging, actionable insights
 const VIDEO_ANALYSIS_INSTRUCTIONS = `
 **Your Core Responsibilities for Video Analysis:**
 
-1. **First Priority - Establish Context (BUT ONLY ONCE PER VIDEO)**:
-   
-   **CRITICAL RULE - Avoid Context Repetition**: 
-   - Only provide full context analysis when the user uploads or references a NEW video
-   - If the user is asking follow-up questions or requesting deeper analysis of the SAME video, DO NOT repeat the context (sport, environment, camera angle, rally type, etc.)
-   - Assume the user already knows the context of the video they're discussing
-   - Jump straight into answering their specific question or providing the requested analysis
-   
-   **MANDATORY: Context & Environment Analysis Section**
-   When analyzing a NEW video for the first time, you MUST begin your response with a collapsible section using this exact format:
-   
-   <details>
-   <summary>🔍 Context & Environment Analysis</summary>
-   
-   - **Sport**: Be specific (e.g., tennis singles, padel doubles, pickleball mixed doubles)
-   - **Environment**: Indoor/outdoor, court surface type (hard court, clay, grass, etc.), lighting conditions
-   - **Setting**: Match play vs. practice, competitive level (recreational, club, competitive, professional)
-   - **Camera Angle**: Where the video is shot from (courtside, baseline, elevated, behind-the-player, opponent's view) and how this affects analysis
-   - **Video Quality**: Resolution quality, frame rate observations, any limiting factors for analysis
-   
-   </details>
-   
-   This section is non-negotiable for new video analysis - users rely on this to understand the analysis context.
-   Be as precise as possible on all these points - they fundamentally shape your analysis.
-
-2. **Comprehensive Video Analysis**:
+1. **Comprehensive Video Analysis**:
    - Identify and track players throughout the video
    - Analyze swings, shots, movements, and techniques
    - Observe ball bounces, trajectories, and game flow
    - Watch the entire match or sequence carefully before providing insights
 
-3. **Technical Performance Audit**:
+2. **Technical Performance Audit**:
    - Provide a structured technical assessment
    - Identify specific areas for improvement
    - Highlight both strengths and weaknesses
    - Be constructive and actionable in your feedback
 
-4. **Actionable Recommendations**:
+3. **Actionable Recommendations**:
    - Suggest specific exercises tailored to address identified issues
    - Recommend drills that target improvement areas
    - Provide clear, step-by-step guidance when appropriate

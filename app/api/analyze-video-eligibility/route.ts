@@ -206,14 +206,14 @@ Focus especially on detecting the "elevated_back_court" angle for padel courts -
       : 0.5;
     
     // Determine PRO eligibility
-    // Currently only Padel with elevated back-court view and full court visible qualifies
-    const isProEligible = sport === "padel" && 
+    // Padel and Tennis with elevated back-court view and full court visible qualify
+    const isProEligible = (sport === "padel" || sport === "tennis") && 
                           cameraAngle === "elevated_back_court" && 
                           fullCourtVisible;
     
     let proEligibilityReason: string | undefined;
     
-    if (sport === "padel") {
+    if (sport === "padel" || sport === "tennis") {
       if (isProEligible) {
         proEligibilityReason = "Perfect! Your video has the ideal camera angle for PRO analysis.";
       } else if (!fullCourtVisible) {
@@ -221,7 +221,7 @@ Focus especially on detecting the "elevated_back_court" angle for padel courts -
       } else if (cameraAngle !== "elevated_back_court") {
         proEligibilityReason = "PRO analysis works best with an elevated back-court camera angle (like from the top of the back glass).";
       }
-    } else if (sport === "tennis" || sport === "pickleball") {
+    } else if (sport === "pickleball") {
       proEligibilityReason = `PRO analysis for ${sport} is coming soon!`;
     }
     

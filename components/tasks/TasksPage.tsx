@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -16,15 +16,16 @@ import {
   Tabs,
   SegmentedControl,
 } from "@radix-ui/themes";
-import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon, ViewGridIcon, ListBulletIcon } from "@radix-ui/react-icons";
+import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon, ViewGridIcon, ListBulletIcon, ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, useLibraryTasks } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
+import { extractFirstFrameFromUrl, uploadThumbnailToS3 } from "@/utils/video-utils";
 
 const TASK_TYPES = [
   { value: "statistics", label: "Statistics" },
@@ -44,6 +45,8 @@ interface Task {
   sport: "tennis" | "padel" | "pickleball";
   sportai_task_id: string | null;
   video_url: string;
+  thumbnail_url: string | null;
+  thumbnail_s3_key: string | null;
   video_length: number | null;
   status: "pending" | "processing" | "completed" | "failed";
   estimated_compute_time: number | null;
@@ -60,6 +63,7 @@ export function TasksPage() {
   const { user, loading: authLoading } = useAuth();
   const { isCollapsed, isInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
+  const { markTaskAsSeen, isTaskNew } = useLibraryTasks();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +76,97 @@ export function TasksPage() {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Filter state
+  const [filterSport, setFilterSport] = useState<string>("all");
+  const [filterTaskType, setFilterTaskType] = useState<string>("all");
+  
+  // Sort state
+  type SortColumn = "sport" | "type" | "status" | "created" | "timeLeft" | "analysis" | "taskId" | "videoUrl" | "length" | "elapsed";
+  type SortDirection = "asc" | "desc";
+  const [sortColumn, setSortColumn] = useState<SortColumn>("created");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  
+  // Handle column header click for sorting
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+  
+  // Filtered and sorted tasks
+  const filteredTasks = useMemo(() => {
+    // First filter
+    let result = tasks.filter(task => {
+      if (filterSport !== "all" && task.sport !== filterSport) return false;
+      if (filterTaskType !== "all" && task.task_type !== filterTaskType) return false;
+      return true;
+    });
+    
+    // Then sort
+    result = [...result].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortColumn) {
+        case "sport":
+          comparison = a.sport.localeCompare(b.sport);
+          break;
+        case "type":
+          comparison = a.task_type.localeCompare(b.task_type);
+          break;
+        case "status":
+          const statusOrder = { pending: 0, processing: 1, completed: 2, failed: 3 };
+          comparison = statusOrder[a.status] - statusOrder[b.status];
+          break;
+        case "created":
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case "timeLeft":
+          // Sort by estimated remaining time
+          const getTimeRemaining = (task: Task) => {
+            if (task.status === "completed") return Infinity;
+            if (task.status === "failed") return Infinity + 1;
+            if (!task.estimated_compute_time) return Infinity - 1;
+            const elapsed = (Date.now() - new Date(task.created_at).getTime()) / 1000;
+            return task.estimated_compute_time - elapsed;
+          };
+          comparison = getTimeRemaining(a) - getTimeRemaining(b);
+          break;
+        case "analysis":
+          // Sort by whether result exists
+          const hasResultA = a.status === "completed" ? 1 : 0;
+          const hasResultB = b.status === "completed" ? 1 : 0;
+          comparison = hasResultA - hasResultB;
+          break;
+        case "taskId":
+          comparison = (a.sportai_task_id || a.id).localeCompare(b.sportai_task_id || b.id);
+          break;
+        case "videoUrl":
+          comparison = a.video_url.localeCompare(b.video_url);
+          break;
+        case "length":
+          comparison = (a.video_length || 0) - (b.video_length || 0);
+          break;
+        case "elapsed":
+          const getElapsed = (task: Task) => {
+            const start = new Date(task.created_at).getTime();
+            const end = task.status === "completed" || task.status === "failed"
+              ? new Date(task.completed_at || task.updated_at).getTime()
+              : Date.now();
+            return end - start;
+          };
+          comparison = getElapsed(a) - getElapsed(b);
+          break;
+      }
+      
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+    
+    return result;
+  }, [tasks, filterSport, filterTaskType, sortColumn, sortDirection]);
   
   // Load developer mode and listen for changes
   useEffect(() => {
@@ -125,6 +220,64 @@ export function TasksPage() {
   };
   
   const [fetchingResult, setFetchingResult] = useState<string | null>(null);
+  const [deletingTask, setDeletingTask] = useState<string | null>(null);
+  const [preparingTask, setPreparingTask] = useState<string | null>(null);
+  
+  // Download video from URL
+  const downloadVideo = async (task: Task) => {
+    try {
+      // Extract filename from URL or use task ID
+      const urlParts = task.video_url.split("/");
+      const filename = urlParts[urlParts.length - 1].split("?")[0] || `video-${task.id}.mp4`;
+      
+      // Use fetch to download the video as a blob
+      const response = await fetch(task.video_url);
+      if (!response.ok) throw new Error("Failed to fetch video");
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the object URL
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      // Fallback: open video in new tab if download fails (e.g., CORS issues)
+      window.open(task.video_url, "_blank");
+    }
+  };
+  
+  // Delete a task from the database
+  const deleteTask = async (taskId: string) => {
+    if (!user) return;
+    
+    setDeletingTask(taskId);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete task");
+      }
+      
+      // Remove task from state
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete task");
+    } finally {
+      setDeletingTask(null);
+    }
+  };
   
   // Fetch result from SportAI API and store in S3 (without downloading)
   // Always uses force=true to bypass cache and get fresh data from SportAI
@@ -203,6 +356,55 @@ export function TasksPage() {
       setError(err instanceof Error ? err.message : "Failed to fetch result");
     } finally {
       setFetchingResult(null);
+    }
+  };
+  
+  // Handle task click - fetch JSON if needed, then navigate
+  const handleTaskClick = async (taskId: string) => {
+    if (!user) return;
+    
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    // Mark task as seen when clicked
+    markTaskAsSeen(taskId);
+    
+    // If we already have the result, navigate directly
+    if (task.result_s3_key) {
+      router.push(`/library/${taskId}`);
+      return;
+    }
+    
+    // Need to fetch the result first
+    setPreparingTask(taskId);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/result`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      
+      if (response.status === 202) {
+        throw new Error("Task is still being processed on SportAI servers");
+      }
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to fetch result");
+      }
+      
+      // Update task in state to show it now has a result
+      setTasks(prev => 
+        prev.map(t => t.id === taskId ? { ...t, result_s3_key: `task-results/${taskId}.json` } : t)
+      );
+      
+      // Navigate to the task viewer
+      router.push(`/library/${taskId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to prepare video");
+    } finally {
+      setPreparingTask(null);
     }
   };
   
@@ -311,6 +513,33 @@ export function TasksPage() {
     setError(null);
     
     try {
+      const trimmedUrl = videoUrl.trim();
+      
+      // Try to extract thumbnail and duration from the video URL
+      // This runs in parallel-ish - we start extraction but don't wait for it
+      let thumbnailUrl: string | null = null;
+      let thumbnailS3Key: string | null = null;
+      let videoLength: number | null = null;
+      
+      try {
+        console.log("[TasksPage] Extracting thumbnail from video URL...");
+        const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(trimmedUrl, 640, 0.7);
+        videoLength = durationSeconds;
+        
+        if (frameBlob) {
+          const uploadResult = await uploadThumbnailToS3(frameBlob);
+          if (uploadResult) {
+            thumbnailUrl = uploadResult.thumbnailUrl;
+            thumbnailS3Key = uploadResult.thumbnailS3Key;
+          }
+        } else {
+          console.log("[TasksPage] Could not extract thumbnail (CORS or video issue)");
+        }
+      } catch (thumbErr) {
+        // Non-blocking - continue without thumbnail
+        console.warn("[TasksPage] Thumbnail extraction failed:", thumbErr);
+      }
+      
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: {
@@ -320,7 +549,10 @@ export function TasksPage() {
         body: JSON.stringify({ 
           taskType,
           sport,
-          videoUrl: videoUrl.trim(),
+          videoUrl: trimmedUrl,
+          thumbnailUrl,
+          thumbnailS3Key,
+          videoLength,
         }),
       });
       
@@ -434,6 +666,29 @@ export function TasksPage() {
     return `~${formatDuration(remainingSeconds)}`;
   };
   
+  // Sortable header component
+  const SortableHeader = ({ column, children }: { column: SortColumn; children: React.ReactNode }) => (
+    <Flex
+      align="center"
+      gap="1"
+      onClick={() => handleSort(column)}
+      style={{ cursor: "pointer", userSelect: "none", textTransform: "uppercase", letterSpacing: "0.05em" }}
+    >
+      {children}
+      {sortColumn === column ? (
+        sortDirection === "asc" ? (
+          <ChevronUpIcon width={12} height={12} />
+        ) : (
+          <ChevronDownIcon width={12} height={12} />
+        )
+      ) : (
+        <Box style={{ width: 12, height: 12, opacity: 0.3 }}>
+          <ChevronDownIcon width={12} height={12} />
+        </Box>
+      )}
+    </Flex>
+  );
+  
   // Handle creating a new chat and navigating to it
   const handleNewChat = useCallback(async () => {
     const newChat = await createNewChat();
@@ -493,67 +748,103 @@ export function TasksPage() {
           </Card>
         )}
         
-        {/* New Task Form */}
-        <Card style={{ marginBottom: "24px" }}>
-          <form onSubmit={handleSubmit}>
-            <Flex gap="3" align="end">
-              <Box style={{ width: "120px" }}>
-                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                  Sport
-                </Text>
-                <Select.Root value={sport} onValueChange={setSport} disabled={submitting}>
-                  <Select.Trigger style={{ width: "100%" }} />
-                  <Select.Content>
-                    {SPORTS.map(s => (
-                      <Select.Item key={s.value} value={s.value}>
-                        {s.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Box>
-              
-              <Box style={{ width: "140px" }}>
-                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                  Task Type
-                </Text>
-                <Select.Root value={taskType} onValueChange={setTaskType} disabled={submitting}>
-                  <Select.Trigger style={{ width: "100%" }} />
-                  <Select.Content>
-                    {TASK_TYPES.map(type => (
-                      <Select.Item key={type.value} value={type.value}>
-                        {type.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Box>
-              
-              <Box style={{ flex: 1 }}>
-                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                  Video URL
-                </Text>
-                <TextField.Root
-                  placeholder="https://example.com/video.mp4"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  disabled={submitting}
-                />
-              </Box>
-              
-              <Button type="submit" disabled={submitting || !videoUrl.trim()}>
-                {submitting ? <Spinner size="1" /> : <PlusIcon />}
-                Create Task
-              </Button>
-            </Flex>
-          </form>
-        </Card>
+        {/* New Task Form - Developer Mode Only */}
+        {developerMode && (
+          <Card style={{ marginBottom: "24px" }}>
+            <form onSubmit={handleSubmit}>
+              <Flex gap="3" align="end">
+                <Box style={{ width: "120px" }}>
+                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                    Sport
+                  </Text>
+                  <Select.Root value={sport} onValueChange={setSport} disabled={submitting}>
+                    <Select.Trigger style={{ width: "100%" }} />
+                    <Select.Content>
+                      {SPORTS.map(s => (
+                        <Select.Item key={s.value} value={s.value}>
+                          {s.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
+                
+                <Box style={{ width: "140px" }}>
+                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                    Analysis Type
+                  </Text>
+                  <Select.Root value={taskType} onValueChange={setTaskType} disabled={submitting}>
+                    <Select.Trigger style={{ width: "100%" }} />
+                    <Select.Content>
+                      {TASK_TYPES.map(type => (
+                        <Select.Item key={type.value} value={type.value}>
+                          {type.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
+                
+                <Box style={{ flex: 1 }}>
+                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                    Video URL
+                  </Text>
+                  <TextField.Root
+                    placeholder="https://example.com/video.mp4"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    disabled={submitting}
+                  />
+                </Box>
+                
+                <Button type="submit" disabled={submitting || !videoUrl.trim()}>
+                  {submitting ? <Spinner size="1" /> : <PlusIcon />}
+                  Analyse
+                </Button>
+              </Flex>
+            </form>
+          </Card>
+        )}
         
-        {/* View Toggle */}
-        <Flex justify="between" align="center" mb="3">
-          <Text size="3" weight="medium" color="gray">
-            {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
-          </Text>
+        {/* Filters and View Toggle */}
+        <Flex justify="between" align="center" mb="3" wrap="wrap" gap="3">
+          <Flex gap="3" align="center">
+            <Text size="2" weight="medium" color="gray">Videos</Text>
+            
+            {/* Sport Filter */}
+            <Select.Root value={filterSport} onValueChange={setFilterSport} size="1">
+              <Select.Trigger placeholder="All Sports" style={{ minWidth: "110px" }} />
+              <Select.Content>
+                <Select.Item value="all">All Sports</Select.Item>
+                {SPORTS.map(s => (
+                  <Select.Item key={s.value} value={s.value}>
+                    {s.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            
+            {/* Analysis Type Filter */}
+            <Select.Root value={filterTaskType} onValueChange={setFilterTaskType} size="1">
+              <Select.Trigger placeholder="All Analysis" style={{ minWidth: "120px" }} />
+              <Select.Content>
+                <Select.Item value="all">All Analysis</Select.Item>
+                {TASK_TYPES.map(type => (
+                  <Select.Item key={type.value} value={type.value}>
+                    {type.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            
+            {/* Show count of filtered results */}
+            {(filterSport !== "all" || filterTaskType !== "all") && (
+              <Text size="1" color="gray">
+                {filteredTasks.length} of {tasks.length}
+              </Text>
+            )}
+          </Flex>
+          
           <SegmentedControl.Root 
             value={viewMode} 
             onValueChange={(value) => setViewMode(value as "list" | "grid")}
@@ -577,38 +868,76 @@ export function TasksPage() {
         {/* Grid View */}
         {viewMode === "grid" && (
           <TaskGridView
-            tasks={tasks}
-            onTaskClick={(taskId) => router.push(`/library/${taskId}`)}
+            tasks={filteredTasks}
+            onTaskClick={handleTaskClick}
             onFetchResult={fetchResult}
             fetchingResult={fetchingResult}
+            onDeleteTask={deleteTask}
+            deletingTask={deletingTask}
+            preparingTask={preparingTask}
+            onDownloadVideo={downloadVideo}
+            onExportData={downloadResult}
+            isTaskNew={isTaskNew}
           />
         )}
         
         {/* List View (Table) */}
         {viewMode === "list" && (
         <Card>
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <Flex align="center" justify="center" py="8">
-              <Text color="gray">No tasks yet. Submit a video URL to get started.</Text>
+              <Text color="gray">
+                {tasks.length === 0 
+                  ? "Your PRO video analyses will appear here in the Library."
+                  : "No tasks match the selected filters."}
+              </Text>
             </Flex>
           ) : (
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  {developerMode && <Table.ColumnHeaderCell>Task ID</Table.ColumnHeaderCell>}
-                  <Table.ColumnHeaderCell>Sport</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Type</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                  {developerMode && <Table.ColumnHeaderCell>Video URL</Table.ColumnHeaderCell>}
-                  {developerMode && <Table.ColumnHeaderCell>Length</Table.ColumnHeaderCell>}
-                  <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
-                  {developerMode && <Table.ColumnHeaderCell>Elapsed</Table.ColumnHeaderCell>}
-                  <Table.ColumnHeaderCell>Time Left</Table.ColumnHeaderCell>
-                  <Table.ColumnHeaderCell>Result</Table.ColumnHeaderCell>
+                  {developerMode && (
+                    <Table.ColumnHeaderCell>
+                      <SortableHeader column="taskId">Task ID</SortableHeader>
+                    </Table.ColumnHeaderCell>
+                  )}
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="sport">Sport</SortableHeader>
+                  </Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="type">Type</SortableHeader>
+                  </Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="status">Status</SortableHeader>
+                  </Table.ColumnHeaderCell>
+                  {developerMode && (
+                    <Table.ColumnHeaderCell>
+                      <SortableHeader column="videoUrl">Video URL</SortableHeader>
+                    </Table.ColumnHeaderCell>
+                  )}
+                  {developerMode && (
+                    <Table.ColumnHeaderCell>
+                      <SortableHeader column="length">Length</SortableHeader>
+                    </Table.ColumnHeaderCell>
+                  )}
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="created">Created</SortableHeader>
+                  </Table.ColumnHeaderCell>
+                  {developerMode && (
+                    <Table.ColumnHeaderCell>
+                      <SortableHeader column="elapsed">Elapsed</SortableHeader>
+                    </Table.ColumnHeaderCell>
+                  )}
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="timeLeft">Time Left</SortableHeader>
+                  </Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell>
+                    <SortableHeader column="analysis">Analysis</SortableHeader>
+                  </Table.ColumnHeaderCell>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {tasks.map((task) => (
+                {filteredTasks.map((task) => (
                   <Table.Row key={task.id}>
                     {developerMode && (
                       <Table.Cell>
@@ -631,7 +960,15 @@ export function TasksPage() {
                     )}
                     <Table.Cell>{getSportBadge(task.sport)}</Table.Cell>
                     <Table.Cell>{getTypeBadge(task.task_type)}</Table.Cell>
-                    <Table.Cell>{getStatusBadge(task.status)}</Table.Cell>
+                    <Table.Cell>
+                      <Flex align="center" gap="2">
+                        {getStatusBadge(task.status)}
+                        {/* New badge for completed tasks that haven't been viewed */}
+                        {isTaskNew(task.id) && task.status === "completed" && (
+                          <Badge color="blue" variant="solid" size="1">New</Badge>
+                        )}
+                      </Flex>
+                    </Table.Cell>
                     {developerMode && (
                       <Table.Cell>
                         <Flex align="center" gap="1">
@@ -683,61 +1020,39 @@ export function TasksPage() {
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      <Flex gap="2" align="center">
-                        {/* Get Result button - fetch from SportAI API (for all completed tasks) */}
-                        {task.status === "completed" && (
-                          <Button
-                            variant={task.result_s3_key ? "soft" : "solid"}
-                            size="1"
-                            color="mint"
-                            onClick={() => fetchResult(task.id)}
-                            disabled={fetchingResult === task.id}
-                            title={task.result_s3_key ? "Re-fetch result from SportAI" : "Fetch result from SportAI"}
-                          >
-                            {fetchingResult === task.id ? (
-                              <Spinner size="1" />
-                            ) : (
-                              <UpdateIcon />
-                            )}
-                            {task.result_s3_key ? "Refresh" : "Get Result"}
-                          </Button>
-                        )}
-                        
-                        {/* View button - only for tasks with results stored */}
-                        {task.status === "completed" && task.result_s3_key && (
-                          <Button
-                            variant="soft"
-                            size="1"
-                            onClick={() => router.push(`/library/${task.id}`)}
-                          >
+                      {/* View button for completed tasks */}
+                      {task.status === "completed" && (
+                        <Button
+                          variant="soft"
+                          size="1"
+                          onClick={() => handleTaskClick(task.id)}
+                          disabled={preparingTask === task.id}
+                        >
+                          {preparingTask === task.id ? (
+                            <Spinner size="1" />
+                          ) : (
                             <EyeOpenIcon />
-                            View
-                          </Button>
-                        )}
-                        
-                        {/* Download button - for tasks with results stored */}
-                        {task.result_s3_key && (
-                          <Button
-                            variant="ghost"
-                            size="1"
-                            color="gray"
-                            onClick={() => downloadResult(task.id)}
-                            title="Download JSON"
-                          >
-                            <DownloadIcon />
-                          </Button>
-                        )}
-                        
-                        {/* Error message for failed tasks */}
-                        {task.status === "failed" && task.error_message && (
-                          <Text size="1" color="red" style={{ maxWidth: "150px", display: "block" }}>
-                            {task.error_message}
-                          </Text>
-                        )}
-                        
-                        {/* Placeholder for pending/processing tasks */}
-                        {(task.status === "pending" || task.status === "processing") && "-"}
-                      </Flex>
+                          )}
+                          View
+                        </Button>
+                      )}
+                      
+                      {/* Error message for failed tasks */}
+                      {task.status === "failed" && task.error_message && (
+                        <Text size="1" color="red" style={{ maxWidth: "150px", display: "block" }}>
+                          {task.error_message}
+                        </Text>
+                      )}
+                      
+                      {/* Placeholder for failed tasks without error message */}
+                      {task.status === "failed" && !task.error_message && (
+                        <Text size="1" color="red">Failed</Text>
+                      )}
+                      
+                      {/* Placeholder for pending/processing tasks */}
+                      {(task.status === "pending" || task.status === "processing") && (
+                        <Text size="2" color="gray">-</Text>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Select, Box, Flex, Text } from "@radix-ui/themes";
 
-type Appearance = "light" | "dark";
+type Appearance = "light" | "dark" | "green";
 type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
 type GrayColor = "gray" | "mauve" | "slate" | "sage" | "olive" | "sand";
 
@@ -46,6 +46,7 @@ export function ThemeSwitcher() {
           <Select.Content>
             <Select.Item value="light">Light</Select.Item>
             <Select.Item value="dark">Dark</Select.Item>
+            <Select.Item value="green">Green</Select.Item>
           </Select.Content>
         </Select.Root>
       </Box>

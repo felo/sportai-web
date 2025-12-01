@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { LibraryTasksProvider } from "@/components/sidebar/LibraryTasksContext";
 // Import Radix CSS in proper order to allow overrides
 import "@radix-ui/themes/tokens.css";
 import "@radix-ui/themes/components.css";
@@ -90,7 +91,9 @@ export default function RootLayout({
     <html lang="en" className={poppins.variable}>
       <body className="font-sans" suppressHydrationWarning>
         <RadixThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <LibraryTasksProvider>{children}</LibraryTasksProvider>
+          </AuthProvider>
         </RadixThemeProvider>
       </body>
     </html>

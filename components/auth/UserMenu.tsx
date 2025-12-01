@@ -10,7 +10,7 @@ import { AuthModal } from "./AuthModal";
 import type { HighlightingPreferences, TTSSettings } from "@/utils/storage";
 
 interface UserMenuProps {
-  appearance?: "light" | "dark";
+  appearance?: "light" | "dark" | "green";
   theatreMode?: boolean;
   developerMode?: boolean;
   highlightingPrefs?: HighlightingPreferences;
@@ -18,7 +18,7 @@ interface UserMenuProps {
   messageCount?: number;
   isMobile?: boolean;
   collapsed?: boolean;
-  onThemeSelect?: (theme: "light" | "dark") => void;
+  onThemeSelect?: (theme: "light" | "dark" | "green") => void;
   onTheatreModeToggle?: (enabled: boolean) => void;
   onDeveloperModeToggle?: (enabled: boolean) => void;
   onHighlightingToggle?: (key: keyof HighlightingPreferences, checked: boolean) => void;
@@ -212,6 +212,12 @@ export function UserMenu({
                   <DropdownMenu.Item onSelect={() => onThemeSelect?.("dark")}>
                     <Text>Dark</Text>
                     {appearance === "dark" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => onThemeSelect?.("green")}>
+                    <Text>Green</Text>
+                    {appearance === "green" && (
                       <Text ml="auto" size="1" color="gray">✓</Text>
                     )}
                   </DropdownMenu.Item>

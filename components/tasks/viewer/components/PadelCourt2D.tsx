@@ -594,39 +594,9 @@ export function PadelCourt2D({
           const age = currentTime - bounce.timestamp;
           const opacity = Math.max(0, 1 - age / DISPLAY_DURATION);
           
-          // Determine color and label based on bounce type
-          let color: string;
-          let label: string;
-          
-          if (bounce.type === "swing") {
-            color = OVERLAY_COLORS.bounce.swing.hex;
-            label = "Swing";
-          } else if (bounce.type === "floor") {
-            color = OVERLAY_COLORS.bounce.floor.hex;
-            label = "Floor";
-          } else if (bounce.type === "wall" || bounce.type === "side_wall") {
-            color = OVERLAY_COLORS.bounce.floor.hex;
-            label = "Wall";
-          } else if (bounce.type === "back_wall" || bounce.type === "backwall") {
-            color = OVERLAY_COLORS.bounce.floor.hex;
-            label = "Back Wall";
-          } else if (bounce.type === "inferred") {
-            color = OVERLAY_COLORS.bounce.inferred.hex;
-            label = "Bounce";
-          } else if (bounce.type === "inferred_swing") {
-            color = OVERLAY_COLORS.bounce.inferred.hex;
-            label = "Swing";
-          } else if (bounce.type === "inferred_wall") {
-            color = OVERLAY_COLORS.bounce.inferred.hex;
-            label = "Wall";
-          } else if (bounce.type === "inferred_back") {
-            color = OVERLAY_COLORS.bounce.inferred.hex;
-            label = "Back Wall";
-          } else {
-            color = OVERLAY_COLORS.bounce.floor.hex;
-            // Capitalize the type for unknown types
-            label = bounce.type.charAt(0).toUpperCase() + bounce.type.slice(1).replace(/_/g, ' ');
-          }
+          // All bounces are yellow with "Bounce" label
+          const color = "#EAB308"; // Yellow - var(--yellow-9)
+          const label = "Bounce";
           
           const { x, y } = toCourtCoords(bounce.court_pos);
           

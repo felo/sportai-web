@@ -11,6 +11,9 @@ export { SidebarContent } from "./SidebarContent";
 export { SidebarDialogs } from "./SidebarDialogs";
 export { SidebarNavigation } from "./SidebarNavigation";
 
+// Context & Hooks
+export { LibraryTasksProvider, useLibraryTasks } from "./LibraryTasksContext";
+
 // Types
 export type {
   SidebarProps,

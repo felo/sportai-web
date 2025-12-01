@@ -10,6 +10,8 @@ interface Task {
   sport: "tennis" | "padel" | "pickleball";
   sportai_task_id: string | null;
   video_url: string;
+  thumbnail_url: string | null;
+  thumbnail_s3_key: string | null;
   video_length: number | null;
   status: "pending" | "processing" | "completed" | "failed";
   estimated_compute_time: number | null;
@@ -26,13 +28,19 @@ interface TaskGridViewProps {
   onTaskClick: (taskId: string) => void;
   onFetchResult: (taskId: string) => void;
   fetchingResult: string | null;
+  onDeleteTask?: (taskId: string) => void;
+  deletingTask?: string | null;
+  preparingTask?: string | null;
+  onDownloadVideo?: (task: Task) => void;
+  onExportData?: (taskId: string) => void;
+  isTaskNew?: (taskId: string) => boolean;
 }
 
-export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult }: TaskGridViewProps) {
+export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew }: TaskGridViewProps) {
   if (tasks.length === 0) {
     return (
       <Flex align="center" justify="center" py="8">
-        <EmptyState message="No tasks yet. Submit a video URL to get started." />
+        <EmptyState message="No videos match the current filters." />
       </Flex>
     );
   }
@@ -74,6 +82,12 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
               onClick={() => onTaskClick(task.id)}
               onFetchResult={() => onFetchResult(task.id)}
               isFetching={fetchingResult === task.id}
+              onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
+              isDeleting={deletingTask === task.id}
+              isPreparing={preparingTask === task.id}
+              onDownloadVideo={onDownloadVideo ? () => onDownloadVideo(task) : undefined}
+              onExportData={onExportData ? () => onExportData(task.id) : undefined}
+              isNew={isTaskNew?.(task.id)}
             />
           ))}
         </Grid>
@@ -87,21 +101,21 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
       {renderTaskSection(
         activeTasks, 
         "In Progress", 
-        `${activeTasks.length} ${activeTasks.length === 1 ? "task" : "tasks"}`
+        `${activeTasks.length} ${activeTasks.length === 1 ? "analysis" : "analyses"}`
       )}
       
       {/* Completed tasks */}
       {renderTaskSection(
         completedTasks, 
         "Completed", 
-        `${completedTasks.length} ${completedTasks.length === 1 ? "task" : "tasks"}`
+        `${completedTasks.length} ${completedTasks.length === 1 ? "analysis" : "analyses"}`
       )}
       
       {/* Failed tasks */}
       {renderTaskSection(
         failedTasks, 
         "Failed", 
-        `${failedTasks.length} ${failedTasks.length === 1 ? "task" : "tasks"}`
+        `${failedTasks.length} ${failedTasks.length === 1 ? "analysis" : "analyses"}`
       )}
     </Flex>
   );

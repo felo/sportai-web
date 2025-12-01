@@ -27,13 +27,15 @@ function dbChatToChat(dbChat: DbChat, messages: Message[] = []): Chat {
  * Convert database message to Message type
  */
 function dbMessageToMessage(dbMsg: DbMessage): Message {
-  // Extract isTechniqueLiteEligible from pose_data if stored there
+  // Extract special fields from pose_data if stored there
   const poseData = dbMsg.pose_data as any;
   const isTechniqueLiteEligible = poseData?.isTechniqueLiteEligible;
+  const messageType = poseData?.messageType;
+  const analysisOptions = poseData?.analysisOptions;
   
-  // Remove isTechniqueLiteEligible from poseData to keep it clean
+  // Remove special fields from poseData to keep it clean
   const cleanPoseData = poseData ? (() => {
-    const { isTechniqueLiteEligible: _, ...rest } = poseData;
+    const { isTechniqueLiteEligible: _, messageType: __, analysisOptions: ___, ...rest } = poseData;
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
   
@@ -41,8 +43,12 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     id: dbMsg.id,
     role: dbMsg.role as "user" | "assistant",
     content: dbMsg.content,
+    messageType: messageType || undefined,
+    analysisOptions: analysisOptions || undefined,
     videoUrl: dbMsg.video_url || undefined,
     videoS3Key: dbMsg.video_s3_key || undefined,
+    thumbnailUrl: dbMsg.thumbnail_url || undefined,
+    thumbnailS3Key: dbMsg.thumbnail_s3_key || undefined,
     videoPlaybackSpeed: dbMsg.video_playback_speed || undefined,
     isVideoSizeLimitError: dbMsg.is_video_size_limit_error || undefined,
     isStreaming: dbMsg.is_streaming || undefined,
@@ -82,11 +88,18 @@ function chatToDbInsert(chat: Chat, userId: string): DbChatInsert {
  * @param sequenceNumber - The position of this message in the chat (0-indexed)
  */
 function messageToDbInsert(message: Message, chatId: string, sequenceNumber: number): DbMessageInsert {
-  // Include isTechniqueLiteEligible in pose_data for persistence
-  const poseDataWithEligibility = message.poseData || message.isTechniqueLiteEligible !== undefined
+  // Include special fields in pose_data for persistence
+  const hasSpecialFields = message.poseData || 
+    message.isTechniqueLiteEligible !== undefined ||
+    message.messageType ||
+    message.analysisOptions;
+    
+  const poseDataWithExtras = hasSpecialFields
     ? {
         ...(message.poseData || {}),
-        isTechniqueLiteEligible: message.isTechniqueLiteEligible,
+        ...(message.isTechniqueLiteEligible !== undefined ? { isTechniqueLiteEligible: message.isTechniqueLiteEligible } : {}),
+        ...(message.messageType ? { messageType: message.messageType } : {}),
+        ...(message.analysisOptions ? { analysisOptions: message.analysisOptions } : {}),
       }
     : null;
     
@@ -98,6 +111,8 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     sequence_number: sequenceNumber,
     video_url: message.videoUrl || null,
     video_s3_key: message.videoS3Key || null,
+    thumbnail_url: message.thumbnailUrl || null,
+    thumbnail_s3_key: message.thumbnailS3Key || null,
     video_playback_speed: message.videoPlaybackSpeed || null,
     is_video_size_limit_error: message.isVideoSizeLimitError || null,
     is_streaming: message.isStreaming || null,
@@ -106,7 +121,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     response_duration: message.responseDuration || null,
     model_settings: message.modelSettings ? (message.modelSettings as any) : null,
     tts_usage: message.ttsUsage ? (message.ttsUsage as any) : null,
-    pose_data: poseDataWithEligibility as any,
+    pose_data: poseDataWithExtras as any,
     pose_data_s3_key: message.poseDataS3Key || null,
   };
 }
@@ -444,6 +459,8 @@ export async function updateMessageInSupabase(
     if (updates.content !== undefined) dbUpdates.content = updates.content;
     if (updates.videoUrl !== undefined) dbUpdates.video_url = updates.videoUrl;
     if (updates.videoS3Key !== undefined) dbUpdates.video_s3_key = updates.videoS3Key;
+    if (updates.thumbnailUrl !== undefined) dbUpdates.thumbnail_url = updates.thumbnailUrl;
+    if (updates.thumbnailS3Key !== undefined) dbUpdates.thumbnail_s3_key = updates.thumbnailS3Key;
     if (updates.videoPlaybackSpeed !== undefined) dbUpdates.video_playback_speed = updates.videoPlaybackSpeed;
     if (updates.isStreaming !== undefined) dbUpdates.is_streaming = updates.isStreaming;
     if (updates.inputTokens !== undefined) dbUpdates.input_tokens = updates.inputTokens;

@@ -154,6 +154,100 @@ html[data-theme="dark"] .radix-themes,
   --color-background: var(--gray-1) !important;
 }
 
+/* GREEN THEME overrides */
+html[data-theme="green"] .radix-themes {
+  /* Custom green color palette */
+  --green-1: #001C0F !important;
+  --green-2: #001C0F !important;
+  --green-3: #002B1A !important;
+  --green-4: #002B1A !important;
+  --green-5: #025940 !important;
+  --green-6: #025940 !important;
+  --green-7: #248559 !important;
+  --green-8: #248559 !important;
+  --green-9: #248559 !important;
+  --green-10: #248559 !important;
+  --green-11: #ffffff !important;
+  --green-12: #ffffff !important;
+
+  /* Override mint colors to use our green palette */
+  --mint-1: #001C0F !important;
+  --mint-2: #001C0F !important;
+  --mint-3: #002B1A !important;
+  --mint-4: #002B1A !important;
+  --mint-5: #025940 !important;
+  --mint-6: #248559 !important;
+  --mint-7: #248559 !important;
+  --mint-8: #2D9B6A !important;
+  --mint-9: #248559 !important;
+  --mint-10: #2D9B6A !important;
+  --mint-11: #ffffff !important;
+  --mint-12: #ffffff !important;
+
+  /* Alpha variants for green theme */
+  --mint-a1: rgba(36, 133, 89, 0.05) !important;
+  --mint-a2: rgba(36, 133, 89, 0.1) !important;
+  --mint-a3: rgba(36, 133, 89, 0.15) !important;
+  --mint-a4: rgba(36, 133, 89, 0.2) !important;
+  --mint-a5: rgba(36, 133, 89, 0.3) !important;
+  --mint-a6: rgba(36, 133, 89, 0.4) !important;
+  --mint-a7: rgba(36, 133, 89, 0.5) !important;
+  --mint-a8: rgba(36, 133, 89, 0.64) !important;
+  --mint-a9: rgba(36, 133, 89, 0.8) !important;
+  --mint-a10: rgba(36, 133, 89, 0.9) !important;
+  --mint-a11: rgba(255, 255, 255, 0.95) !important;
+  --mint-a12: rgba(255, 255, 255, 1) !important;
+
+  /* Override accent colors */
+  --accent-1: var(--mint-1) !important;
+  --accent-2: var(--mint-2) !important;
+  --accent-3: var(--mint-3) !important;
+  --accent-4: var(--mint-4) !important;
+  --accent-5: var(--mint-5) !important;
+  --accent-6: var(--mint-6) !important;
+  --accent-7: var(--mint-7) !important;
+  --accent-8: var(--mint-8) !important;
+  --accent-9: var(--mint-9) !important;
+  --accent-10: var(--mint-10) !important;
+  --accent-11: var(--mint-11) !important;
+  --accent-12: var(--mint-12) !important;
+  
+  --accent-a1: var(--mint-a1) !important;
+  --accent-a2: var(--mint-a2) !important;
+  --accent-a3: var(--mint-a3) !important;
+  --accent-a4: var(--mint-a4) !important;
+  --accent-a5: var(--mint-a5) !important;
+  --accent-a6: var(--mint-a6) !important;
+  --accent-a7: var(--mint-a7) !important;
+  --accent-a8: var(--mint-a8) !important;
+  --accent-a9: var(--mint-a9) !important;
+  --accent-a10: var(--mint-a10) !important;
+  --accent-a11: var(--mint-a11) !important;
+  --accent-a12: var(--mint-a12) !important;
+
+  /* Custom gray scale for green theme - use deep greens instead of grays */
+  --gray-1: #001C0F !important;
+  --gray-2: #002B1A !important;
+  --gray-3: #003D26 !important;
+  --gray-4: #004F32 !important;
+  --gray-5: #025940 !important;
+  --gray-6: #03694D !important;
+  --gray-7: #04795A !important;
+  --gray-8: #058967 !important;
+  --gray-9: #069974 !important;
+  --gray-10: #07A981 !important;
+  --gray-11: #A8E6CF !important;
+  --gray-12: #ffffff !important;
+  
+  --color-background: var(--gray-1) !important;
+  --color-surface: var(--gray-3) !important;
+  --color-border: var(--gray-5) !important;
+  --color-accent: var(--mint-7) !important;
+  --color-accent-hover: var(--mint-5) !important;
+  --color-text: var(--gray-12) !important;
+  --color-text-muted: var(--gray-11) !important;
+}
+
 /* Hide scrollbars while maintaining scroll functionality */
 * {
   scrollbar-width: none; /* Firefox */
@@ -277,6 +371,31 @@ html[data-theme="dark"] .radix-themes,
   }
 }
 
+/* Send button bounce animation - triggers when video analysis completes */
+@keyframes sendButtonBounce {
+  0%, 100% { 
+    transform: translateY(0) scale(1); 
+  }
+  15% { 
+    transform: translateY(-8px) scale(1.15); 
+  }
+  30% { 
+    transform: translateY(0) scale(0.95); 
+  }
+  45% { 
+    transform: translateY(-4px) scale(1.08); 
+  }
+  60% { 
+    transform: translateY(0) scale(0.98); 
+  }
+  75% { 
+    transform: translateY(-2px) scale(1.03); 
+  }
+  90% { 
+    transform: translateY(0) scale(1); 
+  }
+}
+
 /* Slide in from right animation */
 @keyframes slideInFromRight {
   from {
@@ -344,6 +463,10 @@ html[data-theme="dark"] .markdown-ul .markdown-li::before,
   color: #7ADB8F;
 }
 
+html[data-theme="green"] .markdown-ul .markdown-li::before {
+  color: #248559;
+}
+
 .markdown-ol {
   padding-left: 0;
 }
@@ -371,6 +494,10 @@ html[data-theme="dark"] .markdown-ol .markdown-li::before,
   color: #7ADB8F;
 }
 
+html[data-theme="green"] .markdown-ol .markdown-li::before {
+  color: #248559;
+}
+
 /* Lists inside collapsible sections need extra left margin to account for section padding */
 details .markdown-ul,
 details .markdown-ol {
@@ -396,6 +523,10 @@ html[data-theme="dark"] .markdown-divider-line,
   background-color: rgba(122, 219, 143, 0.3);
 }
 
+html[data-theme="green"] .markdown-divider-line {
+  background-color: rgba(36, 133, 89, 0.4);
+}
+
 .markdown-divider-dots {
   color: #025940;
   font-size: 0.75rem;
@@ -407,6 +538,10 @@ html[data-theme="dark"] .markdown-divider-line,
 html[data-theme="dark"] .markdown-divider-dots,
 [data-radix-theme][data-radix-theme-appearance="dark"] .markdown-divider-dots {
   color: #7ADB8F;
+}
+
+html[data-theme="green"] .markdown-divider-dots {
+  color: #248559;
 }
 
 /* Dropdown menu highlight overrides for light mode */
@@ -423,6 +558,13 @@ html[data-theme="dark"] .radix-themes [data-radix-menu-content] [data-highlighte
 [data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-collection-item][data-highlighted],
 [data-radix-theme][data-radix-theme-appearance="dark"] [data-radix-menu-content] [data-highlighted] {
   background-color: rgba(122, 219, 143, 0.15) !important;
+  color: var(--gray-12) !important;
+}
+
+/* Green theme dropdown highlights */
+html[data-theme="green"] .radix-themes [data-radix-collection-item][data-highlighted],
+html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlighted] {
+  background-color: rgba(36, 133, 89, 0.25) !important;
   color: var(--gray-12) !important;
 }
 

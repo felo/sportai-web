@@ -90,6 +90,10 @@ export function ChatInput({
   const [mediaResolutionOpen, setMediaResolutionOpen] = useState(false);
   const [domainExpertiseOpen, setDomainExpertiseOpen] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
+  const [sendButtonBounce, setSendButtonBounce] = useState(false);
+  
+  // Track previous analyzing state to detect when analysis completes
+  const wasAnalyzingRef = useRef(false);
   
   // Prevent hydration mismatch with Radix UI Select components
   const [isMounted, setIsMounted] = useState(false);
@@ -106,6 +110,24 @@ export function ChatInput({
       }
     };
   }, []);
+
+  // Trigger bounce animation on send button when analysis completes
+  useEffect(() => {
+    const isCurrentlyAnalyzing = videoPreAnalysis?.isAnalyzing ?? false;
+    
+    // Detect transition from analyzing to not analyzing
+    if (wasAnalyzingRef.current && !isCurrentlyAnalyzing) {
+      console.log("[ChatInput] Analysis complete, triggering send button bounce");
+      setSendButtonBounce(true);
+      
+      // Reset bounce after animation completes
+      setTimeout(() => {
+        setSendButtonBounce(false);
+      }, 600); // Animation duration
+    }
+    
+    wasAnalyzingRef.current = isCurrentlyAnalyzing;
+  }, [videoPreAnalysis?.isAnalyzing]);
 
   // Trigger glow effect when sport is auto-detected from video
   // Note: videoSportDetected is only set when a valid sport (tennis/pickleball/padel) is detected
@@ -752,13 +774,17 @@ export function ChatInput({
                   </Tooltip>
                 )
               ) : (
-                <Tooltip content="Send message" open={disableTooltips ? false : undefined}>
+                <Tooltip 
+                  content={videoPreAnalysis?.isAnalyzing ? "Analyzing video..." : "Send message"} 
+                  open={disableTooltips ? false : undefined}
+                >
                   {(() => {
                     // Can submit if: has text OR has file OR has exactly one video URL (not multiple)
                     const hasValidVideoUrl = detectedVideoUrls.length === 1;
                     const canSubmit = prompt.trim() || videoFile || hasValidVideoUrl;
-                    // Disable if multiple URLs detected
-                    const isDisabled = !canSubmit || detectedVideoUrls.length > 1;
+                    // Disable if multiple URLs detected OR if video is being analyzed for PRO eligibility
+                    const isAnalyzing = videoPreAnalysis?.isAnalyzing ?? false;
+                    const isDisabled = !canSubmit || detectedVideoUrls.length > 1 || isAnalyzing;
                     
                     return (
                       <button
@@ -779,6 +805,7 @@ export function ChatInput({
                           boxShadow: isDisabled ? "none" : "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
                           textTransform: "uppercase",
                           fontWeight: 600,
+                          animation: sendButtonBounce ? "sendButtonBounce 0.6s cubic-bezier(0.36, 0, 0.66, -0.56)" : "none",
                         }}
                         onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                           if (!isDisabled) {

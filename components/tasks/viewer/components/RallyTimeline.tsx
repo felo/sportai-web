@@ -257,12 +257,8 @@ export function RallyTimeline({
                   <Text size="1" color="gray">Swing</Text>
                 </Flex>
                 <Flex align="center" gap="1">
-                  <Box style={{ width: 10, height: 10, backgroundColor: "var(--orange-9)", borderRadius: "50%" }} />
-                  <Text size="1" color="gray">Floor</Text>
-                </Flex>
-                <Flex align="center" gap="1">
-                  <Box style={{ width: 10, height: 10, backgroundColor: "var(--purple-9)", borderRadius: "50%" }} />
-                  <Text size="1" color="gray">Swing</Text>
+                  <Box style={{ width: 10, height: 10, backgroundColor: "var(--yellow-9)", borderRadius: "50%" }} />
+                  <Text size="1" color="gray">Bounce</Text>
                 </Flex>
               </Flex>
               {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && (
@@ -386,24 +382,9 @@ export function RallyTimeline({
               const isNearPlayhead = Math.abs(currentTime - bounce.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
               const isHovered = hoveredBounceIdx === idx;
               
-              // Determine color based on bounce type
-              // Inferred types → Yellow, Swings → Purple, Floor → Orange
-              const isInferred = bounce.type.startsWith("inferred");
-              const isSwingBounce = bounce.type === "swing";
-              const bounceColor = isInferred 
-                ? "var(--yellow-9)"  // Yellow for all inferred types
-                : isSwingBounce 
-                  ? "var(--purple-9)"  // Purple for swings
-                  : bounce.type === "floor" 
-                    ? "var(--orange-9)"  // Orange for floor
-                    : "var(--purple-9)"; // Purple for others
-              const glowColor = isInferred
-                ? "rgba(234, 179, 8, 0.8)"  // Yellow glow
-                : isSwingBounce 
-                  ? "rgba(168, 85, 247, 0.8)"  // Purple glow
-                  : bounce.type === "floor" 
-                    ? "rgba(245, 158, 11, 0.8)"  // Orange glow
-                    : "rgba(168, 85, 247, 0.8)"; // Purple glow
+              // All bounces are yellow
+              const bounceColor = "var(--yellow-9)";
+              const glowColor = "rgba(234, 179, 8, 0.8)";
 
               return (
                 <Box key={`bounce-${idx}`}>

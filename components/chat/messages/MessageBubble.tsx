@@ -295,6 +295,16 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
         return;
       }
       
+      // Don't show PRO upsell if this chat has PRO-eligible video analysis
+      const hasProEligibleAnalysis = allMessages.some(m => 
+        m.analysisOptions?.preAnalysis?.isProEligible || 
+        m.analysisOptions?.preAnalysis?.isTechniqueLiteEligible
+      );
+      if (hasProEligibleAnalysis) {
+        setShowProUpsell(false);
+        return;
+      }
+      
       // Check if we've already shown the upsell for this chat
       if (hasShownProUpsell(chatId)) {
         setShowProUpsell(false);
@@ -314,7 +324,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     } else {
       setShowProUpsell(false);
     }
-  }, [message.content, message.role, message.isVideoSizeLimitError]);
+  }, [message.content, message.role, message.isVideoSizeLimitError, allMessages]);
 
   // Set video container style - simplified, let VideoPoseViewer handle its own sizing
   useEffect(() => {

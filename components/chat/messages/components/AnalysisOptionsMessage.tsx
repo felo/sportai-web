@@ -309,46 +309,40 @@ export function AnalysisOptionsMessage({
             </Box>
           </Box>
 
-          {/* Action section */}
-          <Box
-            style={{
-              opacity: showButtons ? 1 : 0,
-              transform: showButtons ? "translateY(0)" : "translateY(10px)",
-              transition: "all 0.5s ease-out",
-            }}
-          >
-            <Text size="2" color="gray" mb="3" style={{ display: "block" }}>
-              How would you like to proceed?
-            </Text>
-            
-            <Flex gap="3" direction="column">
-              {/* Quick Chat Only button */}
-              <Button
-                size="3"
-                className={buttonStyles.actionButtonSquareSecondary}
-                onClick={onSelectQuickOnly}
-                disabled={isLoading || selectedOption !== null}
-                style={{ 
-                  opacity: selectedOption === "pro_plus_quick" ? 0.5 : 1,
-                }}
-              >
-                <LightningBoltIcon width={18} height={18} />
-                Instant Chat
-              </Button>
+          {/* Action section - fades out after selection */}
+          {!selectedOption && (
+            <Box
+              style={{
+                opacity: showButtons ? 1 : 0,
+                transform: showButtons ? "translateY(0)" : "translateY(10px)",
+                transition: "all 0.5s ease-out",
+              }}
+            >
+              <Text size="2" color="gray" mb="3" style={{ display: "block" }}>
+                How would you like to proceed?
+              </Text>
+              
+              <Flex gap="3" direction="column">
+                {/* Quick Chat Only button */}
+                <Button
+                  size="3"
+                  className={buttonStyles.actionButtonSquareSecondary}
+                  onClick={onSelectQuickOnly}
+                  disabled={isLoading}
+                >
+                  <LightningBoltIcon width={18} height={18} />
+                  Instant Chat
+                </Button>
 
-              {/* PRO + Quick Chat button */}
-              <Button
-                size="3"
-                className={buttonStyles.actionButtonSquare}
-                onClick={onSelectProPlusQuick}
-                disabled={isLoading || selectedOption !== null}
-                style={{ 
-                  opacity: selectedOption === "quick_only" ? 0.5 : 1,
-                }}
-              >
-                <RocketIcon width={18} height={18} />
-                PRO + Instant Chat
-                {selectedOption !== "pro_plus_quick" && (
+                {/* PRO + Quick Chat button */}
+                <Button
+                  size="3"
+                  className={buttonStyles.actionButtonSquare}
+                  onClick={onSelectProPlusQuick}
+                  disabled={isLoading}
+                >
+                  <RocketIcon width={18} height={18} />
+                  PRO + Instant Chat
                   <Badge 
                     color="gray" 
                     variant="outline" 
@@ -362,18 +356,19 @@ export function AnalysisOptionsMessage({
                   >
                     Recommended
                   </Badge>
-                )}
-              </Button>
-            </Flex>
+                </Button>
+              </Flex>
+            </Box>
+          )}
 
-            {selectedOption && (
-              <Text size="2" color="gray" mt="3" style={{ display: "block" }}>
-                {selectedOption === "pro_plus_quick" 
-                  ? "🚀 Starting PRO analysis... You'll receive detailed statistics when ready." 
-                  : "⚡ Starting quick analysis..."}
-              </Text>
-            )}
-          </Box>
+          {/* Status message after selection */}
+          {selectedOption && (
+            <Text size="2" color="gray" style={{ display: "block" }}>
+              {selectedOption === "pro_plus_quick" 
+                ? "🚀 Starting PRO analysis... You'll receive detailed statistics when ready." 
+                : "⚡ Starting instant analysis..."}
+            </Text>
+          )}
 
           {/* Cursor blink animation */}
           <style jsx>{`

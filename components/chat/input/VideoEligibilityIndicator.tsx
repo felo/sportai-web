@@ -101,7 +101,7 @@ export function VideoEligibilityIndicator({
       {/* Sport detection text */}
       <Text size="2" style={{ flex: 1, color: MINT_COLOR }}>
         {isAnalyzing ? (
-          "⏳ Checking eligibility..."
+          "Autodetecting sport..."
         ) : hasSport ? (
           <>
             {getSportEmoji(sport)} {capitalize(sport)} detected

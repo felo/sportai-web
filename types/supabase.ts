@@ -369,6 +369,8 @@ export interface Database {
           sequence_number: number;
           video_url: string | null;
           video_s3_key: string | null;
+          thumbnail_url: string | null;
+          thumbnail_s3_key: string | null;
           video_playback_speed: number | null;
           is_video_size_limit_error: boolean | null;
           is_streaming: boolean | null;
@@ -389,6 +391,8 @@ export interface Database {
           sequence_number: number;
           video_url?: string | null;
           video_s3_key?: string | null;
+          thumbnail_url?: string | null;
+          thumbnail_s3_key?: string | null;
           video_playback_speed?: number | null;
           is_video_size_limit_error?: boolean | null;
           is_streaming?: boolean | null;
@@ -409,6 +413,8 @@ export interface Database {
           sequence_number?: number;
           video_url?: string | null;
           video_s3_key?: string | null;
+          thumbnail_url?: string | null;
+          thumbnail_s3_key?: string | null;
           video_playback_speed?: number | null;
           is_video_size_limit_error?: boolean | null;
           is_streaming?: boolean | null;
@@ -482,6 +488,8 @@ export interface Database {
           sport: SportType;
           sportai_task_id: string | null;
           video_url: string;
+          thumbnail_url: string | null;
+          thumbnail_s3_key: string | null;
           video_length: number | null;
           status: TaskStatusType;
           estimated_compute_time: number | null;
@@ -499,6 +507,8 @@ export interface Database {
           sport?: SportType;
           sportai_task_id?: string | null;
           video_url: string;
+          thumbnail_url?: string | null;
+          thumbnail_s3_key?: string | null;
           video_duration?: number | null;
           status?: TaskStatusType;
           estimated_compute_time?: number | null;
@@ -516,6 +526,8 @@ export interface Database {
           sport?: SportType;
           sportai_task_id?: string | null;
           video_url?: string;
+          thumbnail_url?: string | null;
+          thumbnail_s3_key?: string | null;
           video_duration?: number | null;
           status?: TaskStatusType;
           estimated_compute_time?: number | null;

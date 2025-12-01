@@ -26,17 +26,30 @@
 
 /* Dark mode timestamp links */
 :global(html[data-theme="dark"]) .timestampLink,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink {
   background-color: rgba(122, 219, 143, 0.15);
   color: #7ADB8F;
   border-color: rgba(122, 219, 143, 0.3);
 }
 
 :global(html[data-theme="dark"]) .timestampLink:hover,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink:hover {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .timestampLink:hover {
   background-color: rgba(122, 219, 143, 0.25);
   border-color: rgba(122, 219, 143, 0.5);
   box-shadow: 0 2px 4px rgba(122, 219, 143, 0.3);
+}
+
+/* Green theme timestamp links */
+:global(html[data-theme="green"]) .timestampLink {
+  background-color: rgba(122, 219, 143, 0.15);
+  color: #ffffff;
+  border-color: rgba(122, 219, 143, 0.4);
+}
+
+:global(html[data-theme="green"]) .timestampLink:hover {
+  background-color: rgba(122, 219, 143, 0.25);
+  border-color: rgba(122, 219, 143, 0.6);
+  box-shadow: 0 2px 4px rgba(122, 219, 143, 0.4);
 }
 
 /* Metric Highlights - Subtle highlighting for sports metrics */
@@ -62,14 +75,24 @@
 
 /* Dark mode metric highlights */
 :global(html[data-theme="dark"]) .metricHighlight,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight {
   background-color: rgba(122, 219, 143, 0.12);
   color: #7ADB8F;
 }
 
 :global(html[data-theme="dark"]) .metricHighlight:hover,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight:hover {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .metricHighlight:hover {
   background-color: rgba(122, 219, 143, 0.2);
+}
+
+/* Green theme metric highlights */
+:global(html[data-theme="green"]) .metricHighlight {
+  background-color: rgba(36, 133, 89, 0.15);
+  color: #248559;
+}
+
+:global(html[data-theme="green"]) .metricHighlight:hover {
+  background-color: rgba(36, 133, 89, 0.25);
 }
 
 /* Swing Type Highlights - Interactive technique glossary */
@@ -98,14 +121,24 @@
 
 /* Dark mode swing highlights */
 :global(html[data-theme="dark"]) .swingHighlight,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight {
   color: #7ADB8F;
   text-decoration-color: #7ADB8F;
 }
 
 :global(html[data-theme="dark"]) .swingHighlight:hover,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight:hover {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .swingHighlight:hover {
   opacity: 0.7;
+}
+
+/* Green theme swing highlights */
+:global(html[data-theme="green"]) .swingHighlight {
+  color: #7ADB8F;
+  text-decoration-color: #7ADB8F;
+}
+
+:global(html[data-theme="green"]) .swingHighlight:hover {
+  opacity: 0.8;
 }
 
 /* API Version Tooltip Styling */
@@ -210,37 +243,65 @@
 
 /* Dark mode collapsible sections */
 :global(html[data-theme="dark"]) .collapsibleSection,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection {
   border-color: rgba(122, 219, 143, 0.3);
   background-color: rgba(122, 219, 143, 0.03);
 }
 
 :global(html[data-theme="dark"]) .collapsibleSection:hover,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection:hover {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection:hover {
   border-color: rgba(122, 219, 143, 0.5);
   background-color: rgba(122, 219, 143, 0.05);
 }
 
 :global(html[data-theme="dark"]) .collapsibleSummary,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary {
   background-color: rgba(122, 219, 143, 0.08);
   color: #7ADB8F;
 }
 
 :global(html[data-theme="dark"]) .collapsibleSummary::before,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary::before {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary::before {
   color: #7ADB8F;
 }
 
 :global(html[data-theme="dark"]) .collapsibleSummary:hover,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary:hover {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSummary:hover {
   background-color: rgba(122, 219, 143, 0.15);
 }
 
 :global(html[data-theme="dark"]) .collapsibleSection[open] .collapsibleSummary,
-:global([data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection[open] .collapsibleSummary {
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .collapsibleSection[open] .collapsibleSummary {
   background-color: rgba(122, 219, 143, 0.12);
   border-bottom-color: rgba(122, 219, 143, 0.2);
 }
 
+/* Green theme collapsible sections */
+:global(html[data-theme="green"]) .collapsibleSection {
+  border-color: rgba(122, 219, 143, 0.3);
+  background-color: rgba(122, 219, 143, 0.05);
+}
+
+:global(html[data-theme="green"]) .collapsibleSection:hover {
+  border-color: rgba(122, 219, 143, 0.5);
+  background-color: rgba(122, 219, 143, 0.08);
+}
+
+:global(html[data-theme="green"]) .collapsibleSummary {
+  background-color: rgba(122, 219, 143, 0.1);
+  color: #7ADB8F;
+}
+
+:global(html[data-theme="green"]) .collapsibleSummary::before {
+  color: #7ADB8F;
+}
+
+:global(html[data-theme="green"]) .collapsibleSummary:hover {
+  background-color: rgba(122, 219, 143, 0.18);
+}
+
+:global(html[data-theme="green"]) .collapsibleSection[open] .collapsibleSummary {
+  background-color: rgba(122, 219, 143, 0.12);
+  border-bottom-color: rgba(122, 219, 143, 0.25);
+}
 

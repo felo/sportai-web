@@ -374,6 +374,8 @@ CREATE TABLE IF NOT EXISTS messages (
   -- Video-related fields
   video_url TEXT,
   video_s3_key TEXT,
+  thumbnail_url TEXT,  -- S3 URL for video thumbnail (first frame)
+  thumbnail_s3_key TEXT,  -- S3 key for thumbnail
   video_playback_speed NUMERIC DEFAULT 1.0,
   is_video_size_limit_error BOOLEAN DEFAULT FALSE,
   
@@ -409,6 +411,13 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Run this if you already have the messages table
 -- =============================================
 -- ALTER TABLE messages ADD COLUMN IF NOT EXISTS pose_data_s3_key TEXT;
+
+-- =============================================
+-- MIGRATION: Add thumbnail columns for storing video first frame
+-- Run this if you already have the messages table
+-- =============================================
+-- ALTER TABLE messages ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
+-- ALTER TABLE messages ADD COLUMN IF NOT EXISTS thumbnail_s3_key TEXT;
 
 -- Create index on chat_id for faster message retrieval
 CREATE INDEX IF NOT EXISTS messages_chat_id_idx ON messages(chat_id);
@@ -590,6 +599,8 @@ CREATE TABLE IF NOT EXISTS sportai_tasks (
   -- SportAI API fields
   sportai_task_id UUID, -- Task ID returned from SportAI API
   video_url TEXT NOT NULL,
+  thumbnail_url TEXT,  -- S3 URL for video thumbnail (first frame)
+  thumbnail_s3_key TEXT,  -- S3 key for thumbnail
   video_length NUMERIC, -- Video length in seconds
   
   -- Task status
@@ -640,4 +651,11 @@ CREATE TRIGGER update_sportai_tasks_updated_at
   BEFORE UPDATE ON sportai_tasks
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- MIGRATION: Add thumbnail columns for storing video first frame
+-- Run this if you already have the sportai_tasks table
+-- =============================================
+-- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
+-- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS thumbnail_s3_key TEXT;
 

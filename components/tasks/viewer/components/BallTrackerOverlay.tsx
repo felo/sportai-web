@@ -161,16 +161,10 @@ function getTrailColor(age: number, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Helper to get bounce color based on type
-function getBounceColor(type: string): { r: number; g: number; b: number } {
-  const colors = OVERLAY_COLORS.bounce;
-  if (type === "floor") return colors.floor.rgb;
-  if (type === "swing") return colors.swing.rgb;
-  // All inferred types use the same color
-  if (type === "inferred" || type === "inferred_swing" || type === "inferred_wall" || type === "inferred_back") {
-    return colors.inferred.rgb;
-  }
-  return colors.default.rgb;
+// Helper to get bounce color - all bounces are yellow
+function getBounceColor(_type: string): { r: number; g: number; b: number } {
+  // Yellow - var(--yellow-9) / #EAB308
+  return { r: 234, g: 179, b: 8 };
 }
 
 

@@ -8,6 +8,7 @@ import { useAIChat } from "@/hooks/useAIChat";
 import { useAIApi } from "@/hooks/useAIApi";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useNavigationWarning } from "@/hooks/useNavigationWarning";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { MessageList } from "@/components/chat/messages/MessageList";
 import { ChatInput } from "@/components/chat/input/ChatInput";
 import { ChatHeader } from "@/components/chat/header/ChatHeader";
@@ -28,7 +29,8 @@ import { type ThinkingMode, type MediaResolution, type DomainExpertise, generate
 import { getCurrentChatId, setCurrentChatId, createNewChat, updateExistingChat, loadChat } from "@/utils/storage-unified";
 import type { Message, VideoPreAnalysis } from "@/types/chat";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
-import { getMediaType, downloadVideoFromUrl, extractFirstFrame, extractFirstFrameFromUrl, extractFirstFrameWithDuration, isImageFile } from "@/utils/video-utils";
+import { uploadToS3 } from "@/lib/s3";
+import { getMediaType, downloadVideoFromUrl, extractFirstFrame, extractFirstFrameFromUrl, extractFirstFrameWithDuration, isImageFile, uploadThumbnailToS3, estimateProAnalysisTime } from "@/utils/video-utils";
 import {
   sharedSwings,
   tennisSwings,
@@ -58,6 +60,18 @@ function generateMessageId(): string {
   });
 }
 
+/**
+ * Strip stream metadata from response text
+ * The API sends metadata at the end of streams prefixed with __STREAM_META__
+ */
+function stripStreamMetadata(text: string): string {
+  const metaIndex = text.indexOf("__STREAM_META__");
+  if (metaIndex !== -1) {
+    return text.slice(0, metaIndex);
+  }
+  return text;
+}
+
 export function AIChatForm() {
   const [authKey, setAuthKey] = useState(0);
   const [prompt, setPrompt] = useState("");
@@ -84,6 +98,7 @@ export function AIChatForm() {
   const lastDetectedVideoRef = useRef<File | null>(null);
   const { isCollapsed: isSidebarCollapsed, isInitialLoad: isSidebarInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   const {
     videoFile,
@@ -378,13 +393,13 @@ export function AIChatForm() {
             const chunk = decoder.decode(value, { stream: true });
             fullResponse += chunk;
             
-            // Update the assistant message with streamed content
-            updateMessage(assistantMessageId, { content: fullResponse, isStreaming: true });
+            // Update the assistant message with streamed content (strip metadata)
+            updateMessage(assistantMessageId, { content: stripStreamMetadata(fullResponse), isStreaming: true });
           }
           
-          // Mark streaming as complete
-          updateMessage(assistantMessageId, { isStreaming: false });
-          console.log("✅ [AIChatForm] Image Insight complete, response length:", fullResponse.length);
+          // Mark streaming as complete (strip any metadata from final content)
+          updateMessage(assistantMessageId, { content: stripStreamMetadata(fullResponse), isStreaming: false });
+          console.log("✅ [AIChatForm] Image Insight complete, response length:", stripStreamMetadata(fullResponse).length);
         }
 
       } catch (error) {
@@ -468,14 +483,30 @@ export function AIChatForm() {
         
         console.log("[VideoFileAnalysis] Frame extracted, duration:", durationSeconds, "s, sending to eligibility API...");
         
+        // Upload thumbnail to S3 in parallel with eligibility analysis
+        let thumbnailUrl: string | null = null;
+        let thumbnailS3Key: string | null = null;
+        
+        const uploadThumbnail = async () => {
+          const result = await uploadThumbnailToS3(frameBlob);
+          if (result) {
+            thumbnailUrl = result.thumbnailUrl;
+            thumbnailS3Key = result.thumbnailS3Key;
+          }
+        };
+        
         // Send to eligibility analysis API
         const formData = new FormData();
         formData.append("image", frameBlob, "frame.jpg");
         
-        const response = await fetch("/api/analyze-video-eligibility", {
-          method: "POST",
-          body: formData,
-        });
+        // Run eligibility analysis and thumbnail upload in parallel
+        const [response] = await Promise.all([
+          fetch("/api/analyze-video-eligibility", {
+            method: "POST",
+            body: formData,
+          }),
+          uploadThumbnail(),
+        ]);
         
         if (!response.ok) {
           throw new Error("Eligibility analysis API failed");
@@ -508,7 +539,7 @@ export function AIChatForm() {
           techniqueLiteEligibilityReason = "Technique LITE requires videos under 20 seconds.";
         }
         
-        // Update pre-analysis state
+        // Update pre-analysis state with thumbnail info
         setVideoPreAnalysis({
           sport: data.sport,
           cameraAngle: data.cameraAngle,
@@ -520,6 +551,8 @@ export function AIChatForm() {
           durationSeconds: durationSeconds,
           isTechniqueLiteEligible,
           techniqueLiteEligibilityReason,
+          thumbnailUrl,
+          thumbnailS3Key,
         });
         
         // Also update domain expertise if a specific sport was detected
@@ -629,14 +662,68 @@ export function AIChatForm() {
         
         console.log("[VideoUrlAnalysis] Frame extracted, duration:", durationSeconds, "s, sending to eligibility API...");
         
+        // Upload thumbnail to S3 in parallel with eligibility analysis
+        let thumbnailUrl: string | null = null;
+        let thumbnailS3Key: string | null = null;
+        
+        const uploadThumbnail = async () => {
+          try {
+            console.log("[VideoUrlAnalysis] Uploading thumbnail to S3...");
+            const thumbnailFile = new File([frameBlob], `thumbnail_${Date.now()}.jpg`, { type: "image/jpeg" });
+            
+            // Get presigned upload URL
+            const urlResponse = await fetch("/api/s3/upload-url", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fileName: thumbnailFile.name,
+                contentType: thumbnailFile.type,
+              }),
+            });
+            
+            if (!urlResponse.ok) {
+              console.warn("[VideoUrlAnalysis] Failed to get upload URL for thumbnail");
+              return;
+            }
+            
+            const { url: presignedUrl, downloadUrl, key: s3Key } = await urlResponse.json();
+            
+            // Upload to S3
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.addEventListener("load", () => {
+                if (xhr.status === 200 || xhr.status === 204) {
+                  resolve();
+                } else {
+                  reject(new Error(`Thumbnail upload failed: ${xhr.status}`));
+                }
+              });
+              xhr.addEventListener("error", () => reject(new Error("Thumbnail upload failed")));
+              xhr.open("PUT", presignedUrl);
+              xhr.setRequestHeader("Content-Type", thumbnailFile.type);
+              xhr.send(thumbnailFile);
+            });
+            
+            thumbnailUrl = downloadUrl;
+            thumbnailS3Key = s3Key;
+            console.log("[VideoUrlAnalysis] ✅ Thumbnail uploaded to S3:", s3Key);
+          } catch (err) {
+            console.warn("[VideoUrlAnalysis] Thumbnail upload failed (non-blocking):", err);
+          }
+        };
+        
         // Send to eligibility analysis API
         const formData = new FormData();
         formData.append("image", frameBlob, "frame.jpg");
         
-        const response = await fetch("/api/analyze-video-eligibility", {
-          method: "POST",
-          body: formData,
-        });
+        // Run eligibility analysis and thumbnail upload in parallel
+        const [response] = await Promise.all([
+          fetch("/api/analyze-video-eligibility", {
+            method: "POST",
+            body: formData,
+          }),
+          uploadThumbnail(),
+        ]);
         
         if (!response.ok) {
           throw new Error("Eligibility analysis API failed");
@@ -669,7 +756,7 @@ export function AIChatForm() {
           techniqueLiteEligibilityReason = "Technique LITE requires videos under 20 seconds.";
         }
         
-        // Update pre-analysis state
+        // Update pre-analysis state with thumbnail info
         setVideoPreAnalysis({
           sport: data.sport,
           cameraAngle: data.cameraAngle,
@@ -681,6 +768,8 @@ export function AIChatForm() {
           durationSeconds: durationSeconds,
           isTechniqueLiteEligible,
           techniqueLiteEligibilityReason,
+          thumbnailUrl,
+          thumbnailS3Key,
         });
         
         // Also update domain expertise if a specific sport was detected
@@ -1059,7 +1148,7 @@ export function AIChatForm() {
             const chatId = getCurrentChatId();
             if (chatId === requestChatId) {
               updateMessage(assistantMessageId, { 
-                content: accumulatedText,
+                content: stripStreamMetadata(accumulatedText),
                 isStreaming: true,
               });
             }
@@ -1115,6 +1204,8 @@ export function AIChatForm() {
       return;
     }
     
+    const { preAnalysis, videoUrl: storedVideoUrl, userPrompt: storedUserPrompt } = optionsMessage.analysisOptions;
+    
     // Update the message to show selection
     updateMessage(messageId, {
       analysisOptions: {
@@ -1123,30 +1214,73 @@ export function AIChatForm() {
       },
     });
     
-    // Find the video URL from previous user message
-    let videoUrl: string | null = null;
-    const msgIndex = messages.findIndex(m => m.id === messageId);
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      const prevMsg = messages[i];
-      if (prevMsg.role === "user" && prevMsg.videoUrl) {
-        videoUrl = prevMsg.videoUrl;
-        break;
-      }
-    }
+    // Use stored video URL directly (avoids stale closure issues)
+    const videoUrl = storedVideoUrl || null;
     
     if (!videoUrl) {
       console.error("[AIChatForm] Could not find video URL for PRO analysis");
-      // Still start quick analysis
-      await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+      // Still start quick analysis with stored values
+      await startQuickAnalysis(messageId, preAnalysis.sport, undefined, storedUserPrompt);
       return;
     }
     
-    // Start PRO analysis task in background
-    // TODO: Implement PRO task creation with the tasks API
-    console.log("[AIChatForm] Starting PRO analysis for URL:", videoUrl);
+    // Get estimated time for PRO analysis
+    const estimatedTime = estimateProAnalysisTime(preAnalysis.durationSeconds ?? null);
     
-    // Start quick analysis
-    await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+    // Create PRO analysis task in background (requires authenticated user)
+    let taskCreated = false;
+    if (user) {
+      try {
+        console.log("[AIChatForm] Creating PRO analysis task for URL:", videoUrl);
+        
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.id}`,
+          },
+          body: JSON.stringify({
+            taskType: "statistics",
+            sport: preAnalysis.sport,
+            videoUrl: videoUrl,
+            thumbnailUrl: preAnalysis.thumbnailUrl || null,
+            thumbnailS3Key: preAnalysis.thumbnailS3Key || null,
+            videoLength: preAnalysis.durationSeconds || null,
+          }),
+        });
+        
+        if (response.ok) {
+          const { task } = await response.json();
+          console.log("[AIChatForm] ✅ PRO analysis task created:", task.id);
+          taskCreated = true;
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("[AIChatForm] Failed to create PRO analysis task:", errorData);
+        }
+      } catch (err) {
+        console.error("[AIChatForm] Error creating PRO analysis task:", err);
+      }
+    } else {
+      console.warn("[AIChatForm] User not authenticated, skipping PRO task creation");
+    }
+    
+    // Add an AI message informing the user about the library addition
+    if (taskCreated) {
+      const libraryMessageId = generateMessageId();
+      const libraryMessage: Message = {
+        id: libraryMessageId,
+        role: "assistant",
+        content: `🎯 I've added this video to your **Library** for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`,
+        isStreaming: false,
+      };
+      addMessage(libraryMessage);
+      
+      // Small delay to let the message render
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Start quick analysis with stored values
+    await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, storedUserPrompt);
   };
 
   /**
@@ -1162,6 +1296,8 @@ export function AIChatForm() {
       return;
     }
     
+    const { preAnalysis, videoUrl, userPrompt } = optionsMessage.analysisOptions;
+    
     // Update the message to show selection
     updateMessage(messageId, {
       analysisOptions: {
@@ -1170,34 +1306,57 @@ export function AIChatForm() {
       },
     });
     
-    // Start quick analysis
-    await startQuickAnalysis(messageId, optionsMessage.analysisOptions.preAnalysis.sport);
+    // Start quick analysis with stored values
+    await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, userPrompt);
   };
 
   /**
    * Start quick AI analysis after user selects an option
+   * @param optionsMessageId - ID of the analysis options message
+   * @param sport - Detected sport type
+   * @param storedVideoUrl - Video URL stored in analysisOptions (preferred, avoids stale closure)
+   * @param storedUserPrompt - User prompt stored in analysisOptions (preferred, avoids stale closure)
    */
-  const startQuickAnalysis = async (optionsMessageId: string, sport: string) => {
-    // Find the video URL from previous user messages
-    let videoUrl: string | null = null;
-    let userPrompt = "";
-    const msgIndex = messages.findIndex(m => m.id === optionsMessageId);
+  const startQuickAnalysis = async (
+    optionsMessageId: string, 
+    sport: string,
+    storedVideoUrl?: string,
+    storedUserPrompt?: string
+  ) => {
+    // Use stored values directly if available (avoids stale closure issues)
+    let videoUrl: string | null = storedVideoUrl || null;
+    let userPrompt = storedUserPrompt || "";
     
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      const prevMsg = messages[i];
-      if (prevMsg.role === "assistant") break;
-      if (prevMsg.role === "user") {
-        if (prevMsg.videoUrl && !videoUrl) {
-          videoUrl = prevMsg.videoUrl;
-        }
-        if (prevMsg.content && !userPrompt) {
-          userPrompt = prevMsg.content;
+    // Fallback: search through messages if stored values not available (backwards compatibility)
+    if (!videoUrl) {
+      const msgIndex = messages.findIndex(m => m.id === optionsMessageId);
+      
+      for (let i = msgIndex - 1; i >= 0; i--) {
+        const prevMsg = messages[i];
+        if (prevMsg.role === "assistant") break;
+        if (prevMsg.role === "user") {
+          if (prevMsg.videoUrl && !videoUrl) {
+            videoUrl = prevMsg.videoUrl;
+          }
+          if (prevMsg.content && !userPrompt) {
+            userPrompt = prevMsg.content;
+          }
         }
       }
     }
     
     if (!videoUrl) {
       console.error("[AIChatForm] Could not find video URL for quick analysis");
+      // Reset the selection state so user can try again
+      const optionsMessage = messages.find(m => m.id === optionsMessageId);
+      if (optionsMessage?.analysisOptions) {
+        updateMessage(optionsMessageId, {
+          analysisOptions: {
+            ...optionsMessage.analysisOptions,
+            selectedOption: null, // Reset selection so user can try again
+          },
+        });
+      }
       return;
     }
     
@@ -1257,13 +1416,14 @@ export function AIChatForm() {
           accumulatedText += chunk;
           
           updateMessage(assistantMessageId, { 
-            content: accumulatedText,
+            content: stripStreamMetadata(accumulatedText),
             isStreaming: true,
           });
         }
         
-        // Mark as complete
+        // Mark as complete (strip any metadata from final content)
         updateMessage(assistantMessageId, {
+          content: stripStreamMetadata(accumulatedText),
           isStreaming: false,
         });
       }
@@ -1494,6 +1654,8 @@ export function AIChatForm() {
         videoFile: currentVideoFile || null,
         videoPreview: currentVideoPreview,
         videoUrl: currentVideoUrl || undefined, // Store the URL directly if it's a URL submission
+        thumbnailUrl: videoPreAnalysis?.thumbnailUrl || undefined,
+        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key || undefined,
         videoPlaybackSpeed: videoPlaybackSpeed,
         inputTokens: videoTokens,
         poseData: poseData,
@@ -1528,6 +1690,8 @@ export function AIChatForm() {
         role: "user",
         content: currentPrompt,
         videoUrl: currentVideoUrl,
+        thumbnailUrl: videoPreAnalysis?.thumbnailUrl || undefined,
+        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key || undefined,
         inputTokens: estimateTextTokens(currentPrompt),
         isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
       };
@@ -1547,6 +1711,8 @@ export function AIChatForm() {
         content: currentPrompt,
         videoFile: currentVideoFile,
         videoPreview: currentVideoPreview,
+        thumbnailUrl: currentVideoFile ? (videoPreAnalysis?.thumbnailUrl || undefined) : undefined,
+        thumbnailS3Key: currentVideoFile ? (videoPreAnalysis?.thumbnailS3Key || undefined) : undefined,
         videoPlaybackSpeed: currentVideoFile ? videoPlaybackSpeed : undefined,
         inputTokens: userTokens,
         poseData: currentVideoFile ? poseData : undefined,
@@ -1646,12 +1812,15 @@ export function AIChatForm() {
           console.log("[AIChatForm] Showing analysis options for eligible video", { isProEligible: videoPreAnalysis.isProEligible, isTechniqueLiteEligible: videoPreAnalysis.isTechniqueLiteEligible });
           
           // Update the assistant message to be an analysis options message
+          // Store videoUrl and userPrompt directly to avoid stale closure issues when user clicks button later
           updateMessage(assistantMessageId, {
             messageType: "analysis_options",
             content: "", // No text content for options message
             analysisOptions: {
               preAnalysis: videoPreAnalysis,
               selectedOption: null,
+              videoUrl: currentVideoUrl, // Store URL directly
+              userPrompt: currentPrompt, // Store prompt directly
             },
             isStreaming: false,
           });
@@ -1711,7 +1880,7 @@ export function AIChatForm() {
             const chatId = getCurrentChatId();
             if (chatId === requestChatId) {
               updateMessage(assistantMessageId, { 
-                content: accumulatedText,
+                content: stripStreamMetadata(accumulatedText),
                 isStreaming: true,
               });
             }
@@ -1750,19 +1919,76 @@ export function AIChatForm() {
         if (videoPreAnalysis && (videoPreAnalysis.isProEligible || videoPreAnalysis.isTechniqueLiteEligible)) {
           console.log("[AIChatForm] Showing analysis options for eligible uploaded video", { isProEligible: videoPreAnalysis.isProEligible, isTechniqueLiteEligible: videoPreAnalysis.isTechniqueLiteEligible });
           
-          updateMessage(assistantMessageId, {
-            messageType: "analysis_options",
-            content: "",
-            analysisOptions: {
-              preAnalysis: videoPreAnalysis,
-              selectedOption: null,
-            },
-            isStreaming: false,
-          });
+          // Upload video to S3 first so it persists even if user leaves
+          setProgressStage("uploading");
+          setUploadProgress(0);
           
-          setLoading(false);
-          setProgressStage("idle");
-          return;
+          let s3Url: string | undefined;
+          
+          try {
+            // Get presigned URL for S3 upload
+            console.log("[AIChatForm] Getting presigned URL for PRO-eligible video...");
+            const urlResponse = await fetch("/api/s3/upload-url", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fileName: currentVideoFile.name,
+                contentType: currentVideoFile.type,
+              }),
+            });
+
+            if (!urlResponse.ok) {
+              const errorData = await urlResponse.json();
+              throw new Error(errorData.error || "Failed to get upload URL");
+            }
+
+            const { url: presignedUrl, downloadUrl, publicUrl, key: s3Key } = await urlResponse.json();
+            s3Url = downloadUrl || publicUrl;
+
+            // Upload to S3
+            console.log("[AIChatForm] Uploading PRO-eligible video to S3...");
+            await uploadToS3(presignedUrl, currentVideoFile, (progress) => {
+              setUploadProgress(progress * 100);
+            }, abortController.signal);
+
+            console.log("[AIChatForm] Video uploaded successfully to S3:", s3Url);
+
+            // Update the video message with S3 URL (so it persists)
+            if (videoMessageId) {
+              updateMessage(videoMessageId, { 
+                videoUrl: s3Url, 
+                videoS3Key: s3Key, 
+                videoPreview: null // Clear blob URL
+              });
+            }
+          } catch (uploadError) {
+            console.error("[AIChatForm] Failed to upload video:", uploadError);
+            // If upload fails, don't show the analysis options dialog
+            // Instead, fall through to the normal video analysis flow
+          }
+          
+          // Only show the analysis options dialog if we have a valid S3 URL
+          if (s3Url) {
+            // Now show the analysis options dialog
+            // Store videoUrl and userPrompt directly to avoid stale closure issues when user clicks button later
+            updateMessage(assistantMessageId, {
+              messageType: "analysis_options",
+              content: "",
+              analysisOptions: {
+                preAnalysis: videoPreAnalysis,
+                selectedOption: null,
+                videoUrl: s3Url, // Store the S3 URL directly
+                userPrompt: currentPrompt, // Store prompt directly
+              },
+              isStreaming: false,
+            });
+            
+            setLoading(false);
+            setProgressStage("idle");
+            setUploadProgress(0);
+            return;
+          }
+          // If upload failed, fall through to normal video analysis below
         }
 
         // Video upload with progress (not eligible for PRO)

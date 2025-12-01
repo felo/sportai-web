@@ -164,11 +164,11 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     }
     
     setIsFloating(floating);
-    // On mobile, auto-minimize when starting to float to respect the small screen
-    if (floating && isMobile) {
+    // Always start minimized when docking the video
+    if (floating) {
       setIsMinimized(true);
     }
-  }, [isMobile]);
+  }, []);
 
   const scrollToVideo = useCallback(() => {
     if (activeVideoId) {

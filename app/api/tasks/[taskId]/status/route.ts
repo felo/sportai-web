@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/supabase";
 
@@ -8,10 +7,6 @@ export const runtime = "nodejs";
 
 const SPORTAI_API_URL = "https://api.sportai.com";
 const SPORTAI_API_KEY = process.env.SPORTAI_API_KEY;
-
-// S3 Configuration
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "sportai-llm-uploads";
-const BUCKET_REGION = process.env.AWS_REGION || "eu-north-1";
 
 // Task type to status endpoint mapping
 const STATUS_ENDPOINTS: Record<string, string> = {
@@ -30,43 +25,6 @@ function getSupabaseClient() {
   }
   
   return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
-
-function getS3Client(): S3Client | null {
-  const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
-  if (!hasCredentials) {
-    logger.warn("AWS credentials not configured - results will not be saved to S3");
-    return null;
-  }
-  
-  return new S3Client({
-    region: BUCKET_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-    },
-  });
-}
-
-async function uploadResultToS3(taskId: string, result: unknown): Promise<string | null> {
-  const s3Client = getS3Client();
-  if (!s3Client) {
-    return null;
-  }
-  
-  const key = `task-results/${taskId}.json`;
-  
-  const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: key,
-    Body: JSON.stringify(result, null, 2),
-    ContentType: "application/json",
-  });
-  
-  await s3Client.send(command);
-  logger.info(`Uploaded task result to S3: ${key}`);
-  
-  return key;
 }
 
 /**
@@ -154,32 +112,15 @@ export async function GET(
     logger.info(`[${requestId}] Parsed status: ${resultStatus}, progress: ${taskProgress}`);
     
     if (resultStatus === "completed") {
-      // Upload result to S3 - try multiple possible locations for result data
-      const resultData = statusResult.data?.result 
-        || statusResult.result 
-        || statusResult.data?.output
-        || statusResult.data; // Sometimes the whole data object IS the result
-      
-      let resultS3Key: string | null = null;
-      
-      if (resultData) {
-        try {
-          resultS3Key = await uploadResultToS3(taskId, resultData);
-          logger.info(`[${requestId}] Uploaded result to S3: ${resultS3Key}`);
-        } catch (s3Error) {
-          logger.error(`[${requestId}] Failed to upload result to S3:`, s3Error);
-          // Continue without S3 upload - we'll still mark as completed
-        }
-      } else {
-        logger.warn(`[${requestId}] Task completed but no result data found in response`);
-      }
-      
+      // Only update status - don't store results here
+      // The result will be fetched and stored properly via /api/tasks/[taskId]/result
+      // when the user clicks to view/download
       updates = {
         ...updates,
         status: "completed",
-        result_s3_key: resultS3Key,
         completed_at: new Date().toISOString(),
       };
+      logger.info(`[${requestId}] Task completed - result will be fetched on demand via /result endpoint`);
     } else if (resultStatus === "failed" || resultStatus === "error") {
       updates = {
         ...updates,

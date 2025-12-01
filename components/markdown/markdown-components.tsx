@@ -446,25 +446,29 @@ export const createMarkdownComponents = (
 ) => ({
   h1: ({ node, ...props }: any) => (
     <h1
-      className="text-2xl font-bold mt-6 mb-4 text-gray-900 dark:text-gray-100"
+      className="text-2xl font-bold mt-6 mb-4"
+      style={{ color: "var(--gray-12)" }}
       {...props}
     />
   ),
   h2: ({ node, ...props }: any) => (
     <h2
-      className="text-xl font-bold mt-5 mb-3 text-gray-900 dark:text-gray-100"
+      className="text-xl font-bold mt-5 mb-3"
+      style={{ color: "var(--gray-12)" }}
       {...props}
     />
   ),
   h3: ({ node, ...props }: any) => (
     <h3
-      className="text-lg font-semibold mt-4 mb-2 text-gray-900 dark:text-gray-100"
+      className="text-lg font-semibold mt-4 mb-2"
+      style={{ color: "var(--gray-12)" }}
       {...props}
     />
   ),
   p: ({ node, children, ...props }: any) => (
     <p
-      className="mb-4 text-base text-gray-700 dark:text-gray-300 leading-relaxed"
+      className="mb-4 text-base leading-relaxed"
+      style={{ color: "var(--gray-12)" }}
       {...props}
     >
       <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
@@ -472,15 +476,15 @@ export const createMarkdownComponents = (
   ),
   ul: ({ node, ...props }: any) => (
     <ul
-      className="markdown-ul mb-4 text-base text-gray-700 dark:text-gray-300"
-      style={{ listStyle: "none" }}
+      className="markdown-ul mb-4 text-base"
+      style={{ listStyle: "none", color: "var(--gray-12)" }}
       {...props}
     />
   ),
   ol: ({ node, ...props }: any) => (
     <ol
-      className="markdown-ol mb-4 text-base text-gray-700 dark:text-gray-300"
-      style={{ listStyle: "none", counterReset: "markdown-counter" }}
+      className="markdown-ol mb-4 text-base"
+      style={{ listStyle: "none", counterReset: "markdown-counter", color: "var(--gray-12)" }}
       {...props}
     />
   ),
@@ -495,12 +499,14 @@ export const createMarkdownComponents = (
   code: ({ node, inline, ...props }: any) =>
     inline ? (
       <code
-        className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-base font-mono"
+        className="px-1.5 py-0.5 rounded text-base font-mono"
+        style={{ backgroundColor: "var(--gray-3)", color: "var(--gray-12)" }}
         {...props}
       />
     ) : (
       <code
-        className="block p-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-base font-mono overflow-x-auto mb-4"
+        className="block p-4 rounded-lg text-base font-mono overflow-x-auto mb-4"
+        style={{ backgroundColor: "var(--gray-3)", color: "var(--gray-12)" }}
         {...props}
       />
     ),
@@ -509,12 +515,13 @@ export const createMarkdownComponents = (
   ),
   blockquote: ({ node, ...props }: any) => (
     <blockquote
-      className="border-l-4 border-blue-500 pl-4 italic my-4 text-gray-600 dark:text-gray-400"
+      className="border-l-4 pl-4 italic my-4"
+      style={{ borderColor: "var(--mint-6)", color: "var(--gray-11)" }}
       {...props}
     />
   ),
   strong: ({ node, children, ...props }: any) => (
-    <strong className="font-semibold text-gray-900 dark:text-gray-100" {...props}>
+    <strong className="font-semibold" style={{ color: "var(--gray-12)" }} {...props}>
       <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
     </strong>
   ),
@@ -556,7 +563,8 @@ export const createMarkdownComponents = (
     return (
       <a
         href={href}
-        className="text-blue-600 dark:text-blue-400 hover:underline"
+        className="hover:underline"
+        style={{ color: "var(--mint-11)" }}
         target="_blank"
         rel="noopener noreferrer"
         {...props}
@@ -568,20 +576,23 @@ export const createMarkdownComponents = (
   table: ({ node, ...props }: any) => (
     <div className="overflow-x-auto my-4">
       <table
-        className="min-w-full border-collapse border border-gray-300 dark:border-gray-600"
+        className="min-w-full border-collapse"
+        style={{ border: "1px solid var(--gray-6)" }}
         {...props}
       />
     </div>
   ),
   th: ({ node, ...props }: any) => (
     <th
-      className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-100 dark:bg-gray-700 font-semibold text-left"
+      className="px-4 py-2 font-semibold text-left"
+      style={{ border: "1px solid var(--gray-6)", backgroundColor: "var(--gray-3)", color: "var(--gray-12)" }}
       {...props}
     />
   ),
   td: ({ node, ...props }: any) => (
     <td
-      className="border border-gray-300 dark:border-gray-600 px-4 py-2"
+      className="px-4 py-2"
+      style={{ border: "1px solid var(--gray-6)", color: "var(--gray-12)" }}
       {...props}
     />
   ),
