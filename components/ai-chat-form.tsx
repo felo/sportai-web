@@ -77,6 +77,7 @@ export function AIChatForm() {
   // Video pre-analysis state (sport detection, camera angle, PRO eligibility)
   const [videoPreAnalysis, setVideoPreAnalysis] = useState<VideoPreAnalysis | null>(null);
   const lastAnalyzedUrlRef = useRef<string | null>(null);
+  const isAnalyzingUrlRef = useRef(false); // Track if URL analysis is in progress
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -415,8 +416,8 @@ export function AIChatForm() {
   useEffect(() => {
     // Skip if no video, already detecting, or same video as last detection
     if (!videoFile || isDetectingSport || videoFile === lastDetectedVideoRef.current) {
-      // Clear pre-analysis if video is removed
-      if (!videoFile && videoPreAnalysis) {
+      // Clear pre-analysis if video file is removed (but NOT if we have a URL - that has its own analysis)
+      if (!videoFile && videoPreAnalysis && !detectedVideoUrl) {
         setVideoPreAnalysis(null);
       }
       return;
@@ -553,41 +554,41 @@ export function AIChatForm() {
     };
     
     analyzeVideoFile();
-  }, [videoFile, isDetectingSport, domainExpertise, videoPreAnalysis]);
+  }, [videoFile, isDetectingSport, domainExpertise, videoPreAnalysis, detectedVideoUrl]);
 
   // Auto-detect sport and PRO eligibility from pasted video URL
   useEffect(() => {
-    console.log("[VideoUrlAnalysis] Effect triggered:", {
-      detectedVideoUrl,
-      lastAnalyzedUrl: lastAnalyzedUrlRef.current,
-      videoFile: !!videoFile,
-      videoPreAnalysis: !!videoPreAnalysis,
-    });
-    
     // Skip if no URL
     if (!detectedVideoUrl) {
       // Clear pre-analysis if URL is removed (but NOT if we have a video file - that has its own analysis)
-      if (videoPreAnalysis && !videoFile) {
-        setVideoPreAnalysis(null);
-      }
-      console.log("[VideoUrlAnalysis] Skipping - no URL");
+      // Use a callback to read current state without adding to deps
+      setVideoPreAnalysis(prev => {
+        if (prev && !videoFile) {
+          console.log("[VideoUrlAnalysis] Clearing - URL removed");
+          return null;
+        }
+        return prev;
+      });
+      // Reset the ref so the same URL can be re-analyzed if pasted again
+      lastAnalyzedUrlRef.current = null;
+      isAnalyzingUrlRef.current = false;
       return;
     }
     
     // Skip if already analyzing
-    if (videoPreAnalysis?.isAnalyzing) {
+    if (isAnalyzingUrlRef.current) {
       console.log("[VideoUrlAnalysis] Skipping - already analyzing");
       return;
     }
     
-    // Skip if same URL AND we already have a result
-    // Re-analyze if result is missing (was cleared after submission)
-    if (detectedVideoUrl === lastAnalyzedUrlRef.current && videoPreAnalysis) {
-      console.log("[VideoUrlAnalysis] Skipping - same URL and already have result");
+    // Skip if same URL as last analysis
+    if (detectedVideoUrl === lastAnalyzedUrlRef.current) {
+      console.log("[VideoUrlAnalysis] Skipping - same URL as last analysis");
       return;
     }
     
     lastAnalyzedUrlRef.current = detectedVideoUrl;
+    isAnalyzingUrlRef.current = true;
     console.log("[VideoUrlAnalysis] Starting analysis for URL:", detectedVideoUrl);
     
     const analyzeVideoUrl = async () => {
@@ -695,6 +696,8 @@ export function AIChatForm() {
           setTimeout(() => setVideoSportDetected(null), 2500);
         }
         
+        isAnalyzingUrlRef.current = false;
+        
       } catch (err) {
         console.error("[VideoUrlAnalysis] Failed:", err);
         setVideoPreAnalysis({
@@ -708,11 +711,13 @@ export function AIChatForm() {
           isTechniqueLiteEligible: false,
           techniqueLiteEligibilityReason: "Analysis failed.",
         });
+        isAnalyzingUrlRef.current = false;
       }
     };
     
     analyzeVideoUrl();
-  }, [detectedVideoUrl, domainExpertise, videoPreAnalysis, videoFile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectedVideoUrl, videoFile]);
 
   const error = videoError || apiError;
 
@@ -1635,10 +1640,10 @@ export function AIChatForm() {
         // Video URL analysis
         console.log("[AIChatForm] Processing video URL:", currentVideoUrl);
         
-        // Check if we have pre-analysis data and it's PRO eligible
-        if (videoPreAnalysis && videoPreAnalysis.sport === "padel") {
+        // Check if we have pre-analysis data and video is eligible for PRO analysis
+        if (videoPreAnalysis && (videoPreAnalysis.isProEligible || videoPreAnalysis.isTechniqueLiteEligible)) {
           // Show analysis options message instead of immediately starting analysis
-          console.log("[AIChatForm] Showing analysis options for padel video");
+          console.log("[AIChatForm] Showing analysis options for eligible video", { isProEligible: videoPreAnalysis.isProEligible, isTechniqueLiteEligible: videoPreAnalysis.isTechniqueLiteEligible });
           
           // Update the assistant message to be an analysis options message
           updateMessage(assistantMessageId, {
@@ -1741,7 +1746,26 @@ export function AIChatForm() {
           domainExpertise
         );
       } else {
-        // Video upload with progress
+        // Check if we have pre-analysis data and video is eligible for PRO analysis
+        if (videoPreAnalysis && (videoPreAnalysis.isProEligible || videoPreAnalysis.isTechniqueLiteEligible)) {
+          console.log("[AIChatForm] Showing analysis options for eligible uploaded video", { isProEligible: videoPreAnalysis.isProEligible, isTechniqueLiteEligible: videoPreAnalysis.isTechniqueLiteEligible });
+          
+          updateMessage(assistantMessageId, {
+            messageType: "analysis_options",
+            content: "",
+            analysisOptions: {
+              preAnalysis: videoPreAnalysis,
+              selectedOption: null,
+            },
+            isStreaming: false,
+          });
+          
+          setLoading(false);
+          setProgressStage("idle");
+          return;
+        }
+
+        // Video upload with progress (not eligible for PRO)
         await sendVideoQuery(
           currentPrompt,
           currentVideoFile,

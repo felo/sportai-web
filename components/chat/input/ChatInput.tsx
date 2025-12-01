@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { TextArea, Tooltip, Box, Flex, Callout, Text, Select, Badge } from "@radix-ui/themes";
-import { ArrowUpIcon, PlusIcon, StopIcon, ExclamationTriangleIcon, VideoIcon } from "@radix-ui/react-icons";
+import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
+import { ArrowUpIcon, PlusIcon, StopIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "../viewers/VideoPreview";
+import { VideoEligibilityIndicator } from "./VideoEligibilityIndicator";
+import { AttachedVideoChip } from "./AttachedVideoChip";
 import type { ProgressStage, VideoPreAnalysis } from "@/types/chat";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -409,37 +411,34 @@ export function ChatInput({
             />
           )}
 
-          {/* Video URL detection indicator with PRO badge */}
+          {/* Video file eligibility indicator */}
+          {videoFile && videoPreAnalysis && (
+            <VideoEligibilityIndicator 
+              preAnalysis={videoPreAnalysis} 
+              fallbackText="Video uploaded" 
+            />
+          )}
+
+          {/* Video URL chip and eligibility indicator */}
           {!videoFile && detectedVideoUrls.length === 1 && (
-            <Flex 
-              align="center" 
-              gap="2" 
-              py="2" 
-              px="3"
-              style={{
-                backgroundColor: videoPreAnalysis?.isProEligible ? "var(--amber-3)" : "var(--green-3)",
-                borderRadius: "var(--radius-2)",
-                border: videoPreAnalysis?.isProEligible ? "1px solid var(--amber-6)" : "1px solid var(--green-6)",
-              }}
-            >
-              <VideoIcon width="16" height="16" color={videoPreAnalysis?.isProEligible ? "var(--amber-11)" : "var(--green-11)"} />
-              <Text size="2" color={videoPreAnalysis?.isProEligible ? "amber" : "green"} style={{ flex: 1 }}>
-                {videoPreAnalysis?.isAnalyzing ? (
-                  "⏳ Checking eligibility..."
-                ) : videoPreAnalysis?.sport && videoPreAnalysis.sport !== "other" ? (
-                  <>
-                    {videoPreAnalysis.sport === "padel" ? "🏸" : videoPreAnalysis.sport === "tennis" ? "🎾" : "🏓"}{" "}
-                    {videoPreAnalysis.sport.charAt(0).toUpperCase() + videoPreAnalysis.sport.slice(1)} detected
-                  </>
-                ) : (
-                  "Video URL detected"
-                )}
-              </Text>
-              {videoPreAnalysis?.isProEligible && (
-                <Badge color="amber" variant="solid" size="1" style={{ fontWeight: 600 }}>
-                  PRO ✓
-                </Badge>
-              )}
+            <Flex direction="column" gap="2">
+              {/* Attached video chip with hover to show full URL */}
+              <AttachedVideoChip 
+                videoUrl={detectedVideoUrls[0]}
+                onRemove={() => {
+                  // Remove the video URL from the prompt
+                  const urlToRemove = detectedVideoUrls[0];
+                  const newPrompt = prompt.replace(urlToRemove, '').trim();
+                  onPromptChange(newPrompt);
+                  setDetectedVideoUrls([]);
+                  onVideoUrlDetected?.(null);
+                }}
+              />
+              {/* Eligibility indicator below the chip */}
+              <VideoEligibilityIndicator 
+                preAnalysis={videoPreAnalysis} 
+                fallbackText="Video URL detected" 
+              />
             </Flex>
           )}
 

@@ -5,6 +5,13 @@ export { MessageBubble } from "./messages/MessageBubble";
 // Input
 export { ChatInput } from "./input/ChatInput";
 export { AudioStopButton } from "./input/AudioStopButton";
+export { 
+  VideoEligibilityIndicator,
+  MINT_GLOW_STYLES,
+  MINT_COLOR,
+  getSportEmoji,
+  getCameraAngleLabel,
+} from "./input/VideoEligibilityIndicator";
 
 // Viewers
 export { VideoPoseViewer } from "./viewers/VideoPoseViewer";
