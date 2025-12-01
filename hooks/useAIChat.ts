@@ -76,25 +76,30 @@ export function useAIChat() {
           }
         }
         
-        // If no chat messages found, try old storage for backward compatibility
+        // If we have a current chat but it's empty, start fresh (don't load legacy storage)
+        // Only fall back to legacy storage if there's no current chat at all
         if (messagesToLoad.length === 0) {
-          loadMessagesFromStorage().then((storedMessages) => {
-            setMessages(storedMessages);
+          if (currentChatId) {
+            // New/empty chat - start with empty messages
+            console.log("[useAIChat] Empty chat, starting fresh");
+            setMessages([]);
             setIsHydrated(true);
-            
-            // Refresh video URLs in the background
-            refreshVideoUrls(storedMessages).then((refreshed) => {
-              setMessages(refreshed);
-              // Save refreshed URLs back to storage
-              saveMessagesToStorage(refreshed);
-              // Also update chat if it exists (silent during initial hydration)
-              if (currentChatId) {
-                updateExistingChat(currentChatId, { messages: refreshed }, true);
-              }
-            }).catch((error) => {
-              console.error("Failed to refresh video URLs:", error);
+          } else {
+            // No current chat - try old storage for backward compatibility
+            loadMessagesFromStorage().then((storedMessages) => {
+              setMessages(storedMessages);
+              setIsHydrated(true);
+              
+              // Refresh video URLs in the background
+              refreshVideoUrls(storedMessages).then((refreshed) => {
+                setMessages(refreshed);
+                // Save refreshed URLs back to storage
+                saveMessagesToStorage(refreshed);
+              }).catch((error) => {
+                console.error("Failed to refresh video URLs:", error);
+              });
             });
-          });
+          }
         } else {
           setMessages(messagesToLoad);
           setIsHydrated(true);

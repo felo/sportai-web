@@ -43,14 +43,16 @@ export function useSidebarChats({
 
   // Initial load and event listeners
   useEffect(() => {
-    // Initial load: Sync from Supabase, then load chats
-    // This is the ONLY time we hit the network on mount
-    syncChatsFromSupabase().then(() => {
-      refreshChats().then(() => {
-        setIsLoading(false);
-      });
+    // FAST PATH: Load from localStorage immediately (instant, no network)
+    refreshChats().then(() => {
+      setIsLoading(false);
     });
     setCurrentChatId(getCurrentChatId());
+    
+    // BACKGROUND: Sync from Supabase and update if there are changes
+    syncChatsFromSupabase().then(() => {
+      refreshChats(); // Update with any new data from server
+    });
 
     // Listen for chat storage changes (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {

@@ -14,7 +14,7 @@ import {
   Card,
   Select,
 } from "@radix-ui/themes";
-import { PlusIcon, ReloadIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Sidebar } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
@@ -446,24 +446,11 @@ export function TasksPage() {
   }
   
   if (!user) return null;
-  
-  const refreshButton = (
-    <Button variant="soft" onClick={async () => {
-      await fetchTasks();
-      // Small delay then check status
-      setTimeout(checkAllActiveTasks, 500);
-    }}>
-      <ReloadIcon />
-      Refresh
-    </Button>
-  );
 
   return (
     <>
       <Sidebar />
       <PageHeader 
-        title="Library" 
-        actions={refreshButton}
         onNewChat={handleNewChat}
       />
       <Box
@@ -658,7 +645,7 @@ export function TasksPage() {
                           <Button
                             variant="soft"
                             size="1"
-                            onClick={() => router.push(`/tasks/${task.id}`)}
+                            onClick={() => router.push(`/library/${task.id}`)}
                           >
                             <EyeOpenIcon />
                             View

@@ -91,6 +91,7 @@ export interface NewChatButtonProps {
 export interface LibraryButtonProps {
   onClick?: () => void;
   isActive?: boolean;
+  onNavigationAttempt?: () => Promise<boolean> | boolean;
 }
 
 // Navigation props

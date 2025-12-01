@@ -125,6 +125,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               onEditChat={handleEditChat}
               onDeleteChat={chatsState.handleDeleteChat}
               onLinkClick={closeSidebar}
+              onNavigationAttempt={onChatSwitchAttempt}
             />
           </Box>
 
@@ -277,6 +278,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               onEditChat={handleEditChat}
               onDeleteChat={chatsState.handleDeleteChat}
               onLinkClick={closeSidebar}
+              onNavigationAttempt={onChatSwitchAttempt}
             />
           ))}
       </Box>

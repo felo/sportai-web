@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flex, Text, Tooltip } from "@radix-ui/themes";
+import { Flex, Tooltip } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import Image from "next/image";
 
@@ -29,47 +29,38 @@ export function VideoPreview({
         borderRadius: "var(--radius-3)",
         marginTop: "var(--space-2)",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+        width: "fit-content",
+        marginLeft: "auto",
       }}
       role="region"
       aria-label="Video preview"
     >
-      {isImage ? (
-        <Image 
-          src={videoPreview || ""} 
-          alt={videoFile.name}
-          width={48}
-          height={48}
-          style={{
-            height: "48px",
-            width: "auto",
-            borderRadius: "var(--radius-2)",
-            objectFit: "cover",
-          }}
-          unoptimized
-        />
-      ) : (
-        <video
-          src={videoPreview || undefined}
-          style={{
-            height: "48px",
-            borderRadius: "var(--radius-2)",
-          }}
-          aria-label={`Preview of ${videoFile.name}`}
-        />
-      )}
-      <Text
-        color="gray"
-        style={{ 
-          flex: 1, 
-          overflow: "hidden", 
-          textOverflow: "ellipsis", 
-          whiteSpace: "nowrap",
-          paddingLeft: "var(--space-2)",
-        }}
-        aria-label={`File: ${videoFile.name}`}
-      >
-        {videoFile.name}
-      </Text>
+      <Tooltip content={videoFile.name} open={disableTooltips ? false : undefined}>
+        {isImage ? (
+          <Image 
+            src={videoPreview || ""} 
+            alt={videoFile.name}
+            width={120}
+            height={80}
+            style={{
+              height: "80px",
+              width: "auto",
+              borderRadius: "var(--radius-2)",
+              objectFit: "cover",
+            }}
+            unoptimized
+          />
+        ) : (
+          <video
+            src={videoPreview || undefined}
+            style={{
+              height: "80px",
+              borderRadius: "var(--radius-2)",
+            }}
+            aria-label={`Preview of ${videoFile.name}`}
+          />
+        )}
+      </Tooltip>
       <Tooltip content="Remove file" open={disableTooltips ? false : undefined}>
         <button
           type="button"
@@ -78,6 +69,9 @@ export function VideoPreview({
           style={{
             width: "36px",
             height: "36px",
+            minWidth: "36px",
+            minHeight: "36px",
+            aspectRatio: "1",
             borderRadius: "9999px",
             backgroundColor: "#7ADB8F",
             display: "flex",
@@ -87,9 +81,7 @@ export function VideoPreview({
             transition: "all 0.3s ease-out",
             border: "2px solid white",
             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
-            textTransform: "uppercase",
-            fontWeight: 600,
-            marginRight: "var(--space-1)",
+            flexShrink: 0,
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = "#95E5A6";
@@ -108,4 +100,3 @@ export function VideoPreview({
     </Flex>
   );
 }
-

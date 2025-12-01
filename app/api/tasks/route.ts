@@ -152,8 +152,12 @@ export async function POST(request: NextRequest) {
     };
     
     // Call SportAI API to register the task
-    // API endpoint format: /api/statistics/{sport} (e.g., /api/statistics/tennis, /api/statistics/padel)
-    const sportaiResponse = await fetch(`${SPORTAI_API_URL}${endpoint}/${sport}`, {
+    // API endpoint format: 
+    // - Padel (default): /api/statistics
+    // - Tennis: /api/statistics/tennis
+    // Padel is the default sport, so no suffix needed
+    const sportSuffix = sport === "padel" ? "" : `/${sport}`;
+    const sportaiResponse = await fetch(`${SPORTAI_API_URL}${endpoint}${sportSuffix}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

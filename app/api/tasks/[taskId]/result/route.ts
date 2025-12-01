@@ -136,8 +136,10 @@ export async function POST(
     logger.info(`[${requestId}] Fetching result from SportAI for task ${task.sportai_task_id}`);
     
     // Call SportAI API to get the result URL
+    // Padel is the default sport, so no suffix needed. Other sports need /{sport} before task_id
+    const sportSuffix = task.sport === "padel" ? "" : `/${task.sport}`;
     const sportaiResponse = await fetch(
-      `${SPORTAI_API_URL}${baseEndpoint}/${task.sportai_task_id}`,
+      `${SPORTAI_API_URL}${baseEndpoint}${sportSuffix}/${task.sportai_task_id}`,
       {
         headers: {
           "Authorization": `Bearer ${SPORTAI_API_KEY}`,

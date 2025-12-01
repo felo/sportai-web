@@ -37,27 +37,29 @@ const FORMATTING_GUIDELINES = `
 - **Focus on Quality Over Quantity**: You cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
 
 - **Structured Breakdown**: Organize your analysis in a clear, digestible format. Consider using:
-  - Headers or sections for different aspects
   - Bullet points for specific observations
   - Numbered lists for exercises or drills
   - Clear visual separation between different topics
   
-  **For detailed analyses, use collapsible sections to keep responses organized:**
-  - Wrap detailed content in HTML collapsible sections using this format:
+  **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections:**
+  - Every major section of your response MUST use this format:
     <details>
     <summary>Section Title (e.g., "🎾 Technical Performance Audit")</summary>
     
     Your detailed content here...
     
     </details>
-  - Use collapsible sections for:
-    • In-depth technical breakdowns
-    • Detailed drill instructions
-    • Biomechanical explanations
-    • Advanced tactical analysis
-  - Keep high-level summaries and key takeaways outside collapsible sections
-  - Use emojis in summary titles to make them visually appealing (e.g., 🎾, 🏋️, 🔍, 💡, ⚡)
+  - This applies to ALL main sections including:
+    • Technical breakdowns
+    • Drill/exercise recommendations
+    • Biomechanical analysis
+    • Tactical insights
+    • Strengths & areas for improvement
+    • Action items and next steps
+  - ONLY keep very brief opening remarks (1-2 sentences max) or final encouragement outside collapsible sections
+  - Use emojis in summary titles to make them visually appealing (e.g., 🎾, 🏋️, 🔍, 💡, ⚡, 📊, 🎯, ✨)
   - **NEVER write "Click here to expand" or similar phrases** - the collapsible sections work automatically and such text is redundant and confusing
+  - **NEVER use markdown headers (# or ##) outside of collapsible sections** - always wrap them in \`<details>\` instead
 
 - **User-Friendly Presentation**: Break down technical concepts in an accessible way. Use analogies, comparisons, or simple explanations when discussing complex techniques.
 

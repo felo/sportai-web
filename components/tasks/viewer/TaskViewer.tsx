@@ -208,7 +208,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
   // Error state (no task)
   if (error && !task) {
-    return <ErrorState error={error} onBack={() => router.push("/tasks")} />;
+    return <ErrorState error={error} onBack={() => router.push("/library")} />;
   }
 
   // No task found
@@ -233,7 +233,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             task={task}
             result={result}
             loadingResult={loadingResult}
-            onBack={() => router.push("/tasks")}
+            onBack={() => router.push("/library")}
             onLoadResult={fetchResult}
           />
         </Box>

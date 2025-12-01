@@ -21,6 +21,7 @@ interface SidebarContentProps {
   onEditChat: (chat: Chat) => void;
   onDeleteChat: (chatId: string) => void;
   onLinkClick?: () => void;
+  onNavigationAttempt?: () => Promise<boolean> | boolean;
 }
 
 export function SidebarContent({
@@ -35,19 +36,20 @@ export function SidebarContent({
   onEditChat,
   onDeleteChat,
   onLinkClick,
+  onNavigationAttempt,
 }: SidebarContentProps) {
   const [chatsExpanded, setChatsExpanded] = useState(true);
   const pathname = usePathname();
   
   // Check if we're on the Library page
-  const isOnLibraryPage = pathname === "/tasks" || pathname?.startsWith("/tasks/");
+  const isOnLibraryPage = pathname === "/library" || pathname?.startsWith("/library/");
   // Only show chat as selected when on the chat page
   const isOnChatPage = pathname === "/";
 
   return (
     <Flex direction="column" gap="3">
       <NewChatButton onClick={onCreateChat} />
-      <LibraryButton onClick={onLinkClick} isActive={isOnLibraryPage} />
+      <LibraryButton onClick={onLinkClick} isActive={isOnLibraryPage} onNavigationAttempt={onNavigationAttempt} />
 
       <ChatList
         chats={chats}

@@ -122,8 +122,10 @@ export async function GET(
     }
     
     // Poll SportAI API for status
+    // Padel is the default sport, so no suffix needed. Other sports need /{sport} before task_id
+    const sportSuffix = task.sport === "padel" ? "" : `/${task.sport}`;
     const statusResponse = await fetch(
-      `${SPORTAI_API_URL}${baseEndpoint}/${task.sportai_task_id}/status`,
+      `${SPORTAI_API_URL}${baseEndpoint}${sportSuffix}/${task.sportai_task_id}/status`,
       {
         headers: {
           "Authorization": `Bearer ${SPORTAI_API_KEY}`,
