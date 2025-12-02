@@ -1209,6 +1209,18 @@ export function AIChatForm() {
     
     const { preAnalysis, videoUrl: storedVideoUrl, userPrompt: storedUserPrompt } = optionsMessage.analysisOptions;
     
+    // Add user message showing their choice
+    const userChoiceMessageId = generateMessageId();
+    const userChoiceMessage: Message = {
+      id: userChoiceMessageId,
+      role: "user",
+      content: "Let's go with the PRO Analysis!",
+    };
+    addMessage(userChoiceMessage);
+    
+    // Scroll to bottom after selection
+    setTimeout(() => scrollToBottom(), 100);
+    
     // Update the message to show selection
     updateMessage(messageId, {
       analysisOptions: {
@@ -1275,7 +1287,7 @@ export function AIChatForm() {
       const libraryMessage: Message = {
         id: libraryMessageId,
         role: "assistant",
-        content: `🎯 I've added this video to your **Library** for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`,
+        content: `🎯 I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`,
         isStreaming: false,
       };
       addMessage(libraryMessage);
@@ -1302,6 +1314,18 @@ export function AIChatForm() {
     }
     
     const { preAnalysis, videoUrl, userPrompt } = optionsMessage.analysisOptions;
+    
+    // Add user message showing their choice
+    const userChoiceMessageId = generateMessageId();
+    const userChoiceMessage: Message = {
+      id: userChoiceMessageId,
+      role: "user",
+      content: "I'll take the Free analysis.",
+    };
+    addMessage(userChoiceMessage);
+    
+    // Scroll to bottom after selection
+    setTimeout(() => scrollToBottom(), 100);
     
     // Update the message to show selection
     updateMessage(messageId, {
@@ -2180,7 +2204,6 @@ export function AIChatForm() {
                 <MessageList
                   messages={messages}
                   loading={loading}
-                  videoFile={videoFile}
                   progressStage={progressStage}
                   uploadProgress={uploadProgress}
                   messagesEndRef={messagesEndRef}

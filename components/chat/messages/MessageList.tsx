@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Text } from "@radix-ui/themes";
 import { MessageBubble } from "./MessageBubble";
-import { ProgressIndicator } from "../feedback/ProgressIndicator";
 import { ScrollSpacer } from "./ScrollSpacer";
 import { URLs } from "@/lib/config";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -12,7 +11,6 @@ import type { Message, ProgressStage } from "@/types/chat";
 interface MessageListProps {
   messages: Message[];
   loading: boolean;
-  videoFile: File | null;
   progressStage: ProgressStage;
   uploadProgress: number;
   messagesEndRef: React.RefObject<HTMLDivElement>;
@@ -29,7 +27,6 @@ interface MessageListProps {
 export function MessageList({
   messages,
   loading,
-  videoFile,
   progressStage,
   uploadProgress,
   messagesEndRef,
@@ -117,16 +114,11 @@ export function MessageList({
           isRetrying={retryingMessageId === message.id}
           onSelectProPlusQuick={onSelectProPlusQuick}
           onSelectQuickOnly={onSelectQuickOnly}
+          // Pass progress info to the last message (the assistant message being generated)
+          progressStage={index === messages.length - 1 ? progressStage : "idle"}
+          uploadProgress={index === messages.length - 1 ? uploadProgress : 0}
         />
       ))}
-
-      {loading && videoFile && (
-        <ProgressIndicator
-          progressStage={progressStage}
-          uploadProgress={uploadProgress}
-          hasVideo={!!videoFile}
-        />
-      )}
 
       {/* Ref for scrollToBottom functionality */}
       <div ref={messagesEndRef} aria-hidden="true" />

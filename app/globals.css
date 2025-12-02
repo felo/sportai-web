@@ -692,3 +692,268 @@ html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlight
     margin-left: 280px;
   }
 }
+
+/* Pricing Page Styles */
+.pricing-title {
+  font-size: 40px;
+}
+
+.pricing-subtitle {
+  font-size: 18px;
+}
+
+@media (max-width: 900px) {
+  .pricing-title {
+    font-size: 34px;
+  }
+  
+  .pricing-subtitle {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pricing-title {
+    font-size: 28px;
+  }
+  
+  .pricing-subtitle {
+    font-size: 15px;
+  }
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 440px) {
+  .pricing-card {
+    min-width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 900px) {
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 800px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .pricing-grid {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: none;
+  }
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Incomplete Message Recovery - spin animation */
+@keyframes incomplete-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Error Toast Styles */
+.error-toast-root {
+  background-color: var(--red-2);
+  border: 1px solid var(--red-6);
+  border-radius: var(--radius-3);
+  padding: var(--space-4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: errorSlideIn 0.2s ease-out;
+}
+
+.error-toast-root[data-state="closed"] {
+  animation: errorSlideOut 0.2s ease-in;
+}
+
+.error-toast-viewport {
+  position: fixed;
+  top: 70px;
+  right: var(--space-4);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: auto;
+  max-width: 440px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .error-toast-viewport {
+    top: 70px;
+    right: 50%;
+    transform: translateX(50%);
+    max-width: calc(100vw - 32px);
+  }
+
+  .error-toast-root {
+    animation: errorSlideInMobile 0.2s ease-out;
+  }
+
+  .error-toast-root[data-state="closed"] {
+    animation: errorSlideOutMobile 0.2s ease-in;
+  }
+}
+
+@keyframes errorSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes errorSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes errorSlideInMobile {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes errorSlideOutMobile {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
+/* Feedback Toast Styles */
+.feedback-toast-root {
+  background-color: var(--gray-1);
+  border: 1px solid var(--gray-6);
+  border-radius: var(--radius-3);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: feedbackSlideIn 0.2s ease-out;
+}
+
+.feedback-toast-root[data-state="closed"] {
+  animation: feedbackSlideOut 0.2s ease-in;
+}
+
+.feedback-toast-viewport {
+  position: fixed;
+  top: 70px;
+  right: var(--space-4);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: auto;
+  max-width: 368px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .feedback-toast-viewport {
+    top: 70px;
+    right: 50%;
+    transform: translateX(50%);
+    max-width: calc(100vw - 32px);
+  }
+
+  .feedback-toast-root {
+    animation: feedbackSlideInMobile 0.2s ease-out;
+  }
+
+  .feedback-toast-root[data-state="closed"] {
+    animation: feedbackSlideOutMobile 0.2s ease-in;
+  }
+}
+
+@keyframes feedbackSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes feedbackSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes feedbackSlideInMobile {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes feedbackSlideOutMobile {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
+/* Sport Card expand animation */
+@keyframes sportCardExpand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Profile page saving pulse (uses existing pulse animation) */

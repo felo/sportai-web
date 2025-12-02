@@ -39,6 +39,21 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
   
+  // Extract additional telemetry fields from model_settings
+  const modelSettingsRaw = dbMsg.model_settings as any;
+  const timeToFirstToken = modelSettingsRaw?.timeToFirstToken;
+  const contextUsage = modelSettingsRaw?.contextUsage;
+  const cacheName = modelSettingsRaw?.cacheName;
+  const cacheUsed = modelSettingsRaw?.cacheUsed;
+  const modelUsed = modelSettingsRaw?.modelUsed;
+  const modelReason = modelSettingsRaw?.modelReason;
+  
+  // Clean model_settings by removing the extra telemetry fields
+  const cleanModelSettings = modelSettingsRaw ? (() => {
+    const { timeToFirstToken: _, contextUsage: __, cacheName: ___, cacheUsed: ____, modelUsed: _____, modelReason: ______, ...rest } = modelSettingsRaw;
+    return Object.keys(rest).length > 0 ? rest : undefined;
+  })() : undefined;
+  
   return {
     id: dbMsg.id,
     role: dbMsg.role as "user" | "assistant",
@@ -55,7 +70,13 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     inputTokens: dbMsg.input_tokens || undefined,
     outputTokens: dbMsg.output_tokens || undefined,
     responseDuration: dbMsg.response_duration || undefined,
-    modelSettings: dbMsg.model_settings ? (dbMsg.model_settings as any) : undefined,
+    timeToFirstToken: timeToFirstToken ?? undefined,
+    modelSettings: cleanModelSettings,
+    contextUsage: contextUsage || undefined,
+    cacheName: cacheName || undefined,
+    cacheUsed: cacheUsed ?? undefined,
+    modelUsed: modelUsed || undefined,
+    modelReason: modelReason || undefined,
     ttsUsage: dbMsg.tts_usage ? (dbMsg.tts_usage as any) : undefined,
     poseData: cleanPoseData,
     poseDataS3Key: dbMsg.pose_data_s3_key || undefined,
@@ -102,6 +123,27 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
         ...(message.analysisOptions ? { analysisOptions: message.analysisOptions } : {}),
       }
     : null;
+  
+  // Expand model_settings to include additional telemetry fields
+  // These are stored together since they're all model/performance related
+  const expandedModelSettings = message.modelSettings || 
+    message.timeToFirstToken !== undefined ||
+    message.contextUsage ||
+    message.cacheName ||
+    message.cacheUsed !== undefined ||
+    message.modelUsed ||
+    message.modelReason
+    ? {
+        ...(message.modelSettings || {}),
+        // Additional telemetry fields stored in model_settings JSONB
+        ...(message.timeToFirstToken !== undefined ? { timeToFirstToken: message.timeToFirstToken } : {}),
+        ...(message.contextUsage ? { contextUsage: message.contextUsage } : {}),
+        ...(message.cacheName ? { cacheName: message.cacheName } : {}),
+        ...(message.cacheUsed !== undefined ? { cacheUsed: message.cacheUsed } : {}),
+        ...(message.modelUsed ? { modelUsed: message.modelUsed } : {}),
+        ...(message.modelReason ? { modelReason: message.modelReason } : {}),
+      }
+    : null;
     
   return {
     id: message.id,
@@ -119,7 +161,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     input_tokens: message.inputTokens || null,
     output_tokens: message.outputTokens || null,
     response_duration: message.responseDuration || null,
-    model_settings: message.modelSettings ? (message.modelSettings as any) : null,
+    model_settings: expandedModelSettings as any,
     tts_usage: message.ttsUsage ? (message.ttsUsage as any) : null,
     pose_data: poseDataWithExtras as any,
     pose_data_s3_key: message.poseDataS3Key || null,

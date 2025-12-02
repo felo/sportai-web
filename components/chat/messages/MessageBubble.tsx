@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Avatar, Box, Flex, Text } from "@radix-ui/themes";
-import type { Message } from "@/types/chat";
+import type { Message, ProgressStage } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -46,9 +46,12 @@ interface MessageBubbleProps {
   // Analysis options handlers
   onSelectProPlusQuick?: (messageId: string) => void;
   onSelectQuickOnly?: (messageId: string) => void;
+  // Progress state for upload/processing/analyzing
+  progressStage?: ProgressStage;
+  uploadProgress?: number;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, progressStage = "idle", uploadProgress = 0 }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -157,7 +160,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     // Look backwards from current message until we hit an assistant message
     for (let i = messageIndex - 1; i >= 0; i--) {
       const prevMessage = allMessages[i];
-      if (prevMessage.role === "assistant") {
+      // Skip analysis_options messages - they're not "real" assistant responses
+      if (prevMessage.role === "assistant" && prevMessage.messageType !== "analysis_options") {
         return false;
       }
       if (prevMessage.role === "user") {
@@ -498,11 +502,44 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     content={message.content}
                     isStreaming={message.isStreaming}
                     isIncomplete={message.isIncomplete}
-                    thinkingMessage={getThinkingMessage(thinkingMessageIndex, {
-                      hasVideo: userSentVideo,
-                      isFirstMessage: false, // First message without video → treat as quick
-                      isComplexQuery: isComplexQuery,
-                    })}
+                    thinkingMessage={(() => {
+                      // Show upload progress during uploading
+                      if (progressStage === "uploading") {
+                        return `Uploading video... ${Math.round(uploadProgress)}%`;
+                      }
+                      // For processing/analyzing/generating, use the rotating thinking messages
+                      // "processing" = waiting for API response (can be long for video)
+                      // "analyzing" = streaming response
+                      // "generating" = text-only response
+                      return getThinkingMessage(thinkingMessageIndex, {
+                        hasVideo: userSentVideo,
+                        isFirstMessage: false, // First message without video → treat as quick
+                        isComplexQuery: isComplexQuery,
+                      });
+                    })()}
+                    showProgressBar={(() => {
+                      // Show actual upload progress bar during uploading
+                      if (progressStage === "uploading") {
+                        return true;
+                      }
+                      // Show time-based progress bar during processing/analyzing/generating (with rotating messages)
+                      // "processing" = waiting for API response (video is being analyzed by AI)
+                      if (userSentVideo && (progressStage === "processing" || progressStage === "analyzing" || progressStage === "generating")) {
+                        // Check if there's an unresolved analysis_options message (user hasn't selected yet)
+                        // If so, don't show progress bar (wait for user to choose FREE/PRO)
+                        for (let i = messageIndex - 1; i >= 0; i--) {
+                          const prevMsg = allMessages[i];
+                          if (prevMsg.messageType === "analysis_options") {
+                            // Found an analysis_options message - only show progress if user selected
+                            return !!prevMsg.analysisOptions?.selectedOption;
+                          }
+                        }
+                        // No analysis_options message found = direct video analysis, show progress bar
+                        return true;
+                      }
+                      return false;
+                    })()}
+                    uploadProgress={progressStage === "uploading" ? uploadProgress : undefined}
                     onAskForHelp={onAskForHelp}
                     onTTSUsage={handleTTSUsage}
                     onFeedbackSubmitted={() => setShowFeedbackToast(true)}
@@ -517,7 +554,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
               
               {/* Developer mode token information */}
               <DeveloperInfo
-                show={developerMode && !!message.content}
+                show={developerMode && (!!message.content || message.messageType === "analysis_options")}
                 messageTokens={messageTokens}
                 cumulativeTokens={cumulativeTokens}
                 messagePricing={messagePricing}

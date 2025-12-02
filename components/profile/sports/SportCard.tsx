@@ -140,7 +140,7 @@ export function SportCard({ sport, defaultExpanded = false }: SportCardProps) {
           p="4"
           style={{
             borderTop: "1px solid var(--gray-5)",
-            animation: "fadeIn 0.2s ease-out",
+            animation: "sportCardExpand 0.2s ease-out",
           }}
         >
           <Flex gap="4" wrap="wrap">
@@ -296,13 +296,6 @@ export function SportCard({ sport, defaultExpanded = false }: SportCardProps) {
           )}
         </Box>
       )}
-      
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
       
       {/* Delete confirmation dialog */}
       <AlertDialog.Root open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

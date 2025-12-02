@@ -100,6 +100,17 @@ export function DeveloperInfo({
 }: DeveloperInfoProps) {
   if (!show) return null;
 
+  // Check if we have any data to show
+  const hasTokenData = messageTokens.input > 0 || messageTokens.output > 0;
+  const hasTimingData = responseDuration !== undefined;
+  const hasModelData = !!modelUsed;
+  const hasModelSettings = !!modelSettings;
+  const hasContextUsage = !!contextUsage;
+  const hasCacheInfo = cacheUsed !== undefined;
+  const hasTTSData = ttsUsage.requestCount > 0;
+  
+  const hasAnyData = hasTokenData || hasTimingData || hasModelData || hasModelSettings || hasContextUsage || hasCacheInfo || hasTTSData;
+
   return (
     <Box
       mt="3"
@@ -123,14 +134,18 @@ export function DeveloperInfo({
           Developer Mode
         </Text>
         <Flex direction="column" gap="1" pl="2">
-          {(messageTokens.input > 0 || messageTokens.output > 0) && (
+          {!hasAnyData && (
+            <Text size="1" style={{ color: "var(--gray-10)", fontStyle: "italic" }}>
+              No telemetry data available for this message. Token usage and timing are captured on new responses.
+            </Text>
+          )}
+          {hasTokenData && (
             <>
               <Text size="1">
                 <strong>Token usage (this message):</strong>{" "}
                 {messageTokens.input > 0 && `${messageTokens.input.toLocaleString()} input`}
                 {messageTokens.input > 0 && messageTokens.output > 0 && " + "}
                 {messageTokens.output > 0 && `${messageTokens.output.toLocaleString()} output`}
-                {messageTokens.input === 0 && messageTokens.output === 0 && "N/A"}
                 {messagePricing && ` (${formatCost(messagePricing.totalCost)})`}
               </Text>
               <Text size="1">
@@ -142,7 +157,7 @@ export function DeveloperInfo({
               </Text>
             </>
           )}
-          {responseDuration !== undefined && (
+          {hasTimingData && (
             <>
               <Text size="1">
                 <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
@@ -159,11 +174,11 @@ export function DeveloperInfo({
               )}
             </>
           )}
-          {modelUsed && (
+          {hasModelData && (
             <Text size="1">
               <strong>Model:</strong>{" "}
               {(() => {
-                const { name, isFlash } = getModelDisplayName(modelUsed);
+                const { name, isFlash } = getModelDisplayName(modelUsed!);
                 return (
                   <span style={{ color: isFlash ? "var(--amber-11)" : "var(--blue-11)" }}>
                     {name}
@@ -175,7 +190,7 @@ export function DeveloperInfo({
               )}
             </Text>
           )}
-          {modelSettings && (
+          {hasModelSettings && modelSettings && (
             <>
               <Text size="1">
                 <strong>Settings:</strong> Thinking={modelSettings.thinkingMode}
@@ -192,7 +207,7 @@ export function DeveloperInfo({
               )}
             </>
           )}
-          {contextUsage && (
+          {hasContextUsage && contextUsage && (
             <Text size="1">
               <strong>Context:</strong> {contextUsage.messagesInContext} messages, {contextUsage.tokensUsed.toLocaleString()}/{contextUsage.maxTokens.toLocaleString()} tokens ({Math.round((contextUsage.tokensUsed / contextUsage.maxTokens) * 100)}%)
               {contextUsage.complexity === "simple" && (
@@ -200,7 +215,7 @@ export function DeveloperInfo({
               )}
             </Text>
           )}
-          {cacheUsed !== undefined && (
+          {hasCacheInfo && (
             <Text size="1">
               <strong>LLM Cache:</strong>{" "}
               {cacheUsed ? (
@@ -213,7 +228,7 @@ export function DeveloperInfo({
               )}
             </Text>
           )}
-          {ttsUsage.requestCount > 0 && (
+          {hasTTSData && (
             <>
               <Text size="1">
                 <strong>TTS usage (this message):</strong>{" "}

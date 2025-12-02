@@ -14,6 +14,8 @@ interface AssistantMessageProps {
   isStreaming?: boolean;
   isIncomplete?: boolean;
   thinkingMessage: string;
+  showProgressBar?: boolean;
+  uploadProgress?: number; // Actual upload progress (0-100) when uploading
   onAskForHelp?: (termName: string, swing?: any) => void;
   onTTSUsage: (characters: number, cost: number, quality: string) => void;
   onFeedbackSubmitted?: () => void;
@@ -31,6 +33,8 @@ export function AssistantMessage({
   isStreaming,
   isIncomplete,
   thinkingMessage,
+  showProgressBar = false,
+  uploadProgress,
   onAskForHelp,
   onTTSUsage,
   onFeedbackSubmitted,
@@ -80,7 +84,7 @@ export function AssistantMessage({
           isRetrying={isRetrying}
         />
       ) : (
-        <ThinkingIndicator message={thinkingMessage} />
+        <ThinkingIndicator message={thinkingMessage} showProgressBar={showProgressBar} uploadProgress={uploadProgress} />
       )}
     </Box>
   );

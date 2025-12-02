@@ -18,7 +18,6 @@ export { VideoPoseViewer } from "./viewers/VideoPoseViewer";
 export { VideoPreview } from "./viewers/VideoPreview";
 
 // Feedback
-export { ProgressIndicator } from "./feedback/ProgressIndicator";
 export { StreamingIndicator } from "./feedback/StreamingIndicator";
 export { FeedbackButtons } from "./feedback/FeedbackButtons";
 export { FeedbackModal } from "./feedback/FeedbackModal";

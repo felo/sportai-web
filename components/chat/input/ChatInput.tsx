@@ -7,7 +7,7 @@ import { VideoPreview } from "../viewers/VideoPreview";
 import { VideoEligibilityIndicator } from "./VideoEligibilityIndicator";
 import { AttachedVideoChip } from "./AttachedVideoChip";
 import type { ProgressStage, VideoPreAnalysis } from "@/types/chat";
-import { type ThinkingMode, type MediaResolution, type DomainExpertise } from "@/utils/storage";
+import { type ThinkingMode, type MediaResolution, type DomainExpertise, getDeveloperMode } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { extractVideoUrls } from "@/utils/video-utils";
 
@@ -91,6 +91,11 @@ export function ChatInput({
   const [domainExpertiseOpen, setDomainExpertiseOpen] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
   const [sendButtonBounce, setSendButtonBounce] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Refs for debounced detection (to avoid stale closures)
+  const sportDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const urlDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track previous analyzing state to detect when analysis completes
   const wasAnalyzingRef = useRef(false);
@@ -101,12 +106,30 @@ export function ChatInput({
     setIsMounted(true);
   }, []);
   const glowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Load developer mode on mount and listen for changes
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+  }, []);
 
-  // Cleanup glow timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (glowTimeoutRef.current) {
         clearTimeout(glowTimeoutRef.current);
+      }
+      if (sportDetectionTimeoutRef.current) {
+        clearTimeout(sportDetectionTimeoutRef.current);
+      }
+      if (urlDetectionTimeoutRef.current) {
+        clearTimeout(urlDetectionTimeoutRef.current);
       }
     };
   }, []);
@@ -326,29 +349,41 @@ export function ChatInput({
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
+    
+    // 1. Update prompt immediately - user sees typing instantly
     onPromptChange(newValue);
     
-    // Detect sport names and auto-switch
-    detectAndSwitchSport(newValue);
+    // 2. Debounce sport detection (200ms) - avoid regex on every keystroke
+    if (sportDetectionTimeoutRef.current) {
+      clearTimeout(sportDetectionTimeoutRef.current);
+    }
+    sportDetectionTimeoutRef.current = setTimeout(() => {
+      detectAndSwitchSport(newValue);
+    }, 200);
     
-    // Detect video URLs in the text (only if no file is uploaded)
+    // 3. Debounce video URL detection (200ms) - avoid URL parsing on every keystroke
+    if (urlDetectionTimeoutRef.current) {
+      clearTimeout(urlDetectionTimeoutRef.current);
+    }
     if (!videoFile) {
-      const videoUrls = extractVideoUrls(newValue);
-      setDetectedVideoUrls(videoUrls);
-      
-      // Notify parent: only if exactly one video URL (ready for analysis)
-      if (videoUrls.length === 1) {
-        onVideoUrlDetected?.(videoUrls[0]);
-      } else {
-        onVideoUrlDetected?.(null);
-      }
+      urlDetectionTimeoutRef.current = setTimeout(() => {
+        const videoUrls = extractVideoUrls(newValue);
+        setDetectedVideoUrls(videoUrls);
+        
+        // Notify parent: only if exactly one video URL (ready for analysis)
+        if (videoUrls.length === 1) {
+          onVideoUrlDetected?.(videoUrls[0]);
+        } else {
+          onVideoUrlDetected?.(null);
+        }
+      }, 200);
     } else {
-      // Clear URL detection when a file is uploaded
+      // Clear URL detection when a file is uploaded (immediate, no debounce needed)
       setDetectedVideoUrls([]);
       onVideoUrlDetected?.(null);
     }
     
-    // Use requestAnimationFrame to ensure DOM is updated before measuring
+    // 4. Resize textarea - use requestAnimationFrame (this is cheap, no debounce needed)
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         const textarea = textareaRef.current;
@@ -398,9 +433,43 @@ export function ChatInput({
     }, 0);
   };
 
+  // Flush any pending debounced detection before submit
+  // This ensures sport/URL detection runs immediately if user submits quickly
+  const flushPendingDetection = () => {
+    // Cancel pending timeouts
+    if (sportDetectionTimeoutRef.current) {
+      clearTimeout(sportDetectionTimeoutRef.current);
+      sportDetectionTimeoutRef.current = null;
+    }
+    if (urlDetectionTimeoutRef.current) {
+      clearTimeout(urlDetectionTimeoutRef.current);
+      urlDetectionTimeoutRef.current = null;
+    }
+    
+    // Run detection immediately with current prompt
+    detectAndSwitchSport(prompt);
+    
+    if (!videoFile) {
+      const videoUrls = extractVideoUrls(prompt);
+      setDetectedVideoUrls(videoUrls);
+      if (videoUrls.length === 1) {
+        onVideoUrlDetected?.(videoUrls[0]);
+      } else {
+        onVideoUrlDetected?.(null);
+      }
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    flushPendingDetection();
+    onSubmit(e);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !loading) {
       e.preventDefault();
+      flushPendingDetection();
       onSubmit(e);
     }
   };
@@ -422,7 +491,7 @@ export function ChatInput({
         </Callout.Root>
       )}
 
-      <form onSubmit={onSubmit}>
+      <form onSubmit={handleFormSubmit}>
         <Flex direction="column" gap="4" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
           {videoFile && videoPreview && (
             <VideoPreview
@@ -584,82 +653,86 @@ export function ChatInput({
                     justifyContent: isMobile ? "center" : "flex-start",
                   }}
                 >
-                  {/* Thinking mode selector */}
-                  <Tooltip 
-                    content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
-                    open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
-                  >
-                    <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
-                      <Select.Root
-                        value={thinkingMode}
-                        open={thinkingModeOpen}
-                        onOpenChange={setThinkingModeOpen}
-                        onValueChange={(value) => {
-                          const mode = value as ThinkingMode;
-                          setThinkingModeState(mode);
-                          onThinkingModeChange?.(mode);
-                        }}
-                      >
-                        <Select.Trigger
-                          className="select-no-border"
-                          style={{
-                            height: "28px",
-                            fontSize: isMobile ? "10px" : "11px",
-                            padding: "0 var(--space-2)",
-                            minWidth: isMobile ? "60px" : "70px",
-                            border: "none",
-                            borderWidth: 0,
-                            outline: "none",
-                            backgroundColor: "transparent",
-                            boxShadow: "none",
+                  {/* Thinking mode selector - Developer Mode Only */}
+                  {developerMode && (
+                    <Tooltip 
+                      content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
+                      open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
+                    >
+                      <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
+                        <Select.Root
+                          value={thinkingMode}
+                          open={thinkingModeOpen}
+                          onOpenChange={setThinkingModeOpen}
+                          onValueChange={(value) => {
+                            const mode = value as ThinkingMode;
+                            setThinkingModeState(mode);
+                            onThinkingModeChange?.(mode);
                           }}
-                        />
-                        <Select.Content>
-                          <Select.Item value="fast">Fast</Select.Item>
-                          <Select.Item value="deep">Deep</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </Box>
-                  </Tooltip>
+                        >
+                          <Select.Trigger
+                            className="select-no-border"
+                            style={{
+                              height: "28px",
+                              fontSize: isMobile ? "10px" : "11px",
+                              padding: "0 var(--space-2)",
+                              minWidth: isMobile ? "60px" : "70px",
+                              border: "none",
+                              borderWidth: 0,
+                              outline: "none",
+                              backgroundColor: "transparent",
+                              boxShadow: "none",
+                            }}
+                          />
+                          <Select.Content>
+                            <Select.Item value="fast">Fast</Select.Item>
+                            <Select.Item value="deep">Deep</Select.Item>
+                          </Select.Content>
+                        </Select.Root>
+                      </Box>
+                    </Tooltip>
+                  )}
 
-                  {/* Media resolution selector */}
-                  <Tooltip 
-                    content="Media resolution: Controls the quality and token usage for video/image analysis"
-                    open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
-                  >
-                    <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
-                      <Select.Root
-                        value={mediaResolution}
-                        open={mediaResolutionOpen}
-                        onOpenChange={setMediaResolutionOpen}
-                        onValueChange={(value) => {
-                          const resolution = value as MediaResolution;
-                          setMediaResolutionState(resolution);
-                          onMediaResolutionChange?.(resolution);
-                        }}
-                      >
-                        <Select.Trigger
-                          className="select-no-border"
-                          style={{
-                            height: "28px",
-                            fontSize: isMobile ? "10px" : "11px",
-                            padding: "0 var(--space-2)",
-                            minWidth: isMobile ? "60px" : "70px",
-                            border: "none",
-                            borderWidth: 0,
-                            outline: "none",
-                            backgroundColor: "transparent",
-                            boxShadow: "none",
+                  {/* Media resolution selector - Developer Mode Only */}
+                  {developerMode && (
+                    <Tooltip 
+                      content="Media resolution: Controls the quality and token usage for video/image analysis"
+                      open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
+                    >
+                      <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
+                        <Select.Root
+                          value={mediaResolution}
+                          open={mediaResolutionOpen}
+                          onOpenChange={setMediaResolutionOpen}
+                          onValueChange={(value) => {
+                            const resolution = value as MediaResolution;
+                            setMediaResolutionState(resolution);
+                            onMediaResolutionChange?.(resolution);
                           }}
-                        />
-                        <Select.Content>
-                          <Select.Item value="low">Low</Select.Item>
-                          <Select.Item value="medium">Medium</Select.Item>
-                          <Select.Item value="high">High</Select.Item>
-                        </Select.Content>
-                      </Select.Root>
-                    </Box>
-                  </Tooltip>
+                        >
+                          <Select.Trigger
+                            className="select-no-border"
+                            style={{
+                              height: "28px",
+                              fontSize: isMobile ? "10px" : "11px",
+                              padding: "0 var(--space-2)",
+                              minWidth: isMobile ? "60px" : "70px",
+                              border: "none",
+                              borderWidth: 0,
+                              outline: "none",
+                              backgroundColor: "transparent",
+                              boxShadow: "none",
+                            }}
+                          />
+                          <Select.Content>
+                            <Select.Item value="low">Low</Select.Item>
+                            <Select.Item value="medium">Medium</Select.Item>
+                            <Select.Item value="high">High</Select.Item>
+                          </Select.Content>
+                        </Select.Root>
+                      </Box>
+                    </Tooltip>
+                  )}
 
                   {/* Domain expertise selector */}
                   <Tooltip 

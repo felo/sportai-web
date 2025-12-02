@@ -56,13 +56,6 @@ export function IncompleteMessageRecovery({
           </Flex>
         </Button>
       </Flex>
-      
-      <style jsx global>{`
-        @keyframes incomplete-spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
