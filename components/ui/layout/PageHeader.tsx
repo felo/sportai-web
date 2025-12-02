@@ -14,7 +14,7 @@ export interface PageHeaderProps {
   actions?: ReactNode;
   /** Callback when new chat button is clicked (for chat pages) */
   onNewChat?: () => void;
-  /** Whether to show the API version badge */
+  /** Whether to show the API version badge (default: true) */
   showVersionBadge?: boolean;
   /** Message count for new chat button (chat pages) */
   messageCount?: number;
@@ -24,7 +24,7 @@ export function PageHeader({
   title, 
   actions, 
   onNewChat,
-  showVersionBadge = false,
+  showVersionBadge = true,
 }: PageHeaderProps) {
   const { isCollapsed, isInitialLoad, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();

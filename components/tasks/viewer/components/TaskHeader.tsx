@@ -1,11 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Flex, Text, Badge } from "@radix-ui/themes";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { IconButton } from "@/components/ui";
 import buttonStyles from "@/styles/buttons.module.css";
 import { Task, StatisticsResult } from "../types";
 import { getSportColor } from "../utils";
+import { getDeveloperMode } from "@/utils/storage";
 
 interface TaskHeaderProps {
   task: Task;
@@ -22,6 +24,19 @@ export function TaskHeader({
   onBack, 
   onLoadResult,
 }: TaskHeaderProps) {
+  const [developerMode, setDeveloperMode] = useState(false);
+  
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+  }, []);
+  
   return (
     <Flex justify="between" align="center" mb="5">
       <Flex align="center" gap="4">
@@ -40,9 +55,11 @@ export function TaskHeader({
           <Badge variant="soft" size="2">
             {task.task_type}
           </Badge>
-          <Text size="2" color="gray">
-            Task: {task.sportai_task_id || task.id}
-          </Text>
+          {developerMode && (
+            <Text size="2" color="gray">
+              Task: {task.sportai_task_id || task.id}
+            </Text>
+          )}
         </Flex>
       </Flex>
 

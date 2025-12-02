@@ -1,7 +1,7 @@
 "use client";
 
 import { Theme } from "@radix-ui/themes";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useLayoutEffect } from "react";
 import { initTheatreModeResizeListener } from "@/utils/storage";
 
 // Custom appearance type that includes our green theme
@@ -17,15 +17,17 @@ const getRadixAppearance = (appearance: CustomAppearance): RadixAppearance => {
   return appearance === "light" ? "light" : "dark";
 };
 
+// Use useLayoutEffect on client, useEffect on server to avoid SSR warnings
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 export function RadixThemeProvider({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const [appearance, setAppearance] = useState<CustomAppearance>("dark");
   const [accentColor, setAccentColor] = useState<AccentColor>("mint");
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
-  useEffect(() => {
-    // Initialize theatre mode resize listener (handles height breakpoint)
-    initTheatreModeResizeListener();
-    
+  // Use layout effect to load theme before paint
+  useIsomorphicLayoutEffect(() => {
     // Load theme from localStorage, defaulting to dark if not set
     const stored = localStorage.getItem("radix-theme");
     if (stored) {
@@ -54,6 +56,14 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
       setGrayColor("gray");
       document.documentElement.setAttribute("data-theme", "dark");
     }
+    
+    // Mark as mounted after theme is loaded
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    // Initialize theatre mode resize listener (handles height breakpoint)
+    initTheatreModeResizeListener();
 
     // Listen for theme changes
     const handleThemeChange = () => {
@@ -82,8 +92,20 @@ export function RadixThemeProvider({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener("theme-change", handleThemeChange);
   }, []);
 
+  // Prevent flash by hiding content until theme is loaded
+  // Using visibility instead of display to maintain layout
   return (
-    <Theme appearance={getRadixAppearance(appearance)} accentColor={accentColor} grayColor={grayColor} radius="medium">
+    <Theme 
+      appearance={getRadixAppearance(appearance)} 
+      accentColor={accentColor} 
+      grayColor={grayColor} 
+      radius="medium"
+      style={{ 
+        visibility: mounted ? 'visible' : 'hidden',
+        // Set background to match theme to prevent white flash
+        backgroundColor: 'var(--gray-1)',
+      }}
+    >
       {children}
     </Theme>
   );

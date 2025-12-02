@@ -9,6 +9,8 @@ html {
   /* Use dvh (dynamic viewport height) for mobile support, fallback to vh */
   height: 100dvh;
   min-height: 100dvh;
+  /* Default dark background to prevent flash before theme loads */
+  background-color: #111113;
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
   /* Disable system color scheme detection */
@@ -21,6 +23,8 @@ body {
   height: 100%;
   width: 100%;
   min-height: 100%;
+  /* Default dark background to prevent flash before theme loads */
+  background-color: #111113;
   /* Prevent white background on mobile overscroll */
   overscroll-behavior: none;
   /* Prevent page-level scrolling */
@@ -662,5 +666,29 @@ html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlight
   .content-wrapper.sidebar-expanded {
     margin-left: 280px;
     width: calc(100% - 280px);
+  }
+}
+
+/* Page content wrapper - for scrollable pages like pricing, library */
+.page-content-wrapper {
+  /* Mobile first - no margin */
+  margin-left: 0;
+  transition: margin-left 0.2s ease-in-out;
+}
+
+/* Disable transitions during initial page load */
+.page-content-wrapper.no-transition {
+  transition: none;
+}
+
+@media (min-width: 768px) {
+  .page-content-wrapper {
+    /* Desktop with collapsed sidebar (default initial state) */
+    margin-left: 64px;
+  }
+  
+  /* Desktop with expanded sidebar */
+  .page-content-wrapper.sidebar-expanded {
+    margin-left: 280px;
   }
 }

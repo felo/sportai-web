@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Flex, Separator } from "@radix-ui/themes";
 import { NewChatButton } from "./NewChatButton";
@@ -8,6 +8,8 @@ import { LibraryButton } from "./LibraryButton";
 import { ChatList } from "./ChatList";
 import { SidebarNavigation } from "./SidebarNavigation";
 import type { Chat } from "@/types/chat";
+
+const CHATS_EXPANDED_KEY = "sportai-sidebar-chats-expanded";
 
 interface SidebarContentProps {
   chats: Chat[];
@@ -38,8 +40,18 @@ export function SidebarContent({
   onLinkClick,
   onNavigationAttempt,
 }: SidebarContentProps) {
-  const [chatsExpanded, setChatsExpanded] = useState(true);
+  // Load from localStorage, default to true if not set
+  const [chatsExpanded, setChatsExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(CHATS_EXPANDED_KEY);
+    return saved === null ? true : saved === "true";
+  });
   const pathname = usePathname();
+
+  // Persist to localStorage when chatsExpanded changes
+  useEffect(() => {
+    localStorage.setItem(CHATS_EXPANDED_KEY, String(chatsExpanded));
+  }, [chatsExpanded]);
   
   // Check if we're on the Library page
   const isOnLibraryPage = pathname === "/library" || pathname?.startsWith("/library/");

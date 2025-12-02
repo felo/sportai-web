@@ -327,18 +327,18 @@ export function useAIChat() {
         const messageArray = Array.from(allMessages);
         const currentIndex = messageArray.findIndex(el => el.getAttribute('data-message-id') === messageId);
         
-        let scrollTarget: number;
-        
-        if (currentIndex > 0) {
-          // There's a previous message - scroll so it's completely hidden
-          const previousMessage = messageArray[currentIndex - 1] as HTMLElement;
-          // Scroll to position just after the previous message ends (hiding it completely)
-          scrollTarget = previousMessage.offsetTop + previousMessage.offsetHeight + 24; // 24px gap between messages
-        } else {
-          // First message - just scroll to show it at top with small padding
-          const messageEl = messageElement as HTMLElement;
-          scrollTarget = messageEl.offsetTop - 16;
-        }
+      let scrollTarget: number;
+      
+      if (currentIndex > 0) {
+        // There's a previous message - scroll so it's completely hidden
+        const previousMessage = messageArray[currentIndex - 1] as HTMLElement;
+        // Scroll to position just after the previous message ends (hiding it completely)
+        scrollTarget = previousMessage.offsetTop + previousMessage.offsetHeight + 24; // 24px gap between messages
+      } else {
+        // First message - scroll to show it at top with breathing room above
+        const messageEl = messageElement as HTMLElement;
+        scrollTarget = Math.max(0, messageEl.offsetTop - 48);
+      }
         
         scrollContainer.scrollTo({ top: Math.max(0, scrollTarget), behavior: "smooth" });
       } else {

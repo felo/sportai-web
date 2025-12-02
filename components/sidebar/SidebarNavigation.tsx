@@ -1,7 +1,7 @@
 "use client";
 
 import { Flex } from "@radix-ui/themes";
-import { GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { GlobeIcon, FileTextIcon, EnvelopeClosedIcon, InfoCircledIcon, RocketIcon } from "@radix-ui/react-icons";
 import { NavigationLink } from "@/components/ui";
 import type { SidebarNavigationProps } from "./types";
 
@@ -21,6 +21,12 @@ export function SidebarNavigation({ onLinkClick }: SidebarNavigationProps) {
         icon={<FileTextIcon />}
         onClick={onLinkClick}
         external
+      />
+      <NavigationLink
+        href="/pricing"
+        label="Plans and Pricing"
+        icon={<RocketIcon />}
+        onClick={onLinkClick}
       />
       <NavigationLink
         href="https://sportai.com/contact"

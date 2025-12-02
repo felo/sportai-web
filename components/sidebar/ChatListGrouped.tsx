@@ -9,6 +9,8 @@ import type { Chat } from "@/types/chat";
 // Threshold for aggressive collapsing (only show active group + most recent)
 const AGGRESSIVE_COLLAPSE_THRESHOLD = 15;
 
+const EXPANDED_GROUPS_KEY = "sportai-sidebar-expanded-groups";
+
 interface ChatGroup {
   label: string;
   chats: Chat[];
@@ -203,10 +205,23 @@ export function ChatListGrouped({
     return expanded;
   }, [groups, activeGroupLabel, chats.length]);
 
-  // Track which groups are expanded
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() =>
-    getInitialExpandedGroups()
-  );
+  // Load expanded groups from localStorage, falling back to smart defaults
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(EXPANDED_GROUPS_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return new Set(parsed);
+          }
+        } catch {
+          // Invalid JSON, use defaults
+        }
+      }
+    }
+    return getInitialExpandedGroups();
+  });
 
   // Track previous active group to detect actual chat switches
   const prevActiveGroupRef = useRef<string | null>(activeGroupLabel);
@@ -222,6 +237,11 @@ export function ChatListGrouped({
     
     prevActiveGroupRef.current = activeGroupLabel;
   }, [activeGroupLabel]);
+
+  // Persist expanded groups to localStorage
+  useEffect(() => {
+    localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify([...expandedGroups]));
+  }, [expandedGroups]);
 
   const toggleGroup = (label: string) => {
     setExpandedGroups((prev) => {

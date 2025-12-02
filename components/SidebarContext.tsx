@@ -7,6 +7,7 @@ const SIDEBAR_STORAGE_KEY = "sportai-sidebar-collapsed";
 interface SidebarContextType {
   isCollapsed: boolean;
   isInitialLoad: boolean;
+  isHydrated: boolean;
   toggleSidebar: () => void;
   closeSidebar: () => void;
 }
@@ -52,7 +53,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, isInitialLoad, toggleSidebar, closeSidebar }}>
+    <SidebarContext.Provider value={{ isCollapsed, isInitialLoad, isHydrated, toggleSidebar, closeSidebar }}>
       {children}
     </SidebarContext.Provider>
   );

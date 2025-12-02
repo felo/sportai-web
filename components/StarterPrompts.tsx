@@ -175,7 +175,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
 
       {/* Instructions */}
       <Text size={isMobile ? "2" : "3"} color="gray" style={{ textAlign: "center", maxWidth: "600px" }}>
-        Drag and drop a video or click the plus button below
+        Drag and drop a video or try out one of the examples above
       </Text>
 
       <style jsx>{`
