@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import { logger } from "@/lib/logger";
 
 // Ensure this route uses Node.js runtime
@@ -38,6 +38,7 @@ const CAMERA_ANGLES = [
 type CameraAngle = typeof CAMERA_ANGLES[number];
 
 // Response schema for structured output
+// Note: Using type assertion because the library types are overly strict with enum schemas
 const ELIGIBILITY_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
@@ -61,7 +62,7 @@ const ELIGIBILITY_SCHEMA = {
     }
   },
   required: ["sport", "cameraAngle", "fullCourtVisible", "confidence"]
-};
+} satisfies Record<string, unknown> as Schema;
 
 export interface VideoEligibilityResult {
   sport: DetectedSport;
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
         maxOutputTokens: 200,
         temperature: 0.1, // Low temperature for consistent responses
         responseMimeType: "application/json",
-        responseSchema: ELIGIBILITY_SCHEMA as Parameters<typeof getGenAI>["0"]["generationConfig"]["responseSchema"],
+        responseSchema: ELIGIBILITY_SCHEMA,
       },
     });
     

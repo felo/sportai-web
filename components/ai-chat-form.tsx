@@ -1952,8 +1952,9 @@ export function AIChatForm() {
               throw new Error(errorData.error || "Failed to get upload URL");
             }
 
-            const { url: presignedUrl, downloadUrl, publicUrl, key: s3Key } = await urlResponse.json();
+            const { url: presignedUrl, downloadUrl, publicUrl, key: originalS3Key } = await urlResponse.json();
             s3Url = downloadUrl || publicUrl;
+            let s3Key = originalS3Key;
 
             // Upload to S3
             console.log("[AIChatForm] Uploading PRO-eligible video to S3...");
@@ -1962,6 +1963,41 @@ export function AIChatForm() {
             }, abortController.signal);
 
             console.log("[AIChatForm] Video uploaded successfully to S3:", s3Url);
+
+            // Convert video if needed (for MOV/HEVC files)
+            if (needsServerConversion) {
+              console.log("[AIChatForm] Converting video for PRO-eligible analysis...");
+              setProgressStage("processing");
+              
+              try {
+                const convertResponse = await fetch("/api/convert-video", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ key: s3Key }),
+                  signal: abortController.signal,
+                });
+                
+                if (convertResponse.ok) {
+                  const convertResult = await convertResponse.json();
+                  if (convertResult.success && convertResult.downloadUrl) {
+                    console.log("[AIChatForm] ✅ Video converted:", convertResult.convertedKey);
+                    // Use converted URL and key instead
+                    s3Url = convertResult.downloadUrl;
+                    s3Key = convertResult.convertedKey;
+                  } else {
+                    console.warn("[AIChatForm] Conversion response missing data, proceeding with original file");
+                  }
+                } else {
+                  const errorData = await convertResponse.json().catch(() => ({}));
+                  console.warn("[AIChatForm] Conversion failed, proceeding with original file:", errorData);
+                }
+              } catch (convertError) {
+                if ((convertError as Error).name === "AbortError") {
+                  throw convertError;
+                }
+                console.warn("[AIChatForm] Conversion error, proceeding with original:", convertError);
+              }
+            }
 
             // Update the video message with S3 URL (so it persists)
             if (videoMessageId) {

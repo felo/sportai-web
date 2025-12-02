@@ -165,13 +165,13 @@ export function RallyNetwork({ result, playerDisplayNames = {} }: RallyNetworkPr
     }
 
     // Find player with most diverse shot selection
-    let mostDiversePlayer: { id: number; count: number } | null = null;
-    filteredPlayers.forEach(p => {
+    const mostDiversePlayer = filteredPlayers.reduce<{ id: number; count: number } | null>((best, p) => {
       const shotTypes = Object.keys(playerShotCounts[p.player_id] || {}).length;
-      if (!mostDiversePlayer || shotTypes > mostDiversePlayer.count) {
-        mostDiversePlayer = { id: p.player_id, count: shotTypes };
+      if (!best || shotTypes > best.count) {
+        return { id: p.player_id, count: shotTypes };
       }
-    });
+      return best;
+    }, null);
     if (mostDiversePlayer && mostDiversePlayer.count > 2) {
       const name = playerDisplayNames[mostDiversePlayer.id] || `Player`;
       insights.push(`${name} uses ${mostDiversePlayer.count} different shot types`);
@@ -227,69 +227,48 @@ export function RallyNetwork({ result, playerDisplayNames = {} }: RallyNetworkPr
           nodeColor={(node) => node.color}
           nodeBorderWidth={2}
           nodeBorderColor={{ from: "color", modifiers: [["darker", 0.4]] }}
-          linkThickness={(link) => 2 + (link.strength || 0.5) * 4}
+          linkThickness={(link) => 2 + ((link as unknown as NetworkLink).strength || 0.5) * 4}
           linkBlendMode="normal"
-          linkColor={(link) => link.color || "#666666"}
+          linkColor={(link) => (link as unknown as NetworkLink).color || "#666666"}
           motionConfig="gentle"
           isInteractive={true}
-          nodeTooltip={({ node }) => (
-            <Box
-              style={{
-                background: "#1a1a1a",
-                padding: "12px 16px",
-                borderRadius: 8,
-                border: `2px solid ${node.color}`,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-                minWidth: 140,
-              }}
-            >
-              <Flex align="center" gap="2" mb="2">
-                <Box
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: node.data.type === "player" ? "50%" : 4,
-                    backgroundColor: node.color,
-                    boxShadow: `0 0 8px ${node.color}`,
-                  }}
-                />
-                <Text size="3" weight="bold" style={{ color: "#fff" }}>
-                  {node.data.label}
+          nodeTooltip={({ node }) => {
+            const nodeData = (node as unknown as NetworkNode).data;
+            return (
+              <Box
+                style={{
+                  background: "#1a1a1a",
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  border: `2px solid ${node.color}`,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                  minWidth: 140,
+                }}
+              >
+                <Flex align="center" gap="2" mb="2">
+                  <Box
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: nodeData.type === "player" ? "50%" : 4,
+                      backgroundColor: node.color,
+                      boxShadow: `0 0 8px ${node.color}`,
+                    }}
+                  />
+                  <Text size="3" weight="bold" style={{ color: "#fff" }}>
+                    {nodeData.label}
+                  </Text>
+                </Flex>
+                <Text size="2" style={{ color: "#aaa" }}>
+                  {nodeData.type === "player" ? "🎾 Total swings: " : "📊 Used: "}
+                  <Text weight="bold" style={{ color: node.color }}>
+                    {nodeData.count}
+                  </Text>
+                  {nodeData.type === "shot" && " times"}
                 </Text>
-              </Flex>
-              <Text size="2" style={{ color: "#aaa" }}>
-                {node.data.type === "player" ? "🎾 Total swings: " : "📊 Used: "}
-                <Text weight="bold" style={{ color: node.color }}>
-                  {node.data.count}
-                </Text>
-                {node.data.type === "shot" && " times"}
-              </Text>
-            </Box>
-          )}
-          linkTooltip={({ link }) => (
-            <Box
-              style={{
-                background: "#1a1a1a",
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: `2px solid ${link.color || "#666"}`,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-              }}
-            >
-              <Text size="2" style={{ color: "#fff" }}>
-                <Text weight="bold" style={{ color: link.source.color }}>
-                  {link.source.data.label}
-                </Text>
-                {" → "}
-                <Text weight="bold" style={{ color: link.target.color }}>
-                  {link.target.data.label}
-                </Text>
-              </Text>
-              <Text size="1" style={{ color: "#aaa", display: "block", marginTop: 4 }}>
-                Used <Text weight="bold" style={{ color: "#fff" }}>{link.count}</Text> times
-              </Text>
-            </Box>
-          )}
+              </Box>
+            );
+          }}
         />
 
         {/* Legend */}

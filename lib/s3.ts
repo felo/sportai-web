@@ -419,6 +419,7 @@ export async function downloadFromS3(
     const bucket = bucketFromUrl || BUCKET_NAME;
     
     logger.debug(`[${requestId}] Extracted bucket: ${bucket}, key: ${key}`);
+    console.log(`[S3 Download] 📂 Bucket: ${bucket}, Key: ${key}`);
     
     // Download using AWS SDK
     const command = new GetObjectCommand({
@@ -462,6 +463,7 @@ export async function downloadFromS3(
     
     logger.info(`[${requestId}] Downloaded ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     console.log(`[S3 Download] ✅ Successfully downloaded: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
+    console.log(`[S3 Download] 📹 Content-Type from S3: ${contentType}`);
     
     return {
       data: buffer,

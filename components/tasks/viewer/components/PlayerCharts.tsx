@@ -241,18 +241,20 @@ function BallSpeedSpeedometer({
   globalMaxSpeed?: number;
   rank?: number;
 }) {
+  // Hooks must be called before any early returns
+  const id = useRef(`speedometer-${Math.random().toString(36).substr(2, 9)}`);
+  const { progress, isComplete } = useAnimatedProgress({
+    isVisible,
+    duration: 2800,
+    delay: 150,
+  });
+
   const swings = player.swings || [];
   if (swings.length === 0) return null;
 
   const avgSpeed = swings.reduce((sum, s) => sum + s.ball_speed, 0) / swings.length;
   const maxSpeed = Math.max(...swings.map((s) => s.ball_speed));
   const maxValue = Math.max(150, Math.ceil(maxSpeed / 10) * 10 + 10);
-
-  const { progress, isComplete } = useAnimatedProgress({
-    isVisible,
-    duration: 2800,
-    delay: 150,
-  });
 
   const displayValue = Math.round(maxSpeed * progress);
   const displayAvg = Math.round(avgSpeed * progress);
@@ -287,7 +289,6 @@ function BallSpeedSpeedometer({
   };
 
   const ticks = [0, 30, 60, 90, 120, 150];
-  const id = useRef(`speedometer-${Math.random().toString(36).substr(2, 9)}`);
   const percentage = globalMaxSpeed && globalMaxSpeed > 0 ? Math.round((maxSpeed / globalMaxSpeed) * 100) : 0;
 
   return (

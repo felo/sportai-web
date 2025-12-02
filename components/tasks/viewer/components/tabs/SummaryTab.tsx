@@ -43,6 +43,28 @@ export function SummaryTab({
   result,
   enhancedBallBounces,
 }: SummaryTabProps) {
+  // Animation state - hooks must be called before any early returns
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const [startCounting, setStartCounting] = useState(false);
+
+  // Trigger card fade-in, then start counting after all cards visible
+  useEffect(() => {
+    if (!result) return; // Skip animation if no result
+    
+    // Start fade-in immediately
+    const fadeTimer = setTimeout(() => setCardsVisible(true), 50);
+    
+    // Start counting after all cards have faded in
+    const countTimer = setTimeout(() => {
+      setStartCounting(true);
+    }, 50 + (TOTAL_ROWS - 1) * CARD_STAGGER_DELAY + CARD_FADE_DURATION + 100);
+    
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(countTimer);
+    };
+  }, [result]);
+
   if (!result) {
     return (
       <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
@@ -197,26 +219,6 @@ export function SummaryTab({
   const hasSwingData = swingTypeData.length > 0;
   const hasSpeedData = allSpeeds.length > 0;
   const hasSprintData = allSprints.length > 0;
-
-  // Animation state
-  const [cardsVisible, setCardsVisible] = useState(false);
-  const [startCounting, setStartCounting] = useState(false);
-
-  // Trigger card fade-in, then start counting after all cards visible
-  useEffect(() => {
-    // Start fade-in immediately
-    const fadeTimer = setTimeout(() => setCardsVisible(true), 50);
-    
-    // Start counting after all cards have faded in
-    const countTimer = setTimeout(() => {
-      setStartCounting(true);
-    }, 50 + (TOTAL_ROWS - 1) * CARD_STAGGER_DELAY + CARD_FADE_DURATION + 100);
-    
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(countTimer);
-    };
-  }, []);
 
   // Categorize bounces
   const bounceCounts = {

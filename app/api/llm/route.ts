@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
         logger.timeEnd(`[${requestId}] S3 download`);
         logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
         console.log(`[LLM API] ✅ Successfully downloaded from S3: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+        console.log(`[LLM API] 📹 Video URL: ${videoUrl}`);
+        console.log(`[LLM API] 📹 Video MIME type: ${videoData.mimeType}`);
       } catch (error) {
         logger.error(`[${requestId}] Failed to download from S3:`, error);
         console.error(`[LLM API] ❌ Failed to download from S3:`, error);
@@ -267,12 +269,24 @@ export async function POST(request: NextRequest) {
             logger.info(`[${requestId}] Stream completed successfully in ${duration}ms`);
           } catch (error) {
             logger.error(`[${requestId}] Stream error:`, error);
-            // Only call error if controller is still open
+            
+            // Send error message as stream content so client can display it
+            // This prevents ERR_EMPTY_RESPONSE errors on the client
+            const errorMessage = error instanceof Error ? error.message : "Failed to process request";
+            const errorResponse = `\n\n⚠️ **Error:** ${errorMessage}`;
+            
             try {
-              controller.error(error);
-            } catch (errorError) {
+              controller.enqueue(new TextEncoder().encode(errorResponse));
+            } catch (enqueueError) {
+              logger.warn(`[${requestId}] Could not enqueue error message:`, enqueueError);
+            }
+            
+            // Close the stream properly (not with error)
+            try {
+              controller.close();
+            } catch (closeError) {
               // Controller already closed, log but don't throw
-              logger.warn(`[${requestId}] Could not send error to closed controller:`, errorError);
+              logger.warn(`[${requestId}] Could not close controller:`, closeError);
             }
           }
         },
