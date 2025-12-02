@@ -1992,6 +1992,11 @@ export function AIChatForm() {
             if (needsServerConversion) {
               console.log("[AIChatForm] Converting video for PRO-eligible analysis...");
               setProgressStage("processing");
+              // Show converting message in the assistant bubble
+              updateMessage(assistantMessageId, { 
+                content: "Converting video format for analysis...",
+                isStreaming: true 
+              });
               
               try {
                 const convertResponse = await fetch("/api/convert-video", {
@@ -2021,6 +2026,9 @@ export function AIChatForm() {
                 }
                 console.warn("[AIChatForm] Conversion error, proceeding with original:", convertError);
               }
+              
+              // Clear the converting message
+              updateMessage(assistantMessageId, { content: "", isStreaming: true });
             }
 
             // Update the video message with S3 URL (so it persists)

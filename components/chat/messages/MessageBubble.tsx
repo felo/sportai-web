@@ -505,7 +505,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     thinkingMessage={(() => {
                       // Show upload progress during uploading
                       if (progressStage === "uploading") {
-                        return `Uploading video... ${Math.round(uploadProgress)}%`;
+                        return "Uploading video...";
                       }
                       // For processing/analyzing/generating, use the rotating thinking messages
                       // Note: During actual video CONVERSION, useAIApi sets message.content to 
