@@ -508,9 +508,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                         return `Uploading video... ${Math.round(uploadProgress)}%`;
                       }
                       // For processing/analyzing/generating, use the rotating thinking messages
-                      // "processing" = waiting for API response (can be long for video)
-                      // "analyzing" = streaming response
-                      // "generating" = text-only response
+                      // Note: During actual video CONVERSION, useAIApi sets message.content to 
+                      // "Converting video format for analysis..." which will be shown instead of thinkingMessage
                       return getThinkingMessage(thinkingMessageIndex, {
                         hasVideo: userSentVideo,
                         isFirstMessage: false, // First message without video → treat as quick
@@ -522,8 +521,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                       if (progressStage === "uploading") {
                         return true;
                       }
-                      // Show time-based progress bar during processing/analyzing/generating (with rotating messages)
-                      // "processing" = waiting for API response (video is being analyzed by AI)
+                      // Show time-based progress bar during processing/analyzing/generating
                       if (userSentVideo && (progressStage === "processing" || progressStage === "analyzing" || progressStage === "generating")) {
                         // Check if there's an unresolved analysis_options message (user hasn't selected yet)
                         // If so, don't show progress bar (wait for user to choose FREE/PRO)
