@@ -40,9 +40,9 @@ const FORMATTING_GUIDELINES = `
 
 - **Focus on Quality Over Quantity**: You cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
 
-- **MANDATORY: Key Takeaway First**: After a brief 1-2 sentence introduction, you MUST immediately provide the single most important piece of advice as a standalone sentence. This is the one thing the athlete should focus on above all else. Format it clearly, e.g.:
+- **MANDATORY: Key Takeaway First**: After a brief 1-2 sentence introduction, you MUST immediately provide the single most important piece of advice as a standalone sentence. This is the one thing the athlete should focus on above all else. Format it clearly as a bold statement, e.g.:
   
-  **🎯 Key Takeaway:** [One sentence with the most impactful advice]
+  **[One sentence with the most impactful advice]**
   
   This key takeaway comes BEFORE any collapsible sections and gives the athlete an immediate, actionable focus point.
 
