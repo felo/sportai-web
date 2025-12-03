@@ -19,6 +19,113 @@ import {
   sharedTechnique,
 } from "@/database";
 import type { HighlightingPreferences } from "@/utils/storage";
+import type { CourtCoordinate, BallSequenceClick, BallSequenceType, CourtZone } from "./CourtCoordinateModal";
+import { COURT_ZONE_DEFINITIONS } from "./CourtCoordinateModal";
+
+// Court grid constants for validation
+const GRID_COLS = 12;
+const GRID_ROWS = 6;
+
+// Ball sequence term mappings
+const BALL_SEQUENCE_TERMS: Record<string, { type: BallSequenceType; label: string }> = {
+  'serve': { type: 'serve', label: 'Serve' },
+  'serves': { type: 'serve', label: 'Serve' },
+  'service': { type: 'serve', label: 'Serve' },
+  '1st ball': { type: 'serve', label: 'Serve' },
+  '1st balls': { type: 'serve', label: 'Serve' },
+  'first ball': { type: 'serve', label: 'Serve' },
+  'first balls': { type: 'serve', label: 'Serve' },
+  'return': { type: 'return', label: 'Return' },
+  'returns': { type: 'return', label: 'Return' },
+  '2nd ball': { type: 'return', label: 'Return' },
+  '2nd balls': { type: 'return', label: 'Return' },
+  'second ball': { type: 'return', label: 'Return' },
+  'second balls': { type: 'return', label: 'Return' },
+  'third ball': { type: 'third-ball', label: 'Third Ball' },
+  'third balls': { type: 'third-ball', label: 'Third Ball' },
+  '3rd ball': { type: 'third-ball', label: 'Third Ball' },
+  '3rd balls': { type: 'third-ball', label: 'Third Ball' },
+  'fourth ball': { type: 'fourth-ball', label: 'Fourth Ball' },
+  'fourth balls': { type: 'fourth-ball', label: 'Fourth Ball' },
+  '4th ball': { type: 'fourth-ball', label: 'Fourth Ball' },
+  '4th balls': { type: 'fourth-ball', label: 'Fourth Ball' },
+  'fifth ball': { type: 'fifth-ball', label: 'Fifth Ball' },
+  'fifth balls': { type: 'fifth-ball', label: 'Fifth Ball' },
+  '5th ball': { type: 'fifth-ball', label: 'Fifth Ball' },
+  '5th balls': { type: 'fifth-ball', label: 'Fifth Ball' },
+};
+
+// Court position terms to highlight (shot directions and zones)
+const COURT_POSITION_TERMS = [
+  // Shot directions
+  'down-the-line',
+  'down the line',
+  'cross-court',
+  'cross court',
+  'crosscourt',
+  // Side positions
+  'far-side right',
+  'far-side left',
+  'far-side center',
+  'far-side centre',
+  'near-side right',
+  'near-side left', 
+  'near-side center',
+  'near-side centre',
+  'far side right',
+  'far side left',
+  'far side center',
+  'far side centre',
+  'near side right',
+  'near side left',
+  'near side center',
+  'near side centre',
+  // Padel court zones
+  'service box',
+  'service boxes',
+  'receiving box',
+  'receiving boxes',
+  'net area',
+  'net zone',
+  'mid-court',
+  'mid-court zone',
+  'midcourt',
+  'back of the court',
+  'back court',
+  'backcourt',
+  'side walls',
+  'side wall',
+  'sidewall',
+  'sidewalls',
+  'corners',
+  'corner',
+  'back glass',
+  'back wall',
+  'backwall',
+];
+
+/**
+ * Find the nearest player reference by looking backwards in text from a given position
+ */
+function findPlayerContext(text: string, position: number): string | undefined {
+  // Look at the text before this position
+  const textBefore = text.substring(0, position);
+  
+  // Pattern to find "Player X" or "Player #X" references
+  const playerPattern = /Player\s*#?\s*(\d+)/gi;
+  let lastMatch: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  
+  while ((match = playerPattern.exec(textBefore)) !== null) {
+    lastMatch = match;
+  }
+  
+  if (lastMatch) {
+    return `Player ${lastMatch[1]}`;
+  }
+  
+  return undefined;
+}
 
 /**
  * Categorize swing explanations by type
@@ -198,13 +305,16 @@ function processTextWithTimestamps(text: string): React.ReactNode[] {
 }
 
 /**
- * Process text with both timestamps, metrics, and swing types
+ * Process text with timestamps, metrics, swing types, court coordinates, ball sequences, and court zones
  */
 function processTextWithTimestampsAndMetrics(
   text: string,
   onSwingClick?: (swing: SwingExplanation) => void,
   onMetricClick?: (value: number, unit: string, originalText: string) => void,
-  highlightingPrefs?: HighlightingPreferences
+  highlightingPrefs?: HighlightingPreferences,
+  onCoordinateClick?: (coordinate: CourtCoordinate) => void,
+  onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
+  onCourtZoneClick?: (zone: CourtZone) => void
 ): React.ReactNode[] {
   // Default to all enabled if not provided
   const prefs = highlightingPrefs || {
@@ -236,15 +346,31 @@ function processTextWithTimestampsAndMetrics(
     ? new RegExp(`\\b(${enabledSwingNames.join('|')})\\b`, 'gi')
     : null;
   
+  // Pattern to match court coordinates in various formats:
+  // (col, row), Grid (col, row), (Grid col,row), Grid col,row, grids col,row and col,row
+  // Examples: (1, 0), Grid (5, 3), (Grid 10,0), Grid 10,0, (grids 0,3 and 0,5)
+  const coordinatePattern = /(?:Grids?\s*\((?:Grids?\s*)?|\((?:Grids?\s*)?|Grids?\s+|and\s+)(\d{1,2})\s*,\s*(\d)\)?/gi;
+  
+  // Pattern to match ball sequence terms (always detect for highlighting, clickable when handler provided)
+  const ballSequenceTerms = Object.keys(BALL_SEQUENCE_TERMS).join('|');
+  const ballSequencePattern = new RegExp(`\\b(${ballSequenceTerms})\\b`, 'gi');
+  
+  // Pattern to match court position terms (sorted by length desc to match longer phrases first)
+  const sortedCourtTerms = [...COURT_POSITION_TERMS].sort((a, b) => b.length - a.length);
+  const courtPositionPattern = new RegExp(`\\b(${sortedCourtTerms.map(t => t.replace(/-/g, '[-\\s]?')).join('|')})\\b`, 'gi');
+  
   // Collect all matches with their types
   const matches: Array<{ 
     index: number; 
     length: number; 
     text: string; 
-    type: 'timestamp' | 'metric' | 'swing';
+    type: 'timestamp' | 'metric' | 'swing' | 'coordinate' | 'ballSequence' | 'courtPosition';
     value?: number;
     unit?: string;
     category?: 'swing' | 'terminology' | 'technique';
+    coordinate?: CourtCoordinate;
+    ballSequence?: BallSequenceClick;
+    courtZone?: CourtZone;
   }> = [];
   
   // Only process timestamps if enabled
@@ -285,6 +411,86 @@ function processTextWithTimestampsAndMetrics(
           });
         }
       }
+    }
+  }
+  
+  // Process court coordinates (e.g., "(1, 0)", "Grid (5, 3)")
+  if (onCoordinateClick) {
+    let coordinateMatch: RegExpExecArray | null;
+    while ((coordinateMatch = coordinatePattern.exec(text)) !== null) {
+      const col = parseInt(coordinateMatch[1], 10);
+      const row = parseInt(coordinateMatch[2], 10);
+      
+      // Only add if within valid grid bounds
+      if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+        const overlaps = matches.some(m => 
+          m.index <= coordinateMatch!.index && coordinateMatch!.index < m.index + m.length
+        );
+        if (!overlaps) {
+          // Find player context by looking backwards in text
+          const playerContext = findPlayerContext(text, coordinateMatch.index);
+          
+          matches.push({
+            index: coordinateMatch.index,
+            length: coordinateMatch[0].length,
+            text: coordinateMatch[0],
+            type: 'coordinate',
+            coordinate: { col, row, playerContext }
+          });
+        }
+      }
+    }
+  }
+  
+  // Process ball sequence terms (e.g., "serve", "third ball") - always detect, clickable when handler provided
+  let ballMatch: RegExpExecArray | null;
+  while ((ballMatch = ballSequencePattern.exec(text)) !== null) {
+    const overlaps = matches.some(m => 
+      m.index <= ballMatch!.index && ballMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      const termKey = ballMatch[0].toLowerCase();
+      const termInfo = BALL_SEQUENCE_TERMS[termKey];
+      if (termInfo) {
+        // Find player context
+        const playerContext = findPlayerContext(text, ballMatch.index);
+        
+        matches.push({
+          index: ballMatch.index,
+          length: ballMatch[0].length,
+          text: ballMatch[0],
+          type: 'ballSequence',
+          ballSequence: {
+            ballType: termInfo.type,
+            ballLabel: termInfo.label,
+            playerContext
+          }
+        });
+      }
+    }
+  }
+  
+  // Process court position terms (e.g., "down-the-line", "far-side right")
+  let courtMatch: RegExpExecArray | null;
+  while ((courtMatch = courtPositionPattern.exec(text)) !== null) {
+    const overlaps = matches.some(m => 
+      m.index <= courtMatch!.index && courtMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      // Normalize the matched term to find the zone definition
+      const normalizedTerm = courtMatch[0].toLowerCase().replace(/\s+/g, '-').replace(/--+/g, '-');
+      // Try to find zone by various key formats
+      const zone = COURT_ZONE_DEFINITIONS[normalizedTerm] 
+        || COURT_ZONE_DEFINITIONS[normalizedTerm.replace(/-/g, ' ')]
+        || COURT_ZONE_DEFINITIONS[courtMatch[0].toLowerCase()];
+      
+      matches.push({
+        index: courtMatch.index,
+        length: courtMatch[0].length,
+        text: courtMatch[0],
+        type: 'courtPosition',
+        courtZone: zone
+      });
     }
   }
   
@@ -372,6 +578,85 @@ function processTextWithTimestampsAndMetrics(
           </button>
         </Tooltip>
       );
+    } else if (matchItem.type === 'coordinate' && matchItem.coordinate && onCoordinateClick) {
+      const tooltipContent = matchItem.coordinate.playerContext 
+        ? `Click to see court position (${matchItem.coordinate.playerContext})`
+        : "Click to see court position";
+      parts.push(
+        <Tooltip key={`coord-${matchItem.index}`} content={tooltipContent}>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCoordinateClick(matchItem.coordinate!);
+            }}
+            className={styles.coordinateHighlight}
+            type="button"
+          >
+            {matchItem.text}
+          </button>
+        </Tooltip>
+      );
+    } else if (matchItem.type === 'ballSequence' && matchItem.ballSequence) {
+      // If handler provided, make clickable with tooltip; otherwise just highlight
+      if (onBallSequenceClick) {
+        const tooltipContent = matchItem.ballSequence.playerContext
+          ? `Go to ${matchItem.ballSequence.ballLabel} tab (${matchItem.ballSequence.playerContext})`
+          : `Go to ${matchItem.ballSequence.ballLabel} tab`;
+        parts.push(
+          <Tooltip key={`ball-${matchItem.index}`} content={tooltipContent}>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onBallSequenceClick(matchItem.ballSequence!);
+              }}
+              className={styles.ballSequenceHighlight}
+              type="button"
+            >
+              {matchItem.text}
+            </button>
+          </Tooltip>
+        );
+      } else {
+        // Just highlight without click functionality
+        parts.push(
+          <span
+            key={`ball-${matchItem.index}`}
+            className={styles.ballSequenceHighlight}
+          >
+            {matchItem.text}
+          </span>
+        );
+      }
+    } else if (matchItem.type === 'courtPosition') {
+      if (matchItem.courtZone && onCourtZoneClick) {
+        parts.push(
+          <Tooltip key={`court-${matchItem.index}`} content={`Click to see ${matchItem.courtZone.name} on court`}>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCourtZoneClick(matchItem.courtZone!);
+              }}
+              className={styles.courtPositionHighlight}
+              type="button"
+              style={{ cursor: 'pointer' }}
+            >
+              {matchItem.text}
+            </button>
+          </Tooltip>
+        );
+      } else {
+        parts.push(
+          <span
+            key={`court-${matchItem.index}`}
+            className={styles.courtPositionHighlight}
+          >
+            {matchItem.text}
+          </span>
+        );
+      }
     } else {
       // Metric with conversion support
       if (matchItem.value !== undefined && matchItem.unit && onMetricClick) {
@@ -414,22 +699,25 @@ function processTextWithTimestampsAndMetrics(
 }
 
 /**
- * Custom text component that processes timestamps, metrics, and swings
+ * Custom text component that processes timestamps, metrics, swings, coordinates, ball sequences, and court zones
  */
 const TextWithTimestamps: React.FC<{ 
   children?: React.ReactNode;
   onSwingClick?: (swing: SwingExplanation) => void;
   onMetricClick?: (value: number, unit: string, originalText: string) => void;
   highlightingPrefs?: HighlightingPreferences;
-}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs }) => {
+  onCoordinateClick?: (coordinate: CourtCoordinate) => void;
+  onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
+  onCourtZoneClick?: (zone: CourtZone) => void;
+}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick }) => {
   if (typeof children === 'string') {
-    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs)}</>;
+    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick)}</>;
   }
   
   if (Array.isArray(children)) {
     return <>{children.map((child, index) => {
       if (typeof child === 'string') {
-        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs)}</React.Fragment>;
+        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick)}</React.Fragment>;
       }
       return <React.Fragment key={index}>{child}</React.Fragment>;
     })}</>;
@@ -438,11 +726,14 @@ const TextWithTimestamps: React.FC<{
   return <>{children}</>;
 };
 
-// Factory function to create markdown components with swing and metric click handlers
+// Factory function to create markdown components with swing, metric, coordinate, ball sequence, and court zone click handlers
 export const createMarkdownComponents = (
   onSwingClick?: (swing: SwingExplanation) => void,
   onMetricClick?: (value: number, unit: string, originalText: string) => void,
-  highlightingPrefs?: HighlightingPreferences
+  highlightingPrefs?: HighlightingPreferences,
+  onCoordinateClick?: (coordinate: CourtCoordinate) => void,
+  onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
+  onCourtZoneClick?: (zone: CourtZone) => void
 ) => ({
   h1: ({ node, ...props }: any) => (
     <h1
@@ -471,7 +762,7 @@ export const createMarkdownComponents = (
       style={{ color: "var(--gray-12)" }}
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
     </p>
   ),
   ul: ({ node, ...props }: any) => (
@@ -493,7 +784,7 @@ export const createMarkdownComponents = (
       className="markdown-li"
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
     </li>
   ),
   code: ({ node, inline, ...props }: any) =>
@@ -522,12 +813,12 @@ export const createMarkdownComponents = (
   ),
   strong: ({ node, children, ...props }: any) => (
     <strong className="font-semibold" style={{ color: "var(--gray-12)" }} {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
     </strong>
   ),
   em: ({ node, children, ...props }: any) => (
     <em className="italic" {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
     </em>
   ),
   a: ({ node, href, children, ...props }: any) => {

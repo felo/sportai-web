@@ -7,6 +7,7 @@ import rehypeRaw from "rehype-raw";
 import { createMarkdownComponents } from "./markdown-components";
 import { SwingExplanationModal } from "./SwingExplanationModal";
 import { MetricConversionModal, convertMetric, type MetricConversion } from "./MetricConversionModal";
+import { CourtCoordinateModal, type CourtCoordinate, type BallSequenceClick, type CourtZone } from "./CourtCoordinateModal";
 import { SectionSpeaker } from "./SectionSpeaker";
 import type { SwingExplanation } from "@/database";
 import { getHighlightingPreferences, getTTSSettings, type HighlightingPreferences } from "@/utils/storage";
@@ -17,6 +18,7 @@ interface MarkdownWithSwingsProps {
   onAskForHelp?: (termName: string, swing?: any) => void;
   feedbackButtons?: React.ReactNode;
   onTTSUsage?: (characters: number, cost: number, quality: string) => void;
+  onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
 }
 
 /**
@@ -41,11 +43,14 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
   const [metricModalOpen, setMetricModalOpen] = useState(false);
+  const [selectedCoordinate, setSelectedCoordinate] = useState<CourtCoordinate | null>(null);
+  const [selectedZone, setSelectedZone] = useState<CourtZone | null>(null);
+  const [coordinateModalOpen, setCoordinateModalOpen] = useState(false);
   const [highlightingPrefs, setHighlightingPrefs] = useState<HighlightingPreferences>({
     terminology: true,
     technique: true,
@@ -94,11 +99,23 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     }
   }, []);
 
+  const handleCoordinateClick = useCallback((coordinate: CourtCoordinate) => {
+    setSelectedCoordinate(coordinate);
+    setSelectedZone(null);
+    setCoordinateModalOpen(true);
+  }, []);
+
+  const handleCourtZoneClick = useCallback((zone: CourtZone) => {
+    setSelectedZone(zone);
+    setSelectedCoordinate(null);
+    setCoordinateModalOpen(true);
+  }, []);
+
   // Memoize markdown components to prevent recreating them on every render
   // This prevents flickering when hovering over links/collapsible sections during streaming
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs),
-    [handleTermClick, handleMetricClick, highlightingPrefs]
+    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick),
+    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick]
   );
 
   // Split content into sections by horizontal rules (---)
@@ -194,6 +211,13 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
         open={metricModalOpen}
         onOpenChange={setMetricModalOpen}
         metric={selectedMetric}
+      />
+      
+      <CourtCoordinateModal 
+        open={coordinateModalOpen}
+        onOpenChange={setCoordinateModalOpen}
+        coordinate={selectedCoordinate}
+        zone={selectedZone}
       />
     </>
   );

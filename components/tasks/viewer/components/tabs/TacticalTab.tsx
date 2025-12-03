@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Box, Flex, Text, Heading, Card, DropdownMenu, IconButton, Badge } from "@radix-ui/themes";
 import { TargetIcon, StackIcon, LayersIcon, MixerHorizontalIcon, Cross2Icon, CheckIcon, GridIcon } from "@radix-ui/react-icons";
 import { StatisticsResult, BallBounce } from "../../types";
@@ -82,6 +82,7 @@ interface AnalysisDisplayProps {
   isAnalyzing: boolean;
   analysis: string | null;
   error: string | null;
+  onBallSequenceClick?: (ballSequence: { ballType: BallSequenceType; ballLabel: string; playerContext?: string }) => void;
 }
 
 function AnalysisDisplay({
@@ -89,6 +90,7 @@ function AnalysisDisplay({
   isAnalyzing,
   analysis,
   error,
+  onBallSequenceClick,
 }: AnalysisDisplayProps) {
   const hasResults = analysis || isAnalyzing || error;
 
@@ -104,7 +106,7 @@ function AnalysisDisplay({
       ) : analysis ? (
         <>
           <Box className="prose dark:prose-invert" style={{ maxWidth: "none", fontSize: "14px" }}>
-            <MarkdownWithSwings>{analysis}</MarkdownWithSwings>
+            <MarkdownWithSwings onBallSequenceClick={onBallSequenceClick}>{analysis}</MarkdownWithSwings>
           </Box>
           {isAnalyzing && <StreamingIndicator />}
         </>
@@ -185,6 +187,36 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
   const allShotsAnalyzedRef = useRef(false);
   const ballSequenceAnalyzedRef = useRef(false);
   const nicknamesGeneratedRef = useRef(false);
+  
+  // Ref for scrolling to ball sequence section
+  const ballSequenceSectionRef = useRef<HTMLDivElement>(null);
+  const [pendingScroll, setPendingScroll] = useState(false);
+
+  // Handle ball sequence clicks from analysis text - navigate to the appropriate tab
+  const handleBallSequenceClick = useCallback((ballSequence: { ballType: BallSequenceType; ballLabel: string; playerContext?: string }) => {
+    // Switch to ball-sequence sub-tab
+    setActiveSubTab("ball-sequence");
+    
+    // Find the ball tab that matches the ball type
+    const ballTab = BALL_TABS.find(tab => tab.ballType === ballSequence.ballType);
+    if (ballTab) {
+      setSelectedBall(ballTab.id);
+    }
+    
+    // Set pending scroll flag - will trigger scroll after render
+    setPendingScroll(true);
+  }, []);
+  
+  // Scroll to ball sequence section when it becomes visible and scroll is pending
+  useEffect(() => {
+    if (pendingScroll && activeSubTab === "ball-sequence" && ballSequenceSectionRef.current) {
+      ballSequenceSectionRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+      setPendingScroll(false);
+    }
+  }, [pendingScroll, activeSubTab]);
 
   // Extract shot data using reusable hooks
   const allShotsData = useAllShotsData({ result, playerDisplayNames });
@@ -646,6 +678,7 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
               isAnalyzing={allShotsAnalysis.isAnalyzing}
               analysis={allShotsAnalysis.analysis}
               error={allShotsAnalysis.error}
+              onBallSequenceClick={handleBallSequenceClick}
             />
           </Box>
         </Box>
@@ -653,7 +686,7 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
 
       {/* Ball Sequence Sub-Tab Content */}
       {activeSubTab === "ball-sequence" && (
-        <Flex direction="column" gap="4">
+        <Flex direction="column" gap="4" ref={ballSequenceSectionRef}>
           {/* Ball Sequence Analysis */}
           <Box>
             <Box mb="3">
@@ -828,6 +861,7 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
                 isAnalyzing={ballSequenceAnalysis.isAnalyzing}
                 analysis={ballSequenceAnalysis.analysis}
                 error={ballSequenceAnalysis.error}
+                onBallSequenceClick={handleBallSequenceClick}
               />
             </Box>
           </Box>

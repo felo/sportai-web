@@ -141,6 +141,158 @@
   opacity: 0.8;
 }
 
+/* Court Coordinate Highlights - Clickable grid positions */
+.coordinateHighlight {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 200, 50, 0.4);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+  font-weight: 600;
+  background-color: rgba(255, 200, 50, 0.15);
+  color: #b38600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  scroll-margin: 0;
+}
+
+.coordinateHighlight:hover {
+  background-color: rgba(255, 200, 50, 0.25);
+  border-color: rgba(255, 200, 50, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(255, 200, 50, 0.2);
+}
+
+/* Dark mode coordinate highlights */
+:global(html[data-theme="dark"]) .coordinateHighlight,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .coordinateHighlight {
+  background-color: rgba(255, 200, 50, 0.2);
+  color: #ffc832;
+  border-color: rgba(255, 200, 50, 0.4);
+}
+
+:global(html[data-theme="dark"]) .coordinateHighlight:hover,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .coordinateHighlight:hover {
+  background-color: rgba(255, 200, 50, 0.3);
+  border-color: rgba(255, 200, 50, 0.6);
+  box-shadow: 0 2px 4px rgba(255, 200, 50, 0.3);
+}
+
+/* Green theme coordinate highlights */
+:global(html[data-theme="green"]) .coordinateHighlight {
+  background-color: rgba(255, 200, 50, 0.2);
+  color: #ffc832;
+  border-color: rgba(255, 200, 50, 0.4);
+}
+
+:global(html[data-theme="green"]) .coordinateHighlight:hover {
+  background-color: rgba(255, 200, 50, 0.3);
+  border-color: rgba(255, 200, 50, 0.6);
+  box-shadow: 0 2px 4px rgba(255, 200, 50, 0.4);
+}
+
+/* Ball Sequence Highlights - Clickable ball type references */
+.ballSequenceHighlight {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(147, 112, 219, 0.4);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  background-color: rgba(147, 112, 219, 0.15);
+  color: #7c4dbd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  scroll-margin: 0;
+}
+
+.ballSequenceHighlight:hover {
+  background-color: rgba(147, 112, 219, 0.25);
+  border-color: rgba(147, 112, 219, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(147, 112, 219, 0.2);
+}
+
+/* Dark mode ball sequence highlights */
+:global(html[data-theme="dark"]) .ballSequenceHighlight,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .ballSequenceHighlight {
+  background-color: rgba(147, 112, 219, 0.2);
+  color: #b794f4;
+  border-color: rgba(147, 112, 219, 0.4);
+}
+
+:global(html[data-theme="dark"]) .ballSequenceHighlight:hover,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .ballSequenceHighlight:hover {
+  background-color: rgba(147, 112, 219, 0.3);
+  border-color: rgba(147, 112, 219, 0.6);
+  box-shadow: 0 2px 4px rgba(147, 112, 219, 0.3);
+}
+
+/* Green theme ball sequence highlights */
+:global(html[data-theme="green"]) .ballSequenceHighlight {
+  background-color: rgba(147, 112, 219, 0.2);
+  color: #b794f4;
+  border-color: rgba(147, 112, 219, 0.4);
+}
+
+:global(html[data-theme="green"]) .ballSequenceHighlight:hover {
+  background-color: rgba(147, 112, 219, 0.3);
+  border-color: rgba(147, 112, 219, 0.6);
+  box-shadow: 0 2px 4px rgba(147, 112, 219, 0.4);
+}
+
+/* Court Position Highlights - Shot directions and court zones */
+.courtPositionHighlight {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 178, 172, 0.4);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  background-color: rgba(56, 178, 172, 0.15);
+  color: #2c9a94;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.courtPositionHighlight:hover {
+  background-color: rgba(56, 178, 172, 0.25);
+  border-color: rgba(56, 178, 172, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(56, 178, 172, 0.2);
+}
+
+/* Dark mode court position highlights */
+:global(html[data-theme="dark"]) .courtPositionHighlight,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .courtPositionHighlight {
+  background-color: rgba(56, 178, 172, 0.2);
+  color: #4fd1c5;
+  border-color: rgba(56, 178, 172, 0.4);
+}
+
+:global(html[data-theme="dark"]) .courtPositionHighlight:hover,
+:global(html:not([data-theme="green"]) [data-radix-theme][data-radix-theme-appearance="dark"]) .courtPositionHighlight:hover {
+  background-color: rgba(56, 178, 172, 0.3);
+  border-color: rgba(56, 178, 172, 0.6);
+  box-shadow: 0 2px 4px rgba(56, 178, 172, 0.3);
+}
+
+/* Green theme court position highlights */
+:global(html[data-theme="green"]) .courtPositionHighlight {
+  background-color: rgba(56, 178, 172, 0.2);
+  color: #4fd1c5;
+  border-color: rgba(56, 178, 172, 0.4);
+}
+
+:global(html[data-theme="green"]) .courtPositionHighlight:hover {
+  background-color: rgba(56, 178, 172, 0.3);
+  border-color: rgba(56, 178, 172, 0.6);
+  box-shadow: 0 2px 4px rgba(56, 178, 172, 0.4);
+}
+
 /* API Version Tooltip Styling */
 .apiVersionTooltip {
   padding: 2px 0;
