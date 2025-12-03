@@ -12,3 +12,4 @@ export { useInView } from "./useInView";
 export type { UseInViewOptions, UseInViewResult } from "./useInView";
 export { useServeData, useReturnData, useThirdBallData, useFourthBallData, useFifthBallData, useAllShotsData } from "./useShotAnalysis";
 export { useVideoThumbnails } from "./useVideoThumbnails";
+export { useHighlightThumbnails } from "./useHighlightThumbnails";

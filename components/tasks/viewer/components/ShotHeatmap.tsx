@@ -239,6 +239,9 @@ interface PlayerShotCardProps {
   countLabel: string; // "serve", "return", "shot"
   ballType?: BallSequenceType; // For tactical analysis
   sport?: DomainExpertise; // For domain-specific analysis
+  portrait?: string; // Player portrait image URL
+  nickname?: string; // AI-generated player nickname
+  nicknameLoading?: boolean; // Whether nickname is being generated
 }
 
 // CSS keyframes for cell bounce animation
@@ -277,12 +280,27 @@ function getTrajectoryStagger(numTrajectories: number): number {
   return Math.max(30, availableTime / (numTrajectories - 1)); // minimum 30ms stagger
 }
 
+// Nickname shimmer animation keyframes
+const nicknameShimmerKeyframes = `
+@keyframes nicknameShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+`;
+
 // Reusable player shot card component
 export function PlayerShotCard({ 
   data, 
   shotLabel, 
   originLabel, 
   countLabel,
+  portrait,
+  nickname,
+  nicknameLoading,
 }: PlayerShotCardProps) {
   const [hoveredCell, setHoveredCell] = useState<{ col: number; row: number } | null>(null);
   const [cellsAnimating, setCellsAnimating] = useState(false);
@@ -335,13 +353,109 @@ export function PlayerShotCard({
   const cellWidth = 100 / GRID_COLS;
   const cellHeight = 100 / GRID_ROWS;
 
+  // Get initials for fallback avatar
+  const initials = data.displayName
+    .split(/\s+/)
+    .map(n => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <Card style={{ border: "1px solid var(--gray-6)", overflow: "visible" }}>
+      {/* Inject nickname shimmer keyframes */}
+      <style dangerouslySetInnerHTML={{ __html: nicknameShimmerKeyframes }} />
+      
       <Flex direction="column" gap="3" p="4">
-        {/* Header */}
-        <Flex justify="between" align="center">
-          <Heading size="3" weight="medium">{data.displayName}</Heading>
-          <Badge color="gray" variant="soft">
+        {/* Header with Portrait */}
+        <Flex justify="between" align="start" gap="3">
+          <Flex align="center" gap="3">
+            {/* Player Portrait */}
+            <Box
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "3px solid var(--accent-9)",
+                backgroundColor: portrait ? "transparent" : "var(--accent-9)",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+              }}
+            >
+              {portrait ? (
+                <img
+                  src={portrait}
+                  alt={data.displayName}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "top",
+                  }}
+                />
+              ) : (
+                <Text size="4" weight="bold" style={{ color: "white" }}>
+                  {initials}
+                </Text>
+              )}
+            </Box>
+            
+            {/* Name & Nickname - Always two lines */}
+            <Flex direction="column" gap="0" style={{ minWidth: 0, flex: 1 }}>
+              {/* Line 1: Player Name */}
+              <Box style={{ height: 22, display: "flex", alignItems: "center" }}>
+                <Heading 
+                  size="3" 
+                  weight="medium" 
+                  style={{ 
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {data.displayName}
+                </Heading>
+              </Box>
+              {/* Line 2: Nickname */}
+              <Box style={{ height: 20, display: "flex", alignItems: "center" }}>
+                {nicknameLoading ? (
+                  <Box
+                    style={{
+                      height: 14,
+                      width: 100,
+                      borderRadius: "var(--radius-2)",
+                      background: "linear-gradient(90deg, var(--gray-4) 25%, var(--gray-3) 50%, var(--gray-4) 75%)",
+                      backgroundSize: "200% 100%",
+                      animation: "nicknameShimmer 1.5s ease-in-out infinite",
+                    }}
+                  />
+                ) : nickname ? (
+                  <Text 
+                    size="2" 
+                    style={{ 
+                      color: "rgba(255, 200, 50, 1)",
+                      fontWeight: 500,
+                      lineHeight: 1.2,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {nickname}
+                  </Text>
+                ) : (
+                  <Text size="2" color="gray" style={{ opacity: 0.4, lineHeight: 1.2 }}>—</Text>
+                )}
+              </Box>
+            </Flex>
+          </Flex>
+          
+          <Badge color="gray" variant="soft" style={{ flexShrink: 0 }}>
             {data.totalShots} {countLabel}{data.totalShots !== 1 ? "s" : ""}
           </Badge>
         </Flex>
@@ -704,6 +818,9 @@ interface ShotHeatmapProps {
   emptyMessage: string;
   ballType?: BallSequenceType;
   sport?: DomainExpertise;
+  portraits?: Record<number, string>;
+  nicknames?: Record<number, string>;
+  nicknamesLoading?: boolean;
 }
 
 // Reusable shot heatmap container
@@ -715,6 +832,9 @@ export function ShotHeatmap({
   emptyMessage,
   ballType = "serve",
   sport = "padel",
+  portraits = {},
+  nicknames = {},
+  nicknamesLoading = false,
 }: ShotHeatmapProps) {
   const playersWithShots = data
     .filter(d => d.totalShots > 0)
@@ -752,6 +872,9 @@ export function ShotHeatmap({
             countLabel={countLabel}
             ballType={ballType}
             sport={sport}
+            portrait={portraits[playerData.playerId]}
+            nickname={nicknames[playerData.playerId]}
+            nicknameLoading={nicknamesLoading}
           />
         ))}
       </Box>

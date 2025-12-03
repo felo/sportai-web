@@ -32,5 +32,5 @@ export { Confetti, Medal, MedalDisplay, ProgressRing, RING_GRADIENTS, RING_ICONS
 export type { MedalConfig, ProgressRingProps, ProgressRingGradient } from "./shared";
 
 // Tab content components
-export { RalliesTab, SummaryTab, PlayersTab, TeamsTab, HighlightsTab, TacticalTab, TechniqueTab } from "./tabs";
+export { RalliesTab, SummaryTab, PlayersTab, TeamsTab, HighlightsTab, TacticalTab, ProfilesTab, TechniqueTab, CoachingTab } from "./tabs";
 

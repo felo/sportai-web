@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Box, Flex, Text, Heading, Card } from "@radix-ui/themes";
-import { TargetIcon, StackIcon, LayersIcon } from "@radix-ui/react-icons";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Box, Flex, Text, Heading, Card, DropdownMenu, IconButton, Badge } from "@radix-ui/themes";
+import { TargetIcon, StackIcon, LayersIcon, MixerHorizontalIcon, Cross2Icon, CheckIcon, GridIcon } from "@radix-ui/react-icons";
 import { StatisticsResult, BallBounce } from "../../types";
 import { ShotHeatmap, PlayerShotData } from "../ShotHeatmap";
-import type { BallSequenceType } from "@/types/tactical-analysis";
+import { CourtDominanceView } from "../CourtDominanceView";
+import type { BallSequenceType, PlayerTacticalData } from "@/types/tactical-analysis";
 import { convertToTacticalData } from "@/types/tactical-analysis";
 import { useTacticalAnalysis } from "@/hooks/useTacticalAnalysis";
+import { usePlayerNicknames } from "@/hooks/usePlayerNicknames";
 import { MarkdownWithSwings } from "@/components/markdown";
 import { CollapsibleSection } from "@/components/ui";
 import { StreamingIndicator } from "@/components/chat";
+import { formatSwingType } from "../../utils";
 import { 
   useServeData, 
   useReturnData, 
@@ -24,10 +27,11 @@ interface TacticalTabProps {
   result: StatisticsResult | null;
   enhancedBallBounces: BallBounce[];
   playerDisplayNames?: Record<number, string>;
+  portraits?: Record<number, string>;
 }
 
 // High-level sub-tabs
-type TacticalSubTab = "all-shots" | "ball-sequence";
+type TacticalSubTab = "all-shots" | "ball-sequence" | "court-dominance";
 
 const SUB_TABS: Array<{
   id: TacticalSubTab;
@@ -46,6 +50,12 @@ const SUB_TABS: Array<{
     label: "Ball Sequence", 
     icon: <StackIcon width={16} height={16} />,
     description: "Analyze shot patterns through the rally sequence"
+  },
+  { 
+    id: "court-dominance", 
+    label: "Court Dominance", 
+    icon: <GridIcon width={16} height={16} />,
+    description: "Player positioning and territory control"
   },
 ];
 
@@ -165,13 +175,16 @@ function buildBallSequenceData(
   }).filter(p => p.ballTypes.length > 0);
 }
 
-export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = {} }: TacticalTabProps) {
+export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = {}, portraits = {} }: TacticalTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<TacticalSubTab>("all-shots");
   const [selectedBall, setSelectedBall] = useState(1);
+  const [selectedSwingType, setSelectedSwingType] = useState<string | null>(null);
+  const [selectedBallSwingType, setSelectedBallSwingType] = useState<string | null>(null);
   
   // Track if we've already triggered analysis for each tab
   const allShotsAnalyzedRef = useRef(false);
   const ballSequenceAnalyzedRef = useRef(false);
+  const nicknamesGeneratedRef = useRef(false);
 
   // Extract shot data using reusable hooks
   const allShotsData = useAllShotsData({ result, playerDisplayNames });
@@ -180,6 +193,92 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
   const thirdBallData = useThirdBallData({ result, playerDisplayNames });
   const fourthBallData = useFourthBallData({ result, playerDisplayNames });
   const fifthBallData = useFifthBallData({ result, playerDisplayNames });
+
+  // Extract unique swing types from all shots data
+  const availableSwingTypes = useMemo(() => {
+    const swingTypes = new Set<string>();
+    allShotsData.forEach(player => {
+      player.pairs.forEach(pair => {
+        if (pair.swingType) {
+          swingTypes.add(pair.swingType);
+        }
+      });
+    });
+    return Array.from(swingTypes).sort();
+  }, [allShotsData]);
+
+  // Filter shot data by swing type
+  const filteredAllShotsData = useMemo((): PlayerShotData[] => {
+    if (!selectedSwingType) return allShotsData;
+    
+    return allShotsData.map(player => {
+      // Filter pairs by swing type
+      const filteredPairs = player.pairs.filter(p => p.swingType === selectedSwingType);
+      
+      if (filteredPairs.length === 0) {
+        return {
+          ...player,
+          origins: player.origins.map(row => row.map(() => 0)),
+          landings: player.landings.map(row => row.map(() => 0)),
+          pairs: [],
+          originDetails: player.originDetails?.map(row => row.map(() => [])) || [],
+          landingDetails: player.landingDetails?.map(row => row.map(() => [])) || [],
+          avgSpeed: 0,
+          topSpeed: 0,
+          totalShots: 0,
+        };
+      }
+      
+      // Rebuild grids from filtered pairs
+      const origins = player.origins.map(row => row.map(() => 0));
+      const landings = player.landings.map(row => row.map(() => 0));
+      const originDetails = player.origins.map(row => row.map(() => [] as any[]));
+      const landingDetails = player.landings.map(row => row.map(() => [] as any[]));
+      
+      let totalSpeed = 0;
+      let topSpeed = 0;
+      
+      filteredPairs.forEach(pair => {
+        origins[pair.originRow][pair.originCol]++;
+        landings[pair.landingRow][pair.landingCol]++;
+        
+        originDetails[pair.originRow][pair.originCol].push({
+          swingType: pair.swingType,
+          speed: pair.speed,
+          isOrigin: true,
+        });
+        landingDetails[pair.landingRow][pair.landingCol].push({
+          swingType: pair.swingType,
+          speed: pair.speed,
+          isOrigin: false,
+        });
+        
+        if (pair.speed > 0) {
+          totalSpeed += pair.speed;
+          topSpeed = Math.max(topSpeed, pair.speed);
+        }
+      });
+      
+      const avgSpeed = filteredPairs.length > 0 ? totalSpeed / filteredPairs.length : 0;
+      
+      return {
+        ...player,
+        origins,
+        landings,
+        pairs: filteredPairs,
+        originDetails,
+        landingDetails,
+        avgSpeed,
+        topSpeed,
+        totalShots: filteredPairs.length,
+      };
+    });
+  }, [allShotsData, selectedSwingType]);
+
+  // Player nicknames hook
+  const { nicknames, isGenerating: nicknamesLoading, generate: generateNicknames } = usePlayerNicknames({
+    sport: "padel",
+  });
 
   // Separate tactical analysis hooks for each sub-tab
   const allShotsAnalysis = useTacticalAnalysis({ sport: "padel" });
@@ -195,6 +294,114 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
   };
 
   const hasAllShotsData = allShotsData.length > 0 && allShotsData.some(d => d.totalShots > 0);
+
+  // Get current ball data
+  const currentBallData = ballDataMap[selectedBall] || [];
+
+  // Extract unique swing types from current ball data
+  const availableBallSwingTypes = useMemo(() => {
+    const swingTypes = new Set<string>();
+    currentBallData.forEach(player => {
+      player.pairs.forEach(pair => {
+        if (pair.swingType) {
+          swingTypes.add(pair.swingType);
+        }
+      });
+    });
+    return Array.from(swingTypes).sort();
+  }, [currentBallData]);
+
+  // Reset ball swing type filter when ball tab changes
+  useEffect(() => {
+    setSelectedBallSwingType(null);
+  }, [selectedBall]);
+
+  // Filter ball data by swing type
+  const filteredBallData = useMemo((): PlayerShotData[] => {
+    if (!selectedBallSwingType) return currentBallData;
+    
+    return currentBallData.map(player => {
+      const filteredPairs = player.pairs.filter(p => p.swingType === selectedBallSwingType);
+      
+      if (filteredPairs.length === 0) {
+        return {
+          ...player,
+          origins: player.origins.map(row => row.map(() => 0)),
+          landings: player.landings.map(row => row.map(() => 0)),
+          pairs: [],
+          originDetails: player.originDetails?.map(row => row.map(() => [])) || [],
+          landingDetails: player.landingDetails?.map(row => row.map(() => [])) || [],
+          avgSpeed: 0,
+          topSpeed: 0,
+          totalShots: 0,
+        };
+      }
+      
+      const origins = player.origins.map(row => row.map(() => 0));
+      const landings = player.landings.map(row => row.map(() => 0));
+      const originDetails = player.origins.map(row => row.map(() => [] as any[]));
+      const landingDetails = player.landings.map(row => row.map(() => [] as any[]));
+      
+      let totalSpeed = 0;
+      let topSpeed = 0;
+      
+      filteredPairs.forEach(pair => {
+        origins[pair.originRow][pair.originCol]++;
+        landings[pair.landingRow][pair.landingCol]++;
+        
+        originDetails[pair.originRow][pair.originCol].push({
+          swingType: pair.swingType,
+          speed: pair.speed,
+          isOrigin: true,
+        });
+        landingDetails[pair.landingRow][pair.landingCol].push({
+          swingType: pair.swingType,
+          speed: pair.speed,
+          isOrigin: false,
+        });
+        
+        if (pair.speed > 0) {
+          totalSpeed += pair.speed;
+          topSpeed = Math.max(topSpeed, pair.speed);
+        }
+      });
+      
+      const avgSpeed = filteredPairs.length > 0 ? totalSpeed / filteredPairs.length : 0;
+      
+      return {
+        ...player,
+        origins,
+        landings,
+        pairs: filteredPairs,
+        originDetails,
+        landingDetails,
+        avgSpeed,
+        topSpeed,
+        totalShots: filteredPairs.length,
+      };
+    });
+  }, [currentBallData, selectedBallSwingType]);
+
+  // Build tactical data for nickname generation
+  const tacticalDataForNicknames = useMemo((): PlayerTacticalData[] => {
+    return allShotsData
+      .filter(d => d.totalShots > 0)
+      .map(playerData => convertToTacticalData(playerData));
+  }, [allShotsData]);
+
+  // Auto-generate nicknames when we have shot data
+  useEffect(() => {
+    if (
+      hasAllShotsData &&
+      !nicknamesGeneratedRef.current &&
+      !nicknamesLoading &&
+      Object.keys(nicknames).length === 0 &&
+      tacticalDataForNicknames.length > 0
+    ) {
+      nicknamesGeneratedRef.current = true;
+      generateNicknames(tacticalDataForNicknames);
+    }
+  }, [hasAllShotsData, nicknamesLoading, nicknames, tacticalDataForNicknames, generateNicknames]);
 
   // Auto-trigger All Shots analysis when tab is active
   useEffect(() => {
@@ -253,7 +460,6 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
   }
 
   const currentTab = BALL_TABS.find(t => t.id === selectedBall) || BALL_TABS[0];
-  const currentData = ballDataMap[selectedBall] || [];
 
   return (
     <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
@@ -304,35 +510,116 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
             }}
           >
             <Flex direction="column" gap="3">
-              <Flex align="center" gap="2">
-                <Box
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    background: "var(--accent-9)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <LayersIcon width={14} height={14} style={{ color: "white" }} />
-                </Box>
-                <Heading size="3" weight="medium">Shot Placement Overview</Heading>
+              <Flex align="center" justify="between">
+                <Flex align="center" gap="2">
+                  <Box
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "var(--accent-9)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LayersIcon width={14} height={14} style={{ color: "white" }} />
+                  </Box>
+                  <Heading size="3" weight="medium">Shot Placement Overview</Heading>
+                  {selectedSwingType && (
+                    <Badge 
+                      color="green" 
+                      variant="soft"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setSelectedSwingType(null)}
+                    >
+                      {formatSwingType(selectedSwingType)}
+                      <Cross2Icon width={12} height={12} style={{ marginLeft: 4 }} />
+                    </Badge>
+                  )}
+                </Flex>
+                
+                {/* Filter Dropdown */}
+                {availableSwingTypes.length > 0 && (
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger>
+                      <IconButton
+                        variant="soft"
+                        size="2"
+                        style={{
+                          position: "relative",
+                        }}
+                      >
+                        <MixerHorizontalIcon width={16} height={16} />
+                        {selectedSwingType && (
+                          <Box
+                            style={{
+                              position: "absolute",
+                              top: -2,
+                              right: -2,
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: "var(--accent-9)",
+                            }}
+                          />
+                        )}
+                      </IconButton>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Label>Filter by Shot Type</DropdownMenu.Label>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Item
+                        onClick={() => setSelectedSwingType(null)}
+                        style={{ 
+                          fontWeight: !selectedSwingType ? 600 : 400,
+                          color: !selectedSwingType ? "var(--accent-11)" : undefined,
+                        }}
+                      >
+                        <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
+                          <span>All Shots</span>
+                          {!selectedSwingType && <CheckIcon width={16} height={16} />}
+                        </Flex>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      {availableSwingTypes.map(swingType => (
+                        <DropdownMenu.Item
+                          key={swingType}
+                          onClick={() => setSelectedSwingType(swingType)}
+                          style={{ 
+                            fontWeight: selectedSwingType === swingType ? 600 : 400,
+                            color: selectedSwingType === swingType ? "var(--accent-11)" : undefined,
+                          }}
+                        >
+                          <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
+                            <span>{formatSwingType(swingType)}</span>
+                            {selectedSwingType === swingType && <CheckIcon width={16} height={16} />}
+                          </Flex>
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
+                )}
               </Flex>
               <Text size="2" color="gray">
-                All shots from all players combined - see where shots originate and land
+                {selectedSwingType 
+                  ? `Showing ${formatSwingType(selectedSwingType)} shots only`
+                  : "All shots from all players combined - see where shots originate and land"
+                }
               </Text>
               
               {hasAllShotsData ? (
                 <ShotHeatmap
-                  data={allShotsData}
-                  shotLabel="Shot"
+                  data={filteredAllShotsData}
+                  shotLabel={selectedSwingType ? formatSwingType(selectedSwingType) : "Shot"}
                   originLabel="Shot position"
                   countLabel="shot"
                   emptyMessage="No shot data available"
                   ballType="serve"
                   sport="padel"
+                  portraits={portraits}
+                  nicknames={nicknames}
+                  nicknamesLoading={nicknamesLoading}
                 />
               ) : (
                 <Card style={{ border: "1px solid var(--gray-5)" }}>
@@ -419,34 +706,117 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
               }}
             >
               <Flex direction="column" gap="3">
-                <Flex align="center" gap="2">
-                  <Box
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "50%",
-                      background: "var(--accent-9)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text size="2" weight="bold" style={{ color: "white" }}>
-                      {currentTab.id}
-                    </Text>
-                  </Box>
-                  <Heading size="3" weight="medium">{currentTab.name}</Heading>
+                <Flex align="center" justify="between">
+                  <Flex align="center" gap="2">
+                    <Box
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: "var(--accent-9)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text size="2" weight="bold" style={{ color: "white" }}>
+                        {currentTab.id}
+                      </Text>
+                    </Box>
+                    <Heading size="3" weight="medium">{currentTab.name}</Heading>
+                    {selectedBallSwingType && (
+                      <Badge 
+                        color="green" 
+                        variant="soft"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setSelectedBallSwingType(null)}
+                      >
+                        {formatSwingType(selectedBallSwingType)}
+                        <Cross2Icon width={12} height={12} style={{ marginLeft: 4 }} />
+                      </Badge>
+                    )}
+                  </Flex>
+                  
+                  {/* Filter Dropdown */}
+                  {availableBallSwingTypes.length > 0 && (
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger>
+                        <IconButton
+                          variant="soft"
+                          size="2"
+                          style={{
+                            position: "relative",
+                          }}
+                        >
+                          <MixerHorizontalIcon width={16} height={16} />
+                          {selectedBallSwingType && (
+                            <Box
+                              style={{
+                                position: "absolute",
+                                top: -2,
+                                right: -2,
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: "var(--accent-9)",
+                              }}
+                            />
+                          )}
+                        </IconButton>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Label>Filter by Shot Type</DropdownMenu.Label>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          onClick={() => setSelectedBallSwingType(null)}
+                          style={{ 
+                            fontWeight: !selectedBallSwingType ? 600 : 400,
+                            color: !selectedBallSwingType ? "var(--accent-11)" : undefined,
+                          }}
+                        >
+                          <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
+                            <span>All Shots</span>
+                            {!selectedBallSwingType && <CheckIcon width={16} height={16} />}
+                          </Flex>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator />
+                        {availableBallSwingTypes.map(swingType => (
+                          <DropdownMenu.Item
+                            key={swingType}
+                            onClick={() => setSelectedBallSwingType(swingType)}
+                            style={{ 
+                              fontWeight: selectedBallSwingType === swingType ? 600 : 400,
+                              color: selectedBallSwingType === swingType ? "var(--accent-11)" : undefined,
+                            }}
+                          >
+                            <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
+                              <span>{formatSwingType(swingType)}</span>
+                              {selectedBallSwingType === swingType && <CheckIcon width={16} height={16} />}
+                            </Flex>
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Root>
+                  )}
                 </Flex>
-                <Text size="2" color="gray">{currentTab.description}</Text>
+                <Text size="2" color="gray">
+                  {selectedBallSwingType 
+                    ? `Showing ${formatSwingType(selectedBallSwingType)} shots only`
+                    : currentTab.description
+                  }
+                </Text>
                 
                 <ShotHeatmap
-                  data={currentData}
-                  shotLabel={currentTab.name}
+                  data={filteredBallData}
+                  shotLabel={selectedBallSwingType ? formatSwingType(selectedBallSwingType) : currentTab.name}
                   originLabel={currentTab.originLabel}
                   countLabel={currentTab.countLabel}
                   emptyMessage={`No ${currentTab.name.toLowerCase()} data available`}
                   ballType={currentTab.ballType}
                   sport="padel"
+                  portraits={portraits}
+                  nicknames={nicknames}
+                  nicknamesLoading={nicknamesLoading}
                 />
               </Flex>
             </Box>
@@ -462,6 +832,15 @@ export function TacticalTab({ result, enhancedBallBounces, playerDisplayNames = 
             </Box>
           </Box>
         </Flex>
+      )}
+
+      {/* Court Dominance Sub-Tab Content */}
+      {activeSubTab === "court-dominance" && (
+        <CourtDominanceView
+          result={result}
+          playerDisplayNames={playerDisplayNames}
+          portraits={portraits}
+        />
       )}
     </Box>
   );

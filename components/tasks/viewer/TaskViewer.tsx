@@ -10,6 +10,8 @@ import {
   StarIcon,
   TargetIcon,
   MixIcon,
+  ActivityLogIcon,
+  ChatBubbleIcon,
 } from "@radix-ui/react-icons";
 
 // Custom two-person team icon matching Radix style
@@ -45,7 +47,9 @@ import {
   TeamsTab,
   HighlightsTab,
   TacticalTab,
+  ProfilesTab,
   TechniqueTab,
+  CoachingTab,
 } from "./components";
 import type { TabDefinition } from "./components";
 
@@ -53,7 +57,7 @@ interface TaskViewerProps {
   paramsPromise: Promise<{ taskId: string }>;
 }
 
-type TabId = "rallies" | "summary" | "players" | "teams" | "highlights" | "tactical" | "technique";
+type TabId = "rallies" | "summary" | "players" | "teams" | "highlights" | "tactical" | "profiles" | "coaching" | "technique";
 
 export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const params = use(paramsPromise);
@@ -181,10 +185,11 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     { 
       id: "highlights", 
       label: "Highlights", 
-      icon: <StarIcon width={16} height={16} />, 
-      disabled: true 
+      icon: <StarIcon width={16} height={16} />,
     },
     { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
+    { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
+    { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} /> },
     { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
   ], [validPlayers.length, teamCount, result?.highlights?.length]);
 
@@ -312,8 +317,11 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
         {activeTab === "highlights" && (
           <HighlightsTab
-            highlights={result?.highlights}
+            result={result}
             videoRef={videoRef}
+            videoUrl={task?.video_url}
+            portraits={portraits}
+            playerDisplayNames={playerDisplayNames}
           />
         )}
 
@@ -322,6 +330,25 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             result={result}
             enhancedBallBounces={enhancedBallBounces}
             playerDisplayNames={playerDisplayNames}
+            portraits={portraits}
+          />
+        )}
+
+        {activeTab === "profiles" && (
+          <ProfilesTab
+            result={result}
+            rankings={rankings}
+            portraits={portraits}
+            playerDisplayNames={playerDisplayNames}
+          />
+        )}
+
+        {activeTab === "coaching" && (
+          <CoachingTab
+            result={result}
+            rankings={rankings}
+            playerDisplayNames={playerDisplayNames}
+            sport={task?.sport}
           />
         )}
 

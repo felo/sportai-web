@@ -594,14 +594,14 @@ function TeamCard({
                   height: 72,
                   borderRadius: "50%",
                   overflow: "hidden",
-                  border: `3px solid ${colors.accent}`,
+                  border: "3px solid var(--mint-9)",
                   backgroundColor: "var(--gray-3)",
                   marginLeft: idx > 0 ? -20 : 0,
                   zIndex: team.playerIds.length - idx,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: `0 4px 12px ${colors.primary}30`,
+                  boxShadow: "0 4px 12px rgba(45, 212, 191, 0.3)",
                 }}
               >
                 {portraits[playerId] ? (

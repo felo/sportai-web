@@ -46,6 +46,7 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: portrait ? "transparent" : "var(--mint-9)",
+              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.3)",
             }}
           >
             {portrait ? (

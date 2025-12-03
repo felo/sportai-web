@@ -832,20 +832,26 @@ export function AIChatForm() {
     }
   }, [messages, scrollToBottom, shouldAutoScroll, showingVideoSizeError]);
 
-  // Generate AI title after first exchange completes
+  // Generate AI title after first real analysis completes
   useEffect(() => {
     if (!isHydrated) return;
     
-    // Only generate title for first exchange (user + assistant)
+    // Only generate title after first real exchange (user + assistant analysis)
     // Note: might be multiple user messages if video + text were sent separately
     const userMessages = messages.filter(m => m.role === "user");
-    const assistantMessages = messages.filter(m => m.role === "assistant");
+    // Filter out analysis_options messages - they don't count as "real" assistant responses
+    // Also filter out short system messages like the library notification
+    const realAnalysisMessages = messages.filter(m => 
+      m.role === "assistant" && 
+      m.messageType !== "analysis_options" &&
+      m.content.trim().length > 100 // Real analysis responses are substantial
+    );
     
-    // Check if we have at least one user message and exactly one assistant message
-    // And the assistant message is complete (we're not loading anymore)
+    // Check if we have at least one user message and at least one real analysis response
+    // And the response is complete (not streaming) and we're not loading
     if (userMessages.length >= 1 && 
-        assistantMessages.length === 1 && 
-        assistantMessages[0].content.trim().length > 0 &&
+        realAnalysisMessages.length >= 1 && 
+        !realAnalysisMessages[0].isStreaming &&
         !loading) { 
       
       const currentChatId = getCurrentChatId();
