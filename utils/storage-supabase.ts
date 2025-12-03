@@ -280,6 +280,61 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
   try {
     console.log("[Supabase] Saving chat:", chat.id, "for user:", userId);
     
+    // Verify the session is valid and auth.uid() will match the userId
+    // This prevents RLS violations when the session is stale
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error("[Supabase] Session error while saving chat:", sessionError);
+      return false;
+    }
+    
+    if (!session) {
+      console.error("[Supabase] No active session, cannot save chat to Supabase");
+      return false;
+    }
+    
+    // Verify the session user matches the userId we're trying to save
+    if (session.user.id !== userId) {
+      console.error("[Supabase] Session user mismatch! Session:", session.user.id, "Expected:", userId);
+      console.error("[Supabase] This could indicate a stale session or auth state inconsistency");
+      return false;
+    }
+    
+    // Check if the token might be expired (Supabase auto-refreshes, but let's be safe)
+    const tokenExpiry = session.expires_at;
+    if (tokenExpiry) {
+      const expiresAt = new Date(tokenExpiry * 1000);
+      const now = new Date();
+      if (expiresAt <= now) {
+        console.error("[Supabase] Session token appears expired, attempting refresh...");
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          console.error("[Supabase] Failed to refresh session:", refreshError);
+          return false;
+        }
+        console.log("[Supabase] Session refreshed successfully");
+      }
+    }
+    
+    // First, check if the chat already exists and belongs to a different user
+    // This prevents RLS violations when trying to insert messages for a chat
+    // that exists but is owned by another user
+    const { data: existingChat, error: checkError } = await supabase
+      .from("chats")
+      .select("id, user_id")
+      .eq("id", chat.id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error("[Supabase] Error checking existing chat:", checkError.message);
+      // Continue anyway - the upsert will handle it
+    } else if (existingChat && existingChat.user_id !== userId) {
+      console.error("[Supabase] Chat ownership mismatch! Chat belongs to:", existingChat.user_id, "Current user:", userId);
+      console.error("[Supabase] Cannot update chat owned by another user. This could be a chat ID collision.");
+      return false;
+    }
+    
     // Use UPSERT to avoid race conditions
     // This handles both insert and update atomically
     const chatUpsert = {
@@ -310,6 +365,12 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         console.error("[Supabase] The profile should be created by a database trigger.");
       }
       
+      // Check if it's an RLS violation
+      if (chatError.code === "42501") {
+        console.error("[Supabase] RLS violation - user may not have permission to upsert this chat");
+        console.error("[Supabase] This could indicate the chat belongs to another user");
+      }
+      
       // Log detailed error information
       console.error("[Supabase] Chat save failed for:", {
         chatId: chat.id,
@@ -338,6 +399,21 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
 
       if (messagesError) {
         console.error("[Supabase] Error upserting messages:", messagesError.message, messagesError.code);
+        
+        // Check if it's an RLS violation
+        if (messagesError.code === "42501") {
+          console.error("[Supabase] RLS violation on messages table. Possible causes:");
+          console.error("  1. Session token may have expired during the request");
+          console.error("  2. Chat ownership mismatch (chat.user_id != auth.uid())");
+          console.error("  3. Chat was not properly created before inserting messages");
+          console.error("[Supabase] Debug info:", {
+            chatId: chat.id,
+            userId,
+            messageCount: messageInserts.length,
+            sessionUserId: session?.user?.id,
+          });
+        }
+        
         return false;
       }
       console.log("[Supabase] Messages upserted successfully");

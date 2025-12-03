@@ -120,6 +120,9 @@ export function getQueryComplexity(
  * Convert messages to Gemini chat format
  * Gemini expects: [{ role: "user", parts: [{ text: "..." }] }, { role: "model", parts: [{ text: "..." }] }]
  * 
+ * IMPORTANT: Gemini requires the first message to have role "user".
+ * This function removes any leading "model" messages to ensure compliance.
+ * 
  * Note: We filter out truly empty messages but KEEP messages that have video/media
  * even if their text content is empty, by adding a reference to the video.
  */
@@ -157,6 +160,13 @@ export function formatMessagesForGemini(messages: Message[]): Array<{
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: content }],
     });
+  }
+  
+  // CRITICAL: Gemini API requires the first message to be from "user"
+  // Remove any leading "model" messages to prevent "First content should be with role 'user'" error
+  while (result.length > 0 && result[0].role === "model") {
+    console.log("🔍 [formatMessagesForGemini] Removing leading model message to ensure first message is user");
+    result.shift();
   }
   
   console.log("🔍 [formatMessagesForGemini] Output messages:", result.length);

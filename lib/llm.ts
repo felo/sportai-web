@@ -452,6 +452,20 @@ export async function queryLLM(
       stack: error?.stack,
     });
     
+    // Handle Google Generative AI specific errors with user-friendly messages
+    // Don't expose raw Google error messages to users
+    if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
+      logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
+      
+      // Handle conversation history errors
+      if (error?.message?.includes("First content should be with role")) {
+        throw new Error("Something went wrong with the conversation. Please try again.");
+      }
+      
+      // Handle other Google-specific errors
+      throw new Error("The AI service encountered an issue. Please try again.");
+    }
+    
     // Handle rate limiting (429) - check both direct and nested status
     const status = error?.status || error?.response?.status;
     if (status === 429) {
@@ -767,6 +781,20 @@ export async function streamLLM(
       statusText: error?.statusText,
       errorDetails: error?.errorDetails,
     });
+    
+    // Handle Google Generative AI specific errors with user-friendly messages
+    // Don't expose raw Google error messages to users
+    if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
+      logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
+      
+      // Handle conversation history errors
+      if (error?.message?.includes("First content should be with role")) {
+        throw new Error("Something went wrong with the conversation. Please try again.");
+      }
+      
+      // Handle other Google-specific errors
+      throw new Error("The AI service encountered an issue. Please try again.");
+    }
     
     // Provide more helpful error messages for common issues
     if (error?.status === 500 || error?.statusText === "Internal Server Error") {

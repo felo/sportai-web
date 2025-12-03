@@ -150,7 +150,7 @@ function buildBallSequenceData(
     if (d.totalShots > 0) allPlayerIds.add(d.playerId);
   });
   
-  return Array.from(allPlayerIds).map(playerId => {
+  return Array.from(allPlayerIds).sort((a, b) => a - b).map(playerId => {
     const servePlayer = serveData.find(d => d.playerId === playerId);
     const returnPlayer = returnData.find(d => d.playerId === playerId);
     const thirdPlayer = thirdBallData.find(d => d.playerId === playerId);

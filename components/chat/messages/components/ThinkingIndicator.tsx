@@ -47,10 +47,15 @@ export function ThinkingIndicator({ message, showProgressBar = false, uploadProg
     return () => clearInterval(interval);
   }, [showProgressBar, uploadProgress]);
 
+  // Show progress bar for:
+  // 1. Upload stage (uploadProgress is defined)
+  // 2. Analysis stage (showProgressBar is true, after user selects Free/PRO)
+  const shouldShowProgressBar = showProgressBar || uploadProgress !== undefined;
+
   return (
     <Box style={{ width: "100%" }}>
-      {/* Progress Bar - shown for video analysis */}
-      {showProgressBar && (
+      {/* Progress Bar - shown for upload or video analysis */}
+      {shouldShowProgressBar && (
         <Box style={{ marginBottom: "16px" }}>
           {/* Progress Bar Container - fixed 320px width */}
           <div

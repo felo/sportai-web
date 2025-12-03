@@ -11,9 +11,8 @@ import type {
   PlayerAllBallTypesData,
 } from "@/types/tactical-analysis";
 
-// Use Gemini 3 Pro for tactical analysis with light thinking
-const MODEL_NAME = "gemini-3-pro-preview";
-const THINKING_BUDGET = 256; // Light thinking - enough for tactical insights without deep reasoning
+// Use Gemini 2.0 Flash for tactical analysis (fast, text-only structured data)
+const MODEL_NAME = "gemini-2.0-flash";
 
 // Ensure this route uses Node.js runtime
 export const runtime = "nodejs";
@@ -280,11 +279,6 @@ export async function POST(request: NextRequest) {
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       systemInstruction: systemPrompt,
-      generationConfig: {
-        thinkingConfig: {
-          thinkingBudget: THINKING_BUDGET,
-        },
-      } as any,
     });
     
     logger.debug(`[${requestId}] Prompt length: ${analysisPrompt.length} chars`);

@@ -434,7 +434,10 @@ function AchievementCard({
         background: "var(--gray-1)",
         border: `1px solid ${isExpanded ? achievement.accentColor : "var(--gray-5)"}`,
         opacity: isVisible ? 1 : 0,
-        animation: isVisible ? `highlightSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards` : "none",
+        animationName: isVisible ? "highlightSlideUp" : "none",
+        animationDuration: "0.6s",
+        animationTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        animationFillMode: "forwards",
         animationDelay: `${delay}ms`,
         transform: isExpanded 
           ? "translateY(0) scale(1)" 
@@ -691,7 +694,10 @@ function AchievementCard({
                   color: achievement.accentColor,
                   fontFamily: "var(--font-mono, monospace)",
                   lineHeight: 1,
-                  animation: isVisible ? "valueCountUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
+                  animationName: isVisible ? "valueCountUp" : "none",
+                  animationDuration: "0.6s",
+                  animationTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  animationFillMode: "forwards",
                   animationDelay: `${delay + 400}ms`,
                   transition: "font-size 0.3s ease",
                 }}

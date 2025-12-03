@@ -154,16 +154,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     (message.videoFile?.type.startsWith("image/"))
   );
   
-  // Check if any previous user messages (until we hit an assistant message) have a video
+  // Check if this conversation involves a video (for showing progress bar during analysis)
+  // Looks for any user message with video OR any analysis_options message in the conversation
   const userSentVideo = (() => {
     if (message.role !== "assistant" || messageIndex === 0) return false;
-    // Look backwards from current message until we hit an assistant message
+    
+    // Look through ALL previous messages to find if this is a video analysis conversation
     for (let i = messageIndex - 1; i >= 0; i--) {
       const prevMessage = allMessages[i];
-      // Skip analysis_options messages - they're not "real" assistant responses
-      if (prevMessage.role === "assistant" && prevMessage.messageType !== "analysis_options") {
-        return false;
+      
+      // If there's an analysis_options message, this is definitely a video conversation
+      if (prevMessage.messageType === "analysis_options") {
+        return true;
       }
+      
+      // Check if any user message has a video
       if (prevMessage.role === "user") {
         const hasVideo = !!(prevMessage.videoUrl || prevMessage.videoPreview || prevMessage.videoFile || prevMessage.videoS3Key);
         if (hasVideo) {
@@ -516,27 +521,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                         isComplexQuery: isComplexQuery,
                       });
                     })()}
-                    showProgressBar={(() => {
-                      // Show actual upload progress bar during uploading
-                      if (progressStage === "uploading") {
-                        return true;
-                      }
-                      // Show time-based progress bar during processing/analyzing/generating
-                      if (userSentVideo && (progressStage === "processing" || progressStage === "analyzing" || progressStage === "generating")) {
-                        // Check if there's an unresolved analysis_options message (user hasn't selected yet)
-                        // If so, don't show progress bar (wait for user to choose FREE/PRO)
-                        for (let i = messageIndex - 1; i >= 0; i--) {
-                          const prevMsg = allMessages[i];
-                          if (prevMsg.messageType === "analysis_options") {
-                            // Found an analysis_options message - only show progress if user selected
-                            return !!prevMsg.analysisOptions?.selectedOption;
-                          }
-                        }
-                        // No analysis_options message found = direct video analysis, show progress bar
-                        return true;
-                      }
-                      return false;
-                    })()}
+                    showProgressBar={userSentVideo && !message.content}
                     uploadProgress={progressStage === "uploading" ? uploadProgress : undefined}
                     onAskForHelp={onAskForHelp}
                     onTTSUsage={handleTTSUsage}
