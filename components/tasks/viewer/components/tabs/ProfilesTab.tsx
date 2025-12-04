@@ -417,8 +417,9 @@ function PlayerProfileCard({
             isInteractive={true}
             sliceTooltip={({ index, data }) => {
               // Extract the attribute key from the label (e.g., "💥 Power" → "power")
+              const indexStr = String(index);
               const attrKey = Object.keys(ATTRIBUTE_CONFIG).find(
-                key => index.includes(ATTRIBUTE_CONFIG[key].label)
+                key => indexStr.includes(ATTRIBUTE_CONFIG[key].label)
               );
               const config = attrKey ? ATTRIBUTE_CONFIG[attrKey] : null;
               return (
@@ -662,8 +663,9 @@ function ComparisonRadar({ profiles, portraits }: {
               isInteractive={true}
               sliceTooltip={({ index, data }) => {
                 // Extract the attribute key from the label
+                const indexStr = String(index);
                 const attrKey = Object.keys(ATTRIBUTE_CONFIG).find(
-                  key => index.includes(ATTRIBUTE_CONFIG[key].label)
+                  key => indexStr.includes(ATTRIBUTE_CONFIG[key].label)
                 );
                 const config = attrKey ? ATTRIBUTE_CONFIG[attrKey] : null;
                 return (
