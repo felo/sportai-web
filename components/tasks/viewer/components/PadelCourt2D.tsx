@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { Box } from "@radix-ui/themes";
-import { OVERLAY_COLORS } from "../constants";
-// import { PLAYER_CONFIG } from "../constants"; // DISABLED - Player tracking
+import { OVERLAY_COLORS, PLAYER_CONFIG } from "../constants";
 
 // Padel court dimensions in meters (portrait/vertical orientation)
 const COURT = {
@@ -31,8 +30,10 @@ interface BallBounce {
 
 interface PlayerPosition {
   timestamp: number;
-  X: number;
-  Y: number;
+  X: number; // Image/video coordinates (normalized 0-1)
+  Y: number; // Image/video coordinates (normalized 0-1)
+  court_X?: number; // Court position in meters (0-10m width)
+  court_Y?: number; // Court position in meters (0-20m length)
 }
 
 interface ShotTrajectory {
@@ -40,49 +41,24 @@ interface ShotTrajectory {
   to: { x: number; y: number; timestamp: number };
 }
 
-interface SwingAnnotation {
-  keypoints?: number[][]; // COCO 17-point format: [[x, y], ...]
-  bbox?: [number, number, number, number];
-}
-
-interface SwingWithPlayer {
-  ball_hit: { timestamp: number; frame_nr: number };
-  player_id: number;
-  annotations?: SwingAnnotation[];
-}
-
-// COCO keypoint indices (for foot midpoint calculation)
-const KEYPOINT = {
-  LEFT_HIP: 11,
-  RIGHT_HIP: 12,
-  LEFT_ANKLE: 15,
-  RIGHT_ANKLE: 16,
-};
-
 interface PadelCourt2DProps {
   className?: string;
   currentTime?: number;
   ballBounces?: BallBounce[];
   rallies?: [number, number][]; // Rally start/end timestamps - clear traces at rally boundaries
-  playerPositions?: Record<string, PlayerPosition[]>; // Keyed by player_id
-  swings?: SwingWithPlayer[]; // For keypoint-based positions
+  playerPositions?: Record<string, PlayerPosition[]>; // Keyed by player_id - already in court coords (meters)
   playerDisplayNames?: Record<number, string>; // player_id -> "Player 1", etc.
-  calibrationMatrix?: number[][] | null; // Homography matrix for video→court transform
   showBounces?: boolean;
   showTrajectories?: boolean;
   showPlayers?: boolean;
 }
 
-// Convert court_pos to court coordinates (meters)
-// court_pos is normalized 0-1, multiply by court dimensions
+// Convert court_pos to court coordinates
+// court_pos from ball_bounces is in meters: X (0-10m), Y (0-20m)
 function toCourtCoords(pos: [number, number]): { x: number; y: number } {
-  const rawX = pos[0];
-  const rawY = pos[1];
-  // If values > 1, assume meters; otherwise assume normalized (0-1)
-  const isMeters = rawX > 1 || rawY > 1;
   return {
-    x: isMeters ? rawX : rawX * COURT.width,
-    y: isMeters ? rawY : rawY * COURT.length,
+    x: pos[0],
+    y: pos[1],
   };
 }
 
@@ -135,8 +111,6 @@ function getArcControlPoint(
 }
 
 // Binary search to find the position nearest to a timestamp
-// DISABLED FOR NOW - Player tracking on 2D court
-/*
 function findNearestPosition(positions: PlayerPosition[], timestamp: number): PlayerPosition | null {
   if (!positions || positions.length === 0) return null;
   
@@ -162,64 +136,12 @@ function findNearestPosition(positions: PlayerPosition[], timestamp: number): Pl
   const diffRight = Math.abs(positions[right].timestamp - timestamp);
   return diffLeft <= diffRight ? positions[left] : positions[right];
 }
-*/
 
-// DISABLED FOR NOW - Player tracking on 2D court
-/*
 // Get player color by index
 function getPlayerColor(index: number): string {
   const colors = PLAYER_CONFIG.colors;
   return colors[index % colors.length].primary;
 }
-
-// Transform a point using the homography matrix (video coords → court coords)
-function transformWithMatrix(matrix: number[][], videoX: number, videoY: number): { x: number; y: number } {
-  // Scale video coords to match what we used in calibration
-  const u = videoX * 10;
-  const v = videoY * 20;
-
-  const w = matrix[2][0] * u + matrix[2][1] * v + matrix[2][2];
-  const x = (matrix[0][0] * u + matrix[0][1] * v + matrix[0][2]) / w;
-  const y = (matrix[1][0] * u + matrix[1][1] * v + matrix[1][2]) / w;
-
-  return { x, y };
-}
-
-// Get foot midpoint from keypoints (average of ankles, fallback to hips)
-function getFootMidpoint(keypoints: number[][]): { x: number; y: number } | null {
-  if (!keypoints || keypoints.length < 17) return null;
-  
-  const leftAnkle = keypoints[KEYPOINT.LEFT_ANKLE];
-  const rightAnkle = keypoints[KEYPOINT.RIGHT_ANKLE];
-  
-  // Check if ankles are valid (not [0,0] or undefined)
-  const leftValid = leftAnkle && (leftAnkle[0] > 0.01 || leftAnkle[1] > 0.01);
-  const rightValid = rightAnkle && (rightAnkle[0] > 0.01 || rightAnkle[1] > 0.01);
-  
-  if (leftValid && rightValid) {
-    return {
-      x: (leftAnkle[0] + rightAnkle[0]) / 2,
-      y: (leftAnkle[1] + rightAnkle[1]) / 2,
-    };
-  }
-  
-  // Fallback to hips if ankles not detected
-  const leftHip = keypoints[KEYPOINT.LEFT_HIP];
-  const rightHip = keypoints[KEYPOINT.RIGHT_HIP];
-  
-  const leftHipValid = leftHip && (leftHip[0] > 0.01 || leftHip[1] > 0.01);
-  const rightHipValid = rightHip && (rightHip[0] > 0.01 || rightHip[1] > 0.01);
-  
-  if (leftHipValid && rightHipValid) {
-    return {
-      x: (leftHip[0] + rightHip[0]) / 2,
-      y: (leftHip[1] + rightHip[1]) / 2,
-    };
-  }
-  
-  return null;
-}
-*/
 
 export function PadelCourt2D({ 
   className,
@@ -227,9 +149,7 @@ export function PadelCourt2D({
   ballBounces = [],
   rallies = [],
   playerPositions = {},
-  swings = [],
   playerDisplayNames = {},
-  calibrationMatrix = null,
   showBounces = true,
   showTrajectories = true,
   showPlayers = true,
@@ -317,11 +237,11 @@ export function PadelCourt2D({
     );
   }
 
-  // Calculate current player positions using keypoints from swings
-  // DISABLED FOR NOW - uncomment when ready to show players on 2D court
-  /*
+  // Calculate current player positions from player_positions data
+  // player_positions from API are already in court coordinates (meters)
+  // X: 0-10m (width), Y: 0-20m (length)
   const currentPlayerPositions = useMemo(() => {
-    if (!showPlayers || !calibrationMatrix) return [];
+    if (!showPlayers) return [];
     
     const positions: Array<{
       playerId: number;
@@ -329,92 +249,99 @@ export function PadelCourt2D({
       y: number;
       displayName: string;
       colorIndex: number;
-      source: "keypoints" | "player_positions";
     }> = [];
+    
+    // DEBUG: Log incoming data
+    const playerPosKeys = Object.keys(playerPositions);
+    console.log("[PadelCourt2D] Player positions debug:", {
+      showPlayers,
+      currentTime,
+      playerPositionsKeys: playerPosKeys,
+      playerDisplayNames,
+      sampleData: playerPosKeys.length > 0 ? {
+        playerId: playerPosKeys[0],
+        firstPosition: playerPositions[playerPosKeys[0]]?.[0],
+        positionCount: playerPositions[playerPosKeys[0]]?.length,
+      } : null,
+    });
     
     // Get list of valid player IDs from display names (those that passed the threshold)
     const validPlayerIds = Object.keys(playerDisplayNames).map(id => parseInt(id));
     
-    // First, try to find positions from swing keypoints (most accurate - foot midpoint)
-    const playerFromSwing = new Set<number>();
+    // If no valid players from displayNames, use all available player_positions
+    const playerIdsToShow = validPlayerIds.length > 0 
+      ? validPlayerIds 
+      : Object.keys(playerPositions).map(id => parseInt(id));
     
-    for (const swing of swings) {
-      // Only use swings near current time
-      const timeDiff = Math.abs(swing.ball_hit.timestamp - currentTime);
-      if (timeDiff > 0.5) continue;
-      
-      // Check if this player is valid
-      if (!validPlayerIds.includes(swing.player_id)) continue;
-      
-      // Already got this player from a closer swing
-      if (playerFromSwing.has(swing.player_id)) continue;
-      
-      // Get keypoints from annotation
-      const annotation = swing.annotations?.[0];
-      if (!annotation?.keypoints) continue;
-      
-      // Calculate foot midpoint from keypoints
-      const footMidpoint = getFootMidpoint(annotation.keypoints);
-      if (!footMidpoint) continue;
-      
-      // Transform through calibration matrix
-      const transformed = transformWithMatrix(calibrationMatrix, footMidpoint.x, footMidpoint.y);
-      
-      if (isInBounds(transformed.x, transformed.y)) {
-        const displayName = playerDisplayNames[swing.player_id] || `P${swing.player_id}`;
-        const colorIndex = validPlayerIds.indexOf(swing.player_id);
-        
-        positions.push({
-          playerId: swing.player_id,
-          x: transformed.x,
-          y: transformed.y,
-          displayName,
-          colorIndex,
-          source: "keypoints",
-        });
-        
-        playerFromSwing.add(swing.player_id);
+    playerIdsToShow.forEach((playerId, idx) => {
+      const posArray = playerPositions[String(playerId)];
+      if (!posArray || posArray.length === 0) {
+        console.log(`[PadelCourt2D] No positions for player ${playerId}`);
+        return;
       }
-    }
-    
-    // Fallback: use player_positions for players not found in swings
-    Object.entries(playerPositions).forEach(([playerIdStr, posArray]) => {
-      const playerId = parseInt(playerIdStr);
-      
-      // Skip if already got from keypoints
-      if (playerFromSwing.has(playerId)) return;
-      
-      // Only show players that are in our display names (passed threshold)
-      if (!validPlayerIds.includes(playerId)) return;
       
       const nearestPos = findNearestPosition(posArray, currentTime);
-      if (!nearestPos) return;
+      if (!nearestPos) {
+        console.log(`[PadelCourt2D] No nearest position found for player ${playerId}`);
+        return;
+      }
       
-      // Check if position is recent (within 0.5 seconds)
-      if (Math.abs(nearestPos.timestamp - currentTime) > 0.5) return;
+      // Check if position is recent (within 1 second - more lenient for sparse data)
+      const timeDiff = Math.abs(nearestPos.timestamp - currentTime);
+      if (timeDiff > 1.0) {
+        console.log(`[PadelCourt2D] Position too old for player ${playerId}: timeDiff=${timeDiff.toFixed(2)}s`);
+        return;
+      }
       
       // Get display name and color index
       const displayName = playerDisplayNames[playerId] || `P${playerId}`;
-      const colorIndex = validPlayerIds.indexOf(playerId);
+      const colorIndex = validPlayerIds.indexOf(playerId) >= 0 
+        ? validPlayerIds.indexOf(playerId) 
+        : idx;
       
-      // Transform through calibration matrix
-      const transformed = transformWithMatrix(calibrationMatrix, nearestPos.X, nearestPos.Y);
+      // Use court_X and court_Y (actual court coordinates in meters)
+      // These are the real court positions, not video frame coordinates
+      // Fallback to normalized X/Y if court coords not available (less accurate)
+      let courtX: number;
+      let courtY: number;
       
-      if (isInBounds(transformed.x, transformed.y)) {
+      if (nearestPos.court_X !== undefined && nearestPos.court_Y !== undefined) {
+        // Use actual court coordinates (already in meters: 0-10m width, 0-20m length)
+        courtX = nearestPos.court_X;
+        courtY = nearestPos.court_Y;
+      } else {
+        // Fallback: convert normalized video coords (not recommended - inaccurate)
+        console.warn(`[PadelCourt2D] Player ${playerId} missing court_X/court_Y, using video coords`);
+        courtX = nearestPos.X * COURT.width;
+        courtY = nearestPos.Y * COURT.length;
+      }
+      
+      const inBounds = isInBounds(courtX, courtY);
+      console.log(`[PadelCourt2D] Player ${playerId} position:`, {
+        videoX: nearestPos.X,
+        videoY: nearestPos.Y,
+        court_X: nearestPos.court_X,
+        court_Y: nearestPos.court_Y,
+        courtX,
+        courtY,
+        timestamp: nearestPos.timestamp,
+        inBounds,
+      });
+      
+      if (inBounds) {
         positions.push({
           playerId,
-          x: transformed.x,
-          y: transformed.y,
+          x: courtX,
+          y: courtY,
           displayName,
           colorIndex,
-          source: "player_positions",
         });
       }
     });
     
+    console.log("[PadelCourt2D] Final positions to render:", positions);
     return positions;
-  }, [playerPositions, swings, playerDisplayNames, currentTime, showPlayers, calibrationMatrix]);
-  */
+  }, [playerPositions, playerDisplayNames, currentTime, showPlayers]);
 
 
   return (
@@ -641,14 +568,28 @@ export function PadelCourt2D({
           );
         })}
 
-        {/* === PLAYERS (foot position markers) - DISABLED FOR NOW ===
+        {/* === DEBUG: Show data availability indicator === */}
+        <text
+          x={COURT.width / 2}
+          y={1}
+          textAnchor="middle"
+          fontSize="0.6"
+          fill="rgba(255,255,255,0.5)"
+          style={{ pointerEvents: "none" }}
+        >
+          {Object.keys(playerPositions).length > 0 
+            ? `Players: ${currentPlayerPositions.length}/${Object.keys(playerPositions).length}` 
+            : "No position data"}
+        </text>
+
+        {/* === PLAYERS (position markers) === */}
         {currentPlayerPositions.map((player) => {
           const color = getPlayerColor(player.colorIndex);
           const playerRadius = 0.5;
-          const isFromKeypoints = player.source === "keypoints";
           
           return (
             <g key={`player-${player.playerId}`}>
+              {/* Outer glow ring */}
               <circle
                 cx={player.x}
                 cy={player.y}
@@ -658,15 +599,16 @@ export function PadelCourt2D({
                 strokeWidth={0.1}
                 opacity={0.4}
               />
+              {/* Player dot */}
               <circle
                 cx={player.x}
                 cy={player.y}
                 r={playerRadius}
                 fill={color}
-                stroke={isFromKeypoints ? "#ffffff" : "#888888"}
-                strokeWidth={isFromKeypoints ? 0.08 : 0.05}
-                strokeDasharray={isFromKeypoints ? undefined : "0.15 0.1"}
+                stroke="#ffffff"
+                strokeWidth={0.08}
               />
+              {/* Player label */}
               <text
                 x={player.x}
                 y={player.y + 0.15}
@@ -681,7 +623,6 @@ export function PadelCourt2D({
             </g>
           );
         })}
-        */}
       </svg>
     </Box>
   );

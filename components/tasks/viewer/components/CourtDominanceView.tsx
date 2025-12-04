@@ -410,11 +410,20 @@ function calculateZoneDominance(
   const sortedPositions = [...rallyPositions].sort((a, b) => a.timestamp - b.timestamp);
   
   sortedPositions.forEach(pos => {
-    // Position is in meters: X = width (0-10m), Y = depth (0-10m from back wall)
+    // Use court_X and court_Y (actual court coordinates in meters)
+    // court_X: 0-10m (width), court_Y: 0-20m (length, but half court is 0-10m)
+    // Skip if court coordinates not available
+    if (pos.court_X === undefined || pos.court_Y === undefined) return;
+    
+    // For half court analysis, we use positions on one side (0-10m depth)
+    // court_Y 0-10 = near side, 10-20 = far side
+    const courtX = pos.court_X;
+    const courtY = pos.court_Y <= 10 ? pos.court_Y : pos.court_Y - 10; // Map to 0-10 range
+    
     // Find which zone this position is in
     const zone = zones.find(z => 
-      pos.X >= z.xMin && pos.X <= z.xMax &&
-      pos.Y >= z.yMin && pos.Y <= z.yMax
+      courtX >= z.xMin && courtX <= z.xMax &&
+      courtY >= z.yMin && courtY <= z.yMax
     );
     
     if (zone) {

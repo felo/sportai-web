@@ -66,8 +66,10 @@ export interface BallBounce {
 
 export interface PlayerPosition {
   timestamp: number;
-  X: number; // Court coordinates (meters)
-  Y: number; // Court coordinates (meters)
+  X: number; // Image/video coordinates (normalized 0-1)
+  Y: number; // Image/video coordinates (normalized 0-1)
+  court_X?: number; // Court position in meters (0-10m width)
+  court_Y?: number; // Court position in meters (0-20m length)
 }
 
 /**

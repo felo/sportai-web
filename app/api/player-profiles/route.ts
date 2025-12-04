@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import { logger } from "@/lib/logger";
 import type { PlayerProfileData, PlayerProfile, PlayerProfileResponse } from "@/types/player-profile";
 
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
         temperature: 0.7, // Balance creativity with consistency
         maxOutputTokens: 2048,
         responseMimeType: "application/json",
-        responseSchema: PROFILE_SCHEMA as unknown as typeof PROFILE_SCHEMA,
+        responseSchema: PROFILE_SCHEMA as Schema,
       },
     });
     
