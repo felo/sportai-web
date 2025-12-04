@@ -956,4 +956,84 @@ html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlight
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Task Viewer Loading Animations */
+/* Realistic bounce with gravity - like dropping a ball */
+@keyframes taskLoaderBallBounce {
+  /* Ground impact - squashed horizontally */
+  0%, 100% {
+    transform: translateY(0) scaleX(1.12) scaleY(0.88);
+    animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); /* Quick bounce up */
+  }
+  /* Leaving ground - back to normal shape */
+  10% {
+    transform: translateY(-20px) scale(1);
+    animation-timing-function: cubic-bezier(0.1, 0, 0.2, 1); /* Decelerate going up */
+  }
+  /* Rising */
+  30% {
+    transform: translateY(-50px) scale(1);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.5, 1);
+  }
+  /* Peak - hang time, normal shape */
+  45% {
+    transform: translateY(-65px) scale(1);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.7, 0); /* Start falling */
+  }
+  /* Falling */
+  60% {
+    transform: translateY(-50px) scale(1);
+    animation-timing-function: cubic-bezier(0.7, 0, 1, 0.5); /* Accelerate with gravity */
+  }
+  /* Falling faster */
+  80% {
+    transform: translateY(-20px) scale(1);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 0.2);
+  }
+  /* Just before impact - slight vertical stretch */
+  94% {
+    transform: translateY(-3px) scaleX(0.95) scaleY(1.05);
+  }
+}
+
+/* Shadow syncs with ball height - big/dark when low, small/faint when high */
+@keyframes taskLoaderShadowPulse {
+  0%, 92%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  8% {
+    transform: scale(0.85);
+    opacity: 0.35;
+  }
+  42% {
+    transform: scale(0.35);
+    opacity: 0.1;
+  }
+  75% {
+    transform: scale(0.7);
+    opacity: 0.25;
+  }
+}
+
+@keyframes taskLoaderProgressSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes taskLoaderLineGlow {
+  0%, 100% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+}
+
 /* Profile page saving pulse (uses existing pulse animation) */

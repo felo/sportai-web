@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Task, StatisticsResult } from "../types";
+import type { LoadingPhase } from "../components/LoadingState";
 
 interface UseTaskFetchingResult {
   task: Task | null;
@@ -12,62 +12,39 @@ interface UseTaskFetchingResult {
   setError: (error: string | null) => void;
   fetchResult: () => Promise<void>;
   setTask: React.Dispatch<React.SetStateAction<Task | null>>;
+  /** Current loading phase for display */
+  loadingPhase: LoadingPhase;
 }
 
 export function useTaskFetching(taskId: string): UseTaskFetchingResult {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
   const [task, setTask] = useState<Task | null>(null);
   const [result, setResult] = useState<StatisticsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingResult, setLoadingResult] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("auth");
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch task details
-  useEffect(() => {
-    if (!user || authLoading) return;
-    
-    const fetchTask = async () => {
-      try {
-        const response = await fetch(`/api/tasks`, {
-          headers: { Authorization: `Bearer ${user.id}` },
-        });
-        
-        if (!response.ok) throw new Error("Failed to fetch tasks");
-        
-        const data = await response.json();
-        const foundTask = data.tasks?.find((t: Task) => t.id === taskId);
-        
-        if (!foundTask) {
-          throw new Error("Task not found");
-        }
-        
-        setTask(foundTask);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load task");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchTask();
-  }, [user, authLoading, taskId]);
-
-  // Fetch result data
+  // Fetch result data (can be called manually for retry)
   const fetchResult = useCallback(async () => {
-    if (!user || !task) return;
+    if (!user) return;
     
     setLoadingResult(true);
+    setLoadingPhase("result");
     setError(null);
     
     try {
-      const response = await fetch(`/api/tasks/${task.id}/result`, {
+      const response = await fetch(`/api/tasks/${taskId}/result`, {
         method: "POST",
         headers: { Authorization: `Bearer ${user.id}` },
       });
       
       if (!response.ok) {
+        if (response.status === 202) {
+          // Still processing - not an error
+          return;
+        }
         const data = await response.json();
         throw new Error(data.error || "Failed to fetch result");
       }
@@ -79,23 +56,96 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
       
       const resultData = await resultResponse.json();
       setResult(resultData);
+      setLoadingPhase("done");
       
       setTask(prev =>
-        prev ? { ...prev, result_s3_key: `task-results/${task.id}.json` } : null
+        prev ? { ...prev, result_s3_key: `task-results/${taskId}.json` } : null
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch result");
     } finally {
       setLoadingResult(false);
     }
-  }, [user, task]);
+  }, [user, taskId]);
 
-  // Auto-load result when task is completed
+  // Main loading effect - fetch task and result in parallel
   useEffect(() => {
-    if (task && task.status === "completed" && !result && !loadingResult) {
-      fetchResult();
+    if (authLoading) {
+      setLoadingPhase("auth");
+      return;
     }
-  }, [task, result, loadingResult, fetchResult]);
+    
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    const loadTaskAndResult = async () => {
+      setLoadingPhase("task");
+      const startTime = Date.now();
+      const MIN_LOADING_TIME = 2000; // Minimum time to show loading state (ms) - set to 2s for visibility
+      
+      // Helper to ensure minimum loading time
+      const ensureMinLoadingTime = async () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed < MIN_LOADING_TIME) {
+          await new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
+        }
+      };
+      
+      try {
+        // Fetch task details using the status endpoint (single task, not all)
+        // AND start fetching result in parallel
+        const [taskResponse, resultResponse] = await Promise.all([
+          fetch(`/api/tasks/${taskId}/status`, {
+            headers: { Authorization: `Bearer ${user.id}` },
+          }),
+          fetch(`/api/tasks/${taskId}/result`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${user.id}` },
+          }),
+        ]);
+        
+        // Handle task response
+        if (!taskResponse.ok) {
+          await ensureMinLoadingTime();
+          throw new Error("Task not found");
+        }
+        
+        const taskData = await taskResponse.json();
+        if (!taskData.task) {
+          await ensureMinLoadingTime();
+          throw new Error("Task not found");
+        }
+        setTask(taskData.task);
+        
+        // Handle result response
+        if (resultResponse.ok) {
+          setLoadingPhase("result");
+          const resultJson = await resultResponse.json();
+          
+          if (resultJson.url) {
+            // Fetch the actual JSON from the presigned URL
+            const jsonResponse = await fetch(resultJson.url);
+            if (jsonResponse.ok) {
+              const statisticsResult = await jsonResponse.json();
+              setResult(statisticsResult);
+            }
+          }
+        }
+        // If 202, task is still processing - user will see task details but no result
+        
+        setLoadingPhase("done");
+        await ensureMinLoadingTime();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load task");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadTaskAndResult();
+  }, [user, authLoading, taskId]);
 
   return {
     task,
@@ -106,9 +156,6 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
     setError,
     fetchResult,
     setTask,
+    loadingPhase,
   };
 }
-
-
-
-

@@ -1,4 +1,5 @@
 export { LoadingState } from "./LoadingState";
+export type { LoadingPhase } from "./LoadingState";
 export { ErrorState } from "./ErrorState";
 export { TaskHeader } from "./TaskHeader";
 export { VidstackPlayer, useVidstackPlayer } from "./VidstackPlayer";

@@ -117,6 +117,7 @@ export function RalliesTab({
             ballBounces={enhancedBallBounces}
             rallies={result?.rallies}
             playerPositions={result?.player_positions}
+            swings={allSwings}
             playerDisplayNames={playerDisplayNames}
             showBounces={true}
             showPlayers={true}

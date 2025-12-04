@@ -41,12 +41,19 @@ interface ShotTrajectory {
   to: { x: number; y: number; timestamp: number };
 }
 
+interface SwingData {
+  ball_hit: { timestamp: number };
+  ball_hit_location?: [number, number]; // Player court position [X, Y] in meters
+  player_id: number;
+}
+
 interface PadelCourt2DProps {
   className?: string;
   currentTime?: number;
   ballBounces?: BallBounce[];
   rallies?: [number, number][]; // Rally start/end timestamps - clear traces at rally boundaries
   playerPositions?: Record<string, PlayerPosition[]>; // Keyed by player_id - already in court coords (meters)
+  swings?: SwingData[]; // For ball_hit_location (player position when hitting)
   playerDisplayNames?: Record<number, string>; // player_id -> "Player 1", etc.
   showBounces?: boolean;
   showTrajectories?: boolean;
@@ -110,18 +117,40 @@ function getArcControlPoint(
   };
 }
 
-// Binary search to find the position nearest to a timestamp
-function findNearestPosition(positions: PlayerPosition[], timestamp: number): PlayerPosition | null {
+// Linear interpolation helper
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+// Binary search to find bracketing positions and interpolate between them
+function findInterpolatedPosition(
+  positions: PlayerPosition[], 
+  timestamp: number
+): { x: number; y: number; timestamp: number } | null {
   if (!positions || positions.length === 0) return null;
   
   let left = 0;
   let right = positions.length - 1;
   
-  // Handle edge cases
-  if (timestamp <= positions[0].timestamp) return positions[0];
-  if (timestamp >= positions[right].timestamp) return positions[right];
+  // Handle edge cases - clamp to first/last position
+  if (timestamp <= positions[0].timestamp) {
+    const p = positions[0];
+    return {
+      x: p.court_X ?? p.X * COURT.width,
+      y: p.court_Y ?? p.Y * COURT.length,
+      timestamp: p.timestamp,
+    };
+  }
+  if (timestamp >= positions[right].timestamp) {
+    const p = positions[right];
+    return {
+      x: p.court_X ?? p.X * COURT.width,
+      y: p.court_Y ?? p.Y * COURT.length,
+      timestamp: p.timestamp,
+    };
+  }
   
-  // Binary search for closest timestamp
+  // Binary search to find bracketing positions
   while (left < right - 1) {
     const mid = Math.floor((left + right) / 2);
     if (positions[mid].timestamp <= timestamp) {
@@ -131,10 +160,26 @@ function findNearestPosition(positions: PlayerPosition[], timestamp: number): Pl
     }
   }
   
-  // Return the closer one
-  const diffLeft = Math.abs(positions[left].timestamp - timestamp);
-  const diffRight = Math.abs(positions[right].timestamp - timestamp);
-  return diffLeft <= diffRight ? positions[left] : positions[right];
+  // Now positions[left] <= timestamp < positions[right]
+  const p1 = positions[left];
+  const p2 = positions[right];
+  
+  // Calculate interpolation factor (0-1)
+  const timeDelta = p2.timestamp - p1.timestamp;
+  const t = timeDelta > 0 ? (timestamp - p1.timestamp) / timeDelta : 0;
+  
+  // Get coordinates (prefer court coords, fallback to normalized)
+  const x1 = p1.court_X ?? p1.X * COURT.width;
+  const y1 = p1.court_Y ?? p1.Y * COURT.length;
+  const x2 = p2.court_X ?? p2.X * COURT.width;
+  const y2 = p2.court_Y ?? p2.Y * COURT.length;
+  
+  // Linearly interpolate position
+  return {
+    x: lerp(x1, x2, t),
+    y: lerp(y1, y2, t),
+    timestamp: timestamp,
+  };
 }
 
 // Get player color by index
@@ -149,6 +194,7 @@ export function PadelCourt2D({
   ballBounces = [],
   rallies = [],
   playerPositions = {},
+  swings = [],
   playerDisplayNames = {},
   showBounces = true,
   showTrajectories = true,
@@ -173,36 +219,48 @@ export function PadelCourt2D({
     return null; // Not in a rally
   }, [rallies, currentTime]);
 
-  // Find shot trajectories: swing bounce → next floor bounce
+  // Find shot trajectories: player position (from swing) → floor bounce
+  // Uses ball_hit_location from swings (player court position in meters)
   const trajectories = useMemo((): ShotTrajectory[] => {
-    if (!showTrajectories || ballBounces.length < 2) return [];
+    if (!showTrajectories) return [];
     
     const shots: ShotTrajectory[] = [];
-    const sortedBounces = [...ballBounces].sort((a, b) => a.timestamp - b.timestamp);
     
-    for (let i = 0; i < sortedBounces.length - 1; i++) {
-      const current = sortedBounces[i];
-      const next = sortedBounces[i + 1];
+    // Get floor bounces sorted by timestamp
+    const floorBounces = ballBounces
+      .filter(b => b.type === "floor")
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Sort swings by timestamp
+    const sortedSwings = [...swings].sort((a, b) => a.ball_hit.timestamp - b.ball_hit.timestamp);
+    
+    // For each floor bounce, find the most recent swing before it
+    for (const floorBounce of floorBounces) {
+      // Find the swing that occurred just before this floor bounce
+      const matchingSwing = sortedSwings
+        .filter(s => s.ball_hit.timestamp < floorBounce.timestamp)
+        .filter(s => floorBounce.timestamp - s.ball_hit.timestamp < 3.0) // Within 3 seconds
+        .pop(); // Get the most recent one
       
-      // Look for swing → floor pairs (shot trajectories)
-      if (current.type === "swing" && next.type === "floor") {
-        // Check time difference is reasonable (< 3 seconds)
-        if (next.timestamp - current.timestamp < 3.0) {
-          const from = toCourtCoords(current.court_pos);
-          const to = toCourtCoords(next.court_pos);
-          
-          if (isInBounds(from.x, from.y) && isInBounds(to.x, to.y)) {
-            shots.push({
-              from: { ...from, timestamp: current.timestamp },
-              to: { ...to, timestamp: next.timestamp },
-            });
-          }
-        }
+      if (!matchingSwing?.ball_hit_location) continue;
+      
+      // Origin: player position when hitting (from swing's ball_hit_location)
+      const [hitX, hitY] = matchingSwing.ball_hit_location;
+      const from = { x: hitX, y: hitY };
+      
+      // Destination: where ball landed (from floor bounce's court_pos)
+      const to = toCourtCoords(floorBounce.court_pos);
+      
+      if (isInBounds(from.x, from.y) && isInBounds(to.x, to.y)) {
+        shots.push({
+          from: { ...from, timestamp: matchingSwing.ball_hit.timestamp },
+          to: { ...to, timestamp: floorBounce.timestamp },
+        });
       }
     }
     
     return shots;
-  }, [ballBounces, showTrajectories]);
+  }, [ballBounces, swings, showTrajectories]);
 
   // Filter to recent trajectories (only within current rally)
   const recentTrajectories = useMemo(() => {
@@ -214,30 +272,21 @@ export function PadelCourt2D({
     });
   }, [trajectories, currentTime, currentRallyStart]);
 
-  // Find recent bounces (only within current rally)
+  // Find recent floor bounces (only FLOOR bounces - actual ball landings on court)
   const recentBounces = useMemo(() => {
     if (!showBounces) return [];
-    return ballBounces.filter(b => {
-      // Must be after current rally start (clear on rally change)
-      if (currentRallyStart !== null && b.timestamp < currentRallyStart) return false;
-      const age = currentTime - b.timestamp;
-      return age >= 0 && age < DISPLAY_DURATION;
-    });
+    return ballBounces
+      .filter(b => b.type === "floor") // Only show floor bounces (court_pos is accurate for these)
+      .filter(b => {
+        // Must be after current rally start (clear on rally change)
+        if (currentRallyStart !== null && b.timestamp < currentRallyStart) return false;
+        const age = currentTime - b.timestamp;
+        return age >= 0 && age < DISPLAY_DURATION;
+      });
   }, [ballBounces, currentTime, showBounces, currentRallyStart]);
 
-  // DEBUG: Log ball bounce positions in meters
-  if (recentBounces.length > 0) {
-    console.log("[PadelCourt2D] Recent bounces (court_pos in meters):", 
-      recentBounces.map(b => ({
-        type: b.type,
-        timestamp: b.timestamp.toFixed(2),
-        court_pos: b.court_pos,
-        converted: toCourtCoords(b.court_pos),
-      }))
-    );
-  }
-
   // Calculate current player positions from player_positions data
+  // Uses linear interpolation for smooth movement between keyframes
   // player_positions from API are already in court coordinates (meters)
   // X: 0-10m (width), Y: 0-20m (length)
   const currentPlayerPositions = useMemo(() => {
@@ -251,20 +300,6 @@ export function PadelCourt2D({
       colorIndex: number;
     }> = [];
     
-    // DEBUG: Log incoming data
-    const playerPosKeys = Object.keys(playerPositions);
-    console.log("[PadelCourt2D] Player positions debug:", {
-      showPlayers,
-      currentTime,
-      playerPositionsKeys: playerPosKeys,
-      playerDisplayNames,
-      sampleData: playerPosKeys.length > 0 ? {
-        playerId: playerPosKeys[0],
-        firstPosition: playerPositions[playerPosKeys[0]]?.[0],
-        positionCount: playerPositions[playerPosKeys[0]]?.length,
-      } : null,
-    });
-    
     // Get list of valid player IDs from display names (those that passed the threshold)
     const validPlayerIds = Object.keys(playerDisplayNames).map(id => parseInt(id));
     
@@ -275,23 +310,16 @@ export function PadelCourt2D({
     
     playerIdsToShow.forEach((playerId, idx) => {
       const posArray = playerPositions[String(playerId)];
-      if (!posArray || posArray.length === 0) {
-        console.log(`[PadelCourt2D] No positions for player ${playerId}`);
-        return;
-      }
+      if (!posArray || posArray.length === 0) return;
       
-      const nearestPos = findNearestPosition(posArray, currentTime);
-      if (!nearestPos) {
-        console.log(`[PadelCourt2D] No nearest position found for player ${playerId}`);
-        return;
-      }
+      // Use interpolation for smooth movement
+      const interpolatedPos = findInterpolatedPosition(posArray, currentTime);
+      if (!interpolatedPos) return;
       
-      // Check if position is recent (within 1 second - more lenient for sparse data)
-      const timeDiff = Math.abs(nearestPos.timestamp - currentTime);
-      if (timeDiff > 1.0) {
-        console.log(`[PadelCourt2D] Position too old for player ${playerId}: timeDiff=${timeDiff.toFixed(2)}s`);
-        return;
-      }
+      // Check if we have data for this time range (within 1 second of nearest keyframe)
+      const firstTs = posArray[0].timestamp;
+      const lastTs = posArray[posArray.length - 1].timestamp;
+      if (currentTime < firstTs - 1.0 || currentTime > lastTs + 1.0) return;
       
       // Get display name and color index
       const displayName = playerDisplayNames[playerId] || `P${playerId}`;
@@ -299,47 +327,17 @@ export function PadelCourt2D({
         ? validPlayerIds.indexOf(playerId) 
         : idx;
       
-      // Use court_X and court_Y (actual court coordinates in meters)
-      // These are the real court positions, not video frame coordinates
-      // Fallback to normalized X/Y if court coords not available (less accurate)
-      let courtX: number;
-      let courtY: number;
-      
-      if (nearestPos.court_X !== undefined && nearestPos.court_Y !== undefined) {
-        // Use actual court coordinates (already in meters: 0-10m width, 0-20m length)
-        courtX = nearestPos.court_X;
-        courtY = nearestPos.court_Y;
-      } else {
-        // Fallback: convert normalized video coords (not recommended - inaccurate)
-        console.warn(`[PadelCourt2D] Player ${playerId} missing court_X/court_Y, using video coords`);
-        courtX = nearestPos.X * COURT.width;
-        courtY = nearestPos.Y * COURT.length;
-      }
-      
-      const inBounds = isInBounds(courtX, courtY);
-      console.log(`[PadelCourt2D] Player ${playerId} position:`, {
-        videoX: nearestPos.X,
-        videoY: nearestPos.Y,
-        court_X: nearestPos.court_X,
-        court_Y: nearestPos.court_Y,
-        courtX,
-        courtY,
-        timestamp: nearestPos.timestamp,
-        inBounds,
-      });
-      
-      if (inBounds) {
+      if (isInBounds(interpolatedPos.x, interpolatedPos.y)) {
         positions.push({
           playerId,
-          x: courtX,
-          y: courtY,
+          x: interpolatedPos.x,
+          y: interpolatedPos.y,
           displayName,
           colorIndex,
         });
       }
     });
     
-    console.log("[PadelCourt2D] Final positions to render:", positions);
     return positions;
   }, [playerPositions, playerDisplayNames, currentTime, showPlayers]);
 
@@ -516,14 +514,14 @@ export function PadelCourt2D({
         })}
 
 
-        {/* === BOUNCES === */}
+        {/* === BOUNCES (tennis ball style - matching RallyTimeline) === */}
         {recentBounces.map((bounce, idx) => {
           const age = currentTime - bounce.timestamp;
           const opacity = Math.max(0, 1 - age / DISPLAY_DURATION);
           
-          // All bounces are yellow with "Bounce" label
-          const color = "#EAB308"; // Yellow - var(--yellow-9)
-          const label = "Bounce";
+          // Yellow ball color - same as RallyTimeline var(--yellow-9)
+          const ballColor = "#EAB308";
+          const glowColor = "rgba(234, 179, 8, 0.8)";
           
           const { x, y } = toCourtCoords(bounce.court_pos);
           
@@ -531,68 +529,59 @@ export function PadelCourt2D({
           if (!isInBounds(x, y)) return null;
           
           return (
-            <g key={`bounce-${idx}`}>
+            <g key={`bounce-${idx}`} opacity={opacity}>
+              {/* Quick pulse ring on recent bounces (fades in 0.5s) */}
+              {age < 0.5 && (
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={0.35 + age * 0.8}
+                  fill="none"
+                  stroke={ballColor}
+                  strokeWidth={0.06}
+                  opacity={Math.max(0, 0.7 - age * 1.4)}
+                />
+              )}
+              {/* Tennis ball - yellow circle with white border */}
               <circle
                 cx={x}
                 cy={y}
-                r={0.3 + (age / DISPLAY_DURATION) * 1.0}
-                fill="none"
-                stroke={color}
-                strokeWidth={0.1}
-                opacity={opacity}
+                r={0.35}
+                fill={ballColor}
+                stroke="#ffffff"
+                strokeWidth={0.08}
               />
-              <circle
-                cx={x}
-                cy={y}
-                r={0.15}
-                fill={color}
-                opacity={opacity}
-              />
-              {/* Bounce type label */}
-              <text
-                x={x}
-                y={y - 0.5}
-                textAnchor="middle"
-                fontSize="0.4"
-                fontWeight="bold"
-                fill="#ffffff"
-                opacity={opacity}
-                style={{ 
-                  pointerEvents: "none",
-                  textShadow: "0 0 0.1px rgba(0,0,0,0.8)",
-                }}
-              >
-                {label}
-              </text>
+              {/* Glow effect on very recent bounces */}
+              {age < 0.3 && (
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={0.35}
+                  fill="none"
+                  stroke={glowColor}
+                  strokeWidth={0.15}
+                  opacity={0.5 - age * 1.5}
+                />
+              )}
             </g>
           );
         })}
 
-        {/* === DEBUG: Show data availability indicator === */}
-        <text
-          x={COURT.width / 2}
-          y={1}
-          textAnchor="middle"
-          fontSize="0.6"
-          fill="rgba(255,255,255,0.5)"
-          style={{ pointerEvents: "none" }}
-        >
-          {Object.keys(playerPositions).length > 0 
-            ? `Players: ${currentPlayerPositions.length}/${Object.keys(playerPositions).length}` 
-            : "No position data"}
-        </text>
-
-        {/* === PLAYERS (position markers) === */}
+        {/* === PLAYERS (position markers with smooth CSS transitions) === */}
         {currentPlayerPositions.map((player) => {
           const color = getPlayerColor(player.colorIndex);
           const playerRadius = 0.5;
           
           return (
-            <g key={`player-${player.playerId}`}>
+            <g 
+              key={`player-${player.playerId}`}
+              transform={`translate(${player.x}, ${player.y})`}
+              style={{ transition: "transform 80ms linear" }}
+            >
               {/* Outer glow ring */}
               <circle
-                cx={player.x}
-                cy={player.y}
+                cx={0}
+                cy={0}
                 r={playerRadius + 0.1}
                 fill="none"
                 stroke={color}
@@ -601,8 +590,8 @@ export function PadelCourt2D({
               />
               {/* Player dot */}
               <circle
-                cx={player.x}
-                cy={player.y}
+                cx={0}
+                cy={0}
                 r={playerRadius}
                 fill={color}
                 stroke="#ffffff"
@@ -610,8 +599,8 @@ export function PadelCourt2D({
               />
               {/* Player label */}
               <text
-                x={player.x}
-                y={player.y + 0.15}
+                x={0}
+                y={0.15}
                 textAnchor="middle"
                 fontSize="0.5"
                 fontWeight="bold"

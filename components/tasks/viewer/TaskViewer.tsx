@@ -77,6 +77,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     error,
     setError,
     fetchResult,
+    loadingPhase,
   } = useTaskFetching(params.taskId);
 
   // UI State
@@ -202,7 +203,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
 
   // Loading state
   if (authLoading || loading) {
-    return <LoadingState />;
+    return <LoadingState phase={loadingPhase} />;
   }
 
   // Auth redirect
