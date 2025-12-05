@@ -15,6 +15,32 @@ const COURT = {
 // Display duration for elements
 const DISPLAY_DURATION = 4.0;
 
+// Team Zone Sync - depth zones for each half of the court
+// Players should move together (same depth) for good positioning
+const DEPTH_ZONES = {
+  topHalf: [
+    { id: 0, name: "back",  minY: 0,  maxY: 3 },   // Behind service line
+    { id: 1, name: "mid",   minY: 3,  maxY: 7 },   // Transition area
+    { id: 2, name: "front", minY: 7,  maxY: 10 },  // At net
+  ],
+  bottomHalf: [
+    { id: 0, name: "front", minY: 10, maxY: 13 },  // At net
+    { id: 1, name: "mid",   minY: 13, maxY: 17 },  // Transition area
+    { id: 2, name: "back",  minY: 17, maxY: 20 },  // Behind service line
+  ],
+};
+
+// Team Zone Sync colors (traffic light system)
+const ZONE_SYNC_COLORS = {
+  synced: "#22C55E",      // Green - both players same depth
+  transitioning: "#EAB308", // Yellow/Amber - 1 zone apart
+  split: "#EF4444",       // Red - 2+ zones apart
+};
+
+// Grace period after rally starts before applying team zone sync
+// (during serve, players are intentionally split - one at net, one at back)
+const SERVE_GRACE_PERIOD = 2.5; // seconds
+
 // Trail colors (same as video overlay)
 const TRAIL_COLORS = {
   current: OVERLAY_COLORS.trail.current, // Mint green
@@ -58,6 +84,7 @@ interface PadelCourt2DProps {
   showBounces?: boolean;
   showTrajectories?: boolean;
   showPlayers?: boolean;
+  showTeamZoneSync?: boolean; // Show team zone sync overlay (traffic light system)
 }
 
 // Convert court_pos to court coordinates
@@ -188,6 +215,86 @@ function getPlayerColor(index: number): string {
   return colors[index % colors.length].primary;
 }
 
+// Get depth zone index for a Y position (0 = back, 1 = mid, 2 = front relative to net)
+function getDepthZoneIndex(y: number): { half: "top" | "bottom"; zoneIndex: number } | null {
+  // Top half (Y: 0-10)
+  if (y >= 0 && y < 10) {
+    for (const zone of DEPTH_ZONES.topHalf) {
+      if (y >= zone.minY && y < zone.maxY) {
+        return { half: "top", zoneIndex: zone.id };
+      }
+    }
+  }
+  // Bottom half (Y: 10-20)
+  if (y >= 10 && y <= 20) {
+    for (const zone of DEPTH_ZONES.bottomHalf) {
+      if (y >= zone.minY && y < zone.maxY) {
+        return { half: "bottom", zoneIndex: zone.id };
+      }
+    }
+    // Edge case: exactly at 20
+    if (y === 20) {
+      return { half: "bottom", zoneIndex: 2 };
+    }
+  }
+  return null;
+}
+
+// Calculate team zone sync status for a pair of players
+type TeamSyncStatus = "synced" | "transitioning" | "split" | "unknown";
+
+interface TeamZoneSync {
+  status: TeamSyncStatus;
+  color: string;
+  activeZones: Array<{ minY: number; maxY: number }>;
+}
+
+function calculateTeamZoneSync(
+  player1Y: number | undefined,
+  player2Y: number | undefined
+): TeamZoneSync {
+  if (player1Y === undefined || player2Y === undefined) {
+    return { status: "unknown", color: "transparent", activeZones: [] };
+  }
+
+  const zone1 = getDepthZoneIndex(player1Y);
+  const zone2 = getDepthZoneIndex(player2Y);
+
+  if (!zone1 || !zone2) {
+    return { status: "unknown", color: "transparent", activeZones: [] };
+  }
+
+  // Players must be on the same half for team sync to apply
+  if (zone1.half !== zone2.half) {
+    return { status: "unknown", color: "transparent", activeZones: [] };
+  }
+
+  const zoneDiff = Math.abs(zone1.zoneIndex - zone2.zoneIndex);
+  const zones = zone1.half === "top" ? DEPTH_ZONES.topHalf : DEPTH_ZONES.bottomHalf;
+
+  // Get the active zone(s) based on player positions
+  const zoneIndices = [zone1.zoneIndex, zone2.zoneIndex];
+  const minZoneIdx = Math.min(...zoneIndices);
+  const maxZoneIdx = Math.max(...zoneIndices);
+  
+  const activeZones: Array<{ minY: number; maxY: number }> = [];
+  for (let i = minZoneIdx; i <= maxZoneIdx; i++) {
+    const zone = zones.find(z => z.id === i);
+    if (zone) {
+      activeZones.push({ minY: zone.minY, maxY: zone.maxY });
+    }
+  }
+
+  switch (zoneDiff) {
+    case 0:
+      return { status: "synced", color: ZONE_SYNC_COLORS.synced, activeZones };
+    case 1:
+      return { status: "transitioning", color: ZONE_SYNC_COLORS.transitioning, activeZones };
+    default:
+      return { status: "split", color: ZONE_SYNC_COLORS.split, activeZones };
+  }
+}
+
 export function PadelCourt2D({ 
   className,
   currentTime = 0,
@@ -199,6 +306,7 @@ export function PadelCourt2D({
   showBounces = true,
   showTrajectories = true,
   showPlayers = true,
+  showTeamZoneSync = false,
 }: PadelCourt2DProps) {
   // Court colors
   const courtColor = "#3B5DC9";
@@ -341,6 +449,41 @@ export function PadelCourt2D({
     return positions;
   }, [playerPositions, playerDisplayNames, currentTime, showPlayers]);
 
+  // Calculate team zone sync for each half of the court
+  // Only applies during rallies, after serve grace period
+  const teamZoneSyncData = useMemo(() => {
+    if (!showTeamZoneSync || currentPlayerPositions.length === 0) {
+      return { topHalf: null, bottomHalf: null, isServePhase: false };
+    }
+
+    // Don't show team zone sync outside of rallies
+    if (currentRallyStart === null) {
+      return { topHalf: null, bottomHalf: null, isServePhase: false };
+    }
+
+    // Check if we're in serve phase (grace period after rally starts)
+    const isServePhase = (currentTime - currentRallyStart) < SERVE_GRACE_PERIOD;
+
+    // Don't show team zone sync during serve phase
+    if (isServePhase) {
+      return { topHalf: null, bottomHalf: null, isServePhase: true };
+    }
+
+    // Group players by court half
+    const topPlayers = currentPlayerPositions.filter(p => p.y < 10);
+    const bottomPlayers = currentPlayerPositions.filter(p => p.y >= 10);
+
+    // Calculate sync for each half (need exactly 2 players per half for team sync)
+    const topHalfSync = topPlayers.length === 2 
+      ? calculateTeamZoneSync(topPlayers[0].y, topPlayers[1].y)
+      : null;
+    
+    const bottomHalfSync = bottomPlayers.length === 2
+      ? calculateTeamZoneSync(bottomPlayers[0].y, bottomPlayers[1].y)
+      : null;
+
+    return { topHalf: topHalfSync, bottomHalf: bottomHalfSync, isServePhase: false };
+  }, [currentPlayerPositions, showTeamZoneSync, currentRallyStart, currentTime]);
 
   return (
     <Box
@@ -394,6 +537,40 @@ export function PadelCourt2D({
 
         {/* Court surface */}
         <rect x={0} y={0} width={COURT.width} height={COURT.length} fill={courtColor} />
+
+        {/* === TEAM ZONE SYNC OVERLAY === */}
+        {showTeamZoneSync && teamZoneSyncData.topHalf && (
+          <g className="team-zone-sync-top">
+            {teamZoneSyncData.topHalf.activeZones.map((zone, idx) => (
+              <rect
+                key={`top-zone-${idx}`}
+                x={wallThickness}
+                y={zone.minY}
+                width={COURT.width - wallThickness * 2}
+                height={zone.maxY - zone.minY}
+                fill={teamZoneSyncData.topHalf!.color}
+                opacity={0.45}
+                style={{ transition: "fill 150ms ease, opacity 150ms ease, y 150ms ease, height 150ms ease" }}
+              />
+            ))}
+          </g>
+        )}
+        {showTeamZoneSync && teamZoneSyncData.bottomHalf && (
+          <g className="team-zone-sync-bottom">
+            {teamZoneSyncData.bottomHalf.activeZones.map((zone, idx) => (
+              <rect
+                key={`bottom-zone-${idx}`}
+                x={wallThickness}
+                y={zone.minY}
+                width={COURT.width - wallThickness * 2}
+                height={zone.maxY - zone.minY}
+                fill={teamZoneSyncData.bottomHalf!.color}
+                opacity={0.45}
+                style={{ transition: "fill 150ms ease, opacity 150ms ease, y 150ms ease, height 150ms ease" }}
+              />
+            ))}
+          </g>
+        )}
         
         {/* === WALLS === */}
         <rect x={0} y={0} width={COURT.width} height={wallThickness} fill={wallColor} />

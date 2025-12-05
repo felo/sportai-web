@@ -6,18 +6,21 @@ import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 export interface TimelineFilterState {
   showOnlyRallies: boolean;
   rallyBuffer: number; // seconds before rally start
+  showTeamZoneSync: boolean; // Show team zone sync overlay on 2D court
 }
 
 interface TimelineFilterProps {
   filters: TimelineFilterState;
   onFilterChange: (filters: TimelineFilterState) => void;
   hasRallies?: boolean;
+  showCourtOptions?: boolean; // Show court-related options (for padel)
 }
 
 export function TimelineFilter({ 
   filters, 
   onFilterChange,
   hasRallies = true,
+  showCourtOptions = false,
 }: TimelineFilterProps) {
   const handleShowOnlyRalliesChange = (checked: boolean) => {
     onFilterChange({
@@ -33,9 +36,17 @@ export function TimelineFilter({
     });
   };
 
+  const handleTeamZoneSyncChange = (checked: boolean) => {
+    onFilterChange({
+      ...filters,
+      showTeamZoneSync: checked,
+    });
+  };
+
   const activeFiltersCount = [
     filters.showOnlyRallies,
     filters.rallyBuffer !== 1, // Count as active if different from default
+    filters.showTeamZoneSync,
   ].filter(Boolean).length;
 
   return (
@@ -165,6 +176,46 @@ export function TimelineFilter({
               <Text size="1" color="gray">5s</Text>
             </Flex>
           </Flex>
+
+          {/* Team Zone Sync Toggle - Only show for padel */}
+          {showCourtOptions && (
+            <>
+              <Separator size="4" />
+
+              <Flex
+                justify="between"
+                align="center"
+                style={{
+                  padding: "var(--space-2)",
+                  borderRadius: "var(--radius-2)",
+                  backgroundColor: filters.showTeamZoneSync ? "var(--mint-a3)" : "transparent",
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                <Flex direction="column" gap="1">
+                  <Flex align="center" gap="2">
+                    <Text size="2" weight="medium">
+                      Team Zone Sync
+                    </Text>
+                    <Flex gap="1">
+                      <Box style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22C55E" }} />
+                      <Box style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#EAB308" }} />
+                      <Box style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#EF4444" }} />
+                    </Flex>
+                  </Flex>
+                  <Text size="1" color="gray">
+                    Show team positioning on 2D court
+                  </Text>
+                </Flex>
+                <Switch
+                  size="2"
+                  checked={filters.showTeamZoneSync}
+                  onCheckedChange={handleTeamZoneSyncChange}
+                  style={{ cursor: "pointer" }}
+                />
+              </Flex>
+            </>
+          )}
         </Flex>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

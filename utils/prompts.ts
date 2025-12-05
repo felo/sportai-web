@@ -88,16 +88,4 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
       velocityWrist: "right"
     }
   },
-  {
-    id: "quick-tips",
-    title: "Quick Tips",
-    description: "Get 3-5 actionable tips to immediately improve your game",
-    prompt:
-      "Watch this video and provide 3-5 quick, actionable tips that would make the biggest immediate impact on performance. Keep it concise and practical.",
-    videoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763676272/Rally.mp4",
-    thinkingMode: "fast",
-    mediaResolution: "medium",
-    domainExpertise: "pickleball",
-    playbackSpeed: 1.0,
-  },
 ];

@@ -428,6 +428,13 @@ export function UserMenu({
                           <Text ml="auto" size="1" color="gray">✓</Text>
                         )}
                       </DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Item onSelect={() => onTTSSettingChange?.("language", "fr-FR")}>
+                        <Text>Français (France)</Text>
+                        {ttsSettings.language === "fr-FR" && (
+                          <Text ml="auto" size="1" color="gray">✓</Text>
+                        )}
+                      </DropdownMenu.Item>
                     </DropdownMenu.SubContent>
                   </DropdownMenu.Sub>
 

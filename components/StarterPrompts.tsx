@@ -24,18 +24,7 @@ interface StarterPromptsProps {
 
 export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
   const [loadingVideoForCard, setLoadingVideoForCard] = React.useState<string | null>(null);
-  const [isTablet, setIsTablet] = React.useState(false);
   const isMobile = useIsMobile();
-
-  // Detect tablet breakpoint (< 1024px)
-  React.useEffect(() => {
-    const checkTablet = () => {
-      setIsTablet(window.innerWidth < 1024);
-    };
-    checkTablet();
-    window.addEventListener("resize", checkTablet);
-    return () => window.removeEventListener("resize", checkTablet);
-  }, []);
 
   const handleCardClick = async (config: StarterPromptConfig) => {
     try {
@@ -65,8 +54,8 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       gap={isMobile ? "4" : "8"}
       className="starter-prompts-container"
       style={{
-        height: "100%",
-        padding: isMobile ? "calc(57px + 1rem) 1rem 1rem" : "3rem 1rem 2rem",
+        minHeight: "100%",
+        padding: isMobile ? "calc(88px + env(safe-area-inset-top, 0px)) 1rem 2rem" : "3rem 1rem 2rem",
         maxWidth: isMobile ? "100%" : "900px",
         margin: "0 auto",
         width: "100%",
@@ -121,13 +110,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
           maxWidth: "900px",
         }}
       >
-        {STARTER_PROMPTS.filter((starterPrompt) => {
-          // Hide quick-tips card on mobile and tablet
-          if (isTablet && starterPrompt.id === "quick-tips") {
-            return false;
-          }
-          return true;
-        }).map((starterPrompt) => (
+        {STARTER_PROMPTS.map((starterPrompt) => (
           <Card
             key={starterPrompt.id}
             style={{

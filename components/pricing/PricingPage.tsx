@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Flex, Text, Button, Badge, Card } from "@radix-ui/themes";
 import { CheckIcon, RocketIcon, ChatBubbleIcon } from "@radix-ui/react-icons";
@@ -263,6 +263,8 @@ export function PricingPage() {
   const router = useRouter();
   const { isCollapsed, isInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Handle creating a new chat and navigating to it
   const handleNewChat = useCallback(async () => {
@@ -271,18 +273,46 @@ export function PricingPage() {
     router.push("/");
   }, [router]);
 
+  // Track scroll position to update active dot indicator
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer || !isMobile) return;
+
+    const handleScroll = () => {
+      const scrollLeft = scrollContainer.scrollLeft;
+      const cardWidth = 280 + 16; // card width + gap
+      const newIndex = Math.round(scrollLeft / cardWidth);
+      setActiveIndex(Math.min(newIndex, plans.length - 1));
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [isMobile]);
+
+  // Handle dot click to scroll to specific card
+  const scrollToCard = (index: number) => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+    const cardWidth = 280 + 16;
+    scrollContainer.scrollTo({
+      left: index * cardWidth,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <>
       <Sidebar />
       <PageHeader onNewChat={handleNewChat} />
       <Box
-        className={`page-content-wrapper ${!isCollapsed ? 'sidebar-expanded' : ''} ${isInitialLoad ? 'no-transition' : ''}`}
         style={{
-          height: "100%",
+          height: "100vh",
           backgroundColor: "var(--gray-1)",
           padding: "24px",
           paddingTop: isMobile ? "calc(57px + 48px + env(safe-area-inset-top))" : "calc(57px + 48px)",
           paddingBottom: "96px",
+          marginLeft: isMobile ? 0 : isCollapsed ? "64px" : "280px",
+          transition: isInitialLoad ? "none" : "margin-left 0.2s ease-in-out",
           overflowY: "auto",
           overflowX: "hidden",
         }}
@@ -318,11 +348,31 @@ export function PricingPage() {
           </Flex>
 
           {/* Pricing Cards */}
-          <Box className="pricing-grid">
+          <Box ref={scrollRef} className="pricing-grid">
             {plans.map((plan) => (
               <PlanCard key={`${plan.name}-${plan.subtitle || 'base'}`} plan={plan} onGetStarted={handleNewChat} isMobile={isMobile} />
             ))}
           </Box>
+
+          {/* Scroll Indicator Dots - Mobile Only */}
+          {isMobile && (
+            <Flex justify="center" gap="2" mt="4">
+              {plans.map((_, index) => (
+                <Box
+                  key={index}
+                  onClick={() => scrollToCard(index)}
+                  style={{
+                    width: activeIndex === index ? "24px" : "8px",
+                    height: "8px",
+                    borderRadius: "4px",
+                    backgroundColor: activeIndex === index ? "var(--accent-9)" : "var(--gray-6)",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                  }}
+                />
+              ))}
+            </Flex>
+          )}
         </Box>
       </Box>
     </>

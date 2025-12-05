@@ -96,6 +96,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [timelineFilters, setTimelineFilters] = useState<TimelineFilterState>({
     showOnlyRallies: true,
     rallyBuffer: 1,
+    showTeamZoneSync: true, // Team zone sync enabled by default
   });
 
   // Extract player portraits from video frames using a hidden video element

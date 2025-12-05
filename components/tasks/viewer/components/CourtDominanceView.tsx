@@ -5,6 +5,16 @@ import { Box, Flex, Text, Card, SegmentedControl, Tooltip, Badge, Heading } from
 import { PersonIcon, TargetIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult, PlayerPosition } from "../types";
 
+// Helper function to format seconds into minutes and seconds
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return `${mins}m ${secs}s`;
+}
+
 // Reuse grid dimensions from ShotHeatmap (for HALF court - one side only)
 // Half court: 10m wide × 10m deep (from back wall to net)
 const HALF_COURT = {
@@ -50,16 +60,18 @@ interface ZoneSystem {
   name: string;
   description: string;
   zones: ZoneDefinition[];
+  coachingTips: string;
 }
 
 // Helper to convert meter boundaries to grid cells
+// Uses round for more even distribution and non-overlapping boundaries
 function metersToGrid(xMin: number, xMax: number, yMin: number, yMax: number): { colMin: number; colMax: number; rowMin: number; rowMax: number } {
   return {
-    colMin: Math.floor((xMin / HALF_COURT.width) * GRID_COLS),
-    colMax: Math.ceil((xMax / HALF_COURT.width) * GRID_COLS),
+    colMin: Math.round((xMin / HALF_COURT.width) * GRID_COLS),
+    colMax: Math.round((xMax / HALF_COURT.width) * GRID_COLS),
     // Row 0 is at net (y=10), Row 5 is at back wall (y=0)
-    rowMin: GRID_ROWS - Math.ceil((yMax / HALF_COURT.depth) * GRID_ROWS),
-    rowMax: GRID_ROWS - Math.floor((yMin / HALF_COURT.depth) * GRID_ROWS),
+    rowMin: GRID_ROWS - Math.round((yMax / HALF_COURT.depth) * GRID_ROWS),
+    rowMax: GRID_ROWS - Math.round((yMin / HALF_COURT.depth) * GRID_ROWS),
   };
 }
 
@@ -337,24 +349,28 @@ const ZONE_SYSTEMS: ZoneSystem[] = [
     name: "Traffic Light",
     description: "Simple 3-zone system (Green/Orange/Red)",
     zones: TRAFFIC_LIGHT_ZONES,
+    coachingTips: "Coaches use the Traffic Light system to teach court positioning basics. Green zone (net) is where you want to be to finish points. Orange zone (transition) should be crossed quickly—don't linger here. Red zone (defense) means you're under pressure; use lobs to reset and work your way forward.",
   },
   {
     id: "6-zone",
     name: "6-Zone Tactical",
     description: "Split by depth and court side",
     zones: SIX_ZONE_SYSTEM,
+    coachingTips: "The 6-Zone system helps coaches analyze court side balance. Players should control their side while being ready to cover the middle. Watch for patterns: Are you spending too much time on one side? Good teams rotate smoothly between deuce and ad sides while maintaining net presence.",
   },
   {
     id: "9-zone",
     name: "9-Zone Grid",
     description: "Detailed 3×3 grid analysis",
     zones: NINE_ZONE_SYSTEM,
+    coachingTips: "The 9-Zone grid provides granular positioning data. Coaches use this to identify specific weaknesses—like a player stuck in back corners or avoiding the center. Elite players dominate the net-center (the 'T') and minimize time in mid-court zones. Compare your heat map to pros to spot improvement areas.",
   },
   {
     id: "functional",
     name: "Functional",
     description: "Based on shot types and tactics",
     zones: FUNCTIONAL_ZONES,
+    coachingTips: "The Functional system maps zones to shot types. Volley zone is for finishing with power. Bandeja zone is where you control with overhead shots. No-man's land is dangerous—never stay here! Service box is for building points. Glass wall zone means you're defending; use the walls creatively to reset.",
   },
 ];
 
@@ -517,6 +533,9 @@ export function CourtDominanceView({
         pressureZoneTime: pressureTime,
         pressurePercentage: totalTime > 0 ? (pressureTime / totalTime) * 100 : 0,
       };
+    }).sort((a, b) => {
+      // Sort by player name naturally (e.g., "Player 1" before "Player 2")
+      return a.playerName.localeCompare(b.playerName, undefined, { numeric: true });
     });
   }, [result, currentSystem, playerDisplayNames, validPlayers]);
   
@@ -693,14 +712,13 @@ export function CourtDominanceView({
                     >
                       <Flex justify="between" align="center">
                         <Flex align="center" gap="2">
-                          <Text style={{ fontSize: 16 }}>{zoneDef.emoji}</Text>
                           <Text size="2" weight="medium">{zoneStat.zoneName}</Text>
                           {zoneDef.isPressureZone && (
                             <Badge size="1" color="orange" variant="soft">Pressure</Badge>
                           )}
                         </Flex>
                         <Text size="3" weight="bold" style={{ color: zoneDef.color, fontVariantNumeric: "tabular-nums" }}>
-                          {zoneStat.percentage.toFixed(1)}%
+                          {zoneStat.percentage.toFixed(0)}%
                         </Text>
                       </Flex>
                       
@@ -720,7 +738,7 @@ export function CourtDominanceView({
                       
                       <Flex justify="between">
                         <Text size="1" color="gray" style={{ fontVariantNumeric: "tabular-nums" }}>
-                          {zoneStat.timeSpent.toFixed(1)}s total
+                          {formatDuration(zoneStat.timeSpent)} total
                         </Text>
                         <Text size="1" color="gray" style={{ fontVariantNumeric: "tabular-nums" }}>
                           {zoneStat.entryCount} entries
@@ -730,6 +748,28 @@ export function CourtDominanceView({
                   </Tooltip>
                 );
               })}
+              
+              {/* Coaching Tips */}
+              <Box
+                style={{
+                  marginTop: 8,
+                  padding: "12px",
+                  backgroundColor: "var(--accent-2)",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--accent-5)",
+                  opacity: isVisible ? 1 : 0,
+                  transform: isVisible ? "translateY(0)" : "translateY(10px)",
+                  transition: "all 0.4s ease-out",
+                  transitionDelay: "0.4s",
+                }}
+              >
+                <Flex align="start" gap="2">
+                  <Text style={{ fontSize: 16, flexShrink: 0 }}>💡</Text>
+                  <Text size="1" color="gray" style={{ lineHeight: 1.5 }}>
+                    {currentSystem.coachingTips}
+                  </Text>
+                </Flex>
+              </Box>
             </Flex>
           </Card>
         </Flex>
@@ -843,15 +883,35 @@ function CourtZoneGrid({
             const stat = zoneStats.find(s => s.zoneId === zone.id);
             const percentage = stat?.percentage || 0;
             
-            // Calculate center position for this zone
-            const left = ((zone.colMin + zone.colMax) / 2 / GRID_COLS) * 100;
-            const top = ((zone.rowMin + zone.rowMax) / 2 / GRID_ROWS) * 100;
+            // Calculate actual visual center based on rendered cells
+            let minRow = GRID_ROWS, maxRow = -1, minCol = GRID_COLS, maxCol = -1;
+            cellZones.forEach((row, rowIdx) => {
+              row.forEach((cellZone, colIdx) => {
+                if (cellZone?.id === zone.id) {
+                  minRow = Math.min(minRow, rowIdx);
+                  maxRow = Math.max(maxRow, rowIdx);
+                  minCol = Math.min(minCol, colIdx);
+                  maxCol = Math.max(maxCol, colIdx);
+                }
+              });
+            });
+            
+            // Skip zones with no cells assigned
+            if (maxRow < 0 || maxCol < 0) return null;
+            
+            // Calculate center: find the midpoint of the cell range
+            // For cells minCol to maxCol (inclusive), the visual span is:
+            // Start: minCol / GRID_COLS, End: (maxCol + 1) / GRID_COLS
+            // Center: ((minCol / GRID_COLS) + ((maxCol + 1) / GRID_COLS)) / 2
+            const left = ((minCol + maxCol + 1) / 2 / GRID_COLS) * 100;
+            const top = ((minRow + maxRow + 1) / 2 / GRID_ROWS) * 100;
             
             return (
               <Flex
                 key={zone.id}
                 direction="column"
                 align="center"
+                justify="center"
                 gap="0"
                 style={{
                   position: "absolute",
@@ -862,18 +922,31 @@ function CourtZoneGrid({
                   transition: `opacity 0.4s ease-out ${0.3 + idx * 0.05}s`,
                 }}
               >
-                <Text style={{ fontSize: 20 }}>{zone.emoji}</Text>
-                <Text 
-                  size="2" 
-                  weight="bold" 
-                  style={{ 
-                    color: "white", 
-                    textShadow: "0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.6)",
-                    fontVariantNumeric: "tabular-nums",
+                <Box
+                  style={{
+                    backgroundColor: "rgba(0, 0, 0, 0.65)",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    backdropFilter: "blur(4px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  {percentage.toFixed(0)}%
-                </Text>
+                  <Text 
+                    size="4" 
+                    weight="bold" 
+                    align="center"
+                    style={{ 
+                      color: "white", 
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "-0.02em",
+                      textAlign: "center",
+                    }}
+                  >
+                    {percentage.toFixed(0)}%
+                  </Text>
+                </Box>
               </Flex>
             );
           })}
@@ -892,14 +965,13 @@ function CourtZoneGrid({
           }}
         />
         <Text
-          size="1"
-          weight="medium"
+          size="4"
+          weight="bold"
           style={{
             position: "absolute",
-            top: 8,
-            right: 8,
-            color: "var(--gray-11)",
-            fontSize: 9,
+            top: 12,
+            right: 12,
+            color: "var(--gray-12)",
           }}
         >
           NET ↑
@@ -907,17 +979,16 @@ function CourtZoneGrid({
         
         {/* Back wall indicator (at bottom) */}
         <Text
-          size="1"
-          weight="medium"
+          size="4"
+          weight="bold"
           style={{
             position: "absolute",
-            bottom: 8,
-            left: 8,
-            color: "var(--gray-9)",
-            fontSize: 9,
+            bottom: 12,
+            left: 12,
+            color: "var(--gray-12)",
           }}
         >
-          BACK WALL
+          BACK WALL ↓
         </Text>
       </Box>
     </Box>
@@ -993,7 +1064,7 @@ function PlayerDominanceCard({
         <Flex gap="2" wrap="wrap">
           <Tooltip content="Total tracked time during rallies">
             <Badge color="gray" variant="soft" size="2" style={{ cursor: "help" }}>
-              ⏱️ {player.totalTime.toFixed(0)}s tracked
+              ⏱️ {formatDuration(player.totalTime)} tracked
             </Badge>
           </Tooltip>
           <Tooltip content="Time spent in defensive or transition zones">
@@ -1020,7 +1091,15 @@ function PlayerDominanceCard({
               
               return (
                 <Flex key={zoneStat.zoneId} align="center" gap="2">
-                  <Text style={{ fontSize: 12, width: 20, textAlign: "center" }}>{zoneDef.emoji}</Text>
+                  <Box
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: zoneDef.color,
+                      flexShrink: 0,
+                    }}
+                  />
                   <Box style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: "var(--gray-4)", overflow: "hidden" }}>
                     <Box
                       style={{

@@ -102,6 +102,11 @@ export async function synthesizeSpeech(text: string, settings?: {
         'female': 'en-GB-Studio-C',
         'neutral': 'en-GB-Studio-B',
       },
+      'fr-FR': {
+        'male': 'fr-FR-Studio-D',
+        'female': 'fr-FR-Studio-A',
+        'neutral': 'fr-FR-Studio-A',
+      },
     };
     
     let voiceName: string;

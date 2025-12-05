@@ -81,6 +81,7 @@ export function RalliesTab({
             filters={timelineFilters}
             onFilterChange={onTimelineFiltersChange}
             hasRallies={result.rallies && result.rallies.length > 0}
+            showCourtOptions={task.sport === "padel"}
           />
         </Flex>
       )}
@@ -121,6 +122,7 @@ export function RalliesTab({
             playerDisplayNames={playerDisplayNames}
             showBounces={true}
             showPlayers={true}
+            showTeamZoneSync={timelineFilters.showTeamZoneSync}
           />
         }
       />

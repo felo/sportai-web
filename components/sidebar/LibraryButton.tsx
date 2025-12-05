@@ -6,7 +6,7 @@ import { VideoIcon } from "@radix-ui/react-icons";
 import type { LibraryButtonProps } from "./types";
 import { useLibraryTasks } from "./LibraryTasksContext";
 
-export function LibraryButton({ isActive, onNavigationAttempt }: LibraryButtonProps) {
+export function LibraryButton({ onClick, isActive, onNavigationAttempt }: LibraryButtonProps) {
   const router = useRouter();
   const { processingCount, newCompletedCount, markTasksAsSeen } = useLibraryTasks();
 
@@ -15,6 +15,8 @@ export function LibraryButton({ isActive, onNavigationAttempt }: LibraryButtonPr
     
     // Don't navigate if already on the Library page
     if (isActive) {
+      // Still close sidebar on mobile even if already on library page
+      onClick?.();
       return;
     }
 
@@ -28,6 +30,9 @@ export function LibraryButton({ isActive, onNavigationAttempt }: LibraryButtonPr
 
     // Mark tasks as seen when navigating to library
     markTasksAsSeen();
+    
+    // Close sidebar on mobile
+    onClick?.();
     
     // Navigate to library
     router.push("/library");
