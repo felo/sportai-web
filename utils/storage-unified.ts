@@ -23,7 +23,7 @@ import {
   getChatById as getChatByIdLocal,
   getCurrentChatId,
   setCurrentChatId,
-} from "./storage";
+} from "./storage/index";
 
 // Supabase functions
 import {
