@@ -1,27 +1,8 @@
 "use client";
 
-import { Box, Flex, Text, Grid } from "@radix-ui/themes";
-import { TaskTile } from "./TaskTile";
+import { Flex, Text, Grid } from "@radix-ui/themes";
+import { TaskTile, type Task } from "./TaskTile";
 import { EmptyState } from "@/components/ui";
-
-interface Task {
-  id: string;
-  task_type: string;
-  sport: "tennis" | "padel" | "pickleball";
-  sportai_task_id: string | null;
-  video_url: string;
-  thumbnail_url: string | null;
-  thumbnail_s3_key: string | null;
-  video_length: number | null;
-  status: "pending" | "processing" | "completed" | "failed";
-  estimated_compute_time: number | null;
-  request_params: Record<string, unknown> | null;
-  result_s3_key: string | null;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
-}
 
 interface TaskGridViewProps {
   tasks: Task[];

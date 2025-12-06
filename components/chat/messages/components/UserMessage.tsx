@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Box, Text, Button } from "@radix-ui/themes";
+import { chatLogger } from "@/lib/logger";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
 import { useFloatingVideoContextOptional } from "../../viewers/FloatingVideoContext";
 import type { Message } from "@/types/chat";
@@ -348,7 +349,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           }
         } catch (error) {
           // Autoplay was prevented, but that's okay - user can still play manually
-          console.log("Autoplay prevented:", error);
+          chatLogger.debug("Autoplay prevented:", error);
         }
       };
 
@@ -398,7 +399,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
               onError={(e) => {
                 // Handle revoked blob URL errors gracefully
                 if (videoSrc?.startsWith("blob:")) {
-                  console.warn("Image blob URL revoked or invalid:", videoSrc);
+                  chatLogger.warn("Image blob URL revoked or invalid:", videoSrc);
                   e.currentTarget.style.display = "none";
                 }
               }}
@@ -584,10 +585,10 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                     const video = e.currentTarget;
                     // Check if this is a blob URL error (revoked blob)
                     if (video.src.startsWith("blob:")) {
-                      console.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
+                      chatLogger.warn("Blob URL revoked or invalid, video may have been cleared:", video.src);
                     } else {
-                      console.error("Video playback error:", e);
-                      console.error("Video error details:", {
+                      chatLogger.error("Video playback error:", e);
+                      chatLogger.error("Video error details:", {
                         error: video.error,
                         networkState: video.networkState,
                         readyState: video.readyState,
@@ -596,10 +597,10 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                     }
                   }}
                   onLoadStart={() => {
-                    console.log("Video load started:", videoSrc);
+                    chatLogger.debug("Video load started:", videoSrc);
                   }}
                   onLoadedMetadata={() => {
-                    console.log("Video metadata loaded");
+                    chatLogger.debug("Video metadata loaded");
                   }}
                   style={{
                     width: "100%",

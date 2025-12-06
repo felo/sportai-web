@@ -2,6 +2,8 @@
  * Storage utilities for managing PRO upsell display state
  */
 
+import { storageLogger } from "@/lib/logger";
+
 const PRO_UPSELL_SHOWN_KEY = "sportai-pro-upsell-shown";
 
 /**
@@ -19,7 +21,7 @@ export function hasShownProUpsell(chatId: string | undefined): boolean {
     const shownChats = JSON.parse(stored) as string[];
     return shownChats.includes(chatId);
   } catch (error) {
-    console.error("Failed to check PRO upsell status:", error);
+    storageLogger.error("Failed to check PRO upsell status:", error);
     return false;
   }
 }
@@ -45,7 +47,7 @@ export function markProUpsellShown(chatId: string | undefined): void {
       localStorage.setItem(PRO_UPSELL_SHOWN_KEY, JSON.stringify(shownChats));
     }
   } catch (error) {
-    console.error("Failed to mark PRO upsell as shown:", error);
+    storageLogger.error("Failed to mark PRO upsell as shown:", error);
   }
 }
 

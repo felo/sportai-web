@@ -3,9 +3,12 @@
 import { useState, useEffect } from "react";
 import { Dialog, Button, Text, Flex, Box, ScrollArea, Badge, Tabs } from "@radix-ui/themes";
 import { Cross2Icon, ReloadIcon, StackIcon } from "@radix-ui/react-icons";
+import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type { Chat, Message } from "@/types/chat";
+
+const debugLogger = createLogger("SupabaseDebug");
 
 interface SupabaseData {
   profile: any | null;
@@ -50,7 +53,7 @@ export function SupabaseDebug({ open: controlledOpen, onOpenChange }: SupabaseDe
         .single();
 
       if (profileError && profileError.code !== "PGRST116") {
-        console.error("Profile fetch error:", profileError);
+        debugLogger.error("Profile fetch error:", profileError);
       }
 
       // Fetch chats
@@ -60,7 +63,7 @@ export function SupabaseDebug({ open: controlledOpen, onOpenChange }: SupabaseDe
         .order("updated_at", { ascending: false });
 
       if (chatsError) {
-        console.error("Chats fetch error:", chatsError);
+        debugLogger.error("Chats fetch error:", chatsError);
       }
 
       // Fetch messages
@@ -71,7 +74,7 @@ export function SupabaseDebug({ open: controlledOpen, onOpenChange }: SupabaseDe
         .limit(100);
 
       if (messagesError) {
-        console.error("Messages fetch error:", messagesError);
+        debugLogger.error("Messages fetch error:", messagesError);
       }
 
       setData({

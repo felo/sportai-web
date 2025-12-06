@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Flex, IconButton } from "@radix-ui/themes";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { feedbackLogger } from "@/lib/logger";
 import { FeedbackModal, type FeedbackData } from "./FeedbackModal";
 import { supabase, getUser } from "@/lib/supabase";
 
@@ -45,7 +46,7 @@ export function FeedbackButtons({
         message_content: messageContent || null,
       };
       
-      console.log("Submitting feedback:", insertData);
+      feedbackLogger.debug("Submitting feedback:", insertData);
       
       const { data: result, error } = await supabase
         .from("message_feedback")
@@ -53,7 +54,7 @@ export function FeedbackButtons({
         .select();
 
       if (error) {
-        console.error("Failed to save feedback:", {
+        feedbackLogger.error("Failed to save feedback:", {
           error,
           message: error.message,
           details: error.details,
@@ -63,7 +64,7 @@ export function FeedbackButtons({
         throw error;
       }
       
-      console.log("Feedback saved successfully:", result);
+      feedbackLogger.debug("Feedback saved successfully:", result);
 
       // Update UI state
       setSelectedFeedback(data.feedbackType);
@@ -76,7 +77,7 @@ export function FeedbackButtons({
       // Notify parent component
       onFeedback?.(messageId, data.feedbackType);
     } catch (error) {
-      console.error("Error submitting feedback:", error);
+      feedbackLogger.error("Error submitting feedback:", error);
       throw error;
     }
   };

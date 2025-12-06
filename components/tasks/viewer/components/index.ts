@@ -6,6 +6,7 @@ export { VidstackPlayer, useVidstackPlayer } from "./VidstackPlayer";
 export { VideoSettings } from "./VideoSettings";
 export { ResizeHandle } from "./ResizeHandle";
 export { BallTrackerOverlay } from "./BallTrackerOverlay";
+export { CourtOverlay } from "./CourtOverlay";
 export { RallyTimeline } from "./RallyTimeline";
 export { MainTimeline } from "./MainTimeline";
 export { MatchInsights } from "./MatchInsights";
@@ -31,6 +32,9 @@ export type { TabDefinition } from "./TabNavigation";
 // Shared components
 export { Confetti, Medal, MedalDisplay, ProgressRing, RING_GRADIENTS, RING_ICONS, MEDAL_CONFIGS } from "./shared";
 export type { MedalConfig, ProgressRingProps, ProgressRingGradient } from "./shared";
+
+// Court Dominance View
+export { CourtDominanceView } from "./CourtDominanceView";
 
 // Tab content components
 export { RalliesTab, SummaryTab, PlayersTab, TeamsTab, HighlightsTab, TacticalTab, ProfilesTab, TechniqueTab, CoachingTab } from "./tabs";

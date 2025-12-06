@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Container, Heading, Text, Flex, Box, Button, Card, Code, Badge, Tabs } from "@radix-ui/themes";
+import { logger } from "@/lib/logger";
 import { VideoPoseViewer } from "@/components/chat/viewers/VideoPoseViewer";
 import { SAM2Viewer } from "@/components/chat/viewers/SAM2Viewer";
 import { UploadIcon, TrashIcon } from "@radix-ui/react-icons";
@@ -21,10 +22,10 @@ export default function PoseDemoPage() {
     const checkDiagnostics = async () => {
       try {
         const diag = await getCacheDiagnostics();
-        console.log("🔍 Cache diagnostics:", diag);
+        logger.debug("🔍 Cache diagnostics:", diag);
         setDiagnostics(diag);
       } catch (err) {
-        console.error("Failed to get diagnostics:", err);
+        logger.error("Failed to get diagnostics:", err);
       }
     };
     

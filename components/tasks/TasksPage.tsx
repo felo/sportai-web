@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { logger } from "@/lib/logger";
 import {
   Box,
   Flex,
@@ -366,19 +367,21 @@ export function TasksPage() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
+    // Show spinner immediately to provide feedback
+    setPreparingTask(taskId);
+    setError(null);
+    
     // Mark task as seen when clicked
     markTaskAsSeen(taskId);
     
     // If we already have the result, navigate directly
     if (task.result_s3_key) {
       router.push(`/library/${taskId}`);
+      // Note: we don't clear preparingTask here since we're navigating away
       return;
     }
     
     // Need to fetch the result first
-    setPreparingTask(taskId);
-    setError(null);
-    
     try {
       const response = await fetch(`/api/tasks/${taskId}/result`, {
         method: "POST",
@@ -401,9 +404,9 @@ export function TasksPage() {
       
       // Navigate to the task viewer
       router.push(`/library/${taskId}`);
+      // Note: we don't clear preparingTask here since we're navigating away
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to prepare video");
-    } finally {
       setPreparingTask(null);
     }
   };
@@ -522,7 +525,7 @@ export function TasksPage() {
       let videoLength: number | null = null;
       
       try {
-        console.log("[TasksPage] Extracting thumbnail from video URL...");
+        logger.debug("[TasksPage] Extracting thumbnail from video URL...");
         const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(trimmedUrl, 640, 0.7);
         videoLength = durationSeconds;
         
@@ -533,11 +536,11 @@ export function TasksPage() {
             thumbnailS3Key = uploadResult.thumbnailS3Key;
           }
         } else {
-          console.log("[TasksPage] Could not extract thumbnail (CORS or video issue)");
+          logger.debug("[TasksPage] Could not extract thumbnail (CORS or video issue)");
         }
       } catch (thumbErr) {
         // Non-blocking - continue without thumbnail
-        console.warn("[TasksPage] Thumbnail extraction failed:", thumbErr);
+        logger.warn("[TasksPage] Thumbnail extraction failed:", thumbErr);
       }
       
       const response = await fetch("/api/tasks", {

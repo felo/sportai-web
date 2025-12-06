@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { apiLogger } from "@/lib/logger";
 import type { ProgressStage, Message } from "@/types/chat";
 import { 
   getOptimizedContext, 
@@ -100,8 +101,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       // Add conversation history if provided and not empty
       // Skip if empty array to avoid sending unnecessary data
       // For first message, conversationHistory should be empty, so we skip this
-      console.log("🔍 [useAIApi] ========== HISTORY PROCESSING ==========");
-      console.log("🔍 [useAIApi] Input conversationHistory length:", conversationHistory?.length ?? 0);
+      apiLogger.debug("History processing - input length:", conversationHistory?.length ?? 0);
       
       // Track context usage for developer mode display
       let contextUsageInfo: {
@@ -129,47 +129,43 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           complexity,
         };
         
-        console.log("🔍 [useAIApi] Complexity:", complexity);
-        console.log("🔍 [useAIApi] Original messages:", originalMessageCount);
-        console.log("🔍 [useAIApi] After trimming:", trimmedMessageCount);
-        console.log("🔍 [useAIApi] Formatted context length:", context.length);
+        apiLogger.debug("Context analysis:", { complexity, originalMessageCount, trimmedMessageCount, contextLength: context.length });
         
         // Log the actual context being sent
         context.forEach((msg, i) => {
-          console.log(`🔍 [useAIApi] Context[${i}] ${msg.role}: "${msg.parts[0]?.text?.slice(0, 100)}..."`);
+          apiLogger.debug(`Context[${i}] ${msg.role}: "${msg.parts[0]?.text?.slice(0, 100)}..."`);
         });
         
         if (context.length > 0) {
           const historyJson = JSON.stringify(context);
-          console.log("🔍 [useAIApi] History JSON size:", historyJson.length, "bytes");
+          apiLogger.debug("History JSON size:", historyJson.length, "bytes");
           
           // Check size - allow up to 20MB total payload
           // Leave room for prompt and other data (reserve 2MB for prompt/video/overhead)
           const MAX_HISTORY_SIZE = 18 * 1024 * 1024; // 18MB to leave room for prompt and other data
           if (historyJson.length > MAX_HISTORY_SIZE) {
-            console.warn(`Conversation history too large (${historyJson.length} bytes), trimming more aggressively`);
+            apiLogger.warn(`Conversation history too large (${historyJson.length} bytes), trimming more aggressively`);
             // Trim more aggressively by reducing token limit
             const trimmedMessages = trimMessagesByTokens(conversationHistory, 2000); // Reduce to 2000 tokens
             const trimmedContext = formatMessagesForGemini(trimmedMessages);
             const trimmedJson = JSON.stringify(trimmedContext);
             if (trimmedJson.length <= MAX_HISTORY_SIZE) {
               formData.append("history", trimmedJson);
-              console.log("🔍 [useAIApi] ✅ Appended trimmed history to form");
+              apiLogger.debug("Appended trimmed history to form");
             } else {
               // If still too large, don't send history
-              console.warn("Conversation history still too large after trimming, skipping");
+              apiLogger.warn("Conversation history still too large after trimming, skipping");
             }
           } else {
             formData.append("history", historyJson);
-            console.log("🔍 [useAIApi] ✅ Appended history to form");
+            apiLogger.debug("Appended history to form");
           }
         } else {
-          console.log("🔍 [useAIApi] ⚠️ Context is empty after formatting!");
+          apiLogger.debug("Context is empty after formatting!");
         }
       } else {
-        console.log("🔍 [useAIApi] No conversation history provided (first message or empty)");
+        apiLogger.debug("No conversation history provided (first message or empty)");
       }
-      console.log("🔍 [useAIApi] ==========================================");
       
       // Send query complexity hint to server for optimized thinking budget
       formData.append("queryComplexity", detectedComplexity);
@@ -223,7 +219,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
                   cacheUsed = meta.cacheUsed;
                   modelUsed = meta.modelUsed;
                   modelReason = meta.modelReason;
-                  console.log("🔍 [useAIApi] Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
                 }
               } catch (e) {
                 // Ignore parse errors
@@ -307,7 +303,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         const sizeMB = videoFile.size / (1024 * 1024);
         
         if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
-          console.log(`[Client] Video size (${sizeMB.toFixed(2)} MB) exceeds limit, showing natural response immediately`);
+          apiLogger.info(`Video size (${sizeMB.toFixed(2)} MB) exceeds limit, showing natural response immediately`);
           
           // Generate the natural response immediately without uploading
           const naturalResponse = getVideoSizeErrorMessage(sizeMB);
@@ -390,7 +386,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       // Step 1: Get presigned URL for S3 upload
       let s3Url: string;
       try {
-        console.log("[S3] Requesting presigned URL for upload...", {
+        apiLogger.debug("Requesting presigned URL for upload...", {
           fileName: videoFile.name,
           fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`,
           contentType: videoFile.type,
@@ -409,7 +405,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
 
         if (!urlResponse.ok) {
           const errorData = await urlResponse.json();
-          console.error("[S3] ❌ Failed to get presigned URL", errorData);
+          apiLogger.error("Failed to get presigned URL", errorData);
           throw new Error(errorData.error || "Failed to get upload URL");
         }
 
@@ -418,7 +414,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         s3Url = downloadUrl || publicUrl;
         const s3Key = key;
 
-        console.log("[S3] ✅ Presigned URL received", {
+        apiLogger.debug("Presigned URL received", {
           key: s3Key,
           publicUrl: publicUrl,
           downloadUrl: downloadUrl ? `${downloadUrl.substring(0, 50)}...` : "none",
@@ -427,13 +423,13 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         });
 
         // Step 2: Upload file to S3 using presigned URL
-        console.log("[S3] Starting file upload to S3...");
+        apiLogger.debug("Starting file upload to S3...");
         await uploadToS3(presignedUrl, videoFile, (progress) => {
           // Scale upload progress to 0-80% (leaving 20% for processing)
           setProgress(progress * 0.8);
         }, abortController?.signal);
 
-        console.log("[S3] ✅ File uploaded successfully to S3!", {
+        apiLogger.debug("File uploaded successfully to S3!", {
           s3Url: s3Url,
           s3Key: s3Key,
           fileName: videoFile.name,
@@ -448,7 +444,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         
         // Step 2.5: Convert video on server if needed (for Apple QuickTime/MOV on iOS)
         if (needsServerConversion) {
-          console.log("[Convert] Starting server-side video conversion...");
+          apiLogger.debug("Starting server-side video conversion...");
           setStage("processing");
           updateMessage(assistantMessageId, { 
             content: "Converting video format for analysis...",
@@ -467,13 +463,13 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             
             if (!convertResponse.ok) {
               const errorData = await convertResponse.json();
-              console.error("[Convert] ❌ Conversion failed:", errorData);
+              apiLogger.error("Conversion failed:", errorData);
               // Continue with original file - Gemini might still work
-              console.log("[Convert] Proceeding with original file...");
+              apiLogger.debug("Proceeding with original file...");
             } else {
               const convertResult = await convertResponse.json();
               if (convertResult.success && convertResult.downloadUrl) {
-                console.log("[Convert] ✅ Video converted successfully!", {
+                apiLogger.debug("Video converted successfully!", {
                   originalKey: s3Key,
                   convertedKey: convertResult.convertedKey,
                 });
@@ -489,9 +485,9 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             if ((convertError as Error).name === "AbortError") {
               throw convertError; // Re-throw abort errors
             }
-            console.error("[Convert] ❌ Conversion error:", convertError);
+            apiLogger.error("Conversion error:", convertError);
             // Continue with original file
-            console.log("[Convert] Proceeding with original file...");
+            apiLogger.debug("Proceeding with original file...");
           }
           
           // Clear the "converting" message
@@ -500,7 +496,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         
         // Step 3: Send S3 URL to Gemini API - backend will download it efficiently
         setStage("processing");
-        console.log("[S3] Sending S3 URL to AI API (backend will download)...", {
+        apiLogger.debug("Sending S3 URL to AI API (backend will download)...", {
           s3Url: s3Url,
           promptLength: prompt.length,
         });
@@ -535,7 +531,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             complexity,
           };
           
-          if (context.length > 0) {
+            if (context.length > 0) {
             const historyJson = JSON.stringify(context);
             // With S3 URL, we have more room for history since video isn't in the payload
             const MAX_HISTORY_SIZE_WITH_S3 = 18 * 1024 * 1024; // 18MB
@@ -543,12 +539,12 @@ export function useAIApi(options: UseAIApiOptions = {}) {
               formData.append("history", historyJson);
               formData.append("queryComplexity", complexity);
             } else {
-              console.warn(`Conversation history too large (${historyJson.length} bytes), skipping`);
+              apiLogger.warn(`Conversation history too large (${historyJson.length} bytes), skipping`);
             }
           }
         }
 
-        console.log("[AI API] Sending request to /api/llm with S3 URL...");
+        apiLogger.debug("Sending request to /api/llm with S3 URL...");
         let res: Response;
         try {
           res = await fetch("/api/llm", {
@@ -559,14 +555,14 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             body: formData,
             signal: abortController?.signal,
           });
-          console.log("[AI API] Response received:", {
+          apiLogger.debug("Response received:", {
             ok: res.ok,
             status: res.status,
             statusText: res.statusText,
             hasBody: !!res.body,
           });
         } catch (fetchError) {
-          console.error("[AI API] ❌ Fetch error:", fetchError);
+          apiLogger.error("Fetch error:", fetchError);
           throw fetchError;
         }
 
@@ -575,7 +571,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.error("[AI API] ❌ Request failed:", {
+          apiLogger.error("Request failed:", {
             status: res.status,
             statusText: res.statusText,
             errorText,
@@ -589,11 +585,11 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         let timeToFirstToken: number | undefined;
 
         if (!reader) {
-          console.error("[AI API] ❌ Response body is null or undefined");
+          apiLogger.error("Response body is null or undefined");
           throw new Error("Response body is null");
         }
 
-        console.log("[AI API] Starting to read stream...");
+        apiLogger.debug("Starting to read stream...");
         try {
           // Mark as streaming when we start
           updateMessage(assistantMessageId, { isStreaming: true });
@@ -607,7 +603,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
-              console.log("[AI API] Stream completed. Total length:", accumulatedText.length);
+              apiLogger.debug("Stream completed. Total length:", accumulatedText.length);
               break;
             }
 
@@ -626,7 +622,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
                   cacheUsed = meta.cacheUsed;
                   modelUsed = meta.modelUsed;
                   modelReason = meta.modelReason;
-                  console.log("🔍 [useAIApi] Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
                 }
               } catch (e) {
                 // Ignore parse errors
@@ -639,7 +635,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             }
             
             accumulatedText += chunk;
-            console.log("[AI API] Received chunk:", {
+            apiLogger.debug("Received chunk:", {
               chunkLength: chunk.length,
               totalLength: accumulatedText.length,
               preview: chunk.substring(0, 50),
@@ -694,8 +690,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         
         if (isS3UploadError) {
           // If S3 upload fails, log the error and check if we should fall back
-          console.error("[S3] ❌ S3 upload failed:", error);
-          console.error("[S3] Error details:", {
+          apiLogger.error("S3 upload failed:", error);
+          apiLogger.error("Error details:", {
             error: error instanceof Error ? error.message : String(error),
             errorName: error instanceof Error ? error.name : undefined,
             errorStack: error instanceof Error ? error.stack : undefined,
@@ -712,11 +708,11 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             );
           }
           
-          console.warn("[S3] ⚠️ Falling back to direct upload (file is small enough)");
+          apiLogger.warn("Falling back to direct upload (file is small enough)");
         } else {
           // This is an API error, not an S3 error - rethrow it
-          console.error("[AI API] ❌ API call failed:", error);
-          console.error("[AI API] Error details:", {
+          apiLogger.error("API call failed:", error);
+          apiLogger.error("Error details:", {
             error: error instanceof Error ? error.message : String(error),
             errorName: error instanceof Error ? error.name : undefined,
             errorStack: error instanceof Error ? error.stack : undefined,

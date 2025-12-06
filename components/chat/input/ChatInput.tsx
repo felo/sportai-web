@@ -1,4 +1,5 @@
 "use client";
+import { chatLogger } from "@/lib/logger";
 
 import { useRef, useEffect, useState } from "react";
 import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
@@ -73,7 +74,7 @@ export function ChatInput({
   // Debug logging
   useEffect(() => {
     if (loading) {
-      console.log("[ChatInput] Loading state:", { loading, hasOnStop: !!onStop, progressStage });
+      chatLogger.debug("[ChatInput] Loading state:", { loading, hasOnStop: !!onStop, progressStage });
     }
   }, [loading, onStop, progressStage]);
   // Base height for textarea (in pixels) - single line height with padding
@@ -140,7 +141,7 @@ export function ChatInput({
     
     // Detect transition from analyzing to not analyzing
     if (wasAnalyzingRef.current && !isCurrentlyAnalyzing) {
-      console.log("[ChatInput] Analysis complete, triggering send button bounce");
+      chatLogger.debug("[ChatInput] Analysis complete, triggering send button bounce");
       setSendButtonBounce(true);
       
       // Reset bounce after animation completes
@@ -156,7 +157,7 @@ export function ChatInput({
   // Note: videoSportDetected is only set when a valid sport (tennis/pickleball/padel) is detected
   useEffect(() => {
     if (videoSportDetected) {
-      console.log("[ChatInput] Video sport auto-detected:", videoSportDetected);
+      chatLogger.debug("[ChatInput] Video sport auto-detected:", videoSportDetected);
       
       // Trigger glow effect
       setIsGlowing(true);

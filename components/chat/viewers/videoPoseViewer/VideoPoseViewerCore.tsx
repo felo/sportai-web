@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as React from "react";
 import { Box, Flex, Button, Text, Switch, Spinner, Select, Grid, Tooltip, DropdownMenu } from "@radix-ui/themes";
 import { PlayIcon, PauseIcon, ResetIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, RulerSquareIcon, CrossCircledIcon, ChevronDownIcon, ChevronUpIcon, EnterFullScreenIcon, ExitFullScreenIcon, CameraIcon, RocketIcon, Crosshair2Icon, ArrowDownIcon } from "@radix-ui/react-icons";
+import { detectionLogger } from "@/lib/logger";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
 import { useObjectDetection } from "@/hooks/useObjectDetection";
 import { useProjectileDetection } from "@/hooks/useProjectileDetection";
@@ -503,8 +504,8 @@ export function VideoPoseViewer({
       // Restore previous angles
       setMeasuredAngles(previousAngles);
 
-      console.log("📸 Frame captured with pose overlay and angles");
-      console.log("📐 Angles:", ALL_ANGLE_PRESETS.map(a => `[${a.join("-")}]`).join(", "));
+      detectionLogger.debug("📸 Frame captured with pose overlay and angles");
+      detectionLogger.debug("📐 Angles:", ALL_ANGLE_PRESETS.map(a => `[${a.join("-")}]`).join(", "));
 
       // Dispatch event to trigger chat integration
       // AIChatForm will listen for this and handle adding messages
@@ -522,7 +523,7 @@ export function VideoPoseViewer({
       }, 100);
 
     } catch (error) {
-      console.error("❌ Image Insight error:", error);
+      detectionLogger.error("❌ Image Insight error:", error);
       setImageInsightError(error instanceof Error ? error.message : "Failed to analyze frame");
     } finally {
       setIsImageInsightLoading(false);
@@ -609,7 +610,7 @@ export function VideoPoseViewer({
   // Reset metadata loaded state when video URL changes
   useEffect(() => {
     setIsVideoMetadataLoaded(false);
-    console.log("Video URL changed, waiting for new video metadata to load...");
+    detectionLogger.debug("Video URL changed, waiting for new video metadata to load...");
   }, [videoUrl]);
 
   // Memoized callback for pose detection
@@ -636,7 +637,7 @@ export function VideoPoseViewer({
     // CRITICAL: Verify video has valid dimensions before starting detection
     // This prevents the "Requested texture size [0x0] is invalid" error
     if (!video.videoWidth || !video.videoHeight || video.videoWidth === 0 || video.videoHeight === 0) {
-      console.warn("Video dimensions not ready for pose detection, waiting for metadata...");
+      detectionLogger.warn("Video dimensions not ready for pose detection, waiting for metadata...");
       stopDetection();
       return;
     }
@@ -691,7 +692,7 @@ export function VideoPoseViewer({
             
             lastDetectionTime = now;
           } catch (err) {
-            console.error('Error detecting objects:', err);
+            detectionLogger.error('Error detecting objects:', err);
           }
         }
         
@@ -722,7 +723,7 @@ export function VideoPoseViewer({
         const objects = await detectObjects(video);
         setCurrentObjects(objects);
       } catch (err) {
-        console.error('Error detecting objects on paused frame:', err);
+        detectionLogger.error('Error detecting objects on paused frame:', err);
       }
     };
 
@@ -752,7 +753,7 @@ export function VideoPoseViewer({
         }).catch((e) => {
           // Ignore AbortError - happens when play() is interrupted
           if (e.name !== "AbortError") {
-            console.error("Video play error:", e);
+            detectionLogger.error("Video play error:", e);
           }
         });
       }
@@ -780,7 +781,7 @@ export function VideoPoseViewer({
             const poses = await detectPose(video);
             setCurrentPoses(poses);
           } catch (err) {
-            console.error('Error detecting pose on seek:', err);
+            detectionLogger.error('Error detecting pose on seek:', err);
           }
         }
       }
@@ -809,7 +810,7 @@ export function VideoPoseViewer({
     const video = videoRef.current;
     if (!video || !usePreprocessing || !isPlaying) return;
 
-    console.log(`🎯 Starting pose sync: ${preprocessedPoses.size} frames available at ${preprocessingFPS} FPS`);
+    detectionLogger.debug(`🎯 Starting pose sync: ${preprocessedPoses.size} frames available at ${preprocessingFPS} FPS`);
     
     let rafId: number;
     let lastFrame = -1;
@@ -862,7 +863,7 @@ export function VideoPoseViewer({
     const video = videoRef.current;
     if (!video || !usePreprocessing || preprocessedPoses.size === 0) return;
 
-    console.log(`🎯 Paused pose sync active: ${preprocessedPoses.size} frames, video at ${video.currentTime.toFixed(2)}s`);
+    detectionLogger.debug(`🎯 Paused pose sync active: ${preprocessedPoses.size} frames, video at ${video.currentTime.toFixed(2)}s`);
 
     // Immediately show pose for current frame
     const showCurrentPose = () => {
@@ -1724,7 +1725,7 @@ export function VideoPoseViewer({
       video.play().catch((e) => {
         // Ignore AbortError - happens when play() is interrupted (normal behavior)
         if (e.name !== "AbortError") {
-          console.error("Video play error:", e);
+          detectionLogger.error("Video play error:", e);
         }
       });
       setIsPlaying(true);
@@ -1763,7 +1764,7 @@ export function VideoPoseViewer({
       const totalFrames = Math.floor(duration * fps);
       const allPoses = new Map<number, PoseDetectionResult[]>();
       
-      console.log(`Pre-processing ${totalFrames} frames at ${fps} FPS...`);
+      detectionLogger.debug(`Pre-processing ${totalFrames} frames at ${fps} FPS...`);
 
       for (let frame = 0; frame < totalFrames; frame++) {
         // Seek to exact frame
@@ -1793,7 +1794,7 @@ export function VideoPoseViewer({
         }
       }
 
-      console.log(`Pre-processing complete! Processed ${totalFrames} frames.`);
+      detectionLogger.debug(`Pre-processing complete! Processed ${totalFrames} frames.`);
       setPreprocessedPoses(allPoses);
       setIsPreprocessing(false);
       setPreprocessProgress(100);
@@ -1807,7 +1808,7 @@ export function VideoPoseViewer({
       }
 
     } catch (err) {
-      console.error('Pre-processing error:', err);
+      detectionLogger.error('Pre-processing error:', err);
       setIsPreprocessing(false);
       setPreprocessProgress(0);
     }
@@ -1819,7 +1820,7 @@ export function VideoPoseViewer({
     const video = videoRef.current;
     if (!video || !detectPose || isBackgroundPreprocessing) return;
 
-    console.log("🎬 Starting auto preprocessing...");
+    detectionLogger.debug("🎬 Starting auto preprocessing...");
     setIsBackgroundPreprocessing(true);
     setBackgroundPreprocessProgress(0);
     backgroundPreprocessAbortRef.current = false;
@@ -1833,7 +1834,7 @@ export function VideoPoseViewer({
       
       // Only detect if we haven't already (still at default)
       if (videoFPS === DEFAULT_VIDEO_FPS && "requestVideoFrameCallback" in video) {
-        console.log("🔍 Detecting FPS (video plays briefly behind overlay)...");
+        detectionLogger.debug("🔍 Detecting FPS (video plays briefly behind overlay)...");
         
         detectedFPS = await new Promise<number>((resolve) => {
           let frameCount = 0;
@@ -1841,7 +1842,7 @@ export function VideoPoseViewer({
           const maxFrames = 20; // Quick detection - only need ~20 frames
           const timeout = setTimeout(() => {
             video.pause();
-            console.log("⏱️ FPS detection timeout, using default");
+            detectionLogger.debug("⏱️ FPS detection timeout, using default");
             resolve(DEFAULT_VIDEO_FPS);
           }, 1500); // 1.5s max
           
@@ -1866,7 +1867,7 @@ export function VideoPoseViewer({
                   Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
                 );
               }
-              console.log(`🔍 Detected FPS: ${fps} (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
+              detectionLogger.debug(`🔍 Detected FPS: ${fps} (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
               resolve(fps);
             } else if (!video.paused && !video.ended) {
               (video as any).requestVideoFrameCallback(callback);
@@ -1898,12 +1899,12 @@ export function VideoPoseViewer({
       const totalFrames = Math.floor(duration * fps);
       const allPoses = new Map<number, PoseDetectionResult[]>();
 
-      console.log(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
+      detectionLogger.debug(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
 
       for (let frame = 0; frame < totalFrames; frame++) {
         // Check if aborted
         if (backgroundPreprocessAbortRef.current) {
-          console.log("🎬 Preprocessing aborted");
+          detectionLogger.debug("🎬 Preprocessing aborted");
           break;
         }
 
@@ -1930,7 +1931,7 @@ export function VideoPoseViewer({
 
         // Log progress every 10%
         if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
-          console.log(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
+          detectionLogger.debug(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
         }
 
         // Yield more frequently to prevent browser freeze on longer videos
@@ -1942,7 +1943,7 @@ export function VideoPoseViewer({
 
       // Only complete if not aborted
       if (!backgroundPreprocessAbortRef.current) {
-        console.log(`✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`);
+        detectionLogger.debug(`✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`);
         
         setPreprocessedPoses(allPoses);
         setPreprocessingFPS(fps);
@@ -1961,7 +1962,7 @@ export function VideoPoseViewer({
         video.currentTime = originalTime;
       }
     } catch (err) {
-      console.error('Preprocessing error:', err);
+      detectionLogger.error('Preprocessing error:', err);
       // Return to original position on error
       video.currentTime = originalTime;
     } finally {
@@ -1989,7 +1990,7 @@ export function VideoPoseViewer({
                           !compactMode && // Don't preprocess in floating mode
                           allowPreprocessing; // Only preprocess if allowed (technique LITE eligible)
     
-    console.log("🔍 Preprocessing check:", {
+    detectionLogger.debug("🔍 Preprocessing check:", {
       isPoseEnabled,
       isLoading,
       isBackgroundPreprocessing,
@@ -2004,7 +2005,7 @@ export function VideoPoseViewer({
     if (!canPreprocess) return;
     
     // Start immediately - FPS detection happens inside startAutoPreprocess
-    console.log("🎬 AI overlay enabled, starting preprocessing...");
+    detectionLogger.debug("🎬 AI overlay enabled, starting preprocessing...");
     const timer = setTimeout(() => {
       startAutoPreprocess();
     }, 100); // Small delay to ensure UI is ready
@@ -2022,7 +2023,7 @@ export function VideoPoseViewer({
   // Auto-run key frame detections when preprocessing completes
   useEffect(() => {
     if (usePreprocessing && preprocessedPoses.size > 0 && !trophyResult && !contactResult && !landingResult) {
-      console.log('🎯 Auto-detecting key frames...');
+      detectionLogger.debug('🎯 Auto-detecting key frames...');
       // Run all detections - they won't seek since we're not using the handlers
       detectTrophyPosition("auto");
       detectContactPoint("auto");
@@ -2068,7 +2069,7 @@ export function VideoPoseViewer({
         const poses = await detectPose(video);
         setCurrentPoses(poses);
       } catch (err) {
-        console.error('Error detecting pose on frame step:', err);
+        detectionLogger.error('Error detecting pose on frame step:', err);
       }
     }
   };
@@ -2128,7 +2129,7 @@ export function VideoPoseViewer({
             video.play().catch((e) => {
               // Ignore AbortError - happens when play() is interrupted
               if (e.name !== "AbortError") {
-                console.error("Video play error:", e);
+                detectionLogger.error("Video play error:", e);
               }
             });
           }
@@ -2226,7 +2227,7 @@ export function VideoPoseViewer({
           onLoadedMetadata={() => {
             setIsVideoMetadataLoaded(true);
             const video = videoRef.current;
-            console.log("Video metadata loaded, dimensions:", video?.videoWidth, "x", video?.videoHeight);
+            detectionLogger.debug("Video metadata loaded, dimensions:", video?.videoWidth, "x", video?.videoHeight);
             // Update canvas dimensions to match video
             if (video && canvasRef.current) {
               canvasRef.current.width = video.videoWidth;

@@ -25,28 +25,25 @@ if (isServer) {
         ttsClient = new TextToSpeechClient({
           credentials: parsedCredentials,
         });
-        console.log('[TTS] ✅ Client initialized with service account credentials (JSON)');
+        logger.info("TTS Client initialized with service account credentials (JSON)");
       } catch (parseError) {
-        console.error('[TTS] ❌ Failed to parse GOOGLE_CLOUD_CREDENTIALS:', parseError);
+        logger.error("Failed to parse GOOGLE_CLOUD_CREDENTIALS:", parseError);
       }
     } else if (credentialsPath) {
       // Option 2: Service account credentials from file path (good for local dev)
       ttsClient = new TextToSpeechClient();
-      console.log('[TTS] ✅ Client initialized with service account credentials (file path)');
+      logger.info("TTS Client initialized with service account credentials (file path)");
     } else if (apiKey) {
       // Option 3: API key (simpler but less secure)
       ttsClient = new TextToSpeechClient({
         apiKey: apiKey,
       });
-      console.log('[TTS] ✅ Client initialized with API key');
+      logger.info("TTS Client initialized with API key");
     } else {
-      console.warn('[TTS] ⚠️ No credentials configured. Set one of:');
-      console.warn('[TTS]   - GOOGLE_CLOUD_CREDENTIALS (service account JSON)');
-      console.warn('[TTS]   - GOOGLE_APPLICATION_CREDENTIALS (path to service account file)');
-      console.warn('[TTS]   - GOOGLE_CLOUD_TTS_API_KEY or GEMINI_API_KEY (API key)');
+      logger.warn("No TTS credentials configured. Set GOOGLE_CLOUD_CREDENTIALS, GOOGLE_APPLICATION_CREDENTIALS, or GOOGLE_CLOUD_TTS_API_KEY.");
     }
   } catch (error) {
-    console.error('[TTS] ❌ Failed to initialize TTS client:', error);
+    logger.error("Failed to initialize TTS client:", error);
   }
 }
 
@@ -74,7 +71,6 @@ export async function synthesizeSpeech(text: string, settings?: {
   }
   
   logger.info(`[${requestId}] Synthesizing speech for text: ${text.length} characters`);
-  console.log(`[TTS] Synthesizing ${text.length} characters`);
   
   try {
     // Strip markdown formatting for better speech synthesis
@@ -172,12 +168,10 @@ export async function synthesizeSpeech(text: string, settings?: {
     const audioBuffer = Buffer.from(response.audioContent as Uint8Array);
     
     logger.info(`[${requestId}] Speech synthesized successfully: ${(audioBuffer.length / 1024).toFixed(2)} KB`);
-    console.log(`[TTS] ✅ Generated ${(audioBuffer.length / 1024).toFixed(2)} KB audio`);
     
     return audioBuffer;
   } catch (error) {
     logger.error(`[${requestId}] Failed to synthesize speech:`, error);
-    console.error('[TTS] ❌ Failed to synthesize speech:', error);
     
     throw new Error(
       error instanceof Error

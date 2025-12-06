@@ -1,6 +1,7 @@
 "use client";
 
 import { Box } from "@radix-ui/themes";
+import { chatLogger } from "@/lib/logger";
 import { MarkdownWithSwings } from "@/components/markdown";
 import { StreamingIndicator } from "../../feedback/StreamingIndicator";
 import { FeedbackButtons } from "../../feedback/FeedbackButtons";
@@ -65,7 +66,7 @@ export function AssistantMessage({
           </MarkdownWithSwings>
           {isStreaming && (
             <>
-              {console.log("[AssistantMessage] Rendering StreamingIndicator for message:", messageId)}
+              {chatLogger.debug("[AssistantMessage] Rendering StreamingIndicator for message:", messageId)}
               <StreamingIndicator />
             </>
           )}

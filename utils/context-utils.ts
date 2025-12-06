@@ -1,3 +1,4 @@
+import { chatLogger } from "@/lib/logger";
 import type { Message } from "@/types/chat";
 import { estimateTextTokens } from "@/lib/token-utils";
 
@@ -130,7 +131,7 @@ export function formatMessagesForGemini(messages: Message[]): Array<{
   role: "user" | "model";
   parts: Array<{ text: string }>;
 }> {
-  console.log("🔍 [formatMessagesForGemini] Input messages:", messages.length);
+  chatLogger.debug("🔍 [formatMessagesForGemini] Input messages:", messages.length);
   
   const result: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
   
@@ -140,19 +141,19 @@ export function formatMessagesForGemini(messages: Message[]): Array<{
     let content = msg.content.trim();
     const hasVideo = !!(msg.videoUrl || msg.videoS3Key || msg.videoFile);
     
-    console.log(`🔍 [formatMessagesForGemini] Processing: ${msg.role}, content="${content.slice(0, 50)}...", hasVideo=${hasVideo}`);
+    chatLogger.debug(`🔍 [formatMessagesForGemini] Processing: ${msg.role}, content="${content.slice(0, 50)}...", hasVideo=${hasVideo}`);
     
     if (msg.role === "user" && content.length === 0) {
       // Check if this message had a video
       if (hasVideo) {
         content = "[User shared a video for analysis]";
-        console.log("🔍 [formatMessagesForGemini] Added video placeholder for empty video message");
+        chatLogger.debug("🔍 [formatMessagesForGemini] Added video placeholder for empty video message");
       }
     }
     
     // Filter out truly empty messages
     if (content.length === 0) {
-      console.log("🔍 [formatMessagesForGemini] Skipping empty message");
+      chatLogger.debug("🔍 [formatMessagesForGemini] Skipping empty message");
       continue;
     }
     
@@ -165,11 +166,11 @@ export function formatMessagesForGemini(messages: Message[]): Array<{
   // CRITICAL: Gemini API requires the first message to be from "user"
   // Remove any leading "model" messages to prevent "First content should be with role 'user'" error
   while (result.length > 0 && result[0].role === "model") {
-    console.log("🔍 [formatMessagesForGemini] Removing leading model message to ensure first message is user");
+    chatLogger.debug("🔍 [formatMessagesForGemini] Removing leading model message to ensure first message is user");
     result.shift();
   }
   
-  console.log("🔍 [formatMessagesForGemini] Output messages:", result.length);
+  chatLogger.debug("🔍 [formatMessagesForGemini] Output messages:", result.length);
   return result;
 }
 
@@ -273,7 +274,7 @@ export function getConversationContext(
     
     // Log for debugging (remove in production)
     if (typeof console !== 'undefined' && process.env.NODE_ENV === 'development') {
-      console.log('[Context] Using simple follow-up mode:', {
+      chatLogger.debug('[Context] Using simple follow-up mode:', {
         originalMessages: messagesToUse.length,
         trimmedMessages: trimmed.length,
         prompt: currentPrompt.slice(0, 50) + '...',
@@ -320,15 +321,15 @@ export function getOptimizedContext(
     // Last message is assistant - only exclude if empty/streaming (placeholder)
     const isPlaceholder = !msg.content.trim() || msg.isStreaming;
     if (isPlaceholder) {
-      console.log("🔍 [getOptimizedContext] Excluding placeholder assistant message");
+      chatLogger.debug("🔍 [getOptimizedContext] Excluding placeholder assistant message");
       return false;
     }
     // Completed assistant response - KEEP IT!
-    console.log("🔍 [getOptimizedContext] Keeping completed assistant response");
+    chatLogger.debug("🔍 [getOptimizedContext] Keeping completed assistant response");
     return true;
   });
   
-  console.log("🔍 [getOptimizedContext] Input:", messages.length, "→ After filter:", messagesToUse.length);
+  chatLogger.debug("🔍 [getOptimizedContext] Input:", messages.length, "→ After filter:", messagesToUse.length);
   
   const complexity = getQueryComplexity(currentPrompt, messagesToUse);
   

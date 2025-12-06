@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { videoLogger } from "@/lib/logger";
 import {
   validateVideoFile,
   createVideoPreview,
@@ -34,18 +35,18 @@ export function useVideoUpload() {
   }, []);
 
   const processVideoFile = useCallback(async (file: File) => {
-    console.log('[useVideoUpload] Processing video file:', file.name, file.type);
+    videoLogger.debug('[useVideoUpload] Processing video file:', file.name, file.type);
     
     const validation = validateVideoFile(file);
     if (!validation.valid) {
-      console.log('[useVideoUpload] Validation failed:', validation.error);
+      videoLogger.debug('[useVideoUpload] Validation failed:', validation.error);
       setError(validation.error || "Invalid video file");
       return;
     }
 
     // Skip compatibility check for images
     if (isImageFile(file)) {
-      console.log('[useVideoUpload] File is image, skipping compatibility check');
+      videoLogger.debug('[useVideoUpload] File is image, skipping compatibility check');
       setVideoInternal(file, false);
       return;
     }
@@ -57,29 +58,29 @@ export function useVideoUpload() {
     const isQuickTime = file.type === 'video/quicktime';
     
     if (isMOVFile || isQuickTime) {
-      console.log('[useVideoUpload] MOV/QuickTime file detected, marking for server-side conversion');
+      videoLogger.debug('[useVideoUpload] MOV/QuickTime file detected, marking for server-side conversion');
       setVideoInternal(file, true);
       return;
     }
     
     // Check video codec compatibility for other formats (MP4, etc.)
     try {
-      console.log('[useVideoUpload] Starting codec compatibility check...');
+      videoLogger.debug('[useVideoUpload] Starting codec compatibility check...');
       const result = await checkVideoCodecCompatibility(file);
-      console.log('[useVideoUpload] Compatibility check result:', result);
+      videoLogger.debug('[useVideoUpload] Compatibility check result:', result);
       
       // HEVC videos need server-side conversion for Gemini API compatibility
       if (result.isHEVC) {
-        console.log('[useVideoUpload] HEVC detected, marking for server-side conversion');
+        videoLogger.debug('[useVideoUpload] HEVC detected, marking for server-side conversion');
         setVideoInternal(file, true);
       } else {
         // Standard MP4/video - proceed normally
-        console.log('[useVideoUpload] Proceeding with file');
+        videoLogger.debug('[useVideoUpload] Proceeding with file');
         setVideoInternal(file, false);
       }
     } catch (err) {
       // If compatibility check fails, proceed anyway
-      console.warn("[useVideoUpload] Compatibility check failed, proceeding with file:", err);
+      videoLogger.warn("[useVideoUpload] Compatibility check failed, proceeding with file:", err);
       setVideoInternal(file, false);
     }
   }, [setVideoInternal]);

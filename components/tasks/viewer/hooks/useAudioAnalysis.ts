@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, RefObject } from "react";
+import { audioLogger } from "@/lib/logger";
 
 interface AudioAnalysisData {
   // Array of volume levels (0-1) sampled at regular intervals
@@ -50,7 +51,7 @@ export function useAudioAnalysis(
         sourceRef.current = source;
         dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
       } catch (error) {
-        console.warn("Failed to set up audio analysis:", error);
+        audioLogger.warn("Failed to set up audio analysis:", error);
       }
     };
 
@@ -194,7 +195,7 @@ export function useRealtimeVolume(
         
         updateVolume();
       } catch (error) {
-        console.warn("Failed to set up audio:", error);
+        audioLogger.warn("Failed to set up audio:", error);
       }
     };
 

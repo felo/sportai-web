@@ -98,19 +98,16 @@ export async function POST(request: NextRequest) {
     if (videoUrl) {
       // Download from S3 using AWS SDK (efficient server-side download)
       logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
-      console.log(`[LLM API] 📥 Downloading from S3 (server-side): ${videoUrl}`);
+      logger.info(`📥 Downloading from S3 (server-side): ${videoUrl}`);
       logger.time(`[${requestId}] S3 download`);
       
       try {
         videoData = await downloadFromS3(videoUrl);
         logger.timeEnd(`[${requestId}] S3 download`);
         logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
-        console.log(`[LLM API] ✅ Successfully downloaded from S3: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
-        console.log(`[LLM API] 📹 Video URL: ${videoUrl}`);
-        console.log(`[LLM API] 📹 Video MIME type: ${videoData.mimeType}`);
+        logger.debug(`[${requestId}] Video URL: ${videoUrl}, MIME type: ${videoData.mimeType}`);
       } catch (error) {
         logger.error(`[${requestId}] Failed to download from S3:`, error);
-        console.error(`[LLM API] ❌ Failed to download from S3:`, error);
         return NextResponse.json(
           { error: `Failed to download media from S3: ${error instanceof Error ? error.message : "Unknown error"}` },
           { status: 500 }
@@ -153,7 +150,6 @@ export async function POST(request: NextRequest) {
         );
       } else if (sizeMB > LARGE_VIDEO_WARNING_MB) {
         logger.warn(`[${requestId}] Large video detected (${sizeMB.toFixed(2)} MB) - may cause API timeout or errors`);
-        console.warn(`[LLM API] ⚠️ Large video (${sizeMB.toFixed(2)} MB) - processing may be slow or fail. Consider using a shorter clip or lower resolution.`);
       }
     }
 

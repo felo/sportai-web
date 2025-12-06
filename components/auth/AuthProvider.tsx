@@ -2,9 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { createLogger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { clearUserDataFromStorage } from "@/utils/storage";
 import { migrateChatIds } from "@/utils/chat-id-migration";
+
+const authLogger = createLogger("Auth");
 
 export interface UserProfile {
   id: string;
@@ -50,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     maxRetries = 3
   ): Promise<UserProfile | null> => {
     try {
-      console.log(`[AuthProvider] fetchProfile attempt ${retryCount + 1}/${maxRetries + 1}`);
+      authLogger.debug(`fetchProfile attempt ${retryCount + 1}/${maxRetries + 1}`);
       
       const { data, error } = await supabase
         .from("profiles")
@@ -59,25 +62,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.log(`[AuthProvider] Profile fetch error:`, error.code, error.message);
+        authLogger.debug(`Profile fetch error:`, error.code, error.message);
         // For new users, the profile might not exist yet (created by trigger)
         // Retry on "not found" or auth errors
         const shouldRetry = (error.code === "PGRST116" || error.code === "PGRST301" || error.message?.includes("JWT")) && retryCount < maxRetries;
         
         if (shouldRetry) {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
-          console.log(`[AuthProvider] Retrying profile fetch in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          authLogger.debug(`Retrying profile fetch in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, delay));
           return fetchProfile(userId, retryCount + 1, maxRetries);
         }
-        console.error("[AuthProvider] Error fetching profile after retries:", error);
+        authLogger.error("Error fetching profile after retries:", error);
         return null;
       }
 
-      console.log(`[AuthProvider] Profile fetched successfully from database:`, data?.email);
+      authLogger.debug(`Profile fetched successfully from database:`, data?.email);
       return data as UserProfile;
     } catch (error) {
-      console.error("[AuthProvider] Exception fetching profile:", error);
+      authLogger.error("Exception fetching profile:", error);
       return null;
     }
   }, []);
@@ -89,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fullName = metadata?.full_name || metadata?.name;
       const oauthAvatarUrl = metadata?.avatar_url || metadata?.picture;
 
-      console.log("[AuthProvider] Syncing profile from OAuth:", {
+      authLogger.debug("Syncing profile from OAuth:", {
         userId: user.id,
         email: user.email,
         fullName,
@@ -97,13 +100,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Fetch current profile from database
-      console.log("[AuthProvider] Fetching profile from database for user:", user.id);
+      authLogger.debug("Fetching profile from database for user:", user.id);
       let currentProfile = await fetchProfile(user.id);
-      console.log("[AuthProvider] Fetch result:", currentProfile ? "found" : "not found");
+      authLogger.debug("Fetch result:", currentProfile ? "found" : "not found");
       
       // If profile doesn't exist after retries, create it manually
       if (!currentProfile) {
-        console.log("[AuthProvider] Profile not found, attempting to create it...");
+        authLogger.debug("Profile not found, attempting to create it...");
         
         const { data: newProfile, error: createError } = await supabase
           .from("profiles")
@@ -118,30 +121,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
         if (createError) {
           // Profile might already exist (race condition with trigger), try fetching again
-          console.log("[AuthProvider] Create failed, trying to fetch again:", createError.message);
+          authLogger.debug("Create failed, trying to fetch again:", createError.message);
           currentProfile = await fetchProfile(user.id, 0, 2);
         } else {
           currentProfile = newProfile as UserProfile;
-          console.log("[AuthProvider] Profile created successfully");
+          authLogger.debug("Profile created successfully");
         }
       }
       
       if (!currentProfile) {
-        console.warn("[AuthProvider] Failed to get or create profile in database");
-        console.log("[AuthProvider] User will continue with OAuth profile data");
+        authLogger.warn("Failed to get or create profile in database");
+        authLogger.debug("User will continue with OAuth profile data");
         // Profile was already set from OAuth data before this background sync
         // No need to set it again
         return;
       }
       
-      console.log("[AuthProvider] Profile ready:", currentProfile.id);
+      authLogger.debug("Profile ready:", currentProfile.id);
 
       // Check if we need to update the profile
       const needsNameUpdate = fullName && !currentProfile.full_name;
       const needsAvatarUpdate = oauthAvatarUrl && !currentProfile.avatar_url;
 
       if (!needsNameUpdate && !needsAvatarUpdate) {
-        console.log("[AuthProvider] Profile already up to date");
+        authLogger.debug("Profile already up to date");
         setProfile(currentProfile);
         return;
       }
@@ -151,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Upload avatar to S3 if we have a new one
       if (needsAvatarUpdate && oauthAvatarUrl) {
         try {
-          console.log("[AuthProvider] Uploading avatar to S3...");
+          authLogger.debug("Uploading avatar to S3...");
           const uploadPromise = fetch("/api/profile/avatar", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -171,12 +174,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (response.ok) {
             const data = await response.json();
             newAvatarUrl = data.avatarUrl;
-            console.log("[AuthProvider] Avatar uploaded to S3:", newAvatarUrl);
+            authLogger.debug("Avatar uploaded to S3:", newAvatarUrl);
           } else {
-            console.error("[AuthProvider] Failed to upload avatar:", await response.text());
+            authLogger.error("Failed to upload avatar:", await response.text());
           }
         } catch (error) {
-          console.error("[AuthProvider] Error uploading avatar:", error);
+          authLogger.error("Error uploading avatar:", error);
           // Continue anyway - avatar upload is not critical
         }
       }
@@ -187,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (newAvatarUrl && newAvatarUrl !== currentProfile.avatar_url) updates.avatar_url = newAvatarUrl;
 
       if (Object.keys(updates).length > 0) {
-        console.log("[AuthProvider] Updating profile:", updates);
+        authLogger.debug("Updating profile:", updates);
         const { data, error } = await supabase
           .from("profiles")
           .update(updates)
@@ -196,9 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .single();
 
         if (error) {
-          console.error("[AuthProvider] Error updating profile:", error);
+          authLogger.error("Error updating profile:", error);
         } else {
-          console.log("[AuthProvider] Profile updated successfully");
+          authLogger.debug("Profile updated successfully");
           setProfile(data as UserProfile);
           return;
         }
@@ -206,9 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update profile state (replacing the temporary OAuth profile)
       setProfile(currentProfile);
-      console.log("[AuthProvider] Database profile synced and set in state:", currentProfile?.email);
+      authLogger.debug("Database profile synced and set in state:", currentProfile?.email);
     } catch (error) {
-      console.error("[AuthProvider] Error syncing profile:", error);
+      authLogger.error("Error syncing profile:", error);
     }
   }, [fetchProfile]);
 
@@ -231,21 +234,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          console.log("[AuthProvider] Running chat ID migration on mount...");
+          authLogger.debug("Running chat ID migration on mount...");
           const stats = migrateChatIds();
           if (stats.migrated > 0) {
-            console.log(`[AuthProvider] ✅ Migrated ${stats.migrated} chat(s) on mount`);
+            authLogger.info(`Migrated ${stats.migrated} chat(s) on mount`);
           }
         }
       } catch (error) {
-        console.error("[AuthProvider] Failed to run migration on mount:", error);
+        authLogger.error("Failed to run migration on mount:", error);
       }
     };
     runMigrationOnMount();
 
     // Set up auth state change listener - this will catch OAuth callbacks
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("[AuthProvider] Auth state changed:", _event, session?.user?.email);
+      authLogger.debug("Auth state changed:", _event, session?.user?.email);
       
       if (!mounted) return;
       
@@ -255,12 +258,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Handle different auth events
       // SIGNED_IN is fired when Supabase successfully processes OAuth callback
       if (_event === "SIGNED_IN" && session?.user) {
-        console.log("[AuthProvider] User signed in");
+        authLogger.info("User signed in");
         
         // Clean up OAuth parameters from URL
         const url = new URL(window.location.href);
         if (url.searchParams.has('code') || url.searchParams.has('error')) {
-          console.log("[AuthProvider] Cleaning up OAuth params from URL");
+          authLogger.debug("Cleaning up OAuth params from URL");
           url.searchParams.delete('code');
           url.searchParams.delete('error');
           url.searchParams.delete('error_code');
@@ -279,38 +282,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         };
         
-        console.log("[AuthProvider] Setting temporary profile from OAuth data");
+        authLogger.debug("Setting temporary profile from OAuth data");
         setProfile(tempProfile);
         setLoading(false);
         
         // Migrate old chat IDs to UUID format before syncing
-        console.log("[AuthProvider] Checking for chat ID migration...");
+        authLogger.debug("Checking for chat ID migration...");
         try {
           const migrationStats = migrateChatIds();
           if (migrationStats.migrated > 0) {
-            console.log(`[AuthProvider] ✅ Migrated ${migrationStats.migrated} chat(s) to UUID format`);
+            authLogger.info(`Migrated ${migrationStats.migrated} chat(s) to UUID format`);
           }
         } catch (error) {
-          console.error("[AuthProvider] ❌ Chat ID migration failed:", error);
+          authLogger.error("Chat ID migration failed:", error);
           // Continue anyway - this won't block sign-in
         }
         
         // Dispatch event immediately so UI updates
         window.dispatchEvent(new CustomEvent("auth-state-change", { detail: { event: _event } }));
-        console.log("[AuthProvider] UI updated, now syncing with database in background...");
+        authLogger.debug("UI updated, now syncing with database in background...");
         
         // Sync with database in background (non-blocking)
         syncProfileFromOAuth(session.user).catch(error => {
-          console.error("[AuthProvider] Background profile sync failed:", error);
+          authLogger.error("Background profile sync failed:", error);
           // UI already works with temp profile, so this is not critical
         });
       } else if (_event === "SIGNED_OUT") {
-        console.log("[AuthProvider] User signed out");
+        authLogger.info("User signed out");
         setProfile(null);
         window.dispatchEvent(new CustomEvent("auth-state-change", { detail: { event: _event } }));
         setLoading(false);
       } else if (_event === "INITIAL_SESSION") {
-        console.log("[AuthProvider] Initial session check");
+        authLogger.debug("Initial session check");
         if (session?.user) {
           await syncProfileFromOAuth(session.user);
         }
@@ -324,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(async () => {
       if (!mounted) return;
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("[AuthProvider] Initial getSession check:", session?.user?.email || "no session");
+      authLogger.debug("Initial getSession check:", session?.user?.email || "no session");
       
       // If we have a session, make sure state is updated (fallback in case event didn't fire)
       if (session?.user) {
@@ -367,7 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Debug: Log when context value changes
   useEffect(() => {
-    console.log("[AuthProvider] Context value updated:", {
+    authLogger.debug("Context value updated:", {
       hasUser: !!user,
       userEmail: user?.email,
       hasProfile: !!profile,

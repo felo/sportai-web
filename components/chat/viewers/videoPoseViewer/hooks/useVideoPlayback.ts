@@ -1,4 +1,5 @@
 import { useState, useCallback, RefObject } from "react";
+import { videoLogger } from "@/lib/logger";
 
 interface UseVideoPlaybackProps {
   videoRef: RefObject<HTMLVideoElement>;
@@ -33,7 +34,7 @@ export function useVideoPlayback({
       video.play().then(() => {
         setIsPlaying(true);
         setHasStartedPlaying(true);
-      }).catch(console.error);
+      }).catch(err => videoLogger.error("Video play error:", err));
     } else {
       video.pause();
       setIsPlaying(false);

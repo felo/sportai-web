@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
     }
     
     logger.info(`[${requestId}] Downloading avatar from: ${avatarUrl}`);
-    console.log(`[Avatar API] Downloading avatar for user: ${userId}`);
     
     // Download the image from the OAuth provider
     const response = await fetch(avatarUrl);
@@ -71,8 +70,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const key = `avatars/${userId}/${timestamp}.${extension}`;
     
-    logger.info(`[${requestId}] Uploading avatar to S3: ${key}`);
-    console.log(`[Avatar API] Uploading to S3: ${key} (${imageBuffer.length} bytes)`);
+    logger.info(`[${requestId}] Uploading avatar to S3: ${key} (${imageBuffer.length} bytes)`);
     
     // Upload to S3
     const command = new PutObjectCommand({
@@ -88,7 +86,6 @@ export async function POST(request: NextRequest) {
     const s3Url = `https://${BUCKET_NAME}.s3.${BUCKET_REGION}.amazonaws.com/${key}`;
     
     logger.info(`[${requestId}] Avatar uploaded successfully: ${s3Url}`);
-    console.log(`[Avatar API] ✅ Avatar uploaded: ${s3Url}`);
     
     return NextResponse.json({ 
       success: true, 
@@ -97,7 +94,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error(`[${requestId}] Failed to upload avatar:`, error);
-    console.error(`[Avatar API] ❌ Failed to upload avatar:`, error);
     
     const errorMessage = error instanceof Error ? error.message : "Failed to upload avatar";
     return NextResponse.json({ error: errorMessage }, { status: 500 });

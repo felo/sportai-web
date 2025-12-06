@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react";
+import { videoLogger } from "@/lib/logger";
 import type { DockCorner, Position } from "@/hooks/useFloatingVideo";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -155,7 +156,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     if (floating) {
       const timeSinceChange = Date.now() - chatChangeCooldownRef.current;
       if (timeSinceChange < CHAT_CHANGE_COOLDOWN_MS) {
-        console.log("[FloatingVideoContext] Ignoring float request during cooldown", {
+        videoLogger.debug("[FloatingVideoContext] Ignoring float request during cooldown", {
           timeSinceChange,
           cooldown: CHAT_CHANGE_COOLDOWN_MS,
         });

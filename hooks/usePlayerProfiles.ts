@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { logger } from "@/lib/logger";
 import type { 
   PlayerProfile, 
   PlayerProfileData, 
@@ -25,7 +26,7 @@ interface UsePlayerProfilesOptions {
  * ```tsx
  * const { profiles, isGenerating, generate, error } = usePlayerProfiles({
  *   sport: "padel",
- *   onComplete: (profiles) => console.log("Generated", profiles.length, "profiles"),
+ *   onComplete: (profiles) => logger.debug("Generated", profiles.length, "profiles"),
  * });
  * 
  * // Trigger generation

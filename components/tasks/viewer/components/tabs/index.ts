@@ -1,5 +1,5 @@
 export { RalliesTab } from "./RalliesTab";
-export { SummaryTab } from "./SummaryTab";
+export { SummaryTab } from "./summary";
 export { PlayersTab } from "./PlayersTab";
 export { TeamsTab } from "./TeamsTab";
 export { HighlightsTab } from "./HighlightsTab";

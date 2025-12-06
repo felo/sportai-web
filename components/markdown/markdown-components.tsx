@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Tooltip } from "@radix-ui/themes";
+import { logger } from "@/lib/logger";
 import styles from "@/styles/markdown.module.css";
 import buttonStyles from "@/styles/buttons.module.css";
 import { 
@@ -193,7 +194,7 @@ function jumpToTimestamp(timestamp: string) {
   const video = findMostRecentVideo();
   
   if (!video) {
-    console.warn('No video found in chat');
+    logger.warn('No video found in chat');
     return;
   }
   
@@ -207,7 +208,7 @@ function jumpToTimestamp(timestamp: string) {
   
   // Play the video at slow motion
   video.play().catch(error => {
-    console.warn('Could not autoplay video:', error);
+    logger.warn('Could not autoplay video:', error);
   });
   
   // Scroll the video into view

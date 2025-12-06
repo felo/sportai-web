@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import { audioLogger } from "@/lib/logger";
 
 interface AudioPlayerState {
   currentMessageId: string | null;
@@ -45,11 +46,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       isLoading: false,
     });
     
-    console.log('[AudioPlayer] Audio stopped');
+    audioLogger.debug('[AudioPlayer] Audio stopped');
   }, []);
 
   const playAudio = useCallback(async (messageId: string, audioUrl: string) => {
-    console.log('[AudioPlayer] Playing audio for message:', messageId);
+    audioLogger.debug('[AudioPlayer] Playing audio for message:', messageId);
     
     // Stop any currently playing audio
     if (audioRef.current) {
@@ -71,7 +72,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       
       // Handle audio events
       audio.addEventListener('loadeddata', () => {
-        console.log('[AudioPlayer] Audio loaded successfully');
+        audioLogger.debug('[AudioPlayer] Audio loaded successfully');
         setState({
           currentMessageId: messageId,
           isPlaying: true,
@@ -80,20 +81,20 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       });
       
       audio.addEventListener('ended', () => {
-        console.log('[AudioPlayer] Audio playback ended');
+        audioLogger.debug('[AudioPlayer] Audio playback ended');
         stopAudio();
       });
       
       audio.addEventListener('error', (e) => {
-        console.error('[AudioPlayer] Audio playback error:', e);
+        audioLogger.error('[AudioPlayer] Audio playback error:', e);
         stopAudio();
       });
       
       // Start playback
       await audio.play();
-      console.log('[AudioPlayer] Audio playback started');
+      audioLogger.debug('[AudioPlayer] Audio playback started');
     } catch (error) {
-      console.error('[AudioPlayer] Failed to play audio:', error);
+      audioLogger.error('[AudioPlayer] Failed to play audio:', error);
       stopAudio();
       throw error;
     }

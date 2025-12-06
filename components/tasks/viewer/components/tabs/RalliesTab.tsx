@@ -110,6 +110,7 @@ export function RalliesTab({
             showCalibrationButton={task.sport === "padel"}
             isCalibrated={calibrationMatrix !== null}
             onCalibrationComplete={onCalibrationComplete}
+            courtKeypoints={result?.debug_data?.court_keypoints}
           />
         }
         courtComponent={

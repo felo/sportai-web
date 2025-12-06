@@ -1,4 +1,5 @@
 import { useState, useEffect, RefObject, useCallback } from "react";
+import { videoLogger } from "@/lib/logger";
 import { DEFAULT_VIDEO_FPS, COMMON_FPS_VALUES } from "../constants";
 
 export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
@@ -45,7 +46,7 @@ export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
           );
 
           setVideoFPS(closest);
-          console.log(`Detected video FPS: ${closest} (raw: ${detectedFPS}, playbackRate: ${video.playbackRate})`);
+          videoLogger.debug(`Detected video FPS: ${closest} (raw: ${detectedFPS}, playbackRate: ${video.playbackRate})`);
         } else if (!video.paused && !video.ended) {
           (video as any).requestVideoFrameCallback(callback);
         }
@@ -61,7 +62,7 @@ export function useVideoFPS(videoRef: RefObject<HTMLVideoElement>) {
       video.addEventListener("play", startDetection, { once: true });
     } else {
       // Fallback: Try to estimate from common frame rates
-      console.log("requestVideoFrameCallback not available, using default 30 FPS");
+      videoLogger.debug("requestVideoFrameCallback not available, using default 30 FPS");
       setVideoFPS(DEFAULT_VIDEO_FPS);
     }
   }, []);

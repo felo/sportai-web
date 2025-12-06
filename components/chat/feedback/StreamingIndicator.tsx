@@ -1,5 +1,7 @@
 "use client";
 
+import { chatLogger } from "@/lib/logger";
+
 /**
  * StreamingIndicator Component
  * 
@@ -7,7 +9,7 @@
  * Shows three pulsing dots that fade in and out sequentially.
  */
 export function StreamingIndicator() {
-  console.log("[StreamingIndicator] Component rendered");
+  chatLogger.debug("[StreamingIndicator] Component rendered");
   
   return (
     <div 

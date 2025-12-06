@@ -22,6 +22,9 @@ interface VideoSettingsProps {
   onPlayerBoxesChange: (value: boolean) => void;
   showPose: boolean;
   onPoseChange: (value: boolean) => void;
+  showCourtKeypoints: boolean;
+  onCourtKeypointsChange: (value: boolean) => void;
+  hasCourtKeypoints?: boolean; // Whether court keypoint data is available
   // Data enhancement
   inferSwingBounces: boolean;
   onInferSwingBouncesChange: (value: boolean) => void;
@@ -49,6 +52,9 @@ export function VideoSettings({
   onPlayerBoxesChange,
   showPose,
   onPoseChange,
+  showCourtKeypoints,
+  onCourtKeypointsChange,
+  hasCourtKeypoints = false,
   inferSwingBounces,
   onInferSwingBouncesChange,
   inferTrajectoryBounces,
@@ -174,6 +180,28 @@ export function VideoSettings({
               <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
             </Tooltip>
           </Flex>
+        )}
+
+        {/* Debug Section */}
+        {hasCourtKeypoints && (
+          <>
+            <Box style={{ height: "1px", backgroundColor: "var(--gray-6)", marginTop: "var(--space-2)" }} />
+            
+            <Heading size="2" weight="medium" style={{ color: "var(--gray-11)" }}>
+              Debug Overlays
+            </Heading>
+
+            <Flex align="center" gap="2">
+              <ToggleSwitch
+                checked={showCourtKeypoints}
+                onCheckedChange={onCourtKeypointsChange}
+                label="Court detection keypoints"
+              />
+              <Tooltip content="Shows the AI-detected court keypoints used for coordinate mapping">
+                <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+              </Tooltip>
+            </Flex>
+          </>
         )}
       </Flex>
     </Box>

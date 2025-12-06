@@ -5,6 +5,7 @@
  * pose detection data to/from S3.
  */
 
+import { storageLogger } from "@/lib/logger";
 import type { StoredPoseData, StoredPoseResult, StoredKeypoint } from "@/types/pose";
 
 // Type for runtime pose detection results (from TensorFlow.js)
@@ -167,7 +168,7 @@ export async function uploadPoseData(
   const poseS3Key = getPoseDataS3Key(videoS3Key);
   const jsonString = JSON.stringify(poseData);
   
-  console.log(`📤 Uploading pose data to S3: ${poseS3Key} (${(jsonString.length / 1024).toFixed(1)} KB)`);
+  storageLogger.debug(`📤 Uploading pose data to S3: ${poseS3Key} (${(jsonString.length / 1024).toFixed(1)} KB)`);
   
   // Get presigned upload URL
   const urlResponse = await fetch("/api/s3/upload-url", {
@@ -196,7 +197,7 @@ export async function uploadPoseData(
     throw new Error(`Failed to upload pose data: ${uploadResponse.statusText}`);
   }
   
-  console.log(`✅ Pose data uploaded successfully: ${key}`);
+  storageLogger.debug(`✅ Pose data uploaded successfully: ${key}`);
   return key;
 }
 
@@ -209,7 +210,7 @@ export async function uploadPoseData(
 export async function downloadPoseData(
   poseS3Key: string
 ): Promise<Map<number, PoseDetectionResult[]> | null> {
-  console.log(`📥 Downloading pose data from S3: ${poseS3Key}`);
+  storageLogger.debug(`📥 Downloading pose data from S3: ${poseS3Key}`);
   
   try {
     // Get presigned download URL
@@ -223,7 +224,7 @@ export async function downloadPoseData(
     });
     
     if (!urlResponse.ok) {
-      console.warn(`Failed to get download URL for pose data: ${urlResponse.statusText}`);
+      storageLogger.warn(`Failed to get download URL for pose data: ${urlResponse.statusText}`);
       return null;
     }
     
@@ -233,17 +234,17 @@ export async function downloadPoseData(
     const dataResponse = await fetch(downloadUrl);
     
     if (!dataResponse.ok) {
-      console.warn(`Failed to download pose data: ${dataResponse.statusText}`);
+      storageLogger.warn(`Failed to download pose data: ${dataResponse.statusText}`);
       return null;
     }
     
     const storedData: StoredPoseData = await dataResponse.json();
     
-    console.log(`✅ Pose data downloaded: ${storedData.totalFrames} frames, model: ${storedData.model}`);
+    storageLogger.debug(`✅ Pose data downloaded: ${storedData.totalFrames} frames, model: ${storedData.model}`);
     
     return deserializePoseData(storedData);
   } catch (error) {
-    console.error("Error downloading pose data:", error);
+    storageLogger.error("Error downloading pose data:", error);
     return null;
   }
 }

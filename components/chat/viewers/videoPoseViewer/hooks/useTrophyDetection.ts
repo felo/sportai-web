@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { detectionLogger } from "@/lib/logger";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
 
@@ -159,7 +160,7 @@ export function useTrophyDetection({
     // Confidence is how different the two are
     const confidence = Math.abs(rightRatio - 0.5) * 2; // 0 to 1
     
-    console.log(`🎾 Handedness analysis: Left=${leftTotalMotion.toFixed(0)}px, Right=${rightTotalMotion.toFixed(0)}px`);
+    detectionLogger.debug(`🎾 Handedness analysis: Left=${leftTotalMotion.toFixed(0)}px, Right=${rightTotalMotion.toFixed(0)}px`);
     
     return {
       dominant: rightTotalMotion > leftTotalMotion ? "right" : "left",
@@ -565,7 +566,7 @@ export function useTrophyDetection({
     
     // Peak should be in the later part of the motion
     if (peakIdx < signals.length * 0.15) {
-      console.warn("Peak acceleration found very early, might not be a serve");
+      detectionLogger.warn("Peak acceleration found very early, might not be a serve");
     }
     
     // Step 2: Calculate trophy scores for frames BEFORE the peak
@@ -628,12 +629,12 @@ export function useTrophyDetection({
     }
     
     const bestSignal = signals[bestTrophyIdx];
-    console.log(`🏆 Best trophy score: ${bestTrophyScore.toFixed(3)} at frame ${bestSignal.frame}`);
-    console.log(`   Both arms up: ${(bestSignal.bothArmsUpScore * 100).toFixed(1)}% (L:${bestSignal.leftArmUp ? '↑' : '↓'} R:${bestSignal.rightArmUp ? '↑' : '↓'})`);
-    console.log(`   Knee bend: ${bestSignal.avgKneeBend.toFixed(1)}°`);
-    console.log(`   Toss height: ${(bestSignal.tossWristHeight * 100).toFixed(1)}%`);
-    console.log(`   Legs together: ${(bestSignal.legsTogetherScore * 100).toFixed(1)}% (ankles: ${bestSignal.ankleDistance.toFixed(0)}px, knees: ${bestSignal.kneeDistance.toFixed(0)}px)`);
-    console.log(`   Acceleration: ${bestSignal.racketWristAcceleration.toFixed(0)} px/s²`);
+    detectionLogger.debug(`🏆 Best trophy score: ${bestTrophyScore.toFixed(3)} at frame ${bestSignal.frame}`);
+    detectionLogger.debug(`   Both arms up: ${(bestSignal.bothArmsUpScore * 100).toFixed(1)}% (L:${bestSignal.leftArmUp ? '↑' : '↓'} R:${bestSignal.rightArmUp ? '↑' : '↓'})`);
+    detectionLogger.debug(`   Knee bend: ${bestSignal.avgKneeBend.toFixed(1)}°`);
+    detectionLogger.debug(`   Toss height: ${(bestSignal.tossWristHeight * 100).toFixed(1)}%`);
+    detectionLogger.debug(`   Legs together: ${(bestSignal.legsTogetherScore * 100).toFixed(1)}% (ankles: ${bestSignal.ankleDistance.toFixed(0)}px, knees: ${bestSignal.kneeDistance.toFixed(0)}px)`);
+    detectionLogger.debug(`   Acceleration: ${bestSignal.racketWristAcceleration.toFixed(0)} px/s²`);
     
     return {
       trophyIdx: bestTrophyIdx,
@@ -663,11 +664,11 @@ export function useTrophyDetection({
         const handedness = detectHandedness();
         dominantHand = handedness.dominant;
         handednessConfidence = handedness.confidence;
-        console.log(`🎾 Detected ${dominantHand}-handed player (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
+        detectionLogger.debug(`🎾 Detected ${dominantHand}-handed player (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
       } else {
         dominantHand = preferredHand;
         handednessConfidence = 1.0;
-        console.log(`🎾 Using specified ${dominantHand} hand`);
+        detectionLogger.debug(`🎾 Using specified ${dominantHand} hand`);
       }
       
       // Step 2: Extract all signals
@@ -714,14 +715,14 @@ export function useTrophyDetection({
       };
       
       setResult(detection);
-      console.log(`🏆 Trophy position detected at frame ${detection.trophyFrame} (${detection.trophyTimestamp.toFixed(2)}s)`);
-      console.log(`   Dominant hand: ${dominantHand}`);
-      console.log(`   Confidence: ${(confidence * 100).toFixed(1)}%`);
+      detectionLogger.debug(`🏆 Trophy position detected at frame ${detection.trophyFrame} (${detection.trophyTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`   Dominant hand: ${dominantHand}`);
+      detectionLogger.debug(`   Confidence: ${(confidence * 100).toFixed(1)}%`);
       
       setIsAnalyzing(false);
       return detection;
     } catch (err) {
-      console.error("Trophy detection error:", err);
+      detectionLogger.error("Trophy detection error:", err);
       setError(err instanceof Error ? err.message : "Unknown error during trophy detection");
       setIsAnalyzing(false);
       return null;

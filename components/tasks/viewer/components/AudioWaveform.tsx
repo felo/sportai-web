@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, RefObject, useCallback } from "react";
 import { Box } from "@radix-ui/themes";
+import { audioLogger } from "@/lib/logger";
 
 interface AudioWaveformProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -70,7 +71,7 @@ export function AudioWaveform({
       
       setIsSetup(true);
     } catch (error) {
-      console.error("Audio waveform setup error:", error);
+      audioLogger.error("Audio waveform setup error:", error);
     }
   }, [videoRef, isSetup]);
 

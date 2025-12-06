@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { detectionLogger } from "@/lib/logger";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
 import { DEFAULT_PERSON_HEIGHT_METERS } from "../constants";
@@ -317,14 +318,14 @@ export function useWristSpeedProtocol({
         dominantHand = handedness.dominant;
         handednessConfidence = handedness.confidence;
         
-        console.log(`🖐️ Wrist Speed Analysis - Handedness Detection:`);
-        console.log(`   Left wrist total motion: ${handedness.leftMotion.toFixed(0)}px`);
-        console.log(`   Right wrist total motion: ${handedness.rightMotion.toFixed(0)}px`);
-        console.log(`   Dominant hand: ${dominantHand} (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
+        detectionLogger.debug(`🖐️ Wrist Speed Analysis - Handedness Detection:`);
+        detectionLogger.debug(`   Left wrist total motion: ${handedness.leftMotion.toFixed(0)}px`);
+        detectionLogger.debug(`   Right wrist total motion: ${handedness.rightMotion.toFixed(0)}px`);
+        detectionLogger.debug(`   Dominant hand: ${dominantHand} (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
       } else {
         dominantHand = preferredHand;
         handednessConfidence = 1.0;
-        console.log(`🖐️ Wrist Speed Analysis - Using specified ${dominantHand} hand`);
+        detectionLogger.debug(`🖐️ Wrist Speed Analysis - Using specified ${dominantHand} hand`);
       }
       
       // Step 2: Calculate speeds for all frames
@@ -379,23 +380,23 @@ export function useWristSpeedProtocol({
       };
       
       // Log results
-      console.log(`\n📊 Wrist Speed Analysis Results:`);
-      console.log(`   Dominant hand: ${dominantHand}`);
-      console.log(`   Frames analyzed: ${speedData.length}`);
-      console.log(`   Video duration: ${videoDuration.toFixed(2)}s`);
-      console.log(`\n⚡ Peak Velocity:`);
-      console.log(`   Speed: ${peakData.speedKmh.toFixed(1)} km/h (${peakData.speedMs.toFixed(1)} m/s)`);
-      console.log(`   Frame: ${peakData.frame}`);
-      console.log(`   Timestamp: ${peakData.timestamp.toFixed(3)}s`);
-      console.log(`\n📈 Average Velocity (active motion):`);
-      console.log(`   Speed: ${avgKmh.toFixed(1)} km/h (${(avgKmh / 3.6).toFixed(1)} m/s)`);
+      detectionLogger.debug(`\n📊 Wrist Speed Analysis Results:`);
+      detectionLogger.debug(`   Dominant hand: ${dominantHand}`);
+      detectionLogger.debug(`   Frames analyzed: ${speedData.length}`);
+      detectionLogger.debug(`   Video duration: ${videoDuration.toFixed(2)}s`);
+      detectionLogger.debug(`\n⚡ Peak Velocity:`);
+      detectionLogger.debug(`   Speed: ${peakData.speedKmh.toFixed(1)} km/h (${peakData.speedMs.toFixed(1)} m/s)`);
+      detectionLogger.debug(`   Frame: ${peakData.frame}`);
+      detectionLogger.debug(`   Timestamp: ${peakData.timestamp.toFixed(3)}s`);
+      detectionLogger.debug(`\n📈 Average Velocity (active motion):`);
+      detectionLogger.debug(`   Speed: ${avgKmh.toFixed(1)} km/h (${(avgKmh / 3.6).toFixed(1)} m/s)`);
       
       setResult(analysisResult);
       setIsAnalyzing(false);
       return analysisResult;
       
     } catch (err) {
-      console.error("Wrist speed analysis error:", err);
+      detectionLogger.error("Wrist speed analysis error:", err);
       setError(err instanceof Error ? err.message : "Unknown error during analysis");
       setIsAnalyzing(false);
       return null;

@@ -3,6 +3,7 @@
  */
 
 import * as tf from "@tensorflow/tfjs";
+import { detectionLogger } from "@/lib/logger";
 
 export interface CacheDiagnostics {
   indexedDBAvailable: boolean;
@@ -36,7 +37,7 @@ export async function checkIndexedDBAvailable(): Promise<boolean> {
       request.onblocked = () => resolve(false);
     });
   } catch (err) {
-    console.error("IndexedDB check failed:", err);
+    detectionLogger.error("IndexedDB check failed:", err);
     return false;
   }
 }
@@ -57,7 +58,7 @@ export async function getStorageQuota() {
       percentUsed: estimate.quota ? ((estimate.usage || 0) / estimate.quota) * 100 : 0,
     };
   } catch (err) {
-    console.error("Failed to get storage quota:", err);
+    detectionLogger.error("Failed to get storage quota:", err);
     return null;
   }
 }
@@ -70,7 +71,7 @@ export async function listCachedModels(): Promise<string[]> {
     const models = await tf.io.listModels();
     return Object.keys(models);
   } catch (err) {
-    console.error("Failed to list models:", err);
+    detectionLogger.error("Failed to list models:", err);
     return [];
   }
 }
@@ -86,7 +87,7 @@ export async function checkCacheAPI(): Promise<{ available: boolean; entries?: n
   try {
     // List all cache names
     const cacheNames = await caches.keys();
-    console.log("🗄️ Browser Cache API names:", cacheNames);
+    detectionLogger.debug("🗄️ Browser Cache API names:", cacheNames);
     
     let totalEntries = 0;
     
@@ -105,17 +106,17 @@ export async function checkCacheAPI(): Promise<{ available: boolean; entries?: n
         );
         
         if (tfRequests.length > 0) {
-          console.log(`📦 Cache "${cacheName}": ${tfRequests.length} TensorFlow.js entries`);
+          detectionLogger.debug(`📦 Cache "${cacheName}": ${tfRequests.length} TensorFlow.js entries`);
           totalEntries += tfRequests.length;
         }
       } catch (err) {
-        console.warn(`Failed to check cache "${cacheName}":`, err);
+        detectionLogger.warn(`Failed to check cache "${cacheName}":`, err);
       }
     }
     
     return { available: true, entries: totalEntries };
   } catch (err) {
-    console.error("Failed to check Cache API:", err);
+    detectionLogger.error("Failed to check Cache API:", err);
     return { available: true, entries: 0 };
   }
 }
@@ -150,12 +151,12 @@ export async function clearAllModelCache(): Promise<number> {
     
     for (const key of modelKeys) {
       await tf.io.removeModel(key);
-      console.log(`🗑️ Cleared cached model: ${key}`);
+      detectionLogger.debug(`🗑️ Cleared cached model: ${key}`);
     }
     
     return modelKeys.length;
   } catch (err) {
-    console.error("Failed to clear model cache:", err);
+    detectionLogger.error("Failed to clear model cache:", err);
     return 0;
   }
 }
@@ -167,12 +168,12 @@ export function monitorModelLoading() {
   if (typeof window === "undefined") return;
 
   // Log when models are accessed
-  console.log("🔍 Model cache monitor initialized");
+  detectionLogger.debug("🔍 Model cache monitor initialized");
   
   // Check cache periodically
   const checkInterval = setInterval(async () => {
     const models = await listCachedModels();
-    console.log(`📊 Cache check: ${models.length} models cached`);
+    detectionLogger.debug(`📊 Cache check: ${models.length} models cached`);
   }, 10000); // Check every 10 seconds
 
   // Cleanup function

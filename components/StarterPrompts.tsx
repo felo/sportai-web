@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
+import { logger } from "@/lib/logger";
 import { STARTER_PROMPTS, type StarterPromptConfig } from "@/utils/prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -41,7 +42,7 @@ export function StarterPrompts({ onPromptSelect }: StarterPromptsProps) {
       
       await onPromptSelect(config.prompt, config.videoUrl, settings);
     } catch (error) {
-      console.error('Error loading demo video:', error);
+      logger.error('Error loading demo video:', error);
     } finally {
       setLoadingVideoForCard(null);
     }

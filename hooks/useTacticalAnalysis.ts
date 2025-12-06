@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { logger } from "@/lib/logger";
 import type { 
   BallSequenceType, 
   PlayerTacticalData, 
@@ -43,7 +44,7 @@ interface AnalyzeAllParams {
  * ```tsx
  * const { analyze, isAnalyzing, analysis, error, reset } = useTacticalAnalysis({
  *   sport: "padel",
- *   onAnalysisComplete: (result) => console.log(result),
+ *   onAnalysisComplete: (result) => logger.debug(result),
  * });
  * 
  * // Trigger analysis

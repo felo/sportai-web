@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Text } from "@radix-ui/themes";
+import { chatLogger } from "@/lib/logger";
 import { MessageBubble } from "./MessageBubble";
 import { ScrollSpacer } from "./ScrollSpacer";
 import { URLs } from "@/lib/config";
@@ -40,7 +41,7 @@ export function MessageList({
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
-  console.log("[MessageList] Render:", {
+  chatLogger.debug("[MessageList] Render:", {
     messagesCount: messages.length,
     loading,
     messageIds: messages.map(m => m.id),

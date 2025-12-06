@@ -74,7 +74,7 @@ export function useSidebarChats({
 
     // Listen for auth state changes (sign in/out)
     const handleAuthStateChange = () => {
-      console.log("[Sidebar] Auth state changed, syncing from Supabase...");
+      chatLogger.debug("[Sidebar] Auth state changed, syncing from Supabase...");
       // Re-sync from Supabase when auth state changes
       syncChatsFromSupabase().then(() => {
         refreshChats(); // Fast: reads from localStorage
@@ -179,7 +179,7 @@ export function useSidebarChats({
       // Check if this is the last chat - if so, clear it instead of deleting
       if (chats.length === 1) {
         // Last chat - clear messages instead of deleting
-        console.log("[Sidebar] Last chat - clearing messages instead of deleting");
+        chatLogger.debug("[Sidebar] Last chat - clearing messages instead of deleting");
         await updateExistingChat(chatId, { messages: [] }, false);
         // Refresh chat list
         await refreshChats();

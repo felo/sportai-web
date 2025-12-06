@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Volume2, Loader2 } from "lucide-react";
+import { audioLogger } from "@/lib/logger";
 import { useAudioPlayer } from "@/components/AudioPlayerContext";
 import { getTTSSettings } from "@/utils/storage";
 
@@ -67,7 +68,7 @@ export function SectionSpeaker({ sectionText, sectionId, messageId, onTTSUsage }
       // Play the audio
       await playAudio(uniqueId, data.audioUrl);
     } catch (error) {
-      console.error('[SectionSpeaker] Failed to play audio:', error);
+      audioLogger.error('[SectionSpeaker] Failed to play audio:', error);
       // TODO: Show error toast
     } finally {
       setIsLoadingAudio(false);

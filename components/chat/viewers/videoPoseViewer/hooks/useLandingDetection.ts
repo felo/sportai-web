@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { detectionLogger } from "@/lib/logger";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
 
@@ -365,7 +366,7 @@ export function useLandingDetection({
     peakDownwardVelocity: number; // Value of peak downward velocity (positive)
   } | null => {
     if (data.length < 5) {
-      console.warn(`⚠️ Not enough frame data: ${data.length} < 5`);
+      detectionLogger.warn(`⚠️ Not enough frame data: ${data.length} < 5`);
       return null;
     }
     
@@ -389,13 +390,13 @@ export function useLandingDetection({
     const jumpHeightPixels = groundLevel - minY;
     const jumpHeight = jumpHeightPixels / groundLevel; // Normalized
     
-    console.log(`🦘 Peak at frame ${data[peakIdx].frame}, Y=${minY.toFixed(0)}`);
-    console.log(`   Ground level: ${groundLevel.toFixed(0)}px`);
-    console.log(`   Jump height: ${jumpHeightPixels.toFixed(0)}px (${(jumpHeight * 100).toFixed(1)}%)`);
+    detectionLogger.debug(`🦘 Peak at frame ${data[peakIdx].frame}, Y=${minY.toFixed(0)}`);
+    detectionLogger.debug(`   Ground level: ${groundLevel.toFixed(0)}px`);
+    detectionLogger.debug(`   Jump height: ${jumpHeightPixels.toFixed(0)}px (${(jumpHeight * 100).toFixed(1)}%)`);
     
     // Warn if jump is very small but don't fail
     if (jumpHeight < 0.05) {
-      console.warn("⚠️ Very small jump detected (< 5% of frame height)");
+      detectionLogger.warn("⚠️ Very small jump detected (< 5% of frame height)");
     }
     
     // Find takeoff: walk backward from peak, find where Y was at ground level
@@ -514,15 +515,15 @@ export function useLandingDetection({
       }
     }
     
-    console.log(`🚀 Takeoff at frame ${data[takeoffIdx].frame} (Y=${data[takeoffIdx].primaryY.toFixed(0)})`);
-    console.log(`🦶 Landing at frame ${data[landingIdx].frame} (Y=${data[landingIdx].primaryY.toFixed(0)})`);
-    console.log(`\n📈 Y-Axis Velocity (between takeoff and landing):`);
-    console.log(`   ⬆️ Peak upward: ${Math.abs(peakUpwardVelocity).toFixed(0)} px/s at frame ${data[peakUpwardVelocityIdx].frame} (${data[peakUpwardVelocityIdx].timestamp.toFixed(2)}s)`);
-    console.log(`   ⬇️ Peak downward: ${peakDownwardVelocity.toFixed(0)} px/s at frame ${data[peakDownwardVelocityIdx].frame} (${data[peakDownwardVelocityIdx].timestamp.toFixed(2)}s)`);
-    console.log(`\n🦵 Knee Bend Phases:`);
-    console.log(`   📉 Loading (max bend): frame ${data[loadingIdx].frame} - angle ${minKneeBeforeTakeoff.toFixed(0)}°`);
-    console.log(`   📈 Extension (push-off): frame ${data[extensionIdx].frame} - angle ${maxKneeDuringPushoff.toFixed(0)}°`);
-    console.log(`   📉 Absorption (impact): frame ${data[absorptionIdx].frame} - angle ${(data[absorptionIdx].minKneeAngle ?? data[absorptionIdx].avgKneeAngle ?? 0).toFixed(0)}°`);
+    detectionLogger.debug(`🚀 Takeoff at frame ${data[takeoffIdx].frame} (Y=${data[takeoffIdx].primaryY.toFixed(0)})`);
+    detectionLogger.debug(`🦶 Landing at frame ${data[landingIdx].frame} (Y=${data[landingIdx].primaryY.toFixed(0)})`);
+    detectionLogger.debug(`\n📈 Y-Axis Velocity (between takeoff and landing):`);
+    detectionLogger.debug(`   ⬆️ Peak upward: ${Math.abs(peakUpwardVelocity).toFixed(0)} px/s at frame ${data[peakUpwardVelocityIdx].frame} (${data[peakUpwardVelocityIdx].timestamp.toFixed(2)}s)`);
+    detectionLogger.debug(`   ⬇️ Peak downward: ${peakDownwardVelocity.toFixed(0)} px/s at frame ${data[peakDownwardVelocityIdx].frame} (${data[peakDownwardVelocityIdx].timestamp.toFixed(2)}s)`);
+    detectionLogger.debug(`\n🦵 Knee Bend Phases:`);
+    detectionLogger.debug(`   📉 Loading (max bend): frame ${data[loadingIdx].frame} - angle ${minKneeBeforeTakeoff.toFixed(0)}°`);
+    detectionLogger.debug(`   📈 Extension (push-off): frame ${data[extensionIdx].frame} - angle ${maxKneeDuringPushoff.toFixed(0)}°`);
+    detectionLogger.debug(`   📉 Absorption (impact): frame ${data[absorptionIdx].frame} - angle ${(data[absorptionIdx].minKneeAngle ?? data[absorptionIdx].avgKneeAngle ?? 0).toFixed(0)}°`);
     
     return {
       takeoffIdx,
@@ -556,7 +557,7 @@ export function useLandingDetection({
       const ankleFrames = rawData.filter(d => d.ySource === "ankle").length;
       const hipFrames = rawData.filter(d => d.ySource === "hip").length;
       
-      console.log(`🦶 Extracted ${rawData.length} frames: ${ankleFrames} with ankles, ${hipFrames} with hip fallback`);
+      detectionLogger.debug(`🦶 Extracted ${rawData.length} frames: ${ankleFrames} with ankles, ${hipFrames} with hip fallback`);
       
       if (rawData.length < 5) {
         setError(`Not enough pose data (${rawData.length} frames). Make sure the player is visible.`);
@@ -636,26 +637,26 @@ export function useLandingDetection({
                         detection.landingFoot === "left" ? "left foot" :
                         detection.landingFoot === "right" ? "right foot" : "unknown";
       
-      console.log(`\n🎾 Jump Analysis Complete:`);
-      console.log(`   🚀 Takeoff: frame ${detection.takeoffFrame} (${detection.takeoffTimestamp.toFixed(2)}s)`);
-      console.log(`   🦘 Peak jump: frame ${detection.peakJumpFrame} (${detection.peakJumpTimestamp.toFixed(2)}s)`);
-      console.log(`   🦶 Landing: frame ${detection.landingFrame} (${detection.landingTimestamp.toFixed(2)}s) - ${footLabel}`);
-      console.log(`   📏 Jump height: ${(detection.jumpHeight * 100).toFixed(1)}%`);
-      console.log(`   ⏱️ Air time: ${(detection.airTime * 1000).toFixed(0)}ms`);
-      console.log(`\n📈 Y-Axis Velocity (during jump):`);
-      console.log(`   ⬆️ Peak upward: ${Math.abs(detection.peakUpwardVelocity).toFixed(0)} px/s at frame ${detection.peakUpwardVelocityFrame} (${detection.peakUpwardVelocityTimestamp.toFixed(2)}s)`);
-      console.log(`   ⬇️ Peak downward: ${detection.peakDownwardVelocity.toFixed(0)} px/s at frame ${detection.peakDownwardVelocityFrame} (${detection.peakDownwardVelocityTimestamp.toFixed(2)}s)`);
-      console.log(`\n🦵 Knee Bend Phases:`);
-      console.log(`   📉 Loading: frame ${detection.loadingFrame} (${detection.loadingTimestamp.toFixed(2)}s) - ${detection.loadingKneeAngle.toFixed(0)}°`);
-      console.log(`   📈 Extension: frame ${detection.extensionFrame} (${detection.extensionTimestamp.toFixed(2)}s) - ${detection.extensionKneeAngle.toFixed(0)}°`);
-      console.log(`   📉 Absorption: frame ${detection.absorptionFrame} (${detection.absorptionTimestamp.toFixed(2)}s) - ${detection.absorptionKneeAngle.toFixed(0)}°`);
-      console.log(`\n   📊 Confidence: ${(confidence * 100).toFixed(1)}%`);
-      console.log(`   📡 Data source: ${ankleFrames} ankle frames, ${hipFrames} hip fallback frames`);
+      detectionLogger.debug(`\n🎾 Jump Analysis Complete:`);
+      detectionLogger.debug(`   🚀 Takeoff: frame ${detection.takeoffFrame} (${detection.takeoffTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`   🦘 Peak jump: frame ${detection.peakJumpFrame} (${detection.peakJumpTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`   🦶 Landing: frame ${detection.landingFrame} (${detection.landingTimestamp.toFixed(2)}s) - ${footLabel}`);
+      detectionLogger.debug(`   📏 Jump height: ${(detection.jumpHeight * 100).toFixed(1)}%`);
+      detectionLogger.debug(`   ⏱️ Air time: ${(detection.airTime * 1000).toFixed(0)}ms`);
+      detectionLogger.debug(`\n📈 Y-Axis Velocity (during jump):`);
+      detectionLogger.debug(`   ⬆️ Peak upward: ${Math.abs(detection.peakUpwardVelocity).toFixed(0)} px/s at frame ${detection.peakUpwardVelocityFrame} (${detection.peakUpwardVelocityTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`   ⬇️ Peak downward: ${detection.peakDownwardVelocity.toFixed(0)} px/s at frame ${detection.peakDownwardVelocityFrame} (${detection.peakDownwardVelocityTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`\n🦵 Knee Bend Phases:`);
+      detectionLogger.debug(`   📉 Loading: frame ${detection.loadingFrame} (${detection.loadingTimestamp.toFixed(2)}s) - ${detection.loadingKneeAngle.toFixed(0)}°`);
+      detectionLogger.debug(`   📈 Extension: frame ${detection.extensionFrame} (${detection.extensionTimestamp.toFixed(2)}s) - ${detection.extensionKneeAngle.toFixed(0)}°`);
+      detectionLogger.debug(`   📉 Absorption: frame ${detection.absorptionFrame} (${detection.absorptionTimestamp.toFixed(2)}s) - ${detection.absorptionKneeAngle.toFixed(0)}°`);
+      detectionLogger.debug(`\n   📊 Confidence: ${(confidence * 100).toFixed(1)}%`);
+      detectionLogger.debug(`   📡 Data source: ${ankleFrames} ankle frames, ${hipFrames} hip fallback frames`);
       
       setIsAnalyzing(false);
       return detection;
     } catch (err) {
-      console.error("Landing detection error:", err);
+      detectionLogger.error("Landing detection error:", err);
       setError(err instanceof Error ? err.message : "Unknown error during landing detection");
       setIsAnalyzing(false);
       return null;

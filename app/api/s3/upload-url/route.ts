@@ -11,18 +11,11 @@ export async function POST(request: NextRequest) {
   
   // Check AWS credentials
   const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
-  console.log(`[S3 API] AWS credentials check:`, {
-    hasCredentials,
-    hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-    hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION || "eu-north-1",
-    bucket: process.env.AWS_S3_BUCKET_NAME || "sportai-llm-uploads",
-  });
+  logger.debug(`[${requestId}] AWS credentials check: hasCredentials=${hasCredentials}`);
   
   if (!hasCredentials) {
     const errorMsg = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.";
     logger.error(`[${requestId}] ${errorMsg}`);
-    console.error(`[S3 API] ❌ ${errorMsg}`);
     return NextResponse.json(
       { error: errorMsg },
       { status: 500 }
@@ -42,21 +35,14 @@ export async function POST(request: NextRequest) {
     }
 
     logger.debug(`[${requestId}] Generating presigned URL for: ${fileName} (${contentType})`);
-    console.log(`[S3 API] Generating presigned URL for: ${fileName} (${contentType})`);
     
     const result = await generatePresignedUploadUrl(fileName, contentType);
     
-    logger.info(`[${requestId}] Presigned URL generated successfully`);
-    console.log(`[S3 API] ✅ Presigned URL generated:`, {
-      key: result.key,
-      publicUrl: result.publicUrl,
-      fileName,
-    });
+    logger.info(`[${requestId}] Presigned URL generated successfully`, { key: result.key });
     
     return NextResponse.json(result);
   } catch (error) {
     logger.error(`[${requestId}] Failed to generate presigned URL:`, error);
-    console.error(`[S3 API] ❌ Failed to generate presigned URL:`, error);
     
     const errorMessage =
       error instanceof Error ? error.message : "Failed to generate upload URL";

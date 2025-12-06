@@ -1,3 +1,5 @@
+import { videoLogger } from "@/lib/logger";
+
 // Maximum video size aligned with Gemini API limit
 // Files larger than this will receive a natural dialogue response from the LLM
 export const MAX_VIDEO_SIZE_MB = 100;
@@ -283,7 +285,7 @@ async function detectCodecFromFile(file: File): Promise<{
   hasDolbyVision: boolean;
   isAppleQuickTime: boolean;
 }> {
-  console.log('[VideoCodec] detectCodecFromFile called for:', file.name, 'size:', file.size);
+  videoLogger.debug('[VideoCodec] detectCodecFromFile called for:', file.name, 'size:', file.size);
   
   // Check file extension and MIME type for MOV
   const isMOVExtension = file.name.toLowerCase().endsWith('.mov');
@@ -300,52 +302,52 @@ async function detectCodecFromFile(file: File): Promise<{
     let hasDolbyVision = false;
     let isAppleQuickTime = false;
     
-    console.log(`[VideoCodec] Scanning ${label}: ${bytes.length} bytes`);
+    videoLogger.debug(`[VideoCodec] Scanning ${label}: ${bytes.length} bytes`);
     
     // HEVC codec identifiers (FourCC codes)
     if (findFourCC(bytes, 'hvc1')) {
       isHEVC = true;
-      console.log('[VideoCodec] ✓ Found hvc1 in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found hvc1 in', label);
     }
     if (findFourCC(bytes, 'hev1')) {
       isHEVC = true;
-      console.log('[VideoCodec] ✓ Found hev1 in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found hev1 in', label);
     }
     if (findFourCC(bytes, 'hevc') || findFourCC(bytes, 'HEVC')) {
       isHEVC = true;
-      console.log('[VideoCodec] ✓ Found hevc/HEVC in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found hevc/HEVC in', label);
     }
     
     // Dolby Vision indicators
     if (findFourCC(bytes, 'dvh1') || findFourCC(bytes, 'dvhe') || findFourCC(bytes, 'dovi') || findFourCC(bytes, 'dvvC')) {
       hasDolbyVision = true;
       isHDR = true;
-      console.log('[VideoCodec] ✓ Found Dolby Vision in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found Dolby Vision in', label);
     }
     
     // HDR indicators
     if (findFourCC(bytes, 'arib') || findFourCC(bytes, 'smpt')) {
       isHDR = true;
-      console.log('[VideoCodec] ✓ Found HDR indicator in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found HDR indicator in', label);
     }
     
     // Apple QuickTime indicators
     // "qt  " is Apple QuickTime brand (with two trailing spaces)
     if (findFourCC(bytes, 'qt  ')) {
       isAppleQuickTime = true;
-      console.log('[VideoCodec] ✓ Found QuickTime brand (qt  ) in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found QuickTime brand (qt  ) in', label);
     }
     
     // Apple Positional Audio Codec (spatial audio) - not browser compatible
     if (findFourCC(bytes, 'apac')) {
       isAppleQuickTime = true;
-      console.log('[VideoCodec] ✓ Found Apple Positional Audio (apac) in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found Apple Positional Audio (apac) in', label);
     }
     
     // Apple metadata boxes (mebx) - indicates Apple-specific format
     if (findFourCC(bytes, 'mebx')) {
       isAppleQuickTime = true;
-      console.log('[VideoCodec] ✓ Found Apple metadata box (mebx) in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found Apple metadata box (mebx) in', label);
     }
     
     // Apple ProRes codecs
@@ -353,7 +355,7 @@ async function detectCodecFromFile(file: File): Promise<{
         findFourCC(bytes, 'apcs') || findFourCC(bytes, 'apco') || 
         findFourCC(bytes, 'ap4h') || findFourCC(bytes, 'ap4x')) {
       isAppleQuickTime = true;
-      console.log('[VideoCodec] ✓ Found Apple ProRes codec in', label);
+      videoLogger.debug('[VideoCodec] ✓ Found Apple ProRes codec in', label);
     }
     
     return { isHEVC, isHDR, hasDolbyVision, isAppleQuickTime };
@@ -377,7 +379,7 @@ async function detectCodecFromFile(file: File): Promise<{
     let isAppleQuickTime = startResult.isAppleQuickTime || isMOVExtension || isMOVMimeType;
     
     if (startResult.isHEVC) {
-      console.log('[VideoCodec] HEVC detected in file start');
+      videoLogger.debug('[VideoCodec] HEVC detected in file start');
       return { ...startResult, isAppleQuickTime };
     }
     
@@ -390,16 +392,16 @@ async function detectCodecFromFile(file: File): Promise<{
       isAppleQuickTime = isAppleQuickTime || endResult.isAppleQuickTime;
       
       if (endResult.isHEVC) {
-        console.log('[VideoCodec] HEVC detected in file end');
+        videoLogger.debug('[VideoCodec] HEVC detected in file end');
         return { ...endResult, isAppleQuickTime };
       }
     }
     
-    console.log('[VideoCodec] No HEVC detected in file, isAppleQuickTime:', isAppleQuickTime);
+    videoLogger.debug('[VideoCodec] No HEVC detected in file, isAppleQuickTime:', isAppleQuickTime);
     return { isHEVC: false, isHDR: false, hasDolbyVision: false, isAppleQuickTime };
     
   } catch (err) {
-    console.error('[VideoCodec] Error reading file:', err);
+    videoLogger.error('[VideoCodec] Error reading file:', err);
     return { isHEVC: false, isHDR: false, hasDolbyVision: false, isAppleQuickTime: isMOVExtension || isMOVMimeType };
   }
 }
@@ -409,13 +411,13 @@ async function detectCodecFromFile(file: File): Promise<{
  * Returns detailed codec and compatibility information
  */
 export async function checkVideoCodecCompatibility(file: File): Promise<VideoCompatibilityResult> {
-  console.log('[VideoCodec] Starting compatibility check for:', file.name, file.type, `${(file.size / 1024 / 1024).toFixed(1)}MB`);
+  videoLogger.debug('[VideoCodec] Starting compatibility check for:', file.name, file.type, `${(file.size / 1024 / 1024).toFixed(1)}MB`);
   
   const issues: VideoCompatibilityIssue[] = [];
   
   // Skip check for images
   if (isImageFile(file)) {
-    console.log('[VideoCodec] Skipping check - file is an image');
+    videoLogger.debug('[VideoCodec] Skipping check - file is an image');
     return {
       compatible: true,
       issues: [],
@@ -428,9 +430,9 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
   }
   
   // First, try to detect codec from file header
-  console.log('[VideoCodec] Detecting codec from file header...');
+  videoLogger.debug('[VideoCodec] Detecting codec from file header...');
   const fileCodecInfo = await detectCodecFromFile(file);
-  console.log('[VideoCodec] File codec detection result:', fileCodecInfo);
+  videoLogger.debug('[VideoCodec] File codec detection result:', fileCodecInfo);
   
   return new Promise((resolve) => {
     const video = document.createElement('video');
@@ -547,7 +549,7 @@ export async function checkVideoCodecCompatibility(file: File): Promise<VideoCom
             
             // Check for Apple QuickTime format - needs conversion for Gemini API compatibility
             if (fileCodecInfo.isAppleQuickTime && !fileCodecInfo.isHEVC) {
-              console.log('[VideoCodec] Apple QuickTime H.264 detected - converting for API compatibility');
+              videoLogger.debug('[VideoCodec] Apple QuickTime H.264 detected - converting for API compatibility');
               issues.push({
                 type: 'apple_quicktime',
                 description: 'This Apple QuickTime video will be converted to MP4 for better compatibility',
@@ -680,7 +682,7 @@ export async function downloadVideoFromUrl(url: string): Promise<File> {
     
     return file;
   } catch (error) {
-    console.error('Error downloading video:', error);
+    videoLogger.error('Error downloading video:', error);
     throw new Error('Failed to load demo video. Please try uploading your own video.');
   }
 }
@@ -777,7 +779,7 @@ export async function extractFirstFrameWithDuration(
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              console.log(`[extractFirstFrameWithDuration] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
+              videoLogger.debug(`[extractFirstFrameWithDuration] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
               resolve({ frameBlob: blob, durationSeconds: videoDuration });
             } else {
               reject(new Error('Failed to create blob from canvas'));
@@ -803,7 +805,7 @@ export async function extractFirstFrameWithDuration(
       // Capture duration when metadata is available
       if (isFinite(video.duration) && video.duration > 0) {
         videoDuration = video.duration;
-        console.log(`[extractFirstFrameWithDuration] Video duration: ${videoDuration}s`);
+        videoLogger.debug(`[extractFirstFrameWithDuration] Video duration: ${videoDuration}s`);
       }
       // Video has enough data to display first frame
       // Seek to a tiny offset to ensure frame is ready
@@ -923,7 +925,7 @@ export async function extractFirstFrame(
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              console.log(`[extractFirstFrame] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB`);
+              videoLogger.debug(`[extractFirstFrame] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB`);
               resolve(blob);
             } else {
               reject(new Error('Failed to create blob from canvas'));
@@ -1047,7 +1049,7 @@ export async function extractFirstFrameFromUrl(
       if (!resolved) {
         resolved = true;
         cleanup();
-        console.warn('[extractFirstFrameFromUrl] Timeout loading video URL');
+        videoLogger.warn('[extractFirstFrameFromUrl] Timeout loading video URL');
         resolve({ frameBlob: null, durationSeconds: videoDuration });
       }
     }, 15000);
@@ -1065,7 +1067,7 @@ export async function extractFirstFrameFromUrl(
         const videoHeight = video.videoHeight;
         
         if (!videoWidth || !videoHeight) {
-          console.warn('[extractFirstFrameFromUrl] Could not determine video dimensions');
+          videoLogger.warn('[extractFirstFrameFromUrl] Could not determine video dimensions');
           resolve({ frameBlob: null, durationSeconds: videoDuration });
           return;
         }
@@ -1091,7 +1093,7 @@ export async function extractFirstFrameFromUrl(
         
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          console.warn('[extractFirstFrameFromUrl] Could not create canvas context');
+          videoLogger.warn('[extractFirstFrameFromUrl] Could not create canvas context');
           resolve({ frameBlob: null, durationSeconds: videoDuration });
           return;
         }
@@ -1100,7 +1102,7 @@ export async function extractFirstFrameFromUrl(
         try {
           ctx.drawImage(video, 0, 0, width, height);
         } catch (corsError) {
-          console.warn('[extractFirstFrameFromUrl] CORS blocked canvas access:', corsError);
+          videoLogger.warn('[extractFirstFrameFromUrl] CORS blocked canvas access:', corsError);
           resolve({ frameBlob: null, durationSeconds: videoDuration });
           return;
         }
@@ -1109,10 +1111,10 @@ export async function extractFirstFrameFromUrl(
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              console.log(`[extractFirstFrameFromUrl] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
+              videoLogger.debug(`[extractFirstFrameFromUrl] Extracted frame: ${width}x${height}, ${(blob.size / 1024).toFixed(1)}KB, duration: ${videoDuration}s`);
               resolve({ frameBlob: blob, durationSeconds: videoDuration });
             } else {
-              console.warn('[extractFirstFrameFromUrl] Failed to create blob from canvas');
+              videoLogger.warn('[extractFirstFrameFromUrl] Failed to create blob from canvas');
               resolve({ frameBlob: null, durationSeconds: videoDuration });
             }
           },
@@ -1120,7 +1122,7 @@ export async function extractFirstFrameFromUrl(
           quality
         );
       } catch (err) {
-        console.warn('[extractFirstFrameFromUrl] Error extracting frame:', err);
+        videoLogger.warn('[extractFirstFrameFromUrl] Error extracting frame:', err);
         resolve({ frameBlob: null, durationSeconds: videoDuration });
       }
     };
@@ -1137,7 +1139,7 @@ export async function extractFirstFrameFromUrl(
       // Capture duration when metadata is available
       if (isFinite(video.duration) && video.duration > 0) {
         videoDuration = video.duration;
-        console.log(`[extractFirstFrameFromUrl] Video duration: ${videoDuration}s`);
+        videoLogger.debug(`[extractFirstFrameFromUrl] Video duration: ${videoDuration}s`);
       }
       // Video has enough data to display first frame
       // Seek to a tiny offset to ensure frame is ready
@@ -1150,7 +1152,7 @@ export async function extractFirstFrameFromUrl(
       clearTimeout(timeout);
       cleanup();
       // CORS errors often manifest as video load errors
-      console.warn('[extractFirstFrameFromUrl] Error loading video URL (likely CORS):', e);
+      videoLogger.warn('[extractFirstFrameFromUrl] Error loading video URL (likely CORS):', e);
       resolve({ frameBlob: null, durationSeconds: videoDuration });
     };
     
@@ -1187,7 +1189,7 @@ export async function uploadThumbnailToS3(
   frameBlob: Blob
 ): Promise<ThumbnailUploadResult | null> {
   try {
-    console.log("[uploadThumbnailToS3] Uploading thumbnail to S3...");
+    videoLogger.debug("[uploadThumbnailToS3] Uploading thumbnail to S3...");
     const thumbnailFile = new File([frameBlob], `thumbnail_${Date.now()}.jpg`, { type: "image/jpeg" });
     
     // Get presigned upload URL
@@ -1201,7 +1203,7 @@ export async function uploadThumbnailToS3(
     });
     
     if (!urlResponse.ok) {
-      console.warn("[uploadThumbnailToS3] Failed to get upload URL for thumbnail");
+      videoLogger.warn("[uploadThumbnailToS3] Failed to get upload URL for thumbnail");
       return null;
     }
     
@@ -1223,10 +1225,10 @@ export async function uploadThumbnailToS3(
       xhr.send(thumbnailFile);
     });
     
-    console.log("[uploadThumbnailToS3] ✅ Thumbnail uploaded to S3:", s3Key);
+    videoLogger.debug("[uploadThumbnailToS3] ✅ Thumbnail uploaded to S3:", s3Key);
     return { thumbnailUrl: downloadUrl, thumbnailS3Key: s3Key };
   } catch (err) {
-    console.warn("[uploadThumbnailToS3] Thumbnail upload failed (non-blocking):", err);
+    videoLogger.warn("[uploadThumbnailToS3] Thumbnail upload failed (non-blocking):", err);
     return null;
   }
 }

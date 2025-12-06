@@ -9,6 +9,7 @@
  * - Use syncChatsFromSupabase() only on mount and auth changes to sync from cloud
  */
 
+import { storageLogger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import type { Chat, Message } from "@/types/chat";
 
@@ -46,7 +47,7 @@ async function isAuthenticated(): Promise<{ authenticated: boolean; userId?: str
       userId: session?.user?.id,
     };
   } catch (error) {
-    console.error("[storage-unified] Error checking auth:", error);
+    storageLogger.error("Error checking auth:", error);
     return {
       authenticated: false,
       userId: undefined,
@@ -63,7 +64,7 @@ export async function loadChats(): Promise<Chat[]> {
   // FAST PATH: Always read from localStorage (instant, no network)
   const localChats = loadChatsFromLocal();
   
-  console.log("[storage-unified] loadChats - fast path (localStorage):", {
+  storageLogger.debug("loadChats - fast path (localStorage):", {
     total: localChats.length,
     chats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
   });
@@ -79,16 +80,16 @@ export async function syncChatsFromSupabase(): Promise<Chat[]> {
   const { authenticated } = await isAuthenticated();
   
   if (!authenticated) {
-    console.log("[storage-unified] syncChatsFromSupabase - not authenticated, skipping");
+    storageLogger.debug("syncChatsFromSupabase - not authenticated, skipping");
     return loadChatsFromLocal();
   }
   
   try {
-    console.log("[storage-unified] syncChatsFromSupabase - fetching from Supabase...");
+    storageLogger.debug("syncChatsFromSupabase - fetching from Supabase...");
     const supabaseChats = await loadChatsFromSupabase();
     const localChats = loadChatsFromLocal();
     
-    console.log("[storage-unified] syncChatsFromSupabase - raw data:", {
+    storageLogger.debug("syncChatsFromSupabase - raw data:", {
       supabaseChats: supabaseChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
       localChats: localChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })),
     });
@@ -98,7 +99,7 @@ export async function syncChatsFromSupabase(): Promise<Chat[]> {
     const supabaseChatIds = new Set(supabaseChats.map(c => c.id));
     const localOnlyChats = localChats.filter(c => !supabaseChatIds.has(c.id));
     
-    console.log("[storage-unified] localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
+    storageLogger.debug("localOnlyChats:", localOnlyChats.map(c => ({ id: c.id, title: c.title, messages: c.messages.length })));
     
     // Combine and sort by createdAt (descending)
     const allChats = [...supabaseChats, ...localOnlyChats].sort((a, b) => b.createdAt - a.createdAt);
@@ -106,7 +107,7 @@ export async function syncChatsFromSupabase(): Promise<Chat[]> {
     // Update localStorage with merged chats
     saveChatsToLocal(allChats);
     
-    console.log("[storage-unified] ✅ syncChatsFromSupabase complete:", {
+    storageLogger.info("syncChatsFromSupabase complete:", {
       supabase: supabaseChats.length,
       localOnly: localOnlyChats.length,
       total: allChats.length,
@@ -114,7 +115,7 @@ export async function syncChatsFromSupabase(): Promise<Chat[]> {
     
     return allChats;
   } catch (error) {
-    console.error("[storage-unified] ❌ Failed to sync from Supabase:", error);
+    storageLogger.error("Failed to sync from Supabase:", error);
     return loadChatsFromLocal();
   }
 }
@@ -136,7 +137,7 @@ export async function saveChat(chat: Chat): Promise<boolean> {
   const { authenticated, userId } = await isAuthenticated();
   const hasMessages = chat.messages && chat.messages.length > 0;
   
-  console.log("[storage-unified] saveChat:", {
+  storageLogger.debug("saveChat:", {
     chatId: chat.id,
     authenticated,
     hasMessages,
@@ -156,14 +157,14 @@ export async function saveChat(chat: Chat): Promise<boolean> {
   // Only sync to Supabase if authenticated AND chat has messages
   if (authenticated && userId && hasMessages) {
     try {
-      console.log("[storage-unified] Syncing chat to Supabase:", chat.id);
+      storageLogger.debug("Syncing chat to Supabase:", chat.id);
       await saveChatToSupabase(chat, userId);
     } catch (error) {
-      console.error("[storage-unified] Failed to save to Supabase:", error);
+      storageLogger.error("Failed to save to Supabase:", error);
       // Already saved to localStorage, so return true
     }
   } else {
-    console.log("[storage-unified] Not syncing to Supabase (auth:", authenticated, "hasMessages:", hasMessages, ")");
+    storageLogger.debug("Not syncing to Supabase (auth:", authenticated, "hasMessages:", hasMessages, ")");
   }
   
   return true;
@@ -184,7 +185,7 @@ export async function createNewChat(
 ): Promise<Chat> {
   const { authenticated, userId } = await isAuthenticated();
   
-  console.log("[storage-unified] createNewChat:", {
+  storageLogger.debug("createNewChat:", {
     authenticated,
     userId: userId?.substring(0, 8) + "...",
     hasMessages: messages.length > 0,
@@ -194,7 +195,7 @@ export async function createNewChat(
   // Create chat using localStorage function (it generates the chat object)
   const chat = createChatLocal(messages, title, settings);
   
-  console.log("[storage-unified] Chat created in localStorage:", {
+  storageLogger.debug("Chat created in localStorage:", {
     id: chat.id,
     title: chat.title,
     messages: chat.messages.length,
@@ -203,7 +204,7 @@ export async function createNewChat(
   // Verify it was saved
   const localChats = loadChatsFromLocal();
   const savedChat = localChats.find(c => c.id === chat.id);
-  console.log("[storage-unified] Verification - chat in localStorage:", {
+  storageLogger.debug("Verification - chat in localStorage:", {
     found: !!savedChat,
     totalChats: localChats.length,
     chatIds: localChats.map(c => c.id),
@@ -212,15 +213,15 @@ export async function createNewChat(
   // Only sync to Supabase if authenticated AND chat has messages
   if (authenticated && userId && messages.length > 0) {
     try {
-      console.log("[storage-unified] Syncing new chat to Supabase:", chat.id);
+      storageLogger.debug("Syncing new chat to Supabase:", chat.id);
       await saveChatToSupabase(chat, userId);
-      console.log("[storage-unified] ✅ New chat synced to Supabase successfully:", chat.id);
+      storageLogger.info("New chat synced to Supabase successfully:", chat.id);
     } catch (error) {
-      console.error("[storage-unified] ❌ Failed to save new chat to Supabase:", error);
+      storageLogger.error("Failed to save new chat to Supabase:", error);
       // Chat is already saved to localStorage by createChatLocal
     }
   } else {
-    console.log("[storage-unified] Not syncing new chat to Supabase:", {
+    storageLogger.debug("Not syncing new chat to Supabase:", {
       authenticated,
       hasUserId: !!userId,
       hasMessages: messages.length > 0,
@@ -242,7 +243,7 @@ export async function updateExistingChat(
 ): Promise<boolean> {
   const { authenticated, userId } = await isAuthenticated();
   
-  console.log("[storage-unified] updateExistingChat:", {
+  storageLogger.debug("updateExistingChat:", {
     chatId,
     authenticated,
     userId: userId?.substring(0, 8) + "...",
@@ -260,14 +261,14 @@ export async function updateExistingChat(
       
       // If we can't find the chat, something is wrong - don't delete it!
       if (!localChat) {
-        console.warn("[storage-unified] Could not find chat in localStorage:", chatId);
+        storageLogger.warn("Could not find chat in localStorage:", chatId);
         return true; // Already updated in localStorage (updateChatLocal above)
       }
       
       const updatedMessages = updates.messages ?? localChat.messages ?? [];
       const hasMessages = updatedMessages.length > 0;
       
-      console.log("[storage-unified] Auth check passed:", {
+      storageLogger.debug("Auth check passed:", {
         hasMessages,
         updatedMessagesCount: updatedMessages.length,
         chatFound: !!localChat,
@@ -275,7 +276,7 @@ export async function updateExistingChat(
       
       // Only sync to Supabase if chat has messages
       if (!hasMessages) {
-        console.log("[storage-unified] Chat has no messages, deleting from Supabase:", chatId);
+        storageLogger.debug("Chat has no messages, deleting from Supabase:", chatId);
         // If chat is now empty, delete it from Supabase (if it exists)
         await deleteChatFromSupabase(chatId).catch(() => {
           // Ignore errors - chat might not exist in Supabase
@@ -285,50 +286,50 @@ export async function updateExistingChat(
       
       // Update in Supabase
       if (updates.messages) {
-        console.log("[storage-unified] Updating messages in Supabase for chat:", chatId);
+        storageLogger.debug("Updating messages in Supabase for chat:", chatId);
         // If messages are being updated, we need to save the whole chat
         const supabaseChat = await loadChatFromSupabase(chatId);
         
         if (supabaseChat) {
-          console.log("[storage-unified] Chat exists in Supabase, updating:", chatId);
+          storageLogger.debug("Chat exists in Supabase, updating:", chatId);
           // Chat exists in Supabase, update it
           const updatedChat = { ...supabaseChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
-          console.log("[storage-unified] ✅ Chat updated in Supabase successfully:", chatId);
+          storageLogger.info("Chat updated in Supabase successfully:", chatId);
         } else if (localChat) {
-          console.log("[storage-unified] Chat doesn't exist in Supabase, creating:", chatId);
+          storageLogger.debug("Chat doesn't exist in Supabase, creating:", chatId);
           // Chat doesn't exist in Supabase yet, create it
           const updatedChat = { ...localChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
-          console.log("[storage-unified] ✅ Chat created in Supabase successfully:", chatId);
+          storageLogger.info("Chat created in Supabase successfully:", chatId);
         }
       } else {
-        console.log("[storage-unified] Updating metadata only for chat:", chatId);
+        storageLogger.debug("Updating metadata only for chat:", chatId);
         // Just update metadata - but only if chat exists in Supabase
         const supabaseChat = await loadChatFromSupabase(chatId);
         if (supabaseChat) {
-          console.log("[storage-unified] Chat exists, updating metadata:", chatId);
+          storageLogger.debug("Chat exists, updating metadata:", chatId);
           await updateChatInSupabase(chatId, updates);
-          console.log("[storage-unified] ✅ Metadata updated in Supabase successfully:", chatId);
+          storageLogger.info("Metadata updated in Supabase successfully:", chatId);
         } else if (localChat && localChat.messages.length > 0) {
-          console.log("[storage-unified] Chat doesn't exist but has messages, creating:", chatId);
+          storageLogger.debug("Chat doesn't exist but has messages, creating:", chatId);
           // Chat doesn't exist in Supabase but has messages, create it
           const updatedChat = { ...localChat, ...updates };
           await saveChatToSupabase(updatedChat, userId);
-          console.log("[storage-unified] ✅ Chat created in Supabase successfully:", chatId);
+          storageLogger.info("Chat created in Supabase successfully:", chatId);
         } else {
-          console.log("[storage-unified] Skipping Supabase update - chat doesn't exist or has no messages");
+          storageLogger.debug("Skipping Supabase update - chat doesn't exist or has no messages");
         }
       }
       
       return true;
     } catch (error) {
-      console.error("[storage-unified] ❌ Failed to update in Supabase:", error);
+      storageLogger.error("Failed to update in Supabase:", error);
       // Already updated localStorage
       return true;
     }
   } else {
-    console.log("[storage-unified] Not syncing to Supabase:", {
+    storageLogger.debug("Not syncing to Supabase:", {
       authenticated,
       reason: !authenticated ? "not authenticated" : "no userId",
     });
@@ -350,7 +351,7 @@ export async function deleteExistingChat(chatId: string): Promise<boolean> {
       deleteChatLocal(chatId);
       return true;
     } catch (error) {
-      console.error("Failed to delete from Supabase, deleting from localStorage only:", error);
+      storageLogger.error("Failed to delete from Supabase, deleting from localStorage only:", error);
       deleteChatLocal(chatId);
       return true;
     }

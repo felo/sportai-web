@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
+import { detectionLogger } from "@/lib/logger";
 import type { YOLOModelType, ObjectDetectionResult } from "@/types/detection";
 
 // Dynamic imports for heavy ML libraries (code-splitting)
@@ -128,7 +129,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         await tf.setBackend("webgl");
         await tf.ready();
 
-        console.log("🔧 TensorFlow.js backend ready for object detection:", tf.getBackend());
+        detectionLogger.debug("🔧 TensorFlow.js backend ready for object detection:", tf.getBackend());
 
         // Generate unique config key for caching
         const configKey = JSON.stringify({
@@ -139,7 +140,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
 
         // Check if we already have a detector for this configuration
         if (detectorCache.has(configKey)) {
-          console.log(`Using cached object detector for ${model}`);
+          detectionLogger.debug(`Using cached object detector for ${model}`);
           try {
             const cachedDetector = await detectorCache.get(configKey);
             if (mounted && cachedDetector) {
@@ -149,13 +150,13 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
               return;
             }
           } catch (err) {
-            console.error("Error retrieving cached detector:", err);
+            detectionLogger.error("Error retrieving cached detector:", err);
             detectorCache.delete(configKey);
           }
         }
 
         // Load new detector
-        console.log(`Loading ${model} object detector...`);
+        detectionLogger.debug(`Loading ${model} object detector...`);
 
         const startTime = performance.now();
         let realDetector: any;
@@ -164,7 +165,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
         // Try to load YOLOv8 ONNX model first (if enabled)
         if (useYOLOv8) {
           try {
-            console.log('📦 Dynamically importing YOLOv8Detector...');
+            detectionLogger.debug('📦 Dynamically importing YOLOv8Detector...');
             // Dynamic import to code-split ONNX Runtime (~3-4MB)
             const { YOLOv8Detector } = await import("@/utils/yolov8-detector");
             
@@ -176,13 +177,13 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
             modelType = 'yolov8';
             
             const loadTime = performance.now() - startTime;
-            console.log(`✅ ${model} (YOLOv8 ONNX) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+            detectionLogger.debug(`✅ ${model} (YOLOv8 ONNX) loaded in ${(loadTime / 1000).toFixed(2)}s`);
           } catch (error) {
-            console.warn('⚠️ YOLOv8 model not found, falling back to COCO-SSD');
-            console.warn('📝 To use YOLOv8, export the model and place it in public/models/yolov8n.onnx');
-            console.warn('   See docs/EXPORT_YOLOV8.md for instructions');
+            detectionLogger.warn('⚠️ YOLOv8 model not found, falling back to COCO-SSD');
+            detectionLogger.warn('📝 To use YOLOv8, export the model and place it in public/models/yolov8n.onnx');
+            detectionLogger.warn('   See docs/EXPORT_YOLOV8.md for instructions');
             
-            console.log('📦 Dynamically importing COCO-SSD...');
+            detectionLogger.debug('📦 Dynamically importing COCO-SSD...');
             // Dynamic import to code-split COCO-SSD (~5MB)
             const cocoSsd = await import("@tensorflow-models/coco-ssd");
             
@@ -192,10 +193,10 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
             modelType = 'coco-ssd';
             
             const loadTime = performance.now() - startTime;
-            console.log(`✅ ${model} (COCO-SSD fallback) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+            detectionLogger.debug(`✅ ${model} (COCO-SSD fallback) loaded in ${(loadTime / 1000).toFixed(2)}s`);
           }
         } else {
-          console.log('📦 Dynamically importing COCO-SSD...');
+          detectionLogger.debug('📦 Dynamically importing COCO-SSD...');
           // Dynamic import to code-split COCO-SSD (~5MB)
           const cocoSsd = await import("@tensorflow-models/coco-ssd");
           
@@ -205,7 +206,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
           modelType = 'coco-ssd';
           
           const loadTime = performance.now() - startTime;
-          console.log(`✅ ${model} (COCO-SSD) loaded in ${(loadTime / 1000).toFixed(2)}s`);
+          detectionLogger.debug(`✅ ${model} (COCO-SSD) loaded in ${(loadTime / 1000).toFixed(2)}s`);
         }
         
         // Store model type with detector
@@ -220,7 +221,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
           setIsLoading(false);
         }
       } catch (err) {
-        console.error("Failed to initialize object detector:", err);
+        detectionLogger.error("Failed to initialize object detector:", err);
         if (mounted) {
           let errorMessage = "Failed to load object detection model.";
           if (err instanceof Error) {
@@ -312,7 +313,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
 
         return results;
       } catch (err) {
-        console.error("Object detection error:", err);
+        detectionLogger.error("Object detection error:", err);
         return [];
       }
     },
@@ -342,7 +343,7 @@ export function useObjectDetection(config: ObjectDetectionConfig = {}) {
             const objects = await detectObjects(videoElement);
             onObjects(objects);
           } catch (err) {
-            console.error("Detection error:", err);
+            detectionLogger.error("Detection error:", err);
           }
         }
 

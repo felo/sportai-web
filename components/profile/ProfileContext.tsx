@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { profileLogger } from "@/lib/logger";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type {
@@ -90,7 +91,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       ]);
       
       if (profileResult.error) {
-        console.error("Error fetching profile:", profileResult.error);
+        profileLogger.error("Error fetching profile:", profileResult.error);
         setError("Failed to load profile");
         // Create default empty profile structure
         setProfile({
@@ -154,7 +155,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (err) {
-      console.error("Error in fetchProfile:", err);
+      profileLogger.error("Error in fetchProfile:", err);
       setError("Failed to load profile");
     }
     
@@ -179,7 +180,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (updateError) {
-        console.error("Error updating profile:", updateError);
+        profileLogger.error("Error updating profile:", updateError);
         setError(updateError.message);
         setSaving(false);
         return false;
@@ -195,7 +196,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return true;
     } catch (err) {
-      console.error("Error in updatePlayerProfile:", err);
+      profileLogger.error("Error in updatePlayerProfile:", err);
       setError("Failed to update profile");
       setSaving(false);
       return false;
@@ -231,7 +232,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (addError) {
-        console.error("Error adding sport:", {
+        profileLogger.error("Error adding sport:", {
           message: addError.message,
           code: addError.code,
           details: addError.details,
@@ -259,7 +260,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return newSport as PlayerSport;
     } catch (err) {
-      console.error("Error in addSport:", err);
+      profileLogger.error("Error in addSport:", err);
       setError("Failed to add sport");
       setSaving(false);
       return null;
@@ -293,7 +294,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (updateError) {
-        console.error("Error updating sport:", updateError);
+        profileLogger.error("Error updating sport:", updateError);
         setError(updateError.message);
         setSaving(false);
         return null;
@@ -309,7 +310,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return updated as PlayerSport;
     } catch (err) {
-      console.error("Error in updateSport:", err);
+      profileLogger.error("Error in updateSport:", err);
       setError("Failed to update sport");
       setSaving(false);
       return null;
@@ -331,7 +332,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .eq("profile_id", user.id);
       
       if (deleteError) {
-        console.error("Error deleting sport:", deleteError);
+        profileLogger.error("Error deleting sport:", deleteError);
         setError(deleteError.message);
         setSaving(false);
         return false;
@@ -345,7 +346,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return true;
     } catch (err) {
-      console.error("Error in deleteSport:", err);
+      profileLogger.error("Error in deleteSport:", err);
       setError("Failed to delete sport");
       setSaving(false);
       return false;
@@ -379,7 +380,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (addError) {
-        console.error("Error adding equipment:", addError);
+        profileLogger.error("Error adding equipment:", addError);
         setError(addError.message);
         setSaving(false);
         return null;
@@ -395,7 +396,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return newEquipment as PlayerEquipment;
     } catch (err) {
-      console.error("Error in addEquipment:", err);
+      profileLogger.error("Error in addEquipment:", err);
       setError("Failed to add equipment");
       setSaving(false);
       return null;
@@ -429,7 +430,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (updateError) {
-        console.error("Error updating equipment:", updateError);
+        profileLogger.error("Error updating equipment:", updateError);
         setError(updateError.message);
         setSaving(false);
         return null;
@@ -445,7 +446,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return updated as PlayerEquipment;
     } catch (err) {
-      console.error("Error in updateEquipment:", err);
+      profileLogger.error("Error in updateEquipment:", err);
       setError("Failed to update equipment");
       setSaving(false);
       return null;
@@ -467,7 +468,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .eq("profile_id", user.id);
       
       if (deleteError) {
-        console.error("Error deleting equipment:", deleteError);
+        profileLogger.error("Error deleting equipment:", deleteError);
         setError(deleteError.message);
         setSaving(false);
         return false;
@@ -481,7 +482,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return true;
     } catch (err) {
-      console.error("Error in deleteEquipment:", err);
+      profileLogger.error("Error in deleteEquipment:", err);
       setError("Failed to delete equipment");
       setSaving(false);
       return false;
@@ -517,7 +518,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (upsertError) {
-        console.error("Error upserting coach profile:", upsertError);
+        profileLogger.error("Error upserting coach profile:", upsertError);
         setError(upsertError.message);
         setSaving(false);
         return null;
@@ -530,7 +531,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return coach as CoachProfile;
     } catch (err) {
-      console.error("Error in upsertCoachProfile:", err);
+      profileLogger.error("Error in upsertCoachProfile:", err);
       setError("Failed to update coach profile");
       setSaving(false);
       return null;
@@ -557,7 +558,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .eq("profile_id", user.id);
       
       if (deleteError) {
-        console.error("Error deleting coach profile:", deleteError);
+        profileLogger.error("Error deleting coach profile:", deleteError);
         setError(deleteError.message);
         setSaving(false);
         return false;
@@ -568,7 +569,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return true;
     } catch (err) {
-      console.error("Error in deleteCoachProfile:", err);
+      profileLogger.error("Error in deleteCoachProfile:", err);
       setError("Failed to delete coach profile");
       setSaving(false);
       return false;
@@ -602,7 +603,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (upsertError) {
-        console.error("Error upserting coach sport:", upsertError);
+        profileLogger.error("Error upserting coach sport:", upsertError);
         setError(upsertError.message);
         setSaving(false);
         return null;
@@ -628,7 +629,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return coachSport as CoachSport;
     } catch (err) {
-      console.error("Error in upsertCoachSport:", err);
+      profileLogger.error("Error in upsertCoachSport:", err);
       setError("Failed to update coach sport");
       setSaving(false);
       return null;
@@ -663,7 +664,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .single();
       
       if (upsertError) {
-        console.error("Error upserting business profile:", upsertError);
+        profileLogger.error("Error upserting business profile:", upsertError);
         setError(upsertError.message);
         setSaving(false);
         return null;
@@ -676,7 +677,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return business as BusinessProfile;
     } catch (err) {
-      console.error("Error in upsertBusinessProfile:", err);
+      profileLogger.error("Error in upsertBusinessProfile:", err);
       setError("Failed to update business profile");
       setSaving(false);
       return null;
@@ -697,7 +698,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .eq("profile_id", user.id);
       
       if (deleteError) {
-        console.error("Error deleting business profile:", deleteError);
+        profileLogger.error("Error deleting business profile:", deleteError);
         setError(deleteError.message);
         setSaving(false);
         return false;
@@ -708,7 +709,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return true;
     } catch (err) {
-      console.error("Error in deleteBusinessProfile:", err);
+      profileLogger.error("Error in deleteBusinessProfile:", err);
       setError("Failed to delete business profile");
       setSaving(false);
       return false;

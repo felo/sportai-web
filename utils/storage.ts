@@ -1,3 +1,4 @@
+import { storageLogger } from "@/lib/logger";
 import type { Message, Chat } from "@/types/chat";
 
 const STORAGE_KEY = "sportai-chat-messages";
@@ -40,7 +41,7 @@ export async function refreshVideoUrls(messages: Message[]): Promise<Message[]> 
     return messages;
   }
 
-  console.log(`[Storage] Refreshing ${messagesWithKeys.length} video URL(s) from S3 keys...`);
+  storageLogger.info(`Refreshing ${messagesWithKeys.length} video URL(s) from S3 keys...`);
 
   const refreshedMessages = await Promise.all(
     messages.map(async (msg) => {
@@ -60,14 +61,14 @@ export async function refreshVideoUrls(messages: Message[]): Promise<Message[]> 
 
           if (response.ok) {
             const { downloadUrl } = await response.json();
-            console.log(`[Storage] ✅ Refreshed video URL for key: ${msg.videoS3Key}`);
+            storageLogger.info(`Refreshed video URL for key: ${msg.videoS3Key}`);
             return { ...msg, videoUrl: downloadUrl };
           } else {
-            console.warn(`[Storage] ⚠️ Failed to refresh video URL for key: ${msg.videoS3Key}`);
+            storageLogger.warn(`Failed to refresh video URL for key: ${msg.videoS3Key}`);
             return msg;
           }
         } catch (error) {
-          console.error(`[Storage] ❌ Error refreshing video URL for key: ${msg.videoS3Key}`, error);
+          storageLogger.error(`Error refreshing video URL for key: ${msg.videoS3Key}`, error);
           return msg;
         }
       }
@@ -105,7 +106,7 @@ export async function loadMessagesFromStorage(): Promise<Message[]> {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
       } catch (error) {
         // If saving fails, continue with trimmed version in memory
-        console.warn("Failed to save trimmed messages back to storage:", error);
+        storageLogger.warn("Failed to save trimmed messages back to storage:", error);
       }
     }
     
@@ -118,7 +119,7 @@ export async function loadMessagesFromStorage(): Promise<Message[]> {
 
     return messages;
   } catch (error) {
-    console.error("Failed to load messages from storage:", error);
+    storageLogger.error("Failed to load messages from storage:", error);
     return [];
   }
 }
@@ -136,7 +137,7 @@ function trimMessages(
 
   // Keep only the most recent messages
   const trimmed = messages.slice(-MAX_MESSAGE_HISTORY);
-  console.info(
+  storageLogger.info(
     `Trimmed message history: kept ${trimmed.length} most recent messages (removed ${messages.length - trimmed.length} older messages)`
   );
   return trimmed;
@@ -180,7 +181,7 @@ export function saveMessagesToStorage(messages: Message[]): void {
       
       if (serializable.length > targetLimit) {
         serializable = serializable.slice(-targetLimit);
-        console.warn(
+        storageLogger.warn(
           `Storage size limit approaching. Trimmed to ${serializable.length} messages to stay under ${(MAX_STORAGE_SIZE_BYTES / 1024 / 1024).toFixed(1)}MB`
         );
       }
@@ -189,10 +190,10 @@ export function saveMessagesToStorage(messages: Message[]): void {
     const serialized = JSON.stringify(serializable);
     localStorage.setItem(STORAGE_KEY, serialized);
   } catch (error) {
-    console.error("Failed to save messages to storage:", error);
+    storageLogger.error("Failed to save messages to storage:", error);
     // Handle quota exceeded error gracefully
     if (error instanceof DOMException && error.name === "QuotaExceededError") {
-      console.warn("LocalStorage quota exceeded. Attempting to trim messages...");
+      storageLogger.warn("LocalStorage quota exceeded. Attempting to trim messages...");
       
       try {
         // Try to save with fewer messages
@@ -205,12 +206,12 @@ export function saveMessagesToStorage(messages: Message[]): void {
         
         const serialized = JSON.stringify(serializable);
         localStorage.setItem(STORAGE_KEY, serialized);
-        console.info(
+        storageLogger.info(
           `Successfully saved ${serializable.length} messages after trimming due to quota`
         );
       } catch (retryError) {
         // If still failing, clear storage as last resort
-        console.error("Failed to save even after trimming. Clearing storage.");
+        storageLogger.error("Failed to save even after trimming. Clearing storage.");
         try {
           localStorage.removeItem(STORAGE_KEY);
         } catch {
@@ -232,7 +233,7 @@ export function clearMessagesFromStorage(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
-    console.error("Failed to clear messages from storage:", error);
+    storageLogger.error("Failed to clear messages from storage:", error);
   }
 }
 
@@ -269,7 +270,7 @@ export function getDeveloperMode(): boolean {
     const stored = localStorage.getItem(DEVELOPER_MODE_KEY);
     return stored === "true";
   } catch (error) {
-    console.error("Failed to load developer mode from storage:", error);
+    storageLogger.error("Failed to load developer mode from storage:", error);
     return false;
   }
 }
@@ -286,7 +287,7 @@ export function setDeveloperMode(enabled: boolean): void {
   try {
     localStorage.setItem(DEVELOPER_MODE_KEY, enabled ? "true" : "false");
   } catch (error) {
-    console.error("Failed to save developer mode to storage:", error);
+    storageLogger.error("Failed to save developer mode to storage:", error);
   }
 }
 
@@ -328,7 +329,7 @@ export function getTheatreMode(): boolean {
     }
     return stored === "true";
   } catch (error) {
-    console.error("Failed to load theatre mode from storage:", error);
+    storageLogger.error("Failed to load theatre mode from storage:", error);
     return true;
   }
 }
@@ -345,7 +346,7 @@ export function setTheatreMode(enabled: boolean): void {
 
   // Prevent enabling theatre mode on short screens
   if (enabled && isShortScreen()) {
-    console.log("[Storage] Theatre mode cannot be enabled on short screens");
+    storageLogger.info("Theatre mode cannot be enabled on short screens");
     return;
   }
 
@@ -354,7 +355,7 @@ export function setTheatreMode(enabled: boolean): void {
     // Dispatch custom event to notify components of theatre mode changes
     window.dispatchEvent(new CustomEvent("theatre-mode-change"));
   } catch (error) {
-    console.error("Failed to save theatre mode to storage:", error);
+    storageLogger.error("Failed to save theatre mode to storage:", error);
   }
 }
 
@@ -476,7 +477,7 @@ export function getThinkingMode(): ThinkingMode {
     const stored = localStorage.getItem(THINKING_MODE_KEY);
     return (stored === "deep" || stored === "fast") ? stored : "fast";
   } catch (error) {
-    console.error("Failed to load thinking mode from storage:", error);
+    storageLogger.error("Failed to load thinking mode from storage:", error);
     return "fast";
   }
 }
@@ -494,7 +495,7 @@ export function setThinkingMode(mode: ThinkingMode): void {
   try {
     localStorage.setItem(THINKING_MODE_KEY, mode);
   } catch (error) {
-    console.error("Failed to save thinking mode to storage:", error);
+    storageLogger.error("Failed to save thinking mode to storage:", error);
   }
 }
 
@@ -512,7 +513,7 @@ export function getMediaResolution(): MediaResolution {
     const stored = localStorage.getItem(MEDIA_RESOLUTION_KEY);
     return (stored === "low" || stored === "medium" || stored === "high") ? stored : "medium";
   } catch (error) {
-    console.error("Failed to load media resolution from storage:", error);
+    storageLogger.error("Failed to load media resolution from storage:", error);
     return "medium";
   }
 }
@@ -530,7 +531,7 @@ export function setMediaResolution(resolution: MediaResolution): void {
   try {
     localStorage.setItem(MEDIA_RESOLUTION_KEY, resolution);
   } catch (error) {
-    console.error("Failed to save media resolution to storage:", error);
+    storageLogger.error("Failed to save media resolution to storage:", error);
   }
 }
 
@@ -550,7 +551,7 @@ export function getDomainExpertise(): DomainExpertise {
       ? stored 
       : "all-sports";
   } catch (error) {
-    console.error("Failed to load domain expertise from storage:", error);
+    storageLogger.error("Failed to load domain expertise from storage:", error);
     return "all-sports";
   }
 }
@@ -568,7 +569,7 @@ export function setDomainExpertise(expertise: DomainExpertise): void {
   try {
     localStorage.setItem(DOMAIN_EXPERTISE_KEY, expertise);
   } catch (error) {
-    console.error("Failed to save domain expertise to storage:", error);
+    storageLogger.error("Failed to save domain expertise to storage:", error);
   }
 }
 
@@ -645,7 +646,7 @@ export async function generateAIChatTitle(messages: Message[]): Promise<string> 
       // Ensure title is reasonable length (fallback if AI generates something too long)
       return title.length > 60 ? title.slice(0, 57) + "..." : title;
     } catch (error) {
-      console.error("Failed to generate AI title:", error);
+      storageLogger.error("Failed to generate AI title:", error);
       // Fallback to text-based title generation
       return generateChatTitle(messages);
     }
@@ -736,7 +737,7 @@ export function loadChatsFromStorage(): Chat[] {
     const parsed = JSON.parse(stored) as SerializableChat[];
     return parsed.map(deserializeChat).sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
-    console.error("Failed to load chats from storage:", error);
+    storageLogger.error("Failed to load chats from storage:", error);
     return [];
   }
 }
@@ -754,10 +755,10 @@ export function saveChatsToStorage(chats: Chat[]): void {
     const serializable = chats.map(serializeChat);
     localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(serializable));
   } catch (error) {
-    console.error("Failed to save chats to storage:", error);
+    storageLogger.error("Failed to save chats to storage:", error);
     // Handle quota exceeded error gracefully
     if (error instanceof DOMException && error.name === "QuotaExceededError") {
-      console.warn("LocalStorage quota exceeded. Attempting to trim chats...");
+      storageLogger.warn("LocalStorage quota exceeded. Attempting to trim chats...");
       try {
         // Keep only the most recent chats (limit to 50)
         const trimmed = chats
@@ -765,9 +766,9 @@ export function saveChatsToStorage(chats: Chat[]): void {
           .slice(0, 50)
           .map(serializeChat);
         localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(trimmed));
-        console.info(`Successfully saved ${trimmed.length} chats after trimming due to quota`);
+        storageLogger.info(`Successfully saved ${trimmed.length} chats after trimming due to quota`);
       } catch (retryError) {
-        console.error("Failed to save even after trimming:", retryError);
+        storageLogger.error("Failed to save even after trimming:", retryError);
       }
     }
   }
@@ -825,7 +826,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
   const index = chats.findIndex((chat) => chat.id === chatId);
 
   if (index === -1) {
-    console.warn(`Chat with id ${chatId} not found`);
+    storageLogger.warn(`Chat with id ${chatId} not found`);
     return;
   }
 
@@ -861,7 +862,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
     ...(updates.messages && { messages: updates.messages }),
   };
   
-  console.log(`[Storage] Updating chat ${chatId}:`, {
+  storageLogger.debug(`Updating chat ${chatId}:`, {
     oldTitle: chats[index].title,
     newTitle: newTitle,
     updatesTitle: updates.title,
@@ -874,7 +875,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
   // Verify it was saved correctly
   const verifyChats = loadChatsFromStorage();
   const verifyChat = verifyChats.find(c => c.id === chatId);
-  console.log(`[Storage] Verification - saved title: "${verifyChat?.title}"`);
+  storageLogger.debug(`Verification - saved title: "${verifyChat?.title}"`);
 
   // Dispatch custom event to notify components of chat update (unless silent)
   if (!silent && typeof window !== "undefined") {
@@ -936,7 +937,7 @@ export function getCurrentChatId(): string | undefined {
     const stored = localStorage.getItem(CURRENT_CHAT_ID_KEY);
     return stored || undefined;
   } catch (error) {
-    console.error("Failed to load current chat ID from storage:", error);
+    storageLogger.error("Failed to load current chat ID from storage:", error);
     return undefined;
   }
 }
@@ -959,7 +960,7 @@ export function setCurrentChatId(chatId: string | undefined): void {
     // Dispatch custom event to notify components of current chat change
     window.dispatchEvent(new Event("chat-storage-change"));
   } catch (error) {
-    console.error("Failed to save current chat ID to storage:", error);
+    storageLogger.error("Failed to save current chat ID to storage:", error);
   }
 }
 
@@ -975,7 +976,7 @@ export function clearChatsFromStorage(): void {
     localStorage.removeItem(CHATS_STORAGE_KEY);
     localStorage.removeItem(CURRENT_CHAT_ID_KEY);
   } catch (error) {
-    console.error("Failed to clear chats from storage:", error);
+    storageLogger.error("Failed to clear chats from storage:", error);
   }
 }
 
@@ -998,12 +999,12 @@ export function clearUserDataFromStorage(): void {
     localStorage.removeItem("sportai-migration-completed");
     localStorage.removeItem("sportai-migration-prompt-dismissed");
     
-    console.log("[Storage] Cleared all user data on sign out");
+    storageLogger.info("Cleared all user data on sign out");
     
     // Dispatch event to notify components
     window.dispatchEvent(new Event("chat-storage-change"));
   } catch (error) {
-    console.error("Failed to clear user data from storage:", error);
+    storageLogger.error("Failed to clear user data from storage:", error);
   }
 }
 
@@ -1034,7 +1035,7 @@ export function getHighlightingPreferences(): HighlightingPreferences {
     }
     return JSON.parse(stored);
   } catch (error) {
-    console.error("Failed to load highlighting preferences from storage:", error);
+    storageLogger.error("Failed to load highlighting preferences from storage:", error);
     return {
       terminology: true,
       technique: true,
@@ -1058,7 +1059,7 @@ export function setHighlightingPreferences(preferences: HighlightingPreferences)
     // Dispatch custom event to notify components of highlighting preference changes
     window.dispatchEvent(new CustomEvent("highlighting-preferences-change"));
   } catch (error) {
-    console.error("Failed to save highlighting preferences to storage:", error);
+    storageLogger.error("Failed to save highlighting preferences to storage:", error);
   }
 }
 
@@ -1116,7 +1117,7 @@ export function getTTSSettings(): TTSSettings {
       pitch: parsed.pitch ?? 0.0,
     };
   } catch (error) {
-    console.error("Failed to load TTS settings from storage:", error);
+    storageLogger.error("Failed to load TTS settings from storage:", error);
     return {
       enabled: false,
       quality: "studio",
@@ -1142,7 +1143,7 @@ export function setTTSSettings(settings: TTSSettings): void {
     // Dispatch custom event to notify components of TTS settings changes
     window.dispatchEvent(new CustomEvent("tts-settings-change"));
   } catch (error) {
-    console.error("Failed to save TTS settings to storage:", error);
+    storageLogger.error("Failed to save TTS settings to storage:", error);
   }
 }
 

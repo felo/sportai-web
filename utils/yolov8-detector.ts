@@ -4,6 +4,7 @@
  */
 
 import * as ort from 'onnxruntime-web';
+import { detectionLogger } from "@/lib/logger";
 
 export interface YOLOv8Detection {
   bbox: {
@@ -40,7 +41,7 @@ export class YOLOv8Detector {
    */
   async load(modelPath: string): Promise<void> {
     try {
-      console.log('🔧 Loading YOLOv8 ONNX model from:', modelPath);
+      detectionLogger.debug('🔧 Loading YOLOv8 ONNX model from:', modelPath);
       const startTime = performance.now();
 
       // Configure ONNX Runtime to use WebGL for GPU acceleration
@@ -50,13 +51,13 @@ export class YOLOv8Detector {
       });
 
       const loadTime = performance.now() - startTime;
-      console.log(`✅ YOLOv8 model loaded in ${(loadTime / 1000).toFixed(2)}s`);
-      console.log('📊 Model inputs:', this.session.inputNames);
-      console.log('📊 Model outputs:', this.session.outputNames);
+      detectionLogger.debug(`✅ YOLOv8 model loaded in ${(loadTime / 1000).toFixed(2)}s`);
+      detectionLogger.debug('📊 Model inputs:', this.session.inputNames);
+      detectionLogger.debug('📊 Model outputs:', this.session.outputNames);
       
       this.modelLoaded = true;
     } catch (error) {
-      console.error('❌ Failed to load YOLOv8 model:', error);
+      detectionLogger.error('❌ Failed to load YOLOv8 model:', error);
       throw new Error(`Failed to load YOLOv8 model: ${error}`);
     }
   }
@@ -106,7 +107,7 @@ export class YOLOv8Detector {
 
       return detections;
     } catch (error) {
-      console.error('Error during YOLOv8 detection:', error);
+      detectionLogger.error('Error during YOLOv8 detection:', error);
       return [];
     }
   }
@@ -309,7 +310,7 @@ export class YOLOv8Detector {
       // ONNX Runtime doesn't have explicit dispose in web version
       this.session = null;
       this.modelLoaded = false;
-      console.log('🗑️ YOLOv8 model disposed');
+      detectionLogger.debug('🗑️ YOLOv8 model disposed');
     }
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { logger } from "@/lib/logger";
+import { analysisLogger } from "@/lib/logger";
 import type {
   AnalysisType,
   CourtAnalysisResult,
@@ -158,13 +158,13 @@ async function analyzeCourtDetection(
   requestId: string,
   sport?: string
 ): Promise<CourtAnalysisResult> {
-  console.log(`\n🎾 [${requestId}] ========== COURT DETECTION START ==========`);
-  console.log(`🎾 [${requestId}] Model: ${PRO_MODEL}`);
-  console.log(`🎾 [${requestId}] Sport context: ${sport || "none"}`);
-  console.log(`🎾 [${requestId}] Image size: ${(base64Image.length * 0.75 / 1024).toFixed(1)}KB`);
+  analysisLogger.debug(`[${requestId}] Court detection start`, {
+    model: PRO_MODEL,
+    sport: sport || "none",
+    imageSize: `${(base64Image.length * 0.75 / 1024).toFixed(1)}KB`,
+  });
   
   const prompt = getCourtDetectionPrompt(sport);
-  console.log(`🎾 [${requestId}] Prompt:\n${prompt.substring(0, 200)}...`);
   
   const model = getGenAI().getGenerativeModel({
     model: PRO_MODEL,
@@ -176,7 +176,6 @@ async function analyzeCourtDetection(
     },
   });
 
-  console.log(`🎾 [${requestId}] Calling Gemini API...`);
   const apiStartTime = Date.now();
   
   const result = await model.generateContent([
@@ -190,31 +189,19 @@ async function analyzeCourtDetection(
   ]);
 
   const apiDuration = Date.now() - apiStartTime;
-  console.log(`🎾 [${requestId}] Gemini API responded in ${apiDuration}ms`);
+  analysisLogger.debug(`[${requestId}] Gemini API responded in ${apiDuration}ms`);
 
   const response = result.response;
   const responseText = response.text();
-  
-  console.log(`🎾 [${requestId}] Raw response:\n${responseText}`);
 
   try {
     const parsed = JSON.parse(responseText);
     
-    console.log(`🎾 [${requestId}] ========== PARSED RESULT ==========`);
-    console.log(`🎾 [${requestId}] Found: ${parsed.found}`);
-    console.log(`🎾 [${requestId}] Court Type: ${parsed.courtType}`);
-    console.log(`🎾 [${requestId}] Confidence: ${(parsed.confidence * 100).toFixed(1)}%`);
-    if (parsed.corners) {
-      console.log(`🎾 [${requestId}] Corners:`);
-      console.log(`   topLeft:     (${parsed.corners.topLeft?.x?.toFixed(3)}, ${parsed.corners.topLeft?.y?.toFixed(3)})`);
-      console.log(`   topRight:    (${parsed.corners.topRight?.x?.toFixed(3)}, ${parsed.corners.topRight?.y?.toFixed(3)})`);
-      console.log(`   bottomLeft:  (${parsed.corners.bottomLeft?.x?.toFixed(3)}, ${parsed.corners.bottomLeft?.y?.toFixed(3)})`);
-      console.log(`   bottomRight: (${parsed.corners.bottomRight?.x?.toFixed(3)}, ${parsed.corners.bottomRight?.y?.toFixed(3)})`);
-    }
-    if (parsed.boundingBox) {
-      console.log(`🎾 [${requestId}] Bounding Box: x=${parsed.boundingBox.x?.toFixed(3)}, y=${parsed.boundingBox.y?.toFixed(3)}, w=${parsed.boundingBox.width?.toFixed(3)}, h=${parsed.boundingBox.height?.toFixed(3)}`);
-    }
-    console.log(`🎾 [${requestId}] ========== COURT DETECTION END ==========\n`);
+    analysisLogger.debug(`[${requestId}] Court detection result`, {
+      found: parsed.found,
+      courtType: parsed.courtType,
+      confidence: `${(parsed.confidence * 100).toFixed(1)}%`,
+    });
     
     return {
       type: "court",
@@ -225,8 +212,7 @@ async function analyzeCourtDetection(
       confidence: parsed.confidence ?? 0,
     };
   } catch (parseError) {
-    console.error(`🎾 [${requestId}] ❌ Failed to parse response:`, parseError);
-    console.error(`🎾 [${requestId}] Raw text was: ${responseText}`);
+    analysisLogger.error(`[${requestId}] Failed to parse response:`, parseError);
     return {
       type: "court",
       found: false,
@@ -241,9 +227,10 @@ async function analyzeCameraAngle(
   mimeType: string,
   requestId: string
 ): Promise<CameraAngleResult> {
-  console.log(`\n📷 [${requestId}] ========== CAMERA ANGLE DETECTION START ==========`);
-  console.log(`📷 [${requestId}] Model: ${PRO_MODEL}`);
-  console.log(`📷 [${requestId}] Image size: ${(base64Image.length * 0.75 / 1024).toFixed(1)}KB`);
+  analysisLogger.debug(`[${requestId}] Camera angle detection start`, {
+    model: PRO_MODEL,
+    imageSize: `${(base64Image.length * 0.75 / 1024).toFixed(1)}KB`,
+  });
   
   const model = getGenAI().getGenerativeModel({
     model: PRO_MODEL,
@@ -255,7 +242,6 @@ async function analyzeCameraAngle(
     },
   });
 
-  console.log(`📷 [${requestId}] Calling Gemini API...`);
   const apiStartTime = Date.now();
 
   const result = await model.generateContent([
@@ -269,21 +255,19 @@ async function analyzeCameraAngle(
   ]);
 
   const apiDuration = Date.now() - apiStartTime;
-  console.log(`📷 [${requestId}] Gemini API responded in ${apiDuration}ms`);
+  analysisLogger.debug(`[${requestId}] Gemini API responded in ${apiDuration}ms`);
 
   const response = result.response;
   const responseText = response.text();
-  
-  console.log(`📷 [${requestId}] Raw response:\n${responseText}`);
 
   try {
     const parsed = JSON.parse(responseText);
     
-    console.log(`📷 [${requestId}] ========== PARSED RESULT ==========`);
-    console.log(`📷 [${requestId}] Angle: ${parsed.angle}`);
-    console.log(`📷 [${requestId}] Confidence: ${(parsed.confidence * 100).toFixed(1)}%`);
-    console.log(`📷 [${requestId}] Description: ${parsed.description || "none"}`);
-    console.log(`📷 [${requestId}] ========== CAMERA ANGLE DETECTION END ==========\n`);
+    analysisLogger.debug(`[${requestId}] Camera angle result`, {
+      angle: parsed.angle,
+      confidence: `${(parsed.confidence * 100).toFixed(1)}%`,
+      description: parsed.description || "none",
+    });
     
     return {
       type: "camera-angle",
@@ -292,8 +276,7 @@ async function analyzeCameraAngle(
       description: parsed.description,
     };
   } catch (parseError) {
-    console.error(`📷 [${requestId}] ❌ Failed to parse response:`, parseError);
-    console.error(`📷 [${requestId}] Raw text was: ${responseText}`);
+    analysisLogger.error(`[${requestId}] Failed to parse response:`, parseError);
     return {
       type: "camera-angle",
       angle: "other",
@@ -323,23 +306,21 @@ export async function POST(request: NextRequest) {
   const requestId = `frame_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
   
-  console.log(`\n🔍 ============================================================`);
-  console.log(`🔍 [${requestId}] FRAME ANALYSIS REQUEST RECEIVED`);
-  console.log(`🔍 ============================================================`);
-  
   try {
     const formData = await request.formData();
     const imageFile = formData.get("image") as File | null;
     const analysisType = formData.get("analysisType") as AnalysisType | null;
     const sport = formData.get("sport") as string | null;
     
-    console.log(`🔍 [${requestId}] Analysis type: ${analysisType}`);
-    console.log(`🔍 [${requestId}] Sport hint: ${sport || "none"}`);
-    console.log(`🔍 [${requestId}] Image file: ${imageFile ? `${imageFile.name} (${imageFile.type}, ${(imageFile.size / 1024).toFixed(1)}KB)` : "MISSING"}`);
+    analysisLogger.debug(`[${requestId}] Frame analysis request`, {
+      analysisType,
+      sport: sport || "none",
+      imageFile: imageFile ? `${imageFile.name} (${imageFile.type}, ${(imageFile.size / 1024).toFixed(1)}KB)` : "MISSING",
+    });
     
     // Validate inputs
     if (!imageFile) {
-      console.error(`🔍 [${requestId}] ❌ No image provided`);
+      analysisLogger.error(`[${requestId}] No image provided`);
       return NextResponse.json(
         { success: false, error: "Image is required" },
         { status: 400 }
@@ -347,7 +328,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!imageFile.type.startsWith("image/")) {
-      console.error(`🔍 [${requestId}] ❌ Invalid file type: ${imageFile.type}`);
+      analysisLogger.error(`[${requestId}] Invalid file type: ${imageFile.type}`);
       return NextResponse.json(
         { success: false, error: "File must be an image" },
         { status: 400 }
@@ -355,7 +336,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!analysisType || !["court", "camera-angle"].includes(analysisType)) {
-      console.error(`🔍 [${requestId}] ❌ Invalid analysis type: ${analysisType}`);
+      analysisLogger.error(`[${requestId}] Invalid analysis type: ${analysisType}`);
       return NextResponse.json(
         { success: false, error: "Valid analysisType is required (court, camera-angle)" },
         { status: 400 }
@@ -363,11 +344,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Convert image to base64
-    console.log(`🔍 [${requestId}] Converting image to base64...`);
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString("base64");
-    console.log(`🔍 [${requestId}] Base64 length: ${base64Image.length} chars (~${(base64Image.length * 0.75 / 1024).toFixed(1)}KB)`);
     
     // Dispatch to appropriate handler
     let result: FrameAnalysisResult;
@@ -388,11 +367,10 @@ export async function POST(request: NextRequest) {
     
     const processingTimeMs = Date.now() - startTime;
     
-    console.log(`🔍 [${requestId}] ============================================================`);
-    console.log(`🔍 [${requestId}] ✅ FRAME ANALYSIS COMPLETE`);
-    console.log(`🔍 [${requestId}] Total time: ${processingTimeMs}ms`);
-    console.log(`🔍 [${requestId}] Result: ${JSON.stringify(result, null, 2)}`);
-    console.log(`🔍 ============================================================\n`);
+    analysisLogger.debug(`[${requestId}] Frame analysis complete`, {
+      processingTimeMs,
+      resultType: result.type,
+    });
     
     return NextResponse.json({
       success: true,
@@ -402,8 +380,7 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     const processingTimeMs = Date.now() - startTime;
-    console.error(`🔍 [${requestId}] ❌ FRAME ANALYSIS FAILED after ${processingTimeMs}ms`);
-    console.error(`🔍 [${requestId}] Error:`, error);
+    analysisLogger.error(`[${requestId}] Frame analysis failed after ${processingTimeMs}ms:`, error);
     
     return NextResponse.json(
       { 

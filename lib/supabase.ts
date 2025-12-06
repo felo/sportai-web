@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { authLogger } from "@/lib/logger";
 import type { Database } from "@/types/supabase";
 
 // Get Supabase credentials from environment variables
@@ -32,7 +33,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 export async function getSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error) {
-    console.error("Error getting session:", error);
+    authLogger.error("Error getting session:", error);
     return null;
   }
   return data.session;
@@ -46,7 +47,7 @@ export async function getUser() {
   if (error) {
     // Suppress "Auth session missing" error - it's expected when not logged in
     if (error.message !== "Auth session missing!") {
-      console.error("Error getting user:", error);
+      authLogger.error("Error getting user:", error);
     }
     return null;
   }
@@ -66,7 +67,7 @@ export async function signInWithOAuth(provider: "google" | "apple") {
   });
   
   if (error) {
-    console.error(`Error signing in with ${provider}:`, error);
+    authLogger.error(`Error signing in with ${provider}:`, error);
     throw error;
   }
   
@@ -79,7 +80,7 @@ export async function signInWithOAuth(provider: "google" | "apple") {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) {
-    console.error("Error signing out:", error);
+    authLogger.error("Error signing out:", error);
     throw error;
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { videoLogger } from "@/lib/logger";
 import type { ThumbnailCrop } from "./types";
 
 /**
@@ -111,11 +112,11 @@ export function usePlayerPortraits(
             newPortraits[playerId] = dataUrl;
           } catch (corsError) {
             // Canvas is tainted by cross-origin video - silently skip
-            console.warn(`CORS blocked portrait extraction for player ${playerId}`);
+            videoLogger.warn(`CORS blocked portrait extraction for player ${playerId}`);
             break; // Exit loop, no point trying other players
           }
         } catch (error) {
-          console.error(`Failed to extract portrait for player ${playerId}:`, error);
+          videoLogger.error(`Failed to extract portrait for player ${playerId}:`, error);
         }
       }
 

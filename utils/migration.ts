@@ -1,3 +1,4 @@
+import { storageLogger } from "@/lib/logger";
 import { loadChatsFromStorage } from "./storage";
 import { saveChatsToSupabase, loadChatsFromSupabase } from "./storage-supabase";
 import { supabase } from "@/lib/supabase";
@@ -22,7 +23,7 @@ async function waitForProfile(
 ): Promise<boolean> {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      console.log(`[Migration] Checking for profile (attempt ${i + 1}/${maxRetries})...`);
+      storageLogger.debug(`[Migration] Checking for profile (attempt ${i + 1}/${maxRetries})...`);
       
       const { data, error } = await supabase
         .from("profiles")
@@ -31,29 +32,29 @@ async function waitForProfile(
         .single();
 
       if (data && !error) {
-        console.log("[Migration] Profile found, ready to migrate");
+        storageLogger.debug("[Migration] Profile found, ready to migrate");
         return true;
       }
 
       // If profile not found, wait and retry
       if (error?.code === "PGRST116") {
-        console.log(`[Migration] Profile not found yet, retrying in ${delayMs}ms...`);
+        storageLogger.debug(`[Migration] Profile not found yet, retrying in ${delayMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
         continue;
       }
 
       // Other errors
       if (error) {
-        console.error("[Migration] Error checking for profile:", error);
+        storageLogger.error("[Migration] Error checking for profile:", error);
         return false;
       }
     } catch (error) {
-      console.error("[Migration] Exception checking for profile:", error);
+      storageLogger.error("[Migration] Exception checking for profile:", error);
       return false;
     }
   }
 
-  console.error("[Migration] Profile not found after", maxRetries, "attempts");
+  storageLogger.error("[Migration] Profile not found after", maxRetries, "attempts");
   return false;
 }
 
@@ -86,7 +87,7 @@ export async function syncLocalToSupabase(
   try {
     // First, ensure the user's profile exists in the database
     // This is required because chats table has a foreign key to profiles
-    console.log("[Migration] Waiting for user profile to be created...");
+    storageLogger.debug("[Migration] Waiting for user profile to be created...");
     const profileExists = await waitForProfile(userId);
     
     if (!profileExists) {
@@ -137,7 +138,7 @@ export async function syncLocalToSupabase(
           onProgress?.(status);
         }
       } catch (error) {
-        console.error(`Failed to migrate chat ${chat.id}:`, error);
+        storageLogger.error(`Failed to migrate chat ${chat.id}:`, error);
         // Continue with other chats
       }
     }
@@ -147,7 +148,7 @@ export async function syncLocalToSupabase(
     onProgress?.(status);
     return status;
   } catch (error) {
-    console.error("Migration failed:", error);
+    storageLogger.error("Migration failed:", error);
     status.status = "error";
     status.error = error instanceof Error ? error.message : "Unknown error occurred";
     onProgress?.(status);
@@ -180,7 +181,7 @@ export async function mergeChats(userId: string): Promise<Chat[]> {
     // Return sorted by updatedAt
     return Array.from(chatMap.values()).sort((a, b) => b.updatedAt - a.updatedAt);
   } catch (error) {
-    console.error("Failed to merge chats:", error);
+    storageLogger.error("Failed to merge chats:", error);
     // Fallback to local chats
     return loadChatsFromStorage();
   }
@@ -210,7 +211,7 @@ export function setMigrationCompleted(completed: boolean): void {
       localStorage.removeItem(MIGRATION_COMPLETED_KEY);
     }
   } catch (error) {
-    console.error("Failed to set migration completed flag:", error);
+    storageLogger.error("Failed to set migration completed flag:", error);
   }
 }
 
@@ -238,7 +239,7 @@ export function setMigrationPromptDismissed(dismissed: boolean): void {
       localStorage.removeItem(MIGRATION_PROMPT_DISMISSED_KEY);
     }
   } catch (error) {
-    console.error("Failed to set migration prompt dismissed flag:", error);
+    storageLogger.error("Failed to set migration prompt dismissed flag:", error);
   }
 }
 

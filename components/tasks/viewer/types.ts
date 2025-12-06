@@ -134,6 +134,17 @@ export interface StatisticsResult {
   // Player thumbnail crops - keyed by player_id (as string)
   // Each player has up to 5 best thumbnail frames with 4 crop size variants
   thumbnail_crops?: Record<string, ThumbnailCrop[]>;
+  // Debug data containing court detection info
+  debug_data?: {
+    court_keypoints?: ([number, number] | [null, null])[];
+    video_info?: {
+      width: number;
+      height: number;
+      fps: number;
+      end_time: number;
+      total_frames: number;
+    };
+  };
 }
 
 export interface SwingWithPlayer extends Swing {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
+import { detectionLogger } from "@/lib/logger";
 import { BallTracker } from "@/utils/ball-tracker";
 import type { ProjectileModelType, BallType, ProjectileDetectionResult } from "@/types/detection";
 import type { ObjectDetectionResult } from "@/types/detection";
@@ -61,14 +62,14 @@ export function useProjectileDetection(config: ProjectileDetectionConfig = {}) {
 
     // If using YOLO detections, we don't need a separate model
     if (useYOLODetections) {
-      console.log("✅ Ball tracking using YOLOv8 detections + smart tracking");
+      detectionLogger.debug("✅ Ball tracking using YOLOv8 detections + smart tracking");
       setDetector({ type: 'yolo-based' }); // Placeholder to indicate ready
       setIsLoading(false);
       return;
     }
 
     // Otherwise, would load TrackNet model (not implemented)
-    console.warn("⚠️ Standalone TrackNet model not implemented. Using YOLO-based detection.");
+    detectionLogger.warn("⚠️ Standalone TrackNet model not implemented. Using YOLO-based detection.");
     setDetector({ type: 'yolo-based' });
     setIsLoading(false);
   }, [model, ballType, enabled, useYOLODetections]);
@@ -121,7 +122,7 @@ export function useProjectileDetection(config: ProjectileDetectionConfig = {}) {
         currentFrameRef.current = currentFrame;
         return result;
       } catch (err) {
-        console.error("Projectile detection error:", err);
+        detectionLogger.error("Projectile detection error:", err);
         return null;
       }
     },

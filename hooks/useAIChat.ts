@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { chatLogger } from "@/lib/logger";
 import type { Message, ProgressStage } from "@/types/chat";
 import {
   loadMessagesFromStorage,
@@ -31,14 +32,14 @@ function markIncompleteMessages(messages: Message[]): Message[] {
       
       // Message was streaming when interrupted (isStreaming=true but we're loading from storage)
       if (msg.isStreaming) {
-        console.log("[useAIChat] Detected interrupted streaming message:", msg.id);
+        chatLogger.debug("Detected interrupted streaming message:", msg.id);
         return { ...msg, isStreaming: false, isIncomplete: true };
       }
       
       // Message is the last one, has no content, and no streaming flag
       // This means it failed before any response was generated
       if (index === messages.length - 1 && !msg.content.trim() && msg.isStreaming === undefined) {
-        console.log("[useAIChat] Detected empty assistant message at end:", msg.id);
+        chatLogger.debug("Detected empty assistant message at end:", msg.id);
         return { ...msg, isIncomplete: true };
       }
     }
@@ -81,7 +82,7 @@ export function useAIChat() {
         if (messagesToLoad.length === 0) {
           if (currentChatId) {
             // New/empty chat - start with empty messages
-            console.log("[useAIChat] Empty chat, starting fresh");
+            chatLogger.debug("Empty chat, starting fresh");
             setMessages([]);
             setIsHydrated(true);
           } else {
@@ -96,7 +97,7 @@ export function useAIChat() {
                 // Save refreshed URLs back to storage
                 saveMessagesToStorage(refreshed);
               }).catch((error) => {
-                console.error("Failed to refresh video URLs:", error);
+                chatLogger.error("Failed to refresh video URLs:", error);
               });
             });
           }
@@ -112,7 +113,7 @@ export function useAIChat() {
                 updateExistingChat(currentChatId, { messages: refreshed }, true);
               }
             }).catch((error) => {
-              console.error("Failed to refresh video URLs:", error);
+              chatLogger.error("Failed to refresh video URLs:", error);
             });
         }
       })();
@@ -145,7 +146,7 @@ export function useAIChat() {
       const currentMessages = messagesRef.current;
       const isLoading = loadingRef.current;
       
-      console.log("[useAIChat] ===== CHAT CHANGE HANDLER =====", {
+      chatLogger.debug("Chat change handler", {
         currentChatId,
         activeChatId: activeChatIdRef.current,
         isSwitchingToDifferentChat,
@@ -155,7 +156,7 @@ export function useAIChat() {
       
       // If this is the same chat we're already on, don't reload
       if (!isSwitchingToDifferentChat && currentChatId) {
-        console.log("[useAIChat] Same chat, skipping reload", {
+        chatLogger.debug("Same chat, skipping reload", {
           chatId: currentChatId,
           messageCount: currentMessages.length,
         });
@@ -170,7 +171,7 @@ export function useAIChat() {
         // Only keep messages if the new chat is empty AND we're actively submitting
         // This prevents losing messages mid-submission
         if (chat && chat.messages.length === 0 && currentMessages.length > 0) {
-          console.log("[useAIChat] ⚠️ Switching to empty chat during submission - KEEPING STATE MESSAGES", {
+          chatLogger.debug("Switching to empty chat during submission - KEEPING STATE MESSAGES", {
             chatId: currentChatId,
             chatMessages: chat.messages.length,
             stateMessages: currentMessages.length,
@@ -184,7 +185,7 @@ export function useAIChat() {
       
       // Don't interfere if we're already loading AND not switching chats
       if (isLoading && !isSwitchingToDifferentChat) {
-        console.log("[useAIChat] Ignoring chat change during active loading (same chat)", {
+        chatLogger.debug("Ignoring chat change during active loading (same chat)", {
           currentChatId,
           activeChatId: activeChatIdRef.current,
         });
@@ -204,7 +205,7 @@ export function useAIChat() {
       if (currentChatId) {
         const chat = await loadChat(currentChatId);
         if (chat) {
-          console.log("[useAIChat] Loading messages from chat:", {
+          chatLogger.debug("Loading messages from chat:", {
             chatId: currentChatId,
             messageCount: chat.messages.length,
             currentMessages: currentMessages.length,
@@ -212,7 +213,7 @@ export function useAIChat() {
           
           // If chat is empty, clear messages immediately (before async operations)
           if (chat.messages.length === 0) {
-            console.log("[useAIChat] Chat is empty, clearing messages immediately");
+            chatLogger.debug("Chat is empty, clearing messages immediately");
             setMessages([]);
             clearMessagesFromStorage();
           } else {
@@ -221,19 +222,19 @@ export function useAIChat() {
             // Load messages from the selected chat
             const refreshed = await refreshVideoUrls(markedMessages);
             setMessages(refreshed);
-            console.log("[useAIChat] Messages loaded:", refreshed.length);
+            chatLogger.debug("Messages loaded:", refreshed.length);
             // Update chat with refreshed URLs and incomplete flags (silent to prevent event loop)
             updateExistingChat(currentChatId, { messages: refreshed }, true);
           }
         } else {
           // Chat not found, clear messages
-          console.log("[useAIChat] Chat not found, clearing messages");
+          chatLogger.debug("Chat not found, clearing messages");
           setMessages([]);
           clearMessagesFromStorage();
         }
       } else {
         // No current chat, try old storage for backward compatibility
-        console.log("[useAIChat] No current chat, loading from old storage");
+        chatLogger.debug("No current chat, loading from old storage");
         const storedMessages = await loadMessagesFromStorage();
         if (storedMessages.length > 0) {
           const refreshed = await refreshVideoUrls(storedMessages);
@@ -258,7 +259,7 @@ export function useAIChat() {
 
   // Save messages to localStorage and update chat whenever they change (but only after hydration)
   useEffect(() => {
-    console.log("[useAIChat] ===== MESSAGES CHANGED EFFECT =====", {
+    chatLogger.debug("Messages changed effect", {
       isHydrated,
       isSwitchingChat: isSwitchingChatRef.current,
       messagesCount: messages.length,
@@ -271,12 +272,12 @@ export function useAIChat() {
       
       // Only save if we're still on the same chat
       if (activeChatIdRef.current !== currentChatId) {
-        console.warn(`[useAIChat] Ignoring message save - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
+        chatLogger.warn(`Ignoring message save - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
         return;
       }
       
       if (messages.length > 0) {
-        console.log("[useAIChat] Saving messages:", {
+        chatLogger.debug("Saving messages:", {
           count: messages.length,
           chatId: currentChatId,
           messageIds: messages.map(m => m.id),
@@ -285,25 +286,25 @@ export function useAIChat() {
         
         // Update current chat with messages
         if (currentChatId) {
-          console.log("[useAIChat] Updating chat with messages:", currentChatId);
+          chatLogger.debug("Updating chat with messages:", currentChatId);
           updateExistingChat(currentChatId, { messages }, true);
-          console.log("[useAIChat] Chat updated successfully");
+          chatLogger.debug("Chat updated successfully");
         } else {
-          console.warn("[useAIChat] No current chat ID, cannot update chat");
+          chatLogger.warn("No current chat ID, cannot update chat");
         }
       } else {
         // Clear storage if messages array is empty
-        console.log("[useAIChat] Messages array is empty, clearing storage");
+        chatLogger.debug("Messages array is empty, clearing storage");
         clearMessagesFromStorage();
         
         // Also update current chat to have empty messages (if we're on a chat)
         if (currentChatId) {
-          console.log("[useAIChat] Updating chat to have empty messages:", currentChatId);
+          chatLogger.debug("Updating chat to have empty messages:", currentChatId);
           updateExistingChat(currentChatId, { messages: [] }, true);
         }
       }
     } else {
-      console.log("[useAIChat] Skipping save:", {
+      chatLogger.debug("Skipping save:", {
         isHydrated,
         isSwitchingChat: isSwitchingChatRef.current,
       });
@@ -349,7 +350,7 @@ export function useAIChat() {
   }, []);
 
   const addMessage = useCallback((message: Message) => {
-    console.log("[useAIChat] ===== ADD MESSAGE =====", {
+    chatLogger.debug("Add message", {
       id: message.id,
       role: message.role,
       hasContent: !!message.content,
@@ -358,7 +359,7 @@ export function useAIChat() {
     });
     setMessages((prev) => {
       const newMessages = [...prev, message];
-      console.log("[useAIChat] State updated:", {
+      chatLogger.debug("State updated:", {
         previousCount: prev.length,
         newCount: newMessages.length,
         messageIds: newMessages.map(m => m.id),
@@ -368,7 +369,7 @@ export function useAIChat() {
   }, [messages.length]);
 
   const updateMessage = useCallback((id: string, updates: Partial<Message>) => {
-    console.log("[useAIChat] ===== UPDATE MESSAGE =====", {
+    chatLogger.debug("Update message", {
       id,
       updates,
       activeChatId: activeChatIdRef.current,
@@ -378,20 +379,20 @@ export function useAIChat() {
     // Check if chat has changed - if so, don't update messages
     const currentChatId = getCurrentChatId();
     if (activeChatIdRef.current !== currentChatId) {
-      console.warn(`[useAIChat] Ignoring message update - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
+      chatLogger.warn(`Ignoring message update - chat changed from ${activeChatIdRef.current} to ${currentChatId}`);
       return;
     }
     
     setMessages((prev) => {
       const messageExists = prev.find(m => m.id === id);
-      console.log("[useAIChat] Updating message in state:", {
+      chatLogger.debug("Updating message in state:", {
         messageExists: !!messageExists,
         previousCount: prev.length,
         updatingId: id,
       });
       
       const updated = prev.map((msg) => (msg.id === id ? { ...msg, ...updates } : msg));
-      console.log("[useAIChat] Updated messages:", {
+      chatLogger.debug("Updated messages:", {
         newCount: updated.length,
         updatedMessage: updated.find(m => m.id === id),
       });

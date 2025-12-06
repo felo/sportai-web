@@ -10,8 +10,7 @@ const hasCredentials = isServer && !!(process.env.AWS_ACCESS_KEY_ID && process.e
 
 // Only log warnings on server-side
 if (isServer && !hasCredentials) {
-  console.warn("[S3] ⚠️ AWS credentials not configured. S3 uploads will not work.");
-  console.warn("[S3] Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.");
+  logger.warn("AWS credentials not configured. S3 uploads will not work.");
 }
 
 // Initialize S3 client (only used server-side)
@@ -33,12 +32,7 @@ if (isServer) {
       : undefined,
   });
 
-  console.log("[S3] Server-side configuration:", {
-    hasCredentials,
-    region: BUCKET_REGION,
-    bucket: BUCKET_NAME,
-    accessKeyId: hasCredentials ? `${process.env.AWS_ACCESS_KEY_ID?.substring(0, 8)}...` : "not set",
-  });
+  logger.debug("Server-side S3 configuration:", { hasCredentials, region: BUCKET_REGION, bucket: BUCKET_NAME });
 }
 
 export interface PresignedUrlResponse {
@@ -73,12 +67,10 @@ export async function generatePresignedDownloadUrl(
   if (!hasCredentials) {
     const errorMsg = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.";
     logger.error(`[${requestId}] ${errorMsg}`);
-    console.error(`[S3] ❌ ${errorMsg}`);
     throw new Error(errorMsg);
   }
   
   logger.info(`[${requestId}] Generating presigned download URL for: ${key}`);
-  console.log(`[S3] Generating presigned download URL for key: ${key}`);
   
   try {
     const command = new GetObjectCommand({
@@ -90,12 +82,10 @@ export async function generatePresignedDownloadUrl(
     
     logger.info(`[${requestId}] Presigned download URL generated successfully`);
     logger.debug(`[${requestId}] Download URL expires in ${expiresIn} seconds`);
-    console.log(`[S3] ✅ Presigned download URL generated successfully`);
     
     return url;
   } catch (error) {
     logger.error(`[${requestId}] Failed to generate presigned download URL:`, error);
-    console.error(`[S3] ❌ Failed to generate presigned download URL:`, error);
     
     throw new Error(
       error instanceof Error
@@ -132,7 +122,6 @@ export async function generatePresignedUploadUrl(
   if (!hasCredentials) {
     const errorMsg = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.";
     logger.error(`[${requestId}] ${errorMsg}`);
-    console.error(`[S3] ❌ ${errorMsg}`);
     throw new Error(errorMsg);
   }
   
@@ -144,7 +133,6 @@ export async function generatePresignedUploadUrl(
   
   logger.info(`[${requestId}] Generating presigned URL for: ${key}`);
   logger.debug(`[${requestId}] Content type: ${contentType}`);
-  console.log(`[S3] Generating presigned URL for key: ${key}`);
   
   try {
     // Build the command - try without ACL first (some buckets have ACL disabled)
@@ -154,13 +142,6 @@ export async function generatePresignedUploadUrl(
       ContentType: contentType,
       // Note: ACL "public-read" may not work if bucket has ACLs disabled
       // If you get errors, remove the ACL line or configure bucket to allow public access
-    });
-
-    console.log(`[S3] Creating presigned URL with command:`, {
-      bucket: BUCKET_NAME,
-      key,
-      contentType,
-      region: BUCKET_REGION,
     });
 
     const url = await getSignedUrl(s3Client, command, { expiresIn });
@@ -173,15 +154,10 @@ export async function generatePresignedUploadUrl(
       downloadUrl = await generatePresignedDownloadUrl(key, 7 * 24 * 3600);
     } catch (error) {
       logger.error(`[${requestId}] Failed to generate presigned download URL, will use public URL:`, error);
-      console.warn(`[S3] ⚠️ Failed to generate presigned download URL, will use public URL`);
     }
     
     logger.info(`[${requestId}] Presigned URL generated successfully`);
     logger.debug(`[${requestId}] Public URL: ${publicUrl}`);
-    if (downloadUrl) {
-      logger.debug(`[${requestId}] Download URL: ${downloadUrl.substring(0, 100)}...`);
-    }
-    console.log(`[S3] ✅ Presigned URL generated successfully`);
     
     return {
       url,
@@ -191,16 +167,6 @@ export async function generatePresignedUploadUrl(
     };
   } catch (error) {
     logger.error(`[${requestId}] Failed to generate presigned URL:`, error);
-    console.error(`[S3] ❌ Failed to generate presigned URL:`, error);
-    
-    // Provide more detailed error information
-    if (error instanceof Error) {
-      console.error(`[S3] Error details:`, {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-      });
-    }
     
     throw new Error(
       error instanceof Error
@@ -222,12 +188,10 @@ export async function uploadToS3(
   onProgress?: (progress: number) => void,
   abortSignal?: AbortSignal
 ): Promise<void> {
-  console.log("[S3 Upload] Starting upload to S3...", {
+  logger.debug("Starting upload to S3...", {
     fileName: file.name,
     fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
     contentType: file.type,
-    presignedUrlLength: presignedUrl.length,
-    presignedUrlPreview: presignedUrl.substring(0, 100) + "...",
   });
 
   return new Promise((resolve, reject) => {
@@ -247,27 +211,13 @@ export async function uploadToS3(
         if (e.lengthComputable) {
           const progress = (e.loaded / e.total) * 100;
           onProgress(progress);
-          // Log progress at key milestones
-          if (progress === 0 || progress >= 25 && progress < 26 || progress >= 50 && progress < 51 || progress >= 75 && progress < 76 || progress >= 99) {
-            console.log(`[S3 Upload] Progress: ${progress.toFixed(1)}% (${(e.loaded / (1024 * 1024)).toFixed(2)} MB / ${(e.total / (1024 * 1024)).toFixed(2)} MB)`);
-          }
         }
       });
     }
 
     xhr.addEventListener("load", () => {
-      console.log("[S3 Upload] Response received", {
-        status: xhr.status,
-        statusText: xhr.statusText,
-        responseText: xhr.responseText.substring(0, 200),
-        headers: xhr.getAllResponseHeaders(),
-      });
-
       if (xhr.status === 200 || xhr.status === 204) {
-        console.log("[S3 Upload] ✅ Upload completed successfully!", {
-          status: xhr.status,
-          fileName: file.name,
-        });
+        logger.debug("Upload completed successfully!", { status: xhr.status, fileName: file.name });
         resolve();
       } else {
         // Parse XML error response from S3
@@ -293,14 +243,7 @@ export async function uploadToS3(
           errorDetails = xhr.responseText.substring(0, 500);
         }
         
-        console.error("[S3 Upload] ❌ Upload failed", {
-          status: xhr.status,
-          statusText: xhr.statusText,
-          errorCode,
-          errorDetails,
-          responseText: xhr.responseText.substring(0, 500),
-          fileName: file.name,
-        });
+        logger.error("Upload failed", { status: xhr.status, errorCode, errorDetails, fileName: file.name });
         
         // Provide helpful error message based on error code
         if (errorCode === "AccessDenied" || xhr.status === 403) {
@@ -317,26 +260,13 @@ export async function uploadToS3(
       }
     });
 
-    xhr.addEventListener("error", (e) => {
-      console.error("[S3 Upload] ❌ Upload failed due to network error", {
-        fileName: file.name,
-        error: e,
-        readyState: xhr.readyState,
-        status: xhr.status,
-        statusText: xhr.statusText,
-      });
+    xhr.addEventListener("error", () => {
+      logger.error("Upload failed due to network error", { fileName: file.name, status: xhr.status });
       
       // Check if it's a CORS error
       if (xhr.status === 0) {
         const currentOrigin = typeof window !== "undefined" ? window.location.origin : "unknown";
-        const errorMsg = `Upload failed due to CORS error. The S3 bucket must allow requests from: ${currentOrigin}\n\n` +
-          `To fix this:\n` +
-          `1. Go to AWS Console → S3 → Your bucket → Permissions → CORS\n` +
-          `2. Add your origin (${currentOrigin}) to AllowedOrigins\n` +
-          `3. Ensure AllowedMethods includes "PUT"\n` +
-          `4. Ensure AllowedHeaders includes "*" or at least "Content-Type"\n\n` +
-          `See README.md for detailed CORS configuration instructions.`;
-        console.error("[S3 Upload] CORS Error Details:", errorMsg);
+        const errorMsg = `Upload failed due to CORS error. The S3 bucket must allow requests from: ${currentOrigin}`;
         reject(new Error(errorMsg));
       } else {
         reject(new Error(`Upload failed due to network error: ${xhr.statusText || "Unknown error"}`));
@@ -344,30 +274,16 @@ export async function uploadToS3(
     });
 
     xhr.addEventListener("abort", () => {
-      console.warn("[S3 Upload] ⚠️ Upload was aborted", {
-        fileName: file.name,
-      });
+      logger.warn("Upload was aborted", { fileName: file.name });
       reject(new Error("Upload was aborted"));
-    });
-
-    xhr.addEventListener("loadend", () => {
-      console.log("[S3 Upload] Request completed", {
-        status: xhr.status,
-        readyState: xhr.readyState,
-      });
     });
 
     try {
       xhr.open("PUT", presignedUrl);
       xhr.setRequestHeader("Content-Type", file.type);
-      console.log("[S3 Upload] Sending file to S3...", {
-        method: "PUT",
-        urlLength: presignedUrl.length,
-        contentType: file.type,
-      });
       xhr.send(file);
     } catch (error) {
-      console.error("[S3 Upload] ❌ Exception while sending request:", error);
+      logger.error("Exception while sending request:", error);
       reject(new Error(`Failed to send request: ${error instanceof Error ? error.message : "Unknown error"}`));
     }
   });
@@ -419,7 +335,6 @@ export async function downloadFromS3(
     const bucket = bucketFromUrl || BUCKET_NAME;
     
     logger.debug(`[${requestId}] Extracted bucket: ${bucket}, key: ${key}`);
-    console.log(`[S3 Download] 📂 Bucket: ${bucket}, Key: ${key}`);
     
     // Download using AWS SDK
     const command = new GetObjectCommand({
@@ -461,9 +376,7 @@ export async function downloadFromS3(
     
     const contentType = response.ContentType || "application/octet-stream";
     
-    logger.info(`[${requestId}] Downloaded ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
-    console.log(`[S3 Download] ✅ Successfully downloaded: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
-    console.log(`[S3 Download] 📹 Content-Type from S3: ${contentType}`);
+    logger.info(`[${requestId}] Downloaded ${(buffer.length / (1024 * 1024)).toFixed(2)} MB, Content-Type: ${contentType}`);
     
     return {
       data: buffer,
@@ -471,7 +384,6 @@ export async function downloadFromS3(
     };
   } catch (error) {
     logger.error(`[${requestId}] Failed to download from S3:`, error);
-    console.error(`[S3 Download] ❌ Failed to download:`, error);
     throw error;
   }
 }

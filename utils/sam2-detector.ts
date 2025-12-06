@@ -5,6 +5,7 @@
  */
 
 import * as ort from 'onnxruntime-web';
+import { detectionLogger } from "@/lib/logger";
 
 export interface SAM2Point {
   x: number;
@@ -76,9 +77,9 @@ export class SAM2Detector {
    */
   async load(encoderPath: string, decoderPath: string): Promise<void> {
     try {
-      console.log('🔧 Loading SAM 2 models...');
-      console.log('  - Encoder:', encoderPath);
-      console.log('  - Decoder:', decoderPath);
+      detectionLogger.debug('🔧 Loading SAM 2 models...');
+      detectionLogger.debug('  - Encoder:', encoderPath);
+      detectionLogger.debug('  - Decoder:', decoderPath);
       const startTime = performance.now();
 
       // Configure ONNX Runtime for optimal performance
@@ -88,10 +89,10 @@ export class SAM2Detector {
         graphOptimizationLevel: 'all',
       };
 
-      console.log('🔧 Using WASM execution provider for better compatibility');
+      detectionLogger.debug('🔧 Using WASM execution provider for better compatibility');
 
       // Verify files are accessible and check their sizes
-      console.log('🔍 Verifying model files...');
+      detectionLogger.debug('🔍 Verifying model files...');
       try {
         const encoderResponse = await fetch(encoderPath);
         const decoderResponse = await fetch(decoderPath);
@@ -106,33 +107,33 @@ export class SAM2Detector {
         const encoderSize = encoderResponse.headers.get('content-length');
         const decoderSize = decoderResponse.headers.get('content-length');
         
-        console.log(`✅ Encoder found: ${encoderSize ? (parseInt(encoderSize) / 1024 / 1024).toFixed(1) + 'MB' : 'unknown size'}`);
-        console.log(`✅ Decoder found: ${decoderSize ? (parseInt(decoderSize) / 1024 / 1024).toFixed(1) + 'MB' : 'unknown size'}`);
+        detectionLogger.debug(`✅ Encoder found: ${encoderSize ? (parseInt(encoderSize) / 1024 / 1024).toFixed(1) + 'MB' : 'unknown size'}`);
+        detectionLogger.debug(`✅ Decoder found: ${decoderSize ? (parseInt(decoderSize) / 1024 / 1024).toFixed(1) + 'MB' : 'unknown size'}`);
         
         // Check if files are suspiciously small (likely incomplete)
         if (encoderSize && parseInt(encoderSize) < 1000000) {
-          console.warn('⚠️ Encoder file seems too small - may be incomplete');
+          detectionLogger.warn('⚠️ Encoder file seems too small - may be incomplete');
         }
         if (decoderSize && parseInt(decoderSize) < 1000000) {
-          console.warn('⚠️ Decoder file seems too small - may be incomplete');
+          detectionLogger.warn('⚠️ Decoder file seems too small - may be incomplete');
         }
       } catch (fetchErr) {
-        console.error('❌ File verification failed:', fetchErr);
+        detectionLogger.error('❌ File verification failed:', fetchErr);
         throw fetchErr;
       }
 
-      console.log('📥 Loading ONNX sessions...');
+      detectionLogger.debug('📥 Loading ONNX sessions...');
       
       // Load both models in parallel
       const [encoder, decoder] = await Promise.all([
         ort.InferenceSession.create(encoderPath, sessionOptions).catch(err => {
-          console.error('❌ Encoder session creation failed:', err);
-          console.error('   This usually means the model file is corrupted or incompatible');
+          detectionLogger.error('❌ Encoder session creation failed:', err);
+          detectionLogger.error('   This usually means the model file is corrupted or incompatible');
           throw err;
         }),
         ort.InferenceSession.create(decoderPath, sessionOptions).catch(err => {
-          console.error('❌ Decoder session creation failed:', err);
-          console.error('   This usually means the model file is corrupted or incompatible');
+          detectionLogger.error('❌ Decoder session creation failed:', err);
+          detectionLogger.error('   This usually means the model file is corrupted or incompatible');
           throw err;
         }),
       ]);
@@ -141,15 +142,15 @@ export class SAM2Detector {
       this.decoderSession = decoder;
 
       const loadTime = performance.now() - startTime;
-      console.log(`✅ SAM 2 models loaded in ${(loadTime / 1000).toFixed(2)}s`);
-      console.log('📊 Encoder inputs:', this.encoderSession.inputNames);
-      console.log('📊 Encoder outputs:', this.encoderSession.outputNames);
-      console.log('📊 Decoder inputs:', this.decoderSession.inputNames);
-      console.log('📊 Decoder outputs:', this.decoderSession.outputNames);
+      detectionLogger.debug(`✅ SAM 2 models loaded in ${(loadTime / 1000).toFixed(2)}s`);
+      detectionLogger.debug('📊 Encoder inputs:', this.encoderSession.inputNames);
+      detectionLogger.debug('📊 Encoder outputs:', this.encoderSession.outputNames);
+      detectionLogger.debug('📊 Decoder inputs:', this.decoderSession.inputNames);
+      detectionLogger.debug('📊 Decoder outputs:', this.decoderSession.outputNames);
       
       this.modelLoaded = true;
     } catch (error) {
-      console.error('❌ Failed to load SAM 2 models:', error);
+      detectionLogger.error('❌ Failed to load SAM 2 models:', error);
       throw new Error(`Failed to load SAM 2 models: ${error}`);
     }
   }
@@ -188,7 +189,7 @@ export class SAM2Detector {
 
       return masks;
     } catch (error) {
-      console.error('Error during SAM 2 point segmentation:', error);
+      detectionLogger.error('Error during SAM 2 point segmentation:', error);
       throw error;
     }
   }
@@ -216,7 +217,7 @@ export class SAM2Detector {
       
       return result;
     } catch (error) {
-      console.error('Error during SAM 2 box segmentation:', error);
+      detectionLogger.error('Error during SAM 2 box segmentation:', error);
       throw error;
     }
   }
@@ -273,7 +274,7 @@ export class SAM2Detector {
 
       return detections;
     } catch (error) {
-      console.error('Error during SAM 2 auto-segmentation:', error);
+      detectionLogger.error('Error during SAM 2 auto-segmentation:', error);
       throw error;
     }
   }
@@ -292,12 +293,12 @@ export class SAM2Detector {
     const now = Date.now();
     
     if (cached && (now - cached.timestamp) < this.CACHE_TTL) {
-      console.log('🎯 Using cached image embeddings');
+      detectionLogger.debug('🎯 Using cached image embeddings');
       return cached.embeddings;
     }
 
     // Compute new embeddings
-    console.log('🔄 Computing image embeddings...');
+    detectionLogger.debug('🔄 Computing image embeddings...');
     const inputTensor = await this.preprocessImage(element);
     
     const feeds = { image: inputTensor };
@@ -449,7 +450,7 @@ export class SAM2Detector {
    */
   clearCache(): void {
     this.imageEmbeddingsCache.clear();
-    console.log('🗑️ SAM 2 embedding cache cleared');
+    detectionLogger.debug('🗑️ SAM 2 embedding cache cleared');
   }
 
   /**
@@ -467,7 +468,7 @@ export class SAM2Detector {
     this.encoderSession = null;
     this.decoderSession = null;
     this.modelLoaded = false;
-    console.log('🗑️ SAM 2 models disposed');
+    detectionLogger.debug('🗑️ SAM 2 models disposed');
   }
 }
 

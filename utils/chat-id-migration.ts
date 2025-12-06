@@ -5,6 +5,7 @@
  * New format: proper UUID v4 (e.g., 4111a51f-c541-4dfc-9705-4a61ce637a1a)
  */
 
+import { storageLogger } from "@/lib/logger";
 import type { Chat } from "@/types/chat";
 
 const MIGRATION_KEY = "chat-id-migration-completed";
@@ -51,7 +52,7 @@ function markMigrationCompleted(): void {
   try {
     localStorage.setItem(MIGRATION_KEY, "true");
   } catch (error) {
-    console.error("[Migration] Failed to mark migration as completed:", error);
+    storageLogger.error("[Migration] Failed to mark migration as completed:", error);
   }
 }
 
@@ -68,11 +69,11 @@ export function migrateChatIds(): { migrated: number; skipped: number; failed: n
 
   // Check if migration already completed
   if (isMigrationCompleted()) {
-    console.log("[Migration] Chat ID migration already completed, skipping");
+    storageLogger.debug("[Migration] Chat ID migration already completed, skipping");
     return { migrated: 0, skipped: 0, failed: 0 };
   }
 
-  console.log("[Migration] Starting chat ID migration...");
+  storageLogger.debug("[Migration] Starting chat ID migration...");
   const stats = { migrated: 0, skipped: 0, failed: 0 };
 
   try {
@@ -81,7 +82,7 @@ export function migrateChatIds(): { migrated: number; skipped: number; failed: n
     const storedChats = localStorage.getItem(chatsKey);
     
     if (!storedChats) {
-      console.log("[Migration] No chats found in localStorage");
+      storageLogger.debug("[Migration] No chats found in localStorage");
       markMigrationCompleted();
       return stats;
     }
@@ -96,7 +97,7 @@ export function migrateChatIds(): { migrated: number; skipped: number; failed: n
         const newId = generateUUID();
         oldToNewIdMap.set(chat.id, newId);
         
-        console.log(`[Migration] Migrating chat: ${chat.id} → ${newId}`);
+        storageLogger.debug(`[Migration] Migrating chat: ${chat.id} → ${newId}`);
         
         migratedChats.push({
           ...chat,
@@ -113,7 +114,7 @@ export function migrateChatIds(): { migrated: number; skipped: number; failed: n
     // Save migrated chats back to localStorage
     if (stats.migrated > 0) {
       localStorage.setItem(chatsKey, JSON.stringify(migratedChats));
-      console.log(`[Migration] ✅ Migrated ${stats.migrated} chat(s) to UUID format`);
+      storageLogger.debug(`[Migration] ✅ Migrated ${stats.migrated} chat(s) to UUID format`);
 
       // Update current chat ID if it was using old format
       const currentChatIdKey = "sportai-current-chat-id";
@@ -122,17 +123,17 @@ export function migrateChatIds(): { migrated: number; skipped: number; failed: n
       if (currentChatId && oldToNewIdMap.has(currentChatId)) {
         const newCurrentChatId = oldToNewIdMap.get(currentChatId)!;
         localStorage.setItem(currentChatIdKey, newCurrentChatId);
-        console.log(`[Migration] Updated current chat ID: ${currentChatId} → ${newCurrentChatId}`);
+        storageLogger.debug(`[Migration] Updated current chat ID: ${currentChatId} → ${newCurrentChatId}`);
       }
     }
 
     // Mark migration as completed
     markMigrationCompleted();
 
-    console.log("[Migration] Chat ID migration completed:", stats);
+    storageLogger.debug("[Migration] Chat ID migration completed:", stats);
     return stats;
   } catch (error) {
-    console.error("[Migration] ❌ Failed to migrate chat IDs:", error);
+    storageLogger.error("[Migration] ❌ Failed to migrate chat IDs:", error);
     stats.failed++;
     return stats;
   }

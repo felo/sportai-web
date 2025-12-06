@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { detectionLogger } from "@/lib/logger";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 import type { SupportedModel } from "@/hooks/usePoseDetection";
 
@@ -146,7 +147,7 @@ export function useContactPointDetection({
     const rightRatio = total > 0 ? rightTotalMotion / total : 0.5;
     const confidence = Math.abs(rightRatio - 0.5) * 2;
     
-    console.log(`🎯 Contact detection - Handedness: Left=${leftTotalMotion.toFixed(0)}px, Right=${rightTotalMotion.toFixed(0)}px`);
+    detectionLogger.debug(`🎯 Contact detection - Handedness: Left=${leftTotalMotion.toFixed(0)}px, Right=${rightTotalMotion.toFixed(0)}px`);
     
     return {
       dominant: rightTotalMotion > leftTotalMotion ? "right" : "left",
@@ -261,7 +262,7 @@ export function useContactPointDetection({
     }
     
     if (elbowFallbackCount > 0) {
-      console.log(`🎯 Using elbow as arm tip fallback in ${elbowFallbackCount}/${rawData.length} frames (wrist tracking lost or arm fully extended)`);
+      detectionLogger.debug(`🎯 Using elbow as arm tip fallback in ${elbowFallbackCount}/${rawData.length} frames (wrist tracking lost or arm fully extended)`);
     }
     
     // Calculate velocities and accelerations using arm tip
@@ -433,7 +434,7 @@ export function useContactPointDetection({
     
     // Peak velocity should be in the middle-to-later part of the motion
     if (peakVelIdx < signals.length * 0.2) {
-      console.warn("⚠️ Peak velocity found very early, might not be a serve");
+      detectionLogger.warn("⚠️ Peak velocity found very early, might not be a serve");
     }
     
     // Step 2: Find peak arm tip height in the region around/after peak velocity
@@ -490,11 +491,11 @@ export function useContactPointDetection({
     }
     
     const contactSignal = signals[bestContactIdx];
-    console.log(`🎯 Best contact score: ${bestContactScore.toFixed(3)} at frame ${contactSignal.frame}`);
-    console.log(`   Arm tip height: ${(contactSignal.armTipHeight * 100).toFixed(1)}%${contactSignal.usedElbowAsTip ? ' (using elbow)' : ''}`);
-    console.log(`   Arm extension: ${contactSignal.armExtensionAngle.toFixed(1)}°`);
-    console.log(`   Body extension: ${(contactSignal.bodyExtensionScore * 100).toFixed(1)}%`);
-    console.log(`   Velocity: ${contactSignal.armTipVelocity.toFixed(0)} px/s`);
+    detectionLogger.debug(`🎯 Best contact score: ${bestContactScore.toFixed(3)} at frame ${contactSignal.frame}`);
+    detectionLogger.debug(`   Arm tip height: ${(contactSignal.armTipHeight * 100).toFixed(1)}%${contactSignal.usedElbowAsTip ? ' (using elbow)' : ''}`);
+    detectionLogger.debug(`   Arm extension: ${contactSignal.armExtensionAngle.toFixed(1)}°`);
+    detectionLogger.debug(`   Body extension: ${(contactSignal.bodyExtensionScore * 100).toFixed(1)}%`);
+    detectionLogger.debug(`   Velocity: ${contactSignal.armTipVelocity.toFixed(0)} px/s`);
     
     return {
       contactIdx: bestContactIdx,
@@ -524,11 +525,11 @@ export function useContactPointDetection({
         const handedness = detectHandedness();
         dominantHand = handedness.dominant;
         handednessConfidence = handedness.confidence;
-        console.log(`🎯 Detected ${dominantHand}-handed player (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
+        detectionLogger.debug(`🎯 Detected ${dominantHand}-handed player (${(handednessConfidence * 100).toFixed(0)}% confidence)`);
       } else {
         dominantHand = preferredHand;
         handednessConfidence = 1.0;
-        console.log(`🎯 Using specified ${dominantHand} hand`);
+        detectionLogger.debug(`🎯 Using specified ${dominantHand} hand`);
       }
       
       // Step 2: Extract all signals
@@ -575,14 +576,14 @@ export function useContactPointDetection({
       };
       
       setResult(detection);
-      console.log(`🎯 Contact point detected at frame ${detection.contactFrame} (${detection.contactTimestamp.toFixed(2)}s)`);
-      console.log(`   Dominant hand: ${dominantHand}`);
-      console.log(`   Confidence: ${(confidence * 100).toFixed(1)}%`);
+      detectionLogger.debug(`🎯 Contact point detected at frame ${detection.contactFrame} (${detection.contactTimestamp.toFixed(2)}s)`);
+      detectionLogger.debug(`   Dominant hand: ${dominantHand}`);
+      detectionLogger.debug(`   Confidence: ${(confidence * 100).toFixed(1)}%`);
       
       setIsAnalyzing(false);
       return detection;
     } catch (err) {
-      console.error("Contact point detection error:", err);
+      detectionLogger.error("Contact point detection error:", err);
       setError(err instanceof Error ? err.message : "Unknown error during contact point detection");
       setIsAnalyzing(false);
       return null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { videoLogger } from "@/lib/logger";
 
 interface ThumbnailGeneratorOptions {
   /** Number of thumbnails to generate (default: 100) */
@@ -184,7 +185,7 @@ export function useVideoThumbnails(
         
       } catch (err) {
         if (!abortRef.current) {
-          console.error("Thumbnail generation error:", err);
+          videoLogger.error("Thumbnail generation error:", err);
           setError(err instanceof Error ? err.message : "Unknown error");
           setLoading(false);
         }

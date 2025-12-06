@@ -18,6 +18,7 @@ import "@/styles/vidstack.css";
 
 import { VideoSettings } from "./VideoSettings";
 import { BallTrackerOverlay } from "./BallTrackerOverlay";
+import { CourtOverlay } from "./CourtOverlay";
 import { CourtCalibration } from "./CourtCalibration";
 
 interface BallPosition {
@@ -81,6 +82,8 @@ interface VidstackPlayerProps {
   onCalibrationComplete?: (matrix: number[][]) => void;
   // Thumbnail preview URL (VTT file)
   thumbnails?: string;
+  // Court keypoints for debug overlay
+  courtKeypoints?: ([number, number] | [null, null])[];
 }
 
 // Custom hook for frame stepping - Vidstack doesn't have built-in frame stepping
@@ -143,6 +146,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     isCalibrated = false, 
     onCalibrationComplete,
     thumbnails,
+    courtKeypoints,
   }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
     const [showBallTracker, setShowBallTracker] = useState(false);
@@ -153,6 +157,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     const [showVelocity, setShowVelocity] = useState(true);
     const [showPlayerBoxes, setShowPlayerBoxes] = useState(false);
     const [showPose, setShowPose] = useState(false);
+    const [showCourtKeypoints, setShowCourtKeypoints] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [showCalibration, setShowCalibration] = useState(false);
     const [videoDuration, setVideoDuration] = useState<number | undefined>();
@@ -315,6 +320,19 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
                 showPose={showPose}
                 playerDisplayNames={playerDisplayNames}
                 isFullscreen={isFullscreen}
+                isVideoReady={isVideoReady}
+              />
+            </div>
+          )}
+          
+          {/* Court Keypoints Debug Overlay */}
+          {showCourtKeypoints && courtKeypoints && courtKeypoints.length > 0 && (
+            <div data-overlay style={{ position: "absolute", inset: 0, zIndex: 11, pointerEvents: "none" }}>
+              <CourtOverlay
+                courtKeypoints={courtKeypoints}
+                videoRef={internalVideoRef}
+                isFullscreen={isFullscreen}
+                isVideoReady={isVideoReady}
               />
             </div>
           )}
@@ -452,6 +470,9 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             onPlayerBoxesChange={setShowPlayerBoxes}
             showPose={showPose}
             onPoseChange={setShowPose}
+            showCourtKeypoints={showCourtKeypoints}
+            onCourtKeypointsChange={setShowCourtKeypoints}
+            hasCourtKeypoints={!!courtKeypoints && courtKeypoints.length > 0}
             inferSwingBounces={inferSwingBounces}
             onInferSwingBouncesChange={onInferSwingBouncesChange || (() => {})}
             inferTrajectoryBounces={inferTrajectoryBounces}

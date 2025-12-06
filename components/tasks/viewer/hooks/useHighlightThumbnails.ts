@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { videoLogger } from "@/lib/logger";
 
 /**
  * Extracts single frame thumbnails at specific timestamps.
@@ -95,11 +96,11 @@ export function useHighlightThumbnails(
             const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
             newThumbnails[timestamp] = dataUrl;
           } catch (error) {
-            console.warn(`Failed to extract thumbnail at ${timestamp}:`, error);
+            videoLogger.warn(`Failed to extract thumbnail at ${timestamp}:`, error);
           }
         }
       } catch (error) {
-        console.warn("Thumbnail extraction failed:", error);
+        videoLogger.warn("Thumbnail extraction failed:", error);
       } finally {
         // Cleanup
         document.body.removeChild(hiddenVideo);

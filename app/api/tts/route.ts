@@ -150,7 +150,6 @@ export async function POST(request: NextRequest) {
       
       if (exists) {
         logger.info(`[${requestId}] Audio found in cache: ${audioKey}`);
-        console.log(`[TTS API] 💾 Cache hit for message ${messageId}`);
         
         // Return presigned URL for cached audio
         const audioUrl = await getPresignedAudioUrl(audioKey);
@@ -167,7 +166,6 @@ export async function POST(request: NextRequest) {
     
     // Generate new audio
     logger.info(`[${requestId}] Generating new audio for message ${messageId}`);
-    console.log(`[TTS API] 🎤 Generating speech for message ${messageId}`);
     
     const audioBuffer = await synthesizeSpeech(text, settings);
     
@@ -180,8 +178,7 @@ export async function POST(request: NextRequest) {
         audioUrl = await getPresignedAudioUrl(audioKey);
         logger.info(`[${requestId}] Audio uploaded to S3 successfully`);
       } catch (uploadError) {
-        logger.error(`[${requestId}] Failed to upload to S3:`, uploadError);
-        console.error('[TTS API] ⚠️ Failed to upload to S3, falling back to inline audio');
+        logger.error(`[${requestId}] Failed to upload to S3, falling back to inline audio:`, uploadError);
         // Fall back to returning base64 audio inline
       }
     }
@@ -195,7 +192,6 @@ export async function POST(request: NextRequest) {
     
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed in ${duration}ms`);
-    console.log(`[TTS API] ✅ Audio generated in ${duration}ms`);
     
     return NextResponse.json({ 
       audioUrl,

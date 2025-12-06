@@ -49,7 +49,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<Conversio
     }
     
     logger.info(`[${requestId}] Converting video: ${key}`);
-    console.log(`[Convert API] Starting conversion for: ${key}`);
     
     // Build headers
     const headers: Record<string, string> = {
@@ -71,7 +70,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<Conversio
     
     if (!response.ok) {
       logger.error(`[${requestId}] Conversion service error: ${result.error}`);
-      console.error(`[Convert API] ❌ Conversion failed: ${result.error}`);
       return NextResponse.json(
         { 
           success: false, 
@@ -82,11 +80,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<Conversio
     }
     
     logger.info(`[${requestId}] Conversion successful: ${result.convertedKey}`);
-    console.log(`[Convert API] ✅ Conversion complete:`, {
-      originalKey: result.originalKey,
-      convertedKey: result.convertedKey,
-      size: result.size ? `${(result.size / 1024 / 1024).toFixed(2)}MB` : 'unknown',
-    });
     
     return NextResponse.json({
       success: true,
@@ -99,7 +92,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<Conversio
     
   } catch (error) {
     logger.error(`[${requestId}] Conversion request failed:`, error);
-    console.error(`[Convert API] ❌ Request failed:`, error);
     
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Dialog, Flex, Text, Button, Box, TextArea, Checkbox } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { feedbackLogger } from "@/lib/logger";
 import styles from "@/styles/buttons.module.css";
 
 // Preset reasons for positive feedback
@@ -72,7 +73,7 @@ export function FeedbackModal({
       setComment("");
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to submit feedback:", error);
+      feedbackLogger.error("Failed to submit feedback:", error);
     } finally {
       setIsSubmitting(false);
     }

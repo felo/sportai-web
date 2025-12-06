@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Box, Flex, Text, Heading } from "@radix-ui/themes";
 import { ResponsiveNetwork } from "@nivo/network";
+import { logger } from "@/lib/logger";
 import { StatisticsResult } from "../types";
 import { formatSwingType } from "../utils";
 import { SWING_TYPE_COLORS, PLAYER_CONFIG, CHART_THEME } from "../constants";
@@ -146,7 +147,7 @@ export function RallyNetwork({ result, playerDisplayNames = {} }: RallyNetworkPr
     });
 
     // Debug: log what we're creating
-    console.log("[RallyNetwork] Data:", {
+    logger.debug("[RallyNetwork] Data:", {
       players: filteredPlayers.length,
       shotTypes: shotNodes.length,
       links: links.length,

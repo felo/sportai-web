@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { Dialog, Flex, Text, Button, Box, IconButton, Callout } from "@radix-ui/themes";
 import { Cross2Icon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { createLogger } from "@/lib/logger";
 import { signInWithOAuth } from "@/lib/supabase";
+
+const authLogger = createLogger("Auth");
 
 interface AuthModalProps {
   open: boolean;
@@ -54,7 +57,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
       await signInWithOAuth(provider);
       // OAuth will redirect, so we don't need to close the modal
     } catch (err) {
-      console.error(`Error signing in with ${provider}:`, err);
+      authLogger.error(`Error signing in with ${provider}:`, err);
       setError(err instanceof Error ? err.message : "Failed to sign in");
       setLoading(null);
     }

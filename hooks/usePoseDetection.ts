@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
+import { detectionLogger } from "@/lib/logger";
 
 // Enable TensorFlow.js model caching
 // This ensures models are cached in the browser's Cache API
@@ -9,9 +10,8 @@ if (typeof window !== "undefined") {
   // Set environment flags to enable caching
   tf.env().set('IS_BROWSER', true);
   
-  console.log("🔧 TensorFlow.js environment initialized");
-  console.log("🔧 Platform:", tf.env().platformName);
-  console.log("🔧 Features:", {
+  detectionLogger.debug("TensorFlow.js environment initialized", {
+    platform: tf.env().platformName,
     hasWebGL: tf.env().getBool('HAS_WEBGL'),
     hasIndexedDB: typeof indexedDB !== 'undefined',
     hasCacheAPI: typeof caches !== 'undefined',
@@ -93,9 +93,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         await tf.ready();
         
         // Enable model caching - this ensures models are saved to IndexedDB
-        // TensorFlow.js should do this automatically, but we're being explicit
-        console.log("🔧 TensorFlow.js backend:", tf.getBackend());
-        console.log("🔧 WebGL backend ready:", tf.backend() !== null);
+        detectionLogger.debug("TensorFlow.js backend ready:", tf.getBackend());
 
         let detectorConfig: any;
         let supportedModel: poseDetection.SupportedModels;
@@ -155,7 +153,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
 
         // Check if we already have a promise for this detector configuration
         if (detectorCache.has(configKey)) {
-          console.log(`Using cached detector instance for ${model} ${modelType}`);
+          detectionLogger.debug(`Using cached detector instance for ${model} ${modelType}`);
           try {
             const cachedDetector = await detectorCache.get(configKey);
             if (mounted && cachedDetector) {
@@ -165,36 +163,34 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
               return;
             }
           } catch (err) {
-            console.error("Error retrieving cached detector:", err);
+            detectionLogger.error("Error retrieving cached detector:", err);
             detectorCache.delete(configKey); // Clear failed cache entry
           }
         }
 
         // If not cached, create new detector
-        console.log(`Creating new detector for ${model} ${modelType}...`);
+        detectionLogger.debug(`Creating new detector for ${model} ${modelType}...`);
         
         // Check if model is already cached (browser cache check)
         // This part is mostly for UI feedback, actual loading happens in createDetector
         try {
           const cachedModels = await tf.io.listModels();
-          console.log("📦 TensorFlow.js cached models:", Object.keys(cachedModels));
+          detectionLogger.debug("TensorFlow.js cached models:", Object.keys(cachedModels));
           const isCached = Object.keys(cachedModels).some(key => key.includes(modelKey));
           
           if (isCached) {
-            console.log(`✅ Model ${modelKey} found in cache`);
+            detectionLogger.debug(`Model ${modelKey} found in cache`);
             setLoadingFromCache(true);
           } else {
-            console.log(`❌ Model ${modelKey} NOT found in cache, will download`);
+            detectionLogger.debug(`Model ${modelKey} NOT found in cache, will download`);
             setLoadingFromCache(false);
           }
         } catch (e) {
-          console.warn("Failed to check cache:", e);
+          detectionLogger.warn("Failed to check cache:", e);
           // Ignore cache check errors
         }
 
         const startTime = performance.now();
-        
-        console.log(`⏳ Creating new detector for ${model} ${modelType}...`);
         
         // Monitor network requests to see if model is being downloaded
         let networkRequestCount = 0;
@@ -206,7 +202,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
           // Track TensorFlow.js model downloads
           if (url.includes('tfhub.dev') || url.includes('tensorflow') || url.includes('tfjs') || url.includes('storage.googleapis.com')) {
             networkRequestCount++;
-            console.log(`🌐 Fetching model file: ${url.substring(url.lastIndexOf('/') + 1)}`);
+            detectionLogger.debug(`Fetching model file: ${url.substring(url.lastIndexOf('/') + 1)}`);
             
             const response = await originalFetch(input, init);
             const clonedResponse = response.clone();
@@ -243,18 +239,11 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
           window.fetch = originalFetch;
           
           // Log results with network info
-          console.log(`✅ ${model} model loaded in ${(loadTime / 1000).toFixed(2)}s`);
-          if (networkRequestCount > 0) {
-            console.log(`🌐 Network: ${networkRequestCount} requests, ${(networkLoadedBytes / 1024 / 1024).toFixed(2)}MB loaded`);
-            if (networkLoadedBytes > 100000) {
-              console.warn(`⚠️ Large download detected! Model was likely NOT loaded from cache.`);
-            } else {
-              console.log(`✅ Minimal network traffic - model likely loaded from cache`);
-            }
-          } else {
-            console.log(`✅ No network requests - model loaded entirely from cache!`);
-          }
-          console.log(`📊 Detector cache size: ${detectorCache.size} entries`);
+          detectionLogger.info(`${model} model loaded in ${(loadTime / 1000).toFixed(2)}s`, {
+            networkRequests: networkRequestCount,
+            bytesLoaded: networkLoadedBytes,
+            cacheSize: detectorCache.size,
+          });
 
           if (mounted) {
             setDetector(poseDetector);
@@ -270,7 +259,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         }
 
       } catch (err) {
-        console.error("Failed to initialize pose detector:", err);
+        detectionLogger.error("Failed to initialize pose detector:", err);
         if (mounted) {
           let errorMessage = "Failed to load pose detection model.";
           
@@ -322,17 +311,17 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
       // This prevents the "Requested texture size [0x0] is invalid" error
       if (element instanceof HTMLVideoElement) {
         if (!element.videoWidth || !element.videoHeight || element.videoWidth === 0 || element.videoHeight === 0) {
-          console.warn("Video element has invalid dimensions, skipping pose detection");
+          detectionLogger.warn("Video element has invalid dimensions, skipping pose detection");
           return [];
         }
       } else if (element instanceof HTMLImageElement) {
         if (!element.naturalWidth || !element.naturalHeight || element.naturalWidth === 0 || element.naturalHeight === 0) {
-          console.warn("Image element has invalid dimensions, skipping pose detection");
+          detectionLogger.warn("Image element has invalid dimensions, skipping pose detection");
           return [];
         }
       } else if (element instanceof HTMLCanvasElement) {
         if (!element.width || !element.height || element.width === 0 || element.height === 0) {
-          console.warn("Canvas element has invalid dimensions, skipping pose detection");
+          detectionLogger.warn("Canvas element has invalid dimensions, skipping pose detection");
           return [];
         }
       }
@@ -348,7 +337,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
           
           // Debug logging for BlazePose
           if (model === "BlazePose") {
-            console.log("BlazePose detection:", {
+            detectionLogger.debug("BlazePose detection:", {
               keypoints2D: pose.keypoints.length,
               hasKeypoints3D: !!keypoints3D,
               keypoints3DLength: keypoints3D?.length || 0,
@@ -365,7 +354,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
           };
         });
       } catch (err) {
-        console.error("Pose detection error:", err);
+        detectionLogger.error("Pose detection error:", err);
         return [];
       }
     },
@@ -395,7 +384,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
               const poses = await detectPose(videoElement);
               onPoses(poses);
             } catch (err) {
-              console.error("Detection error:", err);
+              detectionLogger.error("Detection error:", err);
             }
           }
         }
@@ -427,12 +416,12 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
       
       for (const key of modelKeys) {
         await tf.io.removeModel(key);
-        console.log(`Cleared cached model: ${key}`);
+        detectionLogger.debug(`Cleared cached model: ${key}`);
       }
       
       return modelKeys.length;
     } catch (err) {
-      console.error('Failed to clear model cache:', err);
+      detectionLogger.error('Failed to clear model cache:', err);
       return 0;
     }
   }, []);

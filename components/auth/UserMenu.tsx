@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button, Text, DropdownMenu, Flex, Box, Separator } from "@radix-ui/themes";
 import { ExitIcon, PersonIcon, SunIcon, TrashIcon, GearIcon } from "@radix-ui/react-icons";
+import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { AuthModal } from "./AuthModal";
 import type { HighlightingPreferences, TTSSettings } from "@/utils/storage";
+
+const authLogger = createLogger("Auth");
 
 interface UserMenuProps {
   appearance?: "light" | "dark" | "green";
@@ -57,7 +60,7 @@ export function UserMenu({
       setIsSigningOut(true);
       await signOut();
     } catch (error) {
-      console.error("Error signing out:", error);
+      authLogger.error("Error signing out:", error);
     } finally {
       setIsSigningOut(false);
     }

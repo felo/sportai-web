@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { detectionLogger } from "@/lib/logger";
 import type { SAM2Point, SAM2Box, SAM2Detection, SAM2Config } from "@/utils/sam2-detector";
 
 // Dynamic import for SAM2Detector (code-splitting)
@@ -46,7 +47,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
         setIsLoading(true);
         setError(null);
 
-        console.log("🔧 Initializing SAM 2 detector...");
+        detectionLogger.debug("🔧 Initializing SAM 2 detector...");
 
         // Generate unique config key for caching
         const configKey = JSON.stringify({
@@ -58,7 +59,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
 
         // Check if we already have a detector for this configuration
         if (detectorCache.has(configKey)) {
-          console.log(`Using cached SAM 2 detector for ${modelType}`);
+          detectionLogger.debug(`Using cached SAM 2 detector for ${modelType}`);
           try {
             const cachedDetector = await detectorCache.get(configKey);
             if (mounted && cachedDetector) {
@@ -68,18 +69,18 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
               return;
             }
           } catch (err) {
-            console.error("Error retrieving cached detector:", err);
+            detectionLogger.error("Error retrieving cached detector:", err);
             detectorCache.delete(configKey);
           }
         }
 
         // Load new detector
-        console.log(`Loading SAM 2 ${modelType} detector...`);
+        detectionLogger.debug(`Loading SAM 2 ${modelType} detector...`);
 
         const startTime = performance.now();
 
         // Dynamic import to code-split SAM2Detector and ONNX Runtime (~3-4MB)
-        console.log('📦 Dynamically importing SAM2Detector...');
+        detectionLogger.debug('📦 Dynamically importing SAM2Detector...');
         const { SAM2Detector } = await import("@/utils/sam2-detector");
 
         const sam2 = new SAM2Detector({
@@ -93,7 +94,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
         await sam2.load(encoderPath, decoderPath);
 
         const loadTime = performance.now() - startTime;
-        console.log(`✅ SAM 2 ${modelType} loaded in ${(loadTime / 1000).toFixed(2)}s`);
+        detectionLogger.debug(`✅ SAM 2 ${modelType} loaded in ${(loadTime / 1000).toFixed(2)}s`);
 
         // Cache the detector
         const detectorPromise = Promise.resolve(sam2);
@@ -104,7 +105,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
           setIsLoading(false);
         }
       } catch (err) {
-        console.error("Failed to initialize SAM 2 detector:", err);
+        detectionLogger.error("Failed to initialize SAM 2 detector:", err);
         if (mounted) {
           let errorMessage = "Failed to load SAM 2 model.";
           if (err instanceof Error) {
@@ -149,7 +150,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
       points: SAM2Point[]
     ): Promise<SAM2Detection | null> => {
       if (!detector) {
-        console.warn("Detector not loaded yet");
+        detectionLogger.warn("Detector not loaded yet");
         return null;
       }
 
@@ -158,7 +159,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
         const result = await detector.segmentWithPoints(element, points);
         return result;
       } catch (err) {
-        console.error("SAM 2 point segmentation error:", err);
+        detectionLogger.error("SAM 2 point segmentation error:", err);
         return null;
       } finally {
         setIsSegmenting(false);
@@ -174,7 +175,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
       box: SAM2Box
     ): Promise<SAM2Detection | null> => {
       if (!detector) {
-        console.warn("Detector not loaded yet");
+        detectionLogger.warn("Detector not loaded yet");
         return null;
       }
 
@@ -183,7 +184,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
         const result = await detector.segmentWithBox(element, box);
         return result;
       } catch (err) {
-        console.error("SAM 2 box segmentation error:", err);
+        detectionLogger.error("SAM 2 box segmentation error:", err);
         return null;
       } finally {
         setIsSegmenting(false);
@@ -199,7 +200,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
       gridSize: number = 32
     ): Promise<SAM2Detection[]> => {
       if (!detector) {
-        console.warn("Detector not loaded yet");
+        detectionLogger.warn("Detector not loaded yet");
         return [];
       }
 
@@ -208,7 +209,7 @@ export function useSAM2Detection(config: SAM2DetectionConfig = {}) {
         const results = await detector.autoSegment(element, gridSize);
         return results;
       } catch (err) {
-        console.error("SAM 2 auto-segmentation error:", err);
+        detectionLogger.error("SAM 2 auto-segmentation error:", err);
         return [];
       } finally {
         setIsSegmenting(false);

@@ -1,6 +1,9 @@
+import { createLogger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import type { Chat, Message } from "@/types/chat";
 import type { Database } from "@/types/supabase";
+
+const supabaseLogger = createLogger("Supabase");
 
 type DbChat = Database["public"]["Tables"]["chats"]["Row"];
 type DbMessage = Database["public"]["Tables"]["messages"]["Row"];
@@ -177,16 +180,16 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error("[Supabase] Session error:", sessionError);
+      supabaseLogger.error("Session error:", sessionError);
       return [];
     }
     
     if (!session) {
-      console.log("[Supabase] No active session, skipping Supabase load");
+      supabaseLogger.debug("No active session, skipping Supabase load");
       return [];
     }
     
-    console.log("[Supabase] Loading chats for user:", session.user.id);
+    supabaseLogger.debug("Loading chats for user:", session.user.id);
     
     const { data: chatsData, error: chatsError } = await supabase
       .from("chats")
@@ -194,11 +197,11 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
       .order("created_at", { ascending: false });
 
     if (chatsError) {
-      console.error("[Supabase] Error loading chats:", chatsError.message, chatsError.code, chatsError.details);
+      supabaseLogger.error("Error loading chats:", chatsError.message, chatsError.code, chatsError.details);
       return [];
     }
 
-    console.log("[Supabase] Loaded", chatsData?.length || 0, "chats");
+    supabaseLogger.debug("Loaded", chatsData?.length || 0, "chats");
 
     if (!chatsData || chatsData.length === 0) {
       return [];
@@ -214,7 +217,7 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
         .order("sequence_number", { ascending: true });
 
       if (messagesError) {
-        console.error(`Error loading messages for chat ${chatData.id}:`, messagesError);
+        supabaseLogger.error(`Error loading messages for chat ${chatData.id}:`, messagesError);
         continue;
       }
 
@@ -224,7 +227,7 @@ export async function loadChatsFromSupabase(): Promise<Chat[]> {
 
     return chats;
   } catch (error) {
-    console.error("Failed to load chats from Supabase:", error);
+    supabaseLogger.error("Failed to load chats from Supabase:", error);
     return [];
   }
 }
@@ -243,10 +246,10 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
     if (chatError) {
       // PGRST116 means no rows found - this is expected for new chats not yet synced
       if (chatError.code === "PGRST116") {
-        console.log(`[Supabase] Chat ${chatId} not found in Supabase (may exist only locally)`);
+        supabaseLogger.debug(`Chat ${chatId} not found in Supabase (may exist only locally)`);
         return null;
       }
-      console.error("Error loading chat from Supabase:", chatError.message || chatError);
+      supabaseLogger.error("Error loading chat from Supabase:", chatError.message || chatError);
       return null;
     }
     
@@ -261,14 +264,14 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
       .order("sequence_number", { ascending: true });
 
     if (messagesError) {
-      console.error("Error loading messages from Supabase:", messagesError);
+      supabaseLogger.error("Error loading messages from Supabase:", messagesError);
       return null;
     }
 
     const messages = messagesData ? messagesData.map(dbMessageToMessage) : [];
     return dbChatToChat(chatData, messages);
   } catch (error) {
-    console.error("Failed to load chat from Supabase:", error);
+    supabaseLogger.error("Failed to load chat from Supabase:", error);
     return null;
   }
 }
@@ -278,26 +281,26 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
  */
 export async function saveChatToSupabase(chat: Chat, userId: string): Promise<boolean> {
   try {
-    console.log("[Supabase] Saving chat:", chat.id, "for user:", userId);
+    supabaseLogger.debug("Saving chat:", chat.id, "for user:", userId);
     
     // Verify the session is valid and auth.uid() will match the userId
     // This prevents RLS violations when the session is stale
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error("[Supabase] Session error while saving chat:", sessionError);
+      supabaseLogger.error("Session error while saving chat:", sessionError);
       return false;
     }
     
     if (!session) {
-      console.error("[Supabase] No active session, cannot save chat to Supabase");
+      supabaseLogger.error("No active session, cannot save chat to Supabase");
       return false;
     }
     
     // Verify the session user matches the userId we're trying to save
     if (session.user.id !== userId) {
-      console.error("[Supabase] Session user mismatch! Session:", session.user.id, "Expected:", userId);
-      console.error("[Supabase] This could indicate a stale session or auth state inconsistency");
+      supabaseLogger.error("Session user mismatch! Session:", session.user.id, "Expected:", userId);
+      supabaseLogger.error("This could indicate a stale session or auth state inconsistency");
       return false;
     }
     
@@ -307,13 +310,13 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       const expiresAt = new Date(tokenExpiry * 1000);
       const now = new Date();
       if (expiresAt <= now) {
-        console.error("[Supabase] Session token appears expired, attempting refresh...");
+        supabaseLogger.warn("Session token appears expired, attempting refresh...");
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
-          console.error("[Supabase] Failed to refresh session:", refreshError);
+          supabaseLogger.error("Failed to refresh session:", refreshError);
           return false;
         }
-        console.log("[Supabase] Session refreshed successfully");
+        supabaseLogger.info("Session refreshed successfully");
       }
     }
     
@@ -327,11 +330,11 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       .maybeSingle();
     
     if (checkError) {
-      console.error("[Supabase] Error checking existing chat:", checkError.message);
+      supabaseLogger.error("Error checking existing chat:", checkError.message);
       // Continue anyway - the upsert will handle it
     } else if (existingChat && existingChat.user_id !== userId) {
-      console.error("[Supabase] Chat ownership mismatch! Chat belongs to:", existingChat.user_id, "Current user:", userId);
-      console.error("[Supabase] Cannot update chat owned by another user. This could be a chat ID collision.");
+      supabaseLogger.error("Chat ownership mismatch! Chat belongs to:", existingChat.user_id, "Current user:", userId);
+      supabaseLogger.error("Cannot update chat owned by another user. This could be a chat ID collision.");
       return false;
     }
     
@@ -356,23 +359,23 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       });
 
     if (chatError) {
-      console.error("[Supabase] Error upserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
+      supabaseLogger.error("Error upserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
       
       // Check if it's a foreign key error (profile doesn't exist)
       if (chatError.code === "23503") {
-        console.error("[Supabase] Foreign key error - profile does not exist for user:", userId);
-        console.error("[Supabase] This usually happens if the sync happens too quickly after sign-in.");
-        console.error("[Supabase] The profile should be created by a database trigger.");
+        supabaseLogger.error("Foreign key error - profile does not exist for user:", userId);
+        supabaseLogger.error("This usually happens if the sync happens too quickly after sign-in.");
+        supabaseLogger.error("The profile should be created by a database trigger.");
       }
       
       // Check if it's an RLS violation
       if (chatError.code === "42501") {
-        console.error("[Supabase] RLS violation - user may not have permission to upsert this chat");
-        console.error("[Supabase] This could indicate the chat belongs to another user");
+        supabaseLogger.error("RLS violation - user may not have permission to upsert this chat");
+        supabaseLogger.error("This could indicate the chat belongs to another user");
       }
       
       // Log detailed error information
-      console.error("[Supabase] Chat save failed for:", {
+      supabaseLogger.error("Chat save failed for:", {
         chatId: chat.id,
         userId,
         errorCode: chatError.code,
@@ -382,12 +385,12 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       return false;
     }
     
-    console.log("[Supabase] Chat upserted successfully");
+    supabaseLogger.debug("Chat upserted successfully");
 
     // Upsert messages (insert or update if they already exist)
     // This is safer than delete + insert and handles race conditions
     if (chat.messages && chat.messages.length > 0) {
-      console.log("[Supabase] Upserting", chat.messages.length, "messages");
+      supabaseLogger.debug("Upserting", chat.messages.length, "messages");
       const messageInserts = chat.messages.map((msg, index) => messageToDbInsert(msg, chat.id, index));
       
       const { error: messagesError } = await supabase
@@ -398,15 +401,15 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         });
 
       if (messagesError) {
-        console.error("[Supabase] Error upserting messages:", messagesError.message, messagesError.code);
+        supabaseLogger.error("Error upserting messages:", messagesError.message, messagesError.code);
         
         // Check if it's an RLS violation
         if (messagesError.code === "42501") {
-          console.error("[Supabase] RLS violation on messages table. Possible causes:");
-          console.error("  1. Session token may have expired during the request");
-          console.error("  2. Chat ownership mismatch (chat.user_id != auth.uid())");
-          console.error("  3. Chat was not properly created before inserting messages");
-          console.error("[Supabase] Debug info:", {
+          supabaseLogger.error("RLS violation on messages table. Possible causes:");
+          supabaseLogger.error("  1. Session token may have expired during the request");
+          supabaseLogger.error("  2. Chat ownership mismatch (chat.user_id != auth.uid())");
+          supabaseLogger.error("  3. Chat was not properly created before inserting messages");
+          supabaseLogger.error("Debug info:", {
             chatId: chat.id,
             userId,
             messageCount: messageInserts.length,
@@ -416,7 +419,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         
         return false;
       }
-      console.log("[Supabase] Messages upserted successfully");
+      supabaseLogger.debug("Messages upserted successfully");
       
       // Now delete any messages that are in the database but not in our current set
       // This handles the case where messages were removed from the chat
@@ -431,27 +434,27 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
           .not("id", "in", `(${currentMessageIds.join(",")})`);
 
         if (deleteError) {
-          console.warn("[Supabase] Warning: Could not clean up old messages:", deleteError.message);
+          supabaseLogger.warn("Could not clean up old messages:", deleteError.message);
           // Don't fail the whole operation for this
         }
       }
     } else {
       // If chat has no messages, delete all messages for this chat
-      console.log("[Supabase] Chat has no messages, deleting all messages for chat:", chat.id);
+      supabaseLogger.debug("Chat has no messages, deleting all messages for chat:", chat.id);
       const { error: deleteError } = await supabase
         .from("messages")
         .delete()
         .eq("chat_id", chat.id);
 
       if (deleteError) {
-        console.warn("[Supabase] Warning: Could not delete messages:", deleteError.message);
+        supabaseLogger.warn("Could not delete messages:", deleteError.message);
         // Don't fail for this
       }
     }
 
     return true;
   } catch (error) {
-    console.error("Failed to save chat to Supabase:", error);
+    supabaseLogger.error("Failed to save chat to Supabase:", error);
     return false;
   }
 }
@@ -464,13 +467,13 @@ export async function saveChatsToSupabase(chats: Chat[], userId: string): Promis
     for (const chat of chats) {
       const success = await saveChatToSupabase(chat, userId);
       if (!success) {
-        console.error(`Failed to save chat ${chat.id}`);
+        supabaseLogger.error(`Failed to save chat ${chat.id}`);
         // Continue with other chats
       }
     }
     return true;
   } catch (error) {
-    console.error("Failed to save chats to Supabase:", error);
+    supabaseLogger.error("Failed to save chats to Supabase:", error);
     return false;
   }
 }
@@ -484,13 +487,13 @@ export async function deleteChatFromSupabase(chatId: string): Promise<boolean> {
     const { error } = await supabase.from("chats").delete().eq("id", chatId);
 
     if (error) {
-      console.error("Error deleting chat from Supabase:", error);
+      supabaseLogger.error("Error deleting chat from Supabase:", error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Failed to delete chat from Supabase:", error);
+    supabaseLogger.error("Failed to delete chat from Supabase:", error);
     return false;
   }
 }
@@ -517,13 +520,13 @@ export async function updateChatInSupabase(
       .eq("id", chatId);
 
     if (error) {
-      console.error("Error updating chat in Supabase:", error);
+      supabaseLogger.error("Error updating chat in Supabase:", error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Failed to update chat in Supabase:", error);
+    supabaseLogger.error("Failed to update chat in Supabase:", error);
     return false;
   }
 }
@@ -547,7 +550,7 @@ export async function addMessageToSupabase(message: Message, chatId: string): Pr
     const { error } = await supabase.from("messages").insert(messageInsert);
 
     if (error) {
-      console.error("Error adding message to Supabase:", error);
+      supabaseLogger.error("Error adding message to Supabase:", error);
       return false;
     }
 
@@ -559,7 +562,7 @@ export async function addMessageToSupabase(message: Message, chatId: string): Pr
 
     return true;
   } catch (error) {
-    console.error("Failed to add message to Supabase:", error);
+    supabaseLogger.error("Failed to add message to Supabase:", error);
     return false;
   }
 }
@@ -595,13 +598,13 @@ export async function updateMessageInSupabase(
       .eq("id", messageId);
 
     if (error) {
-      console.error("Error updating message in Supabase:", error);
+      supabaseLogger.error("Error updating message in Supabase:", error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Failed to update message in Supabase:", error);
+    supabaseLogger.error("Failed to update message in Supabase:", error);
     return false;
   }
 }

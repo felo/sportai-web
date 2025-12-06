@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, RefObject } from "react";
+import { useRef, useEffect, useState, RefObject } from "react";
 import { OVERLAY_COLORS } from "../constants";
 import { POSE_CONNECTIONS } from "@/types/pose";
 import { formatSwingType } from "../utils";
@@ -84,6 +84,8 @@ interface BallTrackerOverlayProps {
   playerDisplayNames?: Record<number, string>;
   /** Whether the player is in fullscreen mode (scales overlay 2x) */
   isFullscreen?: boolean;
+  /** Whether the video is ready to play (triggers overlay initialization) */
+  isVideoReady?: boolean;
 }
 
 // Binary search to find index near a timestamp
@@ -184,13 +186,31 @@ export function BallTrackerOverlay({
   showPose = false,
   playerDisplayNames = {},
   isFullscreen = false,
+  isVideoReady = false,
 }: BallTrackerOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const lastPausedRef = useRef<boolean>(true);
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
 
   // Scale factor for fullscreen mode (2x all overlay items)
   const scale = isFullscreen ? 2 : 1;
+
+  // Track video element resize (handles fullscreen transitions)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setVideoDimensions({ width, height });
+      }
+    });
+
+    resizeObserver.observe(video);
+    return () => resizeObserver.disconnect();
+  }, [videoRef, isVideoReady]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -238,8 +258,22 @@ export function BallTrackerOverlay({
       
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
-      const containerWidth = video.clientWidth;
-      const containerHeight = video.clientHeight;
+      
+      // Get the actual rendered position of the video element relative to the canvas parent
+      const parent = canvas.parentElement;
+      if (!parent) {
+        animationRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      
+      const parentRect = parent.getBoundingClientRect();
+      const videoRect = video.getBoundingClientRect();
+      
+      // Calculate video element's position relative to canvas parent
+      const videoOffsetX = videoRect.left - parentRect.left;
+      const videoOffsetY = videoRect.top - parentRect.top;
+      const containerWidth = videoRect.width;
+      const containerHeight = videoRect.height;
       
       if (videoWidth && videoHeight && containerWidth && containerHeight) {
         const videoAspect = videoWidth / videoHeight;
@@ -249,39 +283,40 @@ export function BallTrackerOverlay({
           // Container is wider than video - letterbox on sides
           logicalHeight = containerHeight;
           logicalWidth = containerHeight * videoAspect;
-          offsetX = (containerWidth - logicalWidth) / 2;
-          offsetY = 0;
+          offsetX = videoOffsetX + (containerWidth - logicalWidth) / 2;
+          offsetY = videoOffsetY;
         } else {
           // Container is taller than video - letterbox on top/bottom
           logicalWidth = containerWidth;
           logicalHeight = containerWidth / videoAspect;
-          offsetX = 0;
-          offsetY = (containerHeight - logicalHeight) / 2;
+          offsetX = videoOffsetX;
+          offsetY = videoOffsetY + (containerHeight - logicalHeight) / 2;
         }
       } else {
-        // Fallback to parent dimensions if video dimensions not available
-        const parent = canvas.parentElement;
-        if (parent) {
-          const rect = parent.getBoundingClientRect();
-          logicalWidth = rect.width;
-          logicalHeight = rect.height;
-        }
+        // Fallback to video element dimensions if native dimensions not available
+        logicalWidth = containerWidth;
+        logicalHeight = containerHeight;
+        offsetX = videoOffsetX;
+        offsetY = videoOffsetY;
       }
       
       // Update canvas size and position
-      const targetWidth = logicalWidth * dpr;
-      const targetHeight = logicalHeight * dpr;
+      const targetWidth = Math.round(logicalWidth * dpr);
+      const targetHeight = Math.round(logicalHeight * dpr);
+      
+      // Always update position (in case video moved), only update size if changed
+      canvas.style.left = `${offsetX}px`;
+      canvas.style.top = `${offsetY}px`;
       
       if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
         canvas.style.width = `${logicalWidth}px`;
         canvas.style.height = `${logicalHeight}px`;
-        canvas.style.left = `${offsetX}px`;
-        canvas.style.top = `${offsetY}px`;
-        // Scale context to account for DPR
-        ctx.scale(dpr, dpr);
       }
+      
+      // Always reset transform and apply DPR scaling (transforms are cumulative)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       // Clear canvas
       ctx.clearRect(0, 0, logicalWidth, logicalHeight);
@@ -905,7 +940,7 @@ export function BallTrackerOverlay({
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose, scale]);
+  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose, scale, isVideoReady, videoDimensions]);
 
   return (
     <canvas

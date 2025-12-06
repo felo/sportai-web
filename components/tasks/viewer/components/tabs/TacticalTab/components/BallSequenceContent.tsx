@@ -1,0 +1,131 @@
+"use client";
+
+import { useMemo } from "react";
+import { Box, Flex, Text, Heading } from "@radix-ui/themes";
+import { ShotHeatmap, PlayerShotData } from "../../../ShotHeatmap";
+import { formatSwingType } from "../../../../utils";
+import { extractSwingTypes, filterBySwingType } from "../utils";
+import { BALL_TABS } from "../constants";
+import { BallTabNavigation } from "./BallTabNavigation";
+import { SectionHeader } from "./SectionHeader";
+import { AnalysisDisplay } from "./AnalysisDisplay";
+import type { BallSequenceClickData } from "../types";
+
+interface BallSequenceContentProps {
+  selectedBall: number;
+  onBallChange: (ball: number) => void;
+  ballDataMap: Record<number, PlayerShotData[]>;
+  selectedBallSwingType: string | null;
+  onBallSwingTypeChange: (type: string | null) => void;
+  portraits: Record<number, string>;
+  nicknames: Record<string, string>;
+  nicknamesLoading: boolean;
+  analysis: {
+    isAnalyzing: boolean;
+    analysis: string | null;
+    error: string | null;
+  };
+  onBallSequenceClick: (data: BallSequenceClickData) => void;
+  sectionRef: React.RefObject<HTMLDivElement>;
+}
+
+export function BallSequenceContent({
+  selectedBall,
+  onBallChange,
+  ballDataMap,
+  selectedBallSwingType,
+  onBallSwingTypeChange,
+  portraits,
+  nicknames,
+  nicknamesLoading,
+  analysis,
+  onBallSequenceClick,
+  sectionRef,
+}: BallSequenceContentProps) {
+  const currentBallData = ballDataMap[selectedBall] || [];
+  const currentTab = BALL_TABS.find(t => t.id === selectedBall) || BALL_TABS[0];
+  
+  const availableBallSwingTypes = useMemo(
+    () => extractSwingTypes(currentBallData), 
+    [currentBallData]
+  );
+  
+  const filteredBallData = useMemo(
+    () => filterBySwingType(currentBallData, selectedBallSwingType),
+    [currentBallData, selectedBallSwingType]
+  );
+
+  return (
+    <Flex direction="column" gap="4" ref={sectionRef}>
+      <Box>
+        <Box mb="3">
+          <Heading size="3" weight="medium">Ball Sequence Overview</Heading>
+          <Text size="2" color="gray">
+            Analyze shot patterns through the rally sequence
+          </Text>
+        </Box>
+        
+        <BallTabNavigation
+          selectedBall={selectedBall}
+          onBallChange={onBallChange}
+          ballDataMap={ballDataMap}
+        />
+
+        <Box
+          style={{
+            padding: "16px",
+            background: "var(--gray-2)",
+            borderRadius: "var(--radius-3)",
+            border: "1px solid var(--gray-5)",
+            overflow: "visible",
+          }}
+        >
+          <Flex direction="column" gap="3">
+            <SectionHeader
+              icon={
+                <Text size="2" weight="bold" style={{ color: "white" }}>
+                  {currentTab.id}
+                </Text>
+              }
+              title={currentTab.name}
+              availableSwingTypes={availableBallSwingTypes}
+              selectedSwingType={selectedBallSwingType}
+              onSwingTypeChange={onBallSwingTypeChange}
+            />
+            
+            <Text size="2" color="gray">
+              {selectedBallSwingType 
+                ? `Showing ${formatSwingType(selectedBallSwingType)} shots only`
+                : currentTab.description
+              }
+            </Text>
+            
+            <ShotHeatmap
+              data={filteredBallData}
+              shotLabel={selectedBallSwingType ? formatSwingType(selectedBallSwingType) : currentTab.name}
+              originLabel={currentTab.originLabel}
+              countLabel={currentTab.countLabel}
+              emptyMessage={`No ${currentTab.name.toLowerCase()} data available`}
+              ballType={currentTab.ballType}
+              sport="padel"
+              portraits={portraits}
+              nicknames={nicknames}
+              nicknamesLoading={nicknamesLoading}
+            />
+          </Flex>
+        </Box>
+
+        <Box mt="4">
+          <AnalysisDisplay
+            title="🎯 Ball Sequence Analysis"
+            isAnalyzing={analysis.isAnalyzing}
+            analysis={analysis.analysis}
+            error={analysis.error}
+            onBallSequenceClick={onBallSequenceClick}
+          />
+        </Box>
+      </Box>
+    </Flex>
+  );
+}
+
