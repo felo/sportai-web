@@ -52,6 +52,33 @@ import {
 - `docs/**/*.md` (10) - Documentation files  
 - `test/**/*.js` (6) - Test files
 
+### 3. VideoPoseViewerCore Refactor ✅ COMPLETE (3311 → 1268 lines, 62% reduction)
+
+**Problem:** `VideoPoseViewerCore.tsx` had grown to 3311 lines with mixed concerns.
+
+**Solution:** Extracted into modular structure following colocation principle:
+
+**New Hooks (`hooks/`):**
+- `useCanvasDrawing.ts` - All canvas drawing logic (trajectories, poses, angles, objects)
+- `useVideoPreprocessing.ts` - Video preprocessing & FPS detection
+
+**New Components (`components/`):**
+- `KeyFrameTimeline.tsx` - Trophy/contact/landing timeline markers
+- `AnglesDropdownMenu.tsx` - Joint angle measurement dropdown
+- `StatsOverlay.tsx` - Top-left stats display
+- `Pose3DSection.tsx` - BlazePose 3D visualization
+- `ProcessingOverlays.tsx` - Loading, preprocessing progress, gradient mask
+
+**New Utils (`utils/`):**
+- `trajectoryMath.ts` - Catmull-Rom splines, velocity calculations
+- `canvasDrawing.ts` - Drawing functions for poses, angles, objects, court
+
+**Statistics:**
+| File | Before | After | Change |
+|------|--------|-------|--------|
+| VideoPoseViewerCore.tsx | 3311 | 1268 | **-62%** |
+| Total hooks/components/utils | - | ~7500 | Modular |
+
 ## Statistics
 
 | Metric | Before | After | Change |

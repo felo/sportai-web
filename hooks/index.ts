@@ -13,6 +13,7 @@ export { useFrameAnalysis } from "./useFrameAnalysis";
 export { useTacticalAnalysis } from "./useTacticalAnalysis";
 export { usePlayerNicknames } from "./usePlayerNicknames";
 export { usePlayerProfiles } from "./usePlayerProfiles";
+export { useFFmpegClip, downloadBlob } from "./useFFmpegClip";
 
 // Sidebar hooks
 export { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "./sidebar";

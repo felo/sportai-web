@@ -1,0 +1,1528 @@
+"use client";
+
+/**
+ * VideoPoseViewerV2
+ * 
+ * A clean, modular, externally-controllable pose detection video player.
+ * All configuration is passed via props, making it easy to integrate with
+ * external UI controls and state management.
+ */
+
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Box, Flex, Text, Spinner } from "@radix-ui/themes";
+import { usePoseDetection } from "@/hooks/usePoseDetection";
+import type { PoseDetectionResult, SupportedModel } from "@/hooks/usePoseDetection";
+import { detectionLogger } from "@/lib/logger";
+import { calculateAngle } from "@/types/pose";
+import {
+  drawPoses,
+  drawAngles,
+  drawTrajectories,
+  drawBodyOrientation,
+  resetOrientationTracking,
+  type LabelPositionState,
+  type TrajectoryPoint,
+} from "@/components/chat/viewers/videoPoseViewer/utils";
+
+import { useSwingDetection } from "@/components/chat/viewers/videoPoseViewer/hooks/useSwingDetection";
+import { useSwingDetectionV3, type SwingDetectionResultV3 } from "./hooks/useSwingDetectionV3";
+import { useHandednessDetection, type HandednessResult } from "./hooks/useHandednessDetection";
+
+import type {
+  ViewerConfig,
+  ViewerState,
+  ViewerCallbacks,
+  ViewerActions,
+  DEFAULT_VIEWER_CONFIG,
+  ProtocolEvent,
+} from "./types";
+import {
+  CONFIDENCE_PRESETS,
+  RESOLUTION_PRESETS,
+  PROTOCOL_EVENT_COLORS,
+} from "./types";
+
+// ============================================================================
+// Props
+// ============================================================================
+
+interface VideoPoseViewerV2Props {
+  /** Video URL to play */
+  videoUrl: string;
+  /** Configuration object - externally controlled */
+  config: ViewerConfig;
+  /** Pose detection enabled */
+  poseEnabled: boolean;
+  /** Callbacks for events */
+  callbacks?: ViewerCallbacks;
+  /** Custom class name */
+  className?: string;
+  /** Custom style */
+  style?: React.CSSProperties;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_VIDEO_FPS = 30;
+const COMMON_FPS_VALUES = [24, 25, 30, 50, 60, 120];
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function shouldUseCrossOrigin(url: string): boolean {
+  if (url.startsWith("blob:") || url.startsWith("data:")) {
+    return false;
+  }
+  if (typeof window !== "undefined" && (url.startsWith("http://") || url.startsWith("https://"))) {
+    try {
+      const videoOrigin = new URL(url).origin;
+      const currentOrigin = window.location.origin;
+      return videoOrigin !== currentOrigin;
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
+  function VideoPoseViewerV2(
+    { videoUrl, config, poseEnabled, callbacks, className, style },
+    ref
+  ) {
+    // Refs
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const labelPositionStateRef = useRef<Map<string, LabelPositionState>>(new Map());
+    
+    // Store callbacks in ref to avoid re-render loops
+    const callbacksRef = useRef(callbacks);
+    callbacksRef.current = callbacks;
+
+    // Video state
+    const [isVideoReady, setIsVideoReady] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isDetectingFPS, setIsDetectingFPS] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [videoFPS, setVideoFPS] = useState(DEFAULT_VIDEO_FPS);
+    const [videoDimensions, setVideoDimensions] = useState({ width: 640, height: 480 });
+    const [isPortrait, setIsPortrait] = useState(false);
+
+    // Pose state
+    const [currentPoses, setCurrentPoses] = useState<PoseDetectionResult[]>([]);
+    const [selectedPoseIndex, setSelectedPoseIndex] = useState(0);
+
+    // Preprocessing state
+    const [isPreprocessing, setIsPreprocessing] = useState(false);
+    const [preprocessProgress, setPreprocessProgress] = useState(0);
+    const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
+    const [preprocessingFPS, setPreprocessingFPS] = useState(DEFAULT_VIDEO_FPS);
+    const preprocessAbortRef = useRef(false);
+    
+    // Track if video is ready for display (after FPS detection completes)
+    const [isVideoReadyForDisplay, setIsVideoReadyForDisplay] = useState(false);
+    
+    // Track how FPS was detected: 'default' | 'counted' | 'metadata'
+    const [fpsDetectionMethod, setFpsDetectionMethod] = useState<'default' | 'counted' | 'metadata'>('default');
+
+    // Trajectory state
+    const [jointTrajectories, setJointTrajectories] = useState<Map<number, TrajectoryPoint[]>>(new Map());
+
+    // Protocol events state
+    const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
+
+    // Swing detection V1 hook
+    const {
+      isAnalyzing: isSwingAnalyzing,
+      result: swingResult,
+      detectSwings,
+      clearResult: clearSwingResult,
+    } = useSwingDetection({
+      preprocessedPoses,
+      selectedModel: config.model.model,
+      videoFPS: preprocessingFPS,
+      selectedPoseIndex,
+    });
+
+    // Swing detection V3 hook (orientation-enhanced)
+    const {
+      isAnalyzing: isSwingAnalyzingV3,
+      result: swingResultV3,
+      analyzeSwings: analyzeSwingsV3,
+      clearResults: clearSwingResultV3,
+      error: swingErrorV3,
+    } = useSwingDetectionV3({
+      preprocessedPoses,
+      selectedModel: config.model.model,
+      videoFPS: preprocessingFPS,
+      selectedPoseIndex,
+      config: {
+        minVelocityThreshold: config.swingDetectionV3.minVelocityThreshold,
+        minVelocityKmh: config.swingDetectionV3.minVelocityKmh,
+        velocityPercentile: config.swingDetectionV3.velocityPercentile,
+        minRotationVelocity: config.swingDetectionV3.minRotationVelocity,
+        requireRotation: config.swingDetectionV3.requireRotation,
+        rotationWeight: config.swingDetectionV3.rotationWeight,
+        minSwingDuration: config.swingDetectionV3.minSwingDuration,
+        maxSwingDuration: config.swingDetectionV3.maxSwingDuration,
+        minTimeBetweenSwings: config.swingDetectionV3.minTimeBetweenSwings,
+        loadingRotationThreshold: config.swingDetectionV3.loadingRotationThreshold,
+        contactVelocityRatio: config.swingDetectionV3.contactVelocityRatio,
+        smoothingWindow: config.swingDetectionV3.smoothingWindow,
+        minConfidence: config.swingDetectionV3.minConfidence,
+        classifySwingType: config.swingDetectionV3.classifySwingType,
+        handedness: config.swingDetectionV3.handedness,
+        clipLeadTime: config.swingDetectionV3.clipLeadTime,
+        clipTrailTime: config.swingDetectionV3.clipTrailTime,
+      },
+    });
+
+    // Handedness detection hook
+    const {
+      isAnalyzing: isHandednessAnalyzing,
+      result: handednessResult,
+      analyzeHandedness,
+      clearResult: clearHandednessResult,
+    } = useHandednessDetection({
+      preprocessedPoses,
+      selectedModel: config.model.model,
+      videoFPS: preprocessingFPS,
+      selectedPoseIndex,
+    });
+
+    // Computed values
+    const currentFrame = useMemo(() => Math.floor(currentTime * videoFPS), [currentTime, videoFPS]);
+    const totalFrames = useMemo(() => Math.floor(duration * videoFPS), [duration, videoFPS]);
+    const usingPreprocessedPoses = preprocessedPoses.size > 0;
+
+    // Get effective model type
+    const effectiveModelType = useMemo(() => {
+      if (config.model.model === "BlazePose") {
+        return config.model.blazePoseType;
+      }
+      return config.model.maxPoses > 1 
+        ? "MultiPose.Lightning" 
+        : config.model.moveNetType;
+    }, [config.model]);
+
+    // Get confidence thresholds
+    const confidenceThresholds = useMemo(() => {
+      if (config.confidence.preset === "custom") {
+        return {
+          minPoseScore: config.confidence.minPoseScore,
+          minPartScore: config.confidence.minPartScore,
+        };
+      }
+      return CONFIDENCE_PRESETS[config.confidence.preset];
+    }, [config.confidence]);
+
+    // Get input resolution
+    const inputResolution = useMemo(() => {
+      if (config.resolution.preset === "custom") {
+        return { width: config.resolution.width, height: config.resolution.height };
+      }
+      return RESOLUTION_PRESETS[config.resolution.preset];
+    }, [config.resolution]);
+
+    // Initialize pose detection
+    const {
+      isLoading: isModelLoading,
+      error: modelError,
+      isDetecting,
+      detectPose,
+      startDetection,
+      stopDetection,
+    } = usePoseDetection({
+      model: config.model.model,
+      modelType: effectiveModelType,
+      enableSmoothing: config.model.enableSmoothing,
+      minPoseScore: confidenceThresholds.minPoseScore,
+      minPartScore: confidenceThresholds.minPartScore,
+      inputResolution: config.model.model === "MoveNet" ? inputResolution : undefined,
+      maxPoses: config.model.model === "MoveNet" ? config.model.maxPoses : 1,
+      enabled: poseEnabled,
+    });
+
+    // Unified "initializing" state - covers model loading, FPS detection, and preprocessing
+    const isInitializing = isModelLoading || isDetectingFPS || isPreprocessing;
+
+    // Selected pose
+    const selectedPose = useMemo(() => {
+      if (currentPoses.length === 0) return null;
+      return currentPoses[Math.min(selectedPoseIndex, currentPoses.length - 1)];
+    }, [currentPoses, selectedPoseIndex]);
+
+    // ========================================================================
+    // Video FPS Detection
+    // ========================================================================
+
+    // Track if FPS has been detected
+    const fpsDetectedRef = useRef(false);
+
+    /**
+     * Detect FPS by briefly playing the video and counting frames.
+     * Returns a promise that resolves with the detected FPS.
+     */
+    const detectVideoFPSAsync = useCallback(async (video: HTMLVideoElement): Promise<number> => {
+      setIsDetectingFPS(true);
+      
+      return new Promise((resolve) => {
+        const finish = (fps: number, method: 'default' | 'counted' = 'counted') => {
+          setIsDetectingFPS(false);
+          setIsVideoReadyForDisplay(true); // Video can now be shown
+          setFpsDetectionMethod(method);
+          callbacksRef.current?.onFPSDetected?.(fps, method);
+          resolve(fps);
+        };
+
+        if (!("requestVideoFrameCallback" in video)) {
+          detectionLogger.debug("No requestVideoFrameCallback support, using default FPS: 30");
+          finish(DEFAULT_VIDEO_FPS, 'default');
+          return;
+        }
+
+        let frameCount = 0;
+        let firstMediaTime: number | null = null;
+        const maxFrames = 15; // Need enough frames for accurate detection
+        const originalTime = video.currentTime;
+        const wasMuted = video.muted;
+
+        const callback = (_now: number, metadata: { mediaTime?: number }) => {
+          if (frameCount === 0) {
+            firstMediaTime = metadata.mediaTime ?? 0;
+          }
+          frameCount++;
+
+          if (frameCount >= maxFrames) {
+            // Stop playback
+            video.pause();
+            video.currentTime = originalTime;
+            video.muted = wasMuted;
+
+            const mediaTimeDiff = (metadata.mediaTime ?? 0) - (firstMediaTime ?? 0);
+            let fps = DEFAULT_VIDEO_FPS;
+            if (mediaTimeDiff > 0) {
+              fps = Math.round(frameCount / mediaTimeDiff);
+              fps = COMMON_FPS_VALUES.reduce((prev, curr) =>
+                Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
+              );
+            }
+            detectionLogger.debug(`Detected FPS: ${fps} (${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
+            finish(fps);
+          } else if (!video.paused && !video.ended) {
+            (video as any).requestVideoFrameCallback(callback);
+          } else {
+            // Video stopped unexpectedly, use default
+            finish(DEFAULT_VIDEO_FPS, 'default');
+          }
+        };
+
+        // Mute and play briefly to detect FPS
+        video.muted = true;
+        video.currentTime = 0;
+        
+        const onCanPlay = () => {
+          video.removeEventListener("canplay", onCanPlay);
+          (video as any).requestVideoFrameCallback(callback);
+          video.play().catch(() => {
+            // If play fails, use default
+            video.muted = wasMuted;
+            finish(DEFAULT_VIDEO_FPS, 'default');
+          });
+        };
+
+        if (video.readyState >= 3) {
+          onCanPlay();
+        } else {
+          video.addEventListener("canplay", onCanPlay, { once: true });
+        }
+
+        // Timeout fallback
+        setTimeout(() => {
+          if (frameCount < maxFrames) {
+            video.pause();
+            video.currentTime = originalTime;
+            video.muted = wasMuted;
+            finish(DEFAULT_VIDEO_FPS, 'default');
+          }
+        }, 2000);
+      });
+    }, []);
+
+    // Legacy sync detection for when video is already playing
+    const detectVideoFPS = useCallback((video: HTMLVideoElement) => {
+      if (fpsDetectedRef.current) return;
+
+      if ("requestVideoFrameCallback" in video) {
+        let frameCount = 0;
+        let firstMediaTime: number | null = null;
+        const maxFrames = 15;
+
+        const callback = (_now: number, metadata: { mediaTime?: number }) => {
+          if (fpsDetectedRef.current) return;
+
+          if (frameCount === 0) {
+            firstMediaTime = metadata.mediaTime ?? 0;
+          }
+          frameCount++;
+
+          if (frameCount >= maxFrames) {
+            const mediaTimeDiff = (metadata.mediaTime ?? 0) - (firstMediaTime ?? 0);
+            let fps = DEFAULT_VIDEO_FPS;
+            if (mediaTimeDiff > 0) {
+              fps = Math.round(frameCount / mediaTimeDiff);
+              fps = COMMON_FPS_VALUES.reduce((prev, curr) =>
+                Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
+              );
+            }
+            fpsDetectedRef.current = true;
+            setVideoFPS(fps);
+            detectionLogger.debug(`Detected FPS on play: ${fps}`);
+          } else if (!video.paused && !video.ended) {
+            (video as any).requestVideoFrameCallback(callback);
+          }
+        };
+
+        const startFPSDetection = () => {
+          if (fpsDetectedRef.current) return;
+          frameCount = 0;
+          firstMediaTime = null;
+          (video as any).requestVideoFrameCallback(callback);
+        };
+
+        video.addEventListener("play", startFPSDetection, { once: true });
+      }
+    }, []);
+
+    // ========================================================================
+    // Video Event Handlers
+    // ========================================================================
+
+    const handleLoadedMetadata = useCallback(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      const dur = video.duration;
+
+      setVideoDimensions({ width, height });
+      setIsPortrait(height > width);
+      setDuration(dur);
+      setIsVideoReady(true);
+
+      // Set canvas dimensions
+      if (canvasRef.current) {
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
+      }
+
+      // Detect FPS
+      detectVideoFPS(video);
+
+      // Notify callback (use ref to avoid dependency)
+      callbacksRef.current?.onVideoLoad?.(width, height, dur, videoFPS);
+    }, [detectVideoFPS, videoFPS]);
+
+    const handleTimeUpdate = useCallback(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      
+      setCurrentTime(video.currentTime);
+      const frame = Math.floor(video.currentTime * videoFPS);
+      callbacksRef.current?.onTimeUpdate?.(video.currentTime, frame);
+    }, [videoFPS]);
+
+    const handlePlay = useCallback(() => {
+      setIsPlaying(true);
+      callbacksRef.current?.onPlaybackChange?.(true);
+    }, []);
+
+    const handlePause = useCallback(() => {
+      setIsPlaying(false);
+      callbacksRef.current?.onPlaybackChange?.(false);
+    }, []);
+
+    const handleEnded = useCallback(() => {
+      setIsPlaying(false);
+      stopDetection();
+      callbacksRef.current?.onPlaybackChange?.(false);
+    }, [stopDetection]);
+
+    // ========================================================================
+    // Pose Detection During Playback
+    // ========================================================================
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video || !poseEnabled || isModelLoading || !isVideoReady) {
+        stopDetection();
+        return;
+      }
+
+      // Don't run detection during FPS detection
+      if (isDetectingFPS) {
+        stopDetection();
+        return;
+      }
+
+      // If using preprocessed poses, sync from cache instead of running detection
+      if (usingPreprocessedPoses) {
+        stopDetection();
+        return;
+      }
+
+      if (!isPlaying) {
+        stopDetection();
+        return;
+      }
+
+      if (!video.videoWidth || !video.videoHeight) {
+        stopDetection();
+        return;
+      }
+
+      startDetection(video, (poses) => {
+        setCurrentPoses(poses);
+        callbacksRef.current?.onPoseChange?.(poses, currentFrame);
+      });
+
+      return () => stopDetection();
+    }, [
+      poseEnabled,
+      isPlaying,
+      isModelLoading,
+      isVideoReady,
+      isDetectingFPS,
+      usingPreprocessedPoses,
+      currentFrame,
+      startDetection,
+      stopDetection,
+    ]);
+
+    // Sync preprocessed poses during playback
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video || !usingPreprocessedPoses || !isPlaying) return;
+
+      let rafId: number;
+      let lastFrame = -1;
+
+      const syncPoses = () => {
+        if (!video.paused && !video.ended) {
+          const frame = Math.floor(video.currentTime * preprocessingFPS);
+          if (frame !== lastFrame && preprocessedPoses.has(frame)) {
+            const poses = preprocessedPoses.get(frame);
+            if (poses?.length) {
+              setCurrentPoses(poses);
+              callbacksRef.current?.onPoseChange?.(poses, frame);
+              lastFrame = frame;
+            }
+          }
+          rafId = requestAnimationFrame(syncPoses);
+        }
+      };
+
+      syncPoses();
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+      };
+    }, [usingPreprocessedPoses, isPlaying, preprocessingFPS, preprocessedPoses]);
+
+    // ========================================================================
+    // Trajectory Tracking
+    // ========================================================================
+
+    useEffect(() => {
+      if (!config.trajectories.showTrajectories || currentPoses.length === 0) return;
+
+      const pose = currentPoses[selectedPoseIndex] || currentPoses[0];
+      if (!pose) return;
+
+      setJointTrajectories((prev) => {
+        const next = new Map(prev);
+
+        for (const jointIndex of config.trajectories.selectedJoints) {
+          const keypoint = pose.keypoints[jointIndex];
+          if (!keypoint || (keypoint.score ?? 0) < confidenceThresholds.minPartScore) continue;
+
+          const points = next.get(jointIndex) || [];
+          const newPoint: TrajectoryPoint = {
+            x: keypoint.x,
+            y: keypoint.y,
+            frame: currentFrame,
+          };
+
+          // Add point and limit history
+          const newPoints = [...points, newPoint].slice(-config.trajectories.maxTrajectoryPoints);
+          next.set(jointIndex, newPoints);
+        }
+
+        return next;
+      });
+    }, [
+      currentPoses,
+      selectedPoseIndex,
+      currentFrame,
+      config.trajectories,
+      confidenceThresholds.minPartScore,
+    ]);
+
+    // Clear trajectories when config changes
+    useEffect(() => {
+      if (!config.trajectories.showTrajectories) {
+        setJointTrajectories(new Map());
+      }
+    }, [config.trajectories.showTrajectories, config.trajectories.selectedJoints]);
+
+    // ========================================================================
+    // Canvas Drawing
+    // ========================================================================
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!canvas || !video) return;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!poseEnabled) return;
+
+      // Draw trajectories first (behind skeleton)
+      if (config.trajectories.showTrajectories && jointTrajectories.size > 0) {
+        const scaleX = canvas.width / video.videoWidth;
+        const scaleY = canvas.height / video.videoHeight;
+
+        drawTrajectories({
+          ctx,
+          jointTrajectories,
+          scaleX,
+          scaleY,
+          smoothEnabled: config.trajectories.smoothTrajectories,
+        });
+      }
+
+      // Draw poses
+      if (currentPoses.length > 0 && config.skeleton.showSkeleton) {
+        drawPoses({
+          ctx,
+          canvas,
+          video,
+          currentPoses,
+          selectedModel: config.model.model,
+          showSkeleton: config.skeleton.showConnections,
+          showFaceLandmarks: config.skeleton.showFaceLandmarks,
+          showTrackingId: config.skeleton.showTrackingId,
+        });
+      }
+
+      // Draw angles
+      if (config.angles.showAngles && selectedPose) {
+        const newLabelState = drawAngles({
+          ctx,
+          canvas,
+          video,
+          selectedPose,
+          selectedModel: config.model.model,
+          measuredAngles: config.angles.measuredAngles,
+          selectedAngleJoints: config.angles.selectedAngleJoints,
+          labelPositionState: labelPositionStateRef.current,
+          isPlaying,
+        });
+        labelPositionStateRef.current = newLabelState;
+      }
+
+      // Draw body orientation
+      if (config.bodyOrientation.showOrientation && selectedPose) {
+        // Calculate scale factors
+        let scaleX: number, scaleY: number;
+        if (config.model.model === "BlazePose") {
+          scaleX = canvas.width / 800;
+          scaleY = canvas.height / 450;
+        } else {
+          scaleX = canvas.width / video.videoWidth;
+          scaleY = canvas.height / video.videoHeight;
+        }
+
+        drawBodyOrientation(
+          ctx,
+          selectedPose.keypoints,
+          config.model.model === "BlazePose" ? "BlazePose" : "MoveNet",
+          scaleX,
+          scaleY,
+          {
+            showEllipse: config.bodyOrientation.showEllipse,
+            showDirectionLine: config.bodyOrientation.showDirectionLine,
+            showAngleValue: config.bodyOrientation.showAngleValue,
+            ellipseColor: config.bodyOrientation.ellipseColor,
+            lineColor: config.bodyOrientation.lineColor,
+            textColor: config.bodyOrientation.textColor,
+            ellipseSize: config.bodyOrientation.ellipseSize,
+            lineLength: config.bodyOrientation.lineLength,
+            minConfidence: config.bodyOrientation.minConfidence,
+          }
+        );
+      }
+
+      // Draw V3 swing phase indicator
+      if (
+        config.swingDetectionV3.showSwingOverlay &&
+        swingResultV3 &&
+        config.protocols.enabledProtocols.includes("swing-detection-v3")
+      ) {
+        const frameData = swingResultV3.frameData.find(fd => fd.frame === currentFrame);
+        if (frameData && frameData.phase !== "neutral") {
+          const phaseColors: Record<string, string> = {
+            loading: "#6366F1",  // Indigo
+            swing: "#F59E0B",    // Amber
+            contact: "#EF4444", // Red
+            follow: "#10B981",  // Green
+            recovery: "#6B7280", // Gray
+          };
+          
+          const color = config.swingDetectionV3.showPhaseColors 
+            ? phaseColors[frameData.phase] ?? "#8B5CF6"
+            : "#8B5CF6";
+          
+          // Draw phase label in top-right
+          ctx.save();
+          ctx.font = "bold 16px Inter, system-ui, sans-serif";
+          const phaseLabel = frameData.phase.toUpperCase();
+          const metrics = ctx.measureText(phaseLabel);
+          const padding = 8;
+          const x = canvas.width - metrics.width - padding * 3;
+          const y = 40;
+          
+          // Background
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.roundRect(x - padding, y - 16, metrics.width + padding * 2, 24, 4);
+          ctx.fill();
+          
+          // Text
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillText(phaseLabel, x, y);
+          
+          // Draw swing score if available
+          if (frameData.swingScore !== null) {
+            ctx.font = "12px Inter, system-ui, sans-serif";
+            const scoreText = `Score: ${frameData.swingScore.toFixed(1)}`;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.fillText(scoreText, x, y + 18);
+          }
+          
+          ctx.restore();
+        }
+      }
+    }, [
+      poseEnabled,
+      currentPoses,
+      selectedPose,
+      config.model.model,
+      config.skeleton,
+      config.angles,
+      config.bodyOrientation,
+      config.trajectories,
+      config.swingDetectionV3,
+      config.protocols.enabledProtocols,
+      jointTrajectories,
+      isPlaying,
+      videoDimensions,
+      swingResultV3,
+      currentFrame,
+    ]);
+
+    // ========================================================================
+    // Playback Speed
+    // ========================================================================
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.playbackRate = config.playback.speed;
+    }, [config.playback.speed]);
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.loop = config.playback.loop;
+    }, [config.playback.loop]);
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.muted = config.playback.muted;
+    }, [config.playback.muted]);
+
+    // ========================================================================
+    // Preprocessing
+    // ========================================================================
+
+    const startPreprocessing = useCallback(async () => {
+      const video = videoRef.current;
+      if (!video || !detectPose || isModelLoading) return;
+
+      setIsPreprocessing(true);
+      setPreprocessProgress(0);
+      setPreprocessedPoses(new Map());
+      preprocessAbortRef.current = false;
+
+      // Pause video during preprocessing
+      if (!video.paused) {
+        video.pause();
+        setIsPlaying(false);
+      }
+
+      const originalTime = video.currentTime;
+
+      try {
+        // FIRST: Detect actual video FPS before preprocessing
+        let fps: number;
+        if (config.preprocessing.targetFPS) {
+          // User explicitly set a target FPS
+          fps = config.preprocessing.targetFPS;
+          detectionLogger.debug(`Using user-specified FPS: ${fps}`);
+        } else if (!fpsDetectedRef.current) {
+          // Detect actual FPS from video
+          detectionLogger.debug("Detecting video FPS before preprocessing...");
+          fps = await detectVideoFPSAsync(video);
+          fpsDetectedRef.current = true;
+          setVideoFPS(fps);
+        } else {
+          fps = videoFPS;
+        }
+
+        const dur = video.duration;
+        const total = Math.floor(dur * fps);
+        const allPoses = new Map<number, PoseDetectionResult[]>();
+
+        detectionLogger.debug(`Preprocessing ${total} frames at ${fps} FPS (duration: ${dur.toFixed(2)}s)...`);
+
+        for (let frame = 0; frame < total; frame += config.preprocessing.frameSkip) {
+          if (preprocessAbortRef.current) {
+            detectionLogger.debug("Preprocessing aborted");
+            break;
+          }
+
+          const targetTime = frame / fps;
+          video.currentTime = targetTime;
+
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              video.removeEventListener("seeked", onSeeked);
+              resolve();
+            };
+            video.addEventListener("seeked", onSeeked);
+          });
+
+          const poses = await detectPose(video);
+          allPoses.set(frame, poses);
+          
+          // Show current pose during preprocessing (real-time feedback)
+          if (poses.length > 0) {
+            setCurrentPoses(poses);
+          }
+
+          const progress = ((frame + 1) / total) * 100;
+          setPreprocessProgress(progress);
+
+          // Yield to main thread periodically
+          if (frame % 5 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        }
+
+        if (!preprocessAbortRef.current) {
+          detectionLogger.debug(`Preprocessing complete: ${allPoses.size} frames at ${fps} FPS`);
+          setPreprocessedPoses(allPoses);
+          setPreprocessingFPS(fps);
+          // Ensure FPS is set consistently
+          setVideoFPS(fps);
+          fpsDetectedRef.current = true;
+          callbacksRef.current?.onPreprocessComplete?.(allPoses.size, fps);
+
+          // Restore position and show first frame poses
+          video.currentTime = originalTime;
+          const frameAtTime = Math.floor(originalTime * fps);
+          const posesAtFrame = allPoses.get(frameAtTime) || allPoses.get(0);
+          if (posesAtFrame) {
+            setCurrentPoses(posesAtFrame);
+          }
+        } else {
+          video.currentTime = originalTime;
+        }
+      } catch (err) {
+        detectionLogger.error("Preprocessing error:", err);
+        callbacksRef.current?.onError?.(err instanceof Error ? err.message : "Preprocessing failed");
+        const video = videoRef.current;
+        if (video) video.currentTime = originalTime;
+      } finally {
+        setIsPreprocessing(false);
+        setPreprocessProgress(0);
+      }
+    }, [detectPose, isModelLoading, videoFPS, config.preprocessing, detectVideoFPSAsync]);
+
+    const cancelPreprocessing = useCallback(() => {
+      preprocessAbortRef.current = true;
+    }, []);
+
+    const clearPreprocessing = useCallback(() => {
+      setPreprocessedPoses(new Map());
+      setCurrentPoses([]);
+      // Don't reset fpsDetectedRef or videoFPS - keep the detected FPS
+    }, []);
+
+    // Reset state when video URL changes
+    useEffect(() => {
+      fpsDetectedRef.current = false;
+      setVideoFPS(DEFAULT_VIDEO_FPS);
+      setPreprocessedPoses(new Map());
+      setCurrentPoses([]);
+      setProtocolEvents([]);
+      setIsVideoReadyForDisplay(false); // Hide video until FPS detection completes
+      setFpsDetectionMethod('default');
+      resetOrientationTracking(); // Reset orientation momentum for new video
+      clearSwingResult();
+      clearSwingResultV3();
+      clearHandednessResult();
+      protocolsRunRef.current.clear();
+    }, [videoUrl, clearSwingResult, clearSwingResultV3, clearHandednessResult]);
+
+    // Auto-start preprocessing when enabled
+    useEffect(() => {
+      if (
+        poseEnabled &&
+        !isModelLoading &&
+        !isPreprocessing &&
+        preprocessedPoses.size === 0 &&
+        isVideoReady &&
+        config.preprocessing.allowAutoPreprocess
+      ) {
+        const timer = setTimeout(() => {
+          startPreprocessing();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }, [
+      poseEnabled,
+      isModelLoading,
+      isPreprocessing,
+      preprocessedPoses.size,
+      isVideoReady,
+      config.preprocessing.allowAutoPreprocess,
+      startPreprocessing,
+    ]);
+
+    // ========================================================================
+    // Protocol Execution (after preprocessing)
+    // ========================================================================
+
+    // Track which protocols have been run to avoid re-running
+    const protocolsRunRef = useRef<Set<string>>(new Set());
+
+    // Run enabled protocols after preprocessing completes or when protocols change
+    useEffect(() => {
+      if (
+        usingPreprocessedPoses &&
+        preprocessedPoses.size > 0 &&
+        !isPreprocessing &&
+        !isSwingAnalyzing &&
+        !isSwingAnalyzingV3
+      ) {
+        const swingV1Enabled = config.protocols.enabledProtocols.includes("swing-detection-v1");
+        const swingV1Ran = protocolsRunRef.current.has("swing-detection-v1");
+        const swingV3Enabled = config.protocols.enabledProtocols.includes("swing-detection-v3");
+        const swingV3Ran = protocolsRunRef.current.has("swing-detection-v3");
+
+        // Run swing detection v1 if enabled and not yet run
+        if (swingV1Enabled && !swingV1Ran) {
+          detectionLogger.info("🔄 Running Swing Detection V1 protocol...");
+          protocolsRunRef.current.add("swing-detection-v1");
+          detectSwings({ requireOutwardMotion: true });
+        }
+        
+        // Clear swing v1 results if disabled
+        if (!swingV1Enabled && swingV1Ran) {
+          protocolsRunRef.current.delete("swing-detection-v1");
+          clearSwingResult();
+        }
+
+        // Run swing detection v3 if enabled and not yet run
+        if (swingV3Enabled && !swingV3Ran) {
+          detectionLogger.info("🔄 Running Swing Detection V3 protocol (orientation-enhanced)...");
+          protocolsRunRef.current.add("swing-detection-v3");
+          analyzeSwingsV3();
+        }
+        
+        // Clear swing v3 results if disabled
+        if (!swingV3Enabled && swingV3Ran) {
+          protocolsRunRef.current.delete("swing-detection-v3");
+          clearSwingResultV3();
+        }
+
+        // Run handedness detection if enabled and not yet run
+        const handednessEnabled = config.protocols.enabledProtocols.includes("handedness-detection");
+        const handednessRan = protocolsRunRef.current.has("handedness-detection");
+
+        if (handednessEnabled && !handednessRan && !isHandednessAnalyzing) {
+          detectionLogger.info("🔄 Running Handedness Detection protocol...");
+          protocolsRunRef.current.add("handedness-detection");
+          analyzeHandedness();
+        }
+
+        // Clear handedness results if disabled
+        if (!handednessEnabled && handednessRan) {
+          protocolsRunRef.current.delete("handedness-detection");
+          clearHandednessResult();
+        }
+      }
+    }, [
+      usingPreprocessedPoses,
+      preprocessedPoses.size,
+      isPreprocessing,
+      isSwingAnalyzing,
+      isSwingAnalyzingV3,
+      isHandednessAnalyzing,
+      config.protocols.enabledProtocols,
+      detectSwings,
+      clearSwingResult,
+      analyzeSwingsV3,
+      clearSwingResultV3,
+      analyzeHandedness,
+      clearHandednessResult,
+    ]);
+
+    // Convert swing results to ProtocolEvents and update timeline
+    useEffect(() => {
+      // Build events from all protocol results based on what's enabled
+      const events: ProtocolEvent[] = [];
+
+      // Add swing v1 events if enabled and has results
+      if (
+        config.protocols.enabledProtocols.includes("swing-detection-v1") &&
+        swingResult &&
+        swingResult.swings.length > 0
+      ) {
+        swingResult.swings.forEach((swing, i) => {
+          events.push({
+            id: `swing-v1-${swing.frame}-${i}`,
+            protocolId: "swing-detection-v1" as const,
+            type: "swing",
+            startFrame: swing.frame,
+            endFrame: swing.frame,
+            startTime: swing.timestamp,
+            endTime: swing.timestamp,
+            label: `Swing ${i + 1} (${swing.velocityKmh.toFixed(0)} km/h)`,
+            color: PROTOCOL_EVENT_COLORS["swing-detection-v1"],
+            metadata: {
+              velocity: swing.velocity,
+              velocityKmh: swing.velocityKmh,
+              dominantSide: swing.dominantSide,
+              symmetry: swing.symmetry,
+              confidence: swing.confidence,
+            },
+          });
+        });
+      }
+
+      // Add swing v3 events if enabled and has results
+      if (
+        config.protocols.enabledProtocols.includes("swing-detection-v3") &&
+        swingResultV3 &&
+        swingResultV3.swings.length > 0
+      ) {
+        swingResultV3.swings.forEach((swing, i) => {
+          // Add main swing event using full clip boundaries
+          events.push({
+            id: `swing-v3-${swing.frame}-${i}`,
+            protocolId: "swing-detection-v3" as const,
+            type: "swing",
+            startFrame: swing.clipStartFrame,
+            endFrame: swing.clipEndFrame,
+            startTime: swing.clipStartTime,
+            endTime: swing.clipEndTime,
+            label: `${swing.swingType === "forehand" ? "FH" : swing.swingType === "backhand" ? "BH" : "?"} ${i + 1} (${swing.velocityKmh.toFixed(0)} km/h, ${swing.clipDuration.toFixed(1)}s)`,
+            color: PROTOCOL_EVENT_COLORS["swing-detection-v3"],
+            metadata: {
+              swingType: swing.swingType,
+              peakVelocity: swing.peakVelocity,
+              velocityKmh: swing.velocityKmh,
+              orientationAtContact: swing.orientationAtContact,
+              rotationRange: swing.rotationRange,
+              peakRotationVelocity: swing.peakRotationVelocity,
+              dominantSide: swing.dominantSide,
+              confidence: swing.confidence,
+              swingScore: swing.swingScore,
+              loadingStart: swing.loadingStart,
+              swingStart: swing.swingStart,
+              contactFrame: swing.contactFrame,
+              followEnd: swing.followEnd,
+              // Clip boundaries for analysis export
+              clipStartTime: swing.clipStartTime,
+              clipEndTime: swing.clipEndTime,
+              clipStartFrame: swing.clipStartFrame,
+              clipEndFrame: swing.clipEndFrame,
+              clipDuration: swing.clipDuration,
+            },
+          });
+        });
+      }
+
+      // Update events state and notify callback
+      setProtocolEvents(events);
+      callbacksRef.current?.onProtocolEvents?.(events);
+      
+      if (config.protocols.logExecution && events.length > 0) {
+        detectionLogger.info(`📊 Protocol events updated: ${events.length} total events`);
+      }
+    }, [swingResult, swingResultV3, config.protocols.enabledProtocols, config.protocols.logExecution, preprocessingFPS]);
+
+    // Notify when handedness is detected
+    useEffect(() => {
+      if (handednessResult) {
+        callbacksRef.current?.onHandednessDetected?.(
+          handednessResult.dominantHand,
+          handednessResult.confidence
+        );
+        if (config.protocols.logExecution) {
+          detectionLogger.info(
+            `🖐️ Handedness detected: ${handednessResult.dominantHand}-handed (${(handednessResult.confidence * 100).toFixed(0)}% confidence)`
+          );
+        }
+      }
+    }, [handednessResult, config.protocols.logExecution]);
+
+    // Clear protocol events when preprocessed poses are cleared
+    useEffect(() => {
+      if (preprocessedPoses.size === 0) {
+        setProtocolEvents([]);
+        clearSwingResult();
+        clearSwingResultV3();
+        clearHandednessResult();
+        protocolsRunRef.current.clear();
+      }
+    }, [preprocessedPoses.size, clearSwingResult, clearSwingResultV3, clearHandednessResult]);
+
+    // ========================================================================
+    // Imperative Handle (ViewerActions)
+    // ========================================================================
+
+    useImperativeHandle(ref, () => ({
+      play: () => {
+        videoRef.current?.play();
+      },
+      pause: () => {
+        videoRef.current?.pause();
+      },
+      togglePlay: () => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (video.paused) {
+          video.play();
+        } else {
+          video.pause();
+        }
+      },
+      seekTo: async (time: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+        
+        const clampedTime = Math.max(0, Math.min(time, video.duration || 0));
+        video.currentTime = clampedTime;
+        
+        // Manually update state and call callback
+        setCurrentTime(clampedTime);
+        const newFrame = Math.floor(clampedTime * videoFPS);
+        callbacksRef.current?.onTimeUpdate?.(clampedTime, newFrame);
+
+        // Get pose for new frame from preprocessed data
+        const lookupFPS = usingPreprocessedPoses ? preprocessingFPS : videoFPS;
+        const poseFrame = Math.floor(clampedTime * lookupFPS);
+        if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
+          setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
+        } else if (detectPose && poseEnabled) {
+          try {
+            const poses = await detectPose(video);
+            setCurrentPoses(poses);
+          } catch (err) {
+            detectionLogger.error("Error detecting pose on seek:", err);
+          }
+        }
+      },
+      seekToFrame: async (frame: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+        
+        const newTime = frame / videoFPS;
+        const clampedTime = Math.max(0, Math.min(newTime, video.duration || 0));
+        video.currentTime = clampedTime;
+        
+        if (!video.paused) {
+          video.pause();
+          setIsPlaying(false);
+        }
+        
+        // Manually update state and call callback
+        setCurrentTime(clampedTime);
+        callbacksRef.current?.onTimeUpdate?.(clampedTime, frame);
+
+        // Get pose for new frame from preprocessed data
+        const lookupFPS = usingPreprocessedPoses ? preprocessingFPS : videoFPS;
+        const poseFrame = Math.floor(clampedTime * lookupFPS);
+        if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
+          setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
+        } else if (detectPose && poseEnabled) {
+          try {
+            const poses = await detectPose(video);
+            setCurrentPoses(poses);
+          } catch (err) {
+            detectionLogger.error("Error detecting pose on seekToFrame:", err);
+          }
+        }
+      },
+      stepForward: async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (!video.paused) {
+          video.pause();
+          setIsPlaying(false);
+        }
+        const frameDuration = 1 / videoFPS;
+        const newTime = Math.min(video.currentTime + frameDuration, video.duration);
+        video.currentTime = newTime;
+        
+        // Manually update state and call callback (timeupdate doesn't always fire on seek)
+        setCurrentTime(newTime);
+        const newFrame = Math.floor(newTime * videoFPS);
+        callbacksRef.current?.onTimeUpdate?.(newTime, newFrame);
+
+        // Get pose for new frame
+        const lookupFPS = usingPreprocessedPoses ? preprocessingFPS : videoFPS;
+        const poseFrame = Math.floor(newTime * lookupFPS);
+        if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
+          setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
+        } else if (detectPose && poseEnabled) {
+          try {
+            const poses = await detectPose(video);
+            setCurrentPoses(poses);
+          } catch (err) {
+            detectionLogger.error("Error detecting pose:", err);
+          }
+        }
+      },
+      stepBackward: async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (!video.paused) {
+          video.pause();
+          setIsPlaying(false);
+        }
+        const frameDuration = 1 / videoFPS;
+        const newTime = Math.max(video.currentTime - frameDuration, 0);
+        video.currentTime = newTime;
+        
+        // Manually update state and call callback (timeupdate doesn't always fire on seek)
+        setCurrentTime(newTime);
+        const newFrame = Math.floor(newTime * videoFPS);
+        callbacksRef.current?.onTimeUpdate?.(newTime, newFrame);
+
+        // Get pose for new frame
+        const lookupFPS = usingPreprocessedPoses ? preprocessingFPS : videoFPS;
+        const poseFrame = Math.floor(newTime * lookupFPS);
+        if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
+          setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
+        } else if (detectPose && poseEnabled) {
+          try {
+            const poses = await detectPose(video);
+            setCurrentPoses(poses);
+          } catch (err) {
+            detectionLogger.error("Error detecting pose:", err);
+          }
+        }
+      },
+      startPreprocessing,
+      cancelPreprocessing,
+      clearPreprocessing,
+      captureFrame: async (): Promise<Blob | null> => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas) return null;
+
+        return new Promise((resolve) => {
+          const composite = document.createElement("canvas");
+          composite.width = video.videoWidth;
+          composite.height = video.videoHeight;
+          const ctx = composite.getContext("2d");
+          if (!ctx) {
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(video, 0, 0);
+          ctx.drawImage(canvas, 0, 0, video.videoWidth, video.videoHeight);
+          composite.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+        });
+      },
+      getCurrentPoses: () => currentPoses,
+      setSelectedPose: (index: number) => setSelectedPoseIndex(index),
+      rerunProtocols: () => {
+        // Clear all protocol results and run refs to trigger re-execution
+        protocolsRunRef.current.clear();
+        clearSwingResult();
+        clearSwingResultV3();
+        clearHandednessResult();
+        setProtocolEvents([]);
+        detectionLogger.info("🔄 Protocols cleared - will re-run on next cycle");
+      },
+    }), [
+      videoFPS,
+      usingPreprocessedPoses,
+      preprocessingFPS,
+      preprocessedPoses,
+      detectPose,
+      poseEnabled,
+      currentPoses,
+      startPreprocessing,
+      cancelPreprocessing,
+      clearPreprocessing,
+      clearSwingResult,
+      clearSwingResultV3,
+      clearHandednessResult,
+    ]);
+
+    // ========================================================================
+    // Error Reporting
+    // ========================================================================
+
+    useEffect(() => {
+      if (modelError) {
+        callbacksRef.current?.onError?.(modelError);
+      }
+    }, [modelError]);
+
+    // ========================================================================
+    // Render
+    // ========================================================================
+
+    return (
+      <Box
+        ref={containerRef}
+        className={className}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          backgroundColor: "#000",
+          overflow: "hidden",
+          ...style,
+        }}
+      >
+        {/* Video Element - hidden during FPS detection to prevent visible playback */}
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          crossOrigin={shouldUseCrossOrigin(videoUrl) ? "anonymous" : undefined}
+          onLoadedMetadata={handleLoadedMetadata}
+          onTimeUpdate={handleTimeUpdate}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onEnded={handleEnded}
+          autoPlay={config.playback.autoPlay}
+          loop={config.playback.loop}
+          muted={config.playback.muted}
+          playsInline
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            // Hide video until FPS detection completes (unless pose is disabled)
+            visibility: (isVideoReadyForDisplay || !poseEnabled) ? "visible" : "hidden",
+          }}
+        />
+
+        {/* Canvas Overlay - hidden until video is ready for display */}
+        <canvas
+          ref={canvasRef}
+          width={videoDimensions.width}
+          height={videoDimensions.height}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            pointerEvents: "none",
+            zIndex: 10,
+            // Hide canvas until video is ready for display
+            opacity: isVideoReadyForDisplay ? 1 : 0,
+          }}
+        />
+
+        {/* Loading Overlay - solid black before video is ready */}
+        {poseEnabled && !isVideoReadyForDisplay && (
+          <Flex
+            align="center"
+            justify="center"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "#000",
+              zIndex: 20,
+            }}
+          >
+            <Flex direction="column" align="center" gap="2">
+              <Spinner size="3" />
+              <Text size="2" style={{ color: "white" }}>
+                {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
+              </Text>
+            </Flex>
+          </Flex>
+        )}
+
+        {/* Preprocessing Overlay - semi-transparent to show video */}
+        {poseEnabled && isVideoReadyForDisplay && isPreprocessing && config.preprocessing.showProgress && (
+          <Flex
+            align="center"
+            justify="center"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              zIndex: 20,
+            }}
+          >
+            <Flex direction="column" align="center" gap="3" style={{ width: "80%", maxWidth: "300px" }}>
+              <Text size="2" weight="medium" style={{ color: "white" }}>
+                Processing video frames...
+              </Text>
+              <Box
+                style={{
+                  width: "100%",
+                  height: "8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  borderRadius: "4px",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  style={{
+                    width: `${preprocessProgress}%`,
+                    height: "100%",
+                    backgroundColor: "#7ADB8F",
+                    transition: "width 0.1s",
+                  }}
+                />
+              </Box>
+              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                {preprocessProgress.toFixed(0)}%
+              </Text>
+            </Flex>
+          </Flex>
+        )}
+
+        {/* Debug Overlay */}
+        {config.debug.showDebugOverlay && (
+          <Flex
+            direction="column"
+            gap="1"
+            style={{
+              position: "absolute",
+              top: "8px",
+              left: "8px",
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              zIndex: 25,
+            }}
+          >
+            {config.debug.showFPS && (
+              <Text size="1" style={{ color: "#7ADB8F", fontFamily: "monospace" }}>
+                FPS: {videoFPS}
+              </Text>
+            )}
+            {config.debug.showPreprocessingStats && (
+              <>
+                <Text size="1" style={{ color: "white", fontFamily: "monospace" }}>
+                  Frame: {currentFrame} / {totalFrames}
+                </Text>
+                {usingPreprocessedPoses && (
+                  <Text size="1" style={{ color: "#4ECDC4", fontFamily: "monospace" }}>
+                    Preprocessed: {preprocessedPoses.size} frames
+                  </Text>
+                )}
+              </>
+            )}
+            {config.debug.showVideoMetadata && (
+              <>
+                <Text size="1" style={{ color: "white", fontFamily: "monospace" }}>
+                  Size: {videoDimensions.width}×{videoDimensions.height}
+                </Text>
+                <Text size="1" style={{ color: "white", fontFamily: "monospace" }}>
+                  Duration: {duration.toFixed(2)}s
+                </Text>
+              </>
+            )}
+            {currentPoses.length > 0 && (
+              <Text size="1" style={{ color: "#FFE66D", fontFamily: "monospace" }}>
+                Poses: {currentPoses.length}
+              </Text>
+            )}
+          </Flex>
+        )}
+
+        {/* Error Display */}
+        {modelError && (
+          <Flex
+            align="center"
+            justify="center"
+            style={{
+              position: "absolute",
+              bottom: "8px",
+              left: "8px",
+              right: "8px",
+              backgroundColor: "rgba(220, 38, 38, 0.9)",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              zIndex: 25,
+            }}
+          >
+            <Text size="1" style={{ color: "white" }}>
+              {modelError}
+            </Text>
+          </Flex>
+        )}
+      </Box>
+    );
+  }
+);
+
+export default VideoPoseViewerV2;
+

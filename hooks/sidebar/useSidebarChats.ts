@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { chatLogger } from "@/lib/logger";
 import {
   getCurrentChatId,
   setCurrentChatId as saveCurrentChatId,

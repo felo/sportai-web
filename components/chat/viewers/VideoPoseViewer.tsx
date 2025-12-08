@@ -1,8 +1,11 @@
 "use client";
 
 import { lazy, Suspense } from "react";
-import type { SupportedModel } from "@/hooks/usePoseDetection";
+import type { SupportedModel, PoseDetectionResult } from "@/hooks/usePoseDetection";
 import { Box } from "@radix-ui/themes";
+
+// Re-export PoseDetectionResult for consumers
+export type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 
 // Dynamic import of the TensorFlow-heavy component
 const VideoPoseViewerCore = lazy(() => 
@@ -38,6 +41,8 @@ interface VideoPoseViewerProps {
   onPoseEnabledChange?: (enabled: boolean) => void;
   // Callback when video metadata is loaded - provides actual video dimensions
   onVideoMetadataLoaded?: (width: number, height: number) => void;
+  // Callback when pose detection results change
+  onPoseChange?: (poses: PoseDetectionResult[]) => void;
   // Compact mode - hides button text, used when video is floating/docked
   compactMode?: boolean;
   // S3 storage for pose data caching
