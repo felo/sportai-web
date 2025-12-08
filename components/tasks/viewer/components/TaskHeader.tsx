@@ -53,7 +53,7 @@ export function TaskHeader({
             {task.sport.charAt(0).toUpperCase() + task.sport.slice(1)}
           </Badge>
           <Badge variant="soft" size="2">
-            {task.task_type}
+            {task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1)}
           </Badge>
           {developerMode && (
             <Text size="2" color="gray">

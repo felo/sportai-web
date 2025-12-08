@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Flex, IconButton, Tooltip, Text, Button } from "@radix-ui/themes";
+import { Box, Flex, IconButton, Tooltip, Text, Button, Badge } from "@radix-ui/themes";
 import { 
   ArrowLeftIcon, 
   GearIcon, 
@@ -22,13 +22,16 @@ import {
   PROTOCOL_EVENT_COLORS,
   AVAILABLE_PROTOCOLS,
 } from "@/components/videoPoseViewerV2";
+import { getSportColor } from "@/components/tasks/viewer/utils";
 
 interface TechniqueViewerProps {
   videoUrl: string;
   onBack?: () => void;
+  /** Sport name (e.g., "Tennis", "Padel") */
+  sport?: string;
 }
 
-export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
+export function TechniqueViewer({ videoUrl, onBack, sport }: TechniqueViewerProps) {
   // Viewer configuration (externally controlled)
   const [config, setConfig] = useState<ViewerConfig>(DEFAULT_VIEWER_CONFIG);
 
@@ -177,7 +180,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "#0a0a0a",
+        backgroundColor: "var(--gray-1)",
         overflow: "hidden",
       }}
     >
@@ -197,8 +200,8 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
             justify="between"
             style={{
               padding: "12px 16px",
-              backgroundColor: "rgba(0, 0, 0, 0.8)",
-              borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+              backgroundColor: "var(--gray-1)",
+              borderBottom: "1px solid var(--gray-a5)",
             }}
           >
             <Flex align="center" gap="3">
@@ -214,39 +217,22 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                   </IconButton>
                 </Tooltip>
               )}
-              <Text
-                size="2"
-                weight="medium"
-                style={{ color: "rgba(255, 255, 255, 0.9)" }}
-              >
-                Technique Analysis
-              </Text>
+              {sport && (
+                <Badge color={getSportColor(sport)} size="2">
+                  {sport.charAt(0).toUpperCase() + sport.slice(1)}
+                </Badge>
+              )}
+              <Badge variant="soft" size="2">
+                Technique
+              </Badge>
               {viewerState.handednessResult && (
-                <Text
-                  size="1"
-                  style={{
-                    color: "rgba(255, 255, 255, 0.6)",
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                  }}
-                >
+                <Badge variant="soft" size="2">
                   {viewerState.handednessResult.dominantHand === "right" ? "Right" : "Left"}-handed
-                </Text>
+                </Badge>
               )}
             </Flex>
 
             <Flex align="center" gap="2">
-              {viewMode === "player" && (
-                <Text
-                  size="1"
-                  style={{ color: "rgba(255, 255, 255, 0.5)", marginRight: "8px" }}
-                >
-                  {viewerState.currentFrame} / {viewerState.totalFrames} •{" "}
-                  {viewerState.currentTime.toFixed(2)}s
-                </Text>
-              )}
-              
               {/* View Swings / View Player toggle */}
               {swingCount > 0 && (
                 <Tooltip content={viewMode === "player" ? "View detected swings" : "View full video"}>
@@ -313,7 +299,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                 flex: 1,
                 overflow: "auto",
                 padding: "24px",
-                backgroundColor: "#0a0a0a",
+                backgroundColor: "var(--gray-1)",
               }}
             >
               {/* Gallery Header */}
@@ -325,8 +311,8 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                     </Text>
                     <Box
                       style={{
-                        backgroundColor: PROTOCOL_EVENT_COLORS["swing-detection-v3"],
-                        color: "black",
+                        backgroundColor: "var(--blue-9)",
+                        color: "white",
                         padding: "2px 10px",
                         borderRadius: "12px",
                         fontWeight: 600,
@@ -360,7 +346,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                           cursor: "pointer",
                           transition: "transform 0.2s, box-shadow 0.2s",
                           backgroundColor: "rgba(30, 30, 30, 0.9)",
-                          border: `2px solid ${event.color}40`,
+                          border: "2px solid var(--blue-a5)",
                           borderRadius: "8px",
                           overflow: "hidden",
                         }}
@@ -373,7 +359,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                         <Box
                           style={{
                             height: "100px",
-                            backgroundColor: event.color + "20",
+                            backgroundColor: "var(--blue-a3)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -384,16 +370,16 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                             style={{
                               position: "absolute",
                               inset: 0,
-                              background: `linear-gradient(135deg, ${event.color}30 0%, transparent 50%)`,
+                              background: "linear-gradient(135deg, var(--blue-a4) 0%, transparent 50%)",
                             }}
                           />
                           <Flex direction="column" align="center" gap="1">
                             <Text
                               size="5"
                               weight="bold"
-                              style={{ color: event.color }}
+                              style={{ color: "var(--blue-9)" }}
                             >
-                              {swingType === "forehand" ? "FH" : swingType === "backhand" ? "BH" : "?"}
+                              {swingType === "forehand" ? "FH" : swingType === "backhand" ? "BH" : "Swing"}
                             </Text>
                             <Text size="1" style={{ color: "rgba(255,255,255,0.5)" }}>
                               {event.startTime.toFixed(2)}s - {event.endTime.toFixed(2)}s
@@ -405,8 +391,8 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                               position: "absolute",
                               top: "8px",
                               left: "8px",
-                              backgroundColor: event.color,
-                              color: "black",
+                              backgroundColor: "var(--blue-9)",
+                              color: "white",
                               padding: "2px 8px",
                               borderRadius: "4px",
                               fontWeight: 600,
@@ -435,7 +421,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                                 <Text size="1" style={{ color: "rgba(255,255,255,0.4)" }}>
                                   Speed
                                 </Text>
-                                <Text size="2" weight="medium" style={{ color: event.color }}>
+                                <Text size="2" weight="medium" style={{ color: "var(--blue-9)" }}>
                                   {velocityKmh.toFixed(0)} km/h
                                 </Text>
                               </Flex>
@@ -482,8 +468,8 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
             <Box
               style={{
                 padding: "8px 16px 12px",
-                backgroundColor: "rgba(0, 0, 0, 0.8)",
-                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                backgroundColor: "var(--gray-1)",
+                borderTop: "1px solid var(--gray-a5)",
               }}
             >
               {/* Time display */}
@@ -492,7 +478,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                   {viewerState.currentTime.toFixed(2)}s
                 </Text>
                 <Text size="1" style={{ color: "rgba(255, 255, 255, 0.6)", fontFamily: "monospace" }}>
-                  Frame {viewerState.currentFrame} / {viewerState.totalFrames}
+                  {viewerState.currentFrame} / {viewerState.totalFrames}
                 </Text>
                 <Text size="1" style={{ color: "rgba(255, 255, 255, 0.6)", fontFamily: "monospace" }}>
                   {viewerState.duration.toFixed(2)}s
@@ -517,7 +503,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                       : 0;
                     const widthPercent = Math.max(1, endPercent - startPercent);
                     const isRange = event.endFrame !== event.startFrame;
-                    const color = event.color || PROTOCOL_EVENT_COLORS[event.protocolId] || "#FF6B6B";
+                    const color = "var(--blue-9)";
                     
                     return (
                       <Tooltip key={event.id} content={`${event.label} (${event.startTime.toFixed(2)}s)`}>
@@ -540,7 +526,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                         >
                           {isRange && widthPercent > 3 && (
                             <Text size="1" style={{ color: "black", fontSize: "9px", fontWeight: 600 }}>
-                              {event.label.split(" ")[0]}
+                              {event.label.split(" ")[0] === "?" ? "Swing" : event.label.split(" ")[0]}
                             </Text>
                           )}
                         </Box>
@@ -555,7 +541,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                 style={{
                   position: "relative",
                   height: "32px",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  backgroundColor: "var(--gray-3)",
                   borderRadius: "4px",
                   cursor: "pointer",
                   touchAction: "none",
@@ -630,31 +616,6 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
                 ))}
               </Box>
 
-              {/* Protocol Events Legend */}
-              {protocolEvents.length > 0 && (
-                <Flex gap="3" style={{ marginTop: "8px" }}>
-                  {Array.from(new Set(protocolEvents.map(e => e.protocolId))).map(protocolId => {
-                    const protocol = AVAILABLE_PROTOCOLS.find(p => p.id === protocolId);
-                    const color = PROTOCOL_EVENT_COLORS[protocolId] || "#888";
-                    const count = protocolEvents.filter(e => e.protocolId === protocolId).length;
-                    return (
-                      <Flex key={protocolId} align="center" gap="1">
-                        <Box
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            backgroundColor: color,
-                            borderRadius: "2px",
-                          }}
-                        />
-                        <Text size="1" style={{ color: "rgba(255, 255, 255, 0.6)" }}>
-                          {protocol?.name || protocolId} ({count})
-                        </Text>
-                      </Flex>
-                    );
-                  })}
-                </Flex>
-              )}
             </Box>
           )}
         </Box>
@@ -665,7 +626,7 @@ export function TechniqueViewer({ videoUrl, onBack }: TechniqueViewerProps) {
             style={{
               width: "400px",
               height: "100%",
-              borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
+              borderLeft: "1px solid var(--gray-a5)",
               overflow: "auto",
             }}
           >

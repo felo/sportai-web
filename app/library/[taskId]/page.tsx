@@ -17,6 +17,7 @@ export default function TaskViewerPage({
   const { user, loading: authLoading } = useAuth();
   const [taskType, setTaskType] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [sport, setSport] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch task to determine type
@@ -33,6 +34,7 @@ export default function TaskViewerPage({
           const { task } = await response.json();
           setTaskType(task.task_type);
           setVideoUrl(task.video_url);
+          setSport(task.sport);
         }
       } catch (err) {
         console.error("Failed to fetch task:", err);
@@ -79,6 +81,7 @@ export default function TaskViewerPage({
     return (
       <TechniqueViewer 
         videoUrl={videoUrl} 
+        sport={sport || undefined}
         onBack={() => router.push("/library")}
       />
     );

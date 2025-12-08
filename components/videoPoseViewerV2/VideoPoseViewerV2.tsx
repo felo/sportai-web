@@ -1334,7 +1334,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           position: "relative",
           width: "100%",
           height: "100%",
-          backgroundColor: "#000",
+          backgroundColor: "var(--gray-1)",
           overflow: "hidden",
           ...style,
         }}
@@ -1382,7 +1382,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           }}
         />
 
-        {/* Loading Overlay - solid black before video is ready */}
+        {/* Loading Overlay - solid background before video is ready */}
         {poseEnabled && !isVideoReadyForDisplay && (
           <Flex
             align="center"
@@ -1393,20 +1393,20 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: "#000",
+              backgroundColor: "var(--gray-1)",
               zIndex: 20,
             }}
           >
             <Flex direction="column" align="center" gap="2">
               <Spinner size="3" />
-              <Text size="2" style={{ color: "white" }}>
+              <Text size="2" color="gray">
                 {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
               </Text>
             </Flex>
           </Flex>
         )}
 
-        {/* Preprocessing Overlay - semi-transparent to show video */}
+        {/* Preprocessing Overlay - themed background */}
         {poseEnabled && isVideoReadyForDisplay && isPreprocessing && config.preprocessing.showProgress && (
           <Flex
             align="center"
@@ -1417,19 +1417,19 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              backgroundColor: "color-mix(in srgb, var(--gray-1) 90%, transparent)",
               zIndex: 20,
             }}
           >
             <Flex direction="column" align="center" gap="3" style={{ width: "80%", maxWidth: "300px" }}>
-              <Text size="2" weight="medium" style={{ color: "white" }}>
+              <Text size="2" weight="medium" color="gray">
                 Processing video frames...
               </Text>
               <Box
                 style={{
                   width: "100%",
                   height: "8px",
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  backgroundColor: "var(--gray-a4)",
                   borderRadius: "4px",
                   overflow: "hidden",
                 }}
@@ -1438,12 +1438,12 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
                   style={{
                     width: `${preprocessProgress}%`,
                     height: "100%",
-                    backgroundColor: "#7ADB8F",
+                    backgroundColor: "var(--accent-9)",
                     transition: "width 0.1s",
                   }}
                 />
               </Box>
-              <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+              <Text size="1" color="gray">
                 {preprocessProgress.toFixed(0)}%
               </Text>
             </Flex>
