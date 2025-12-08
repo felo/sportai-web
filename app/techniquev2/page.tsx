@@ -63,14 +63,17 @@ export default function TechniqueV2Page() {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
 
+  // Lite mode from URL - hides top bar, bottom frame, and settings panel
+  const lite = searchParams.get("lite") === "true";
+
   // Viewer configuration (externally controlled)
   const [config, setConfig] = useState<ViewerConfig>(DEFAULT_VIEWER_CONFIG);
 
   // Pose enabled state
   const [poseEnabled, setPoseEnabled] = useState(true);
 
-  // Panel visibility
-  const [showPanel, setShowPanel] = useState(true);
+  // Panel visibility - default to hidden in lite mode
+  const [showPanel, setShowPanel] = useState(!lite);
 
   // View mode: "player" shows video player, "swings" shows swing gallery
   const [viewMode, setViewMode] = useState<"player" | "swings">("player");
@@ -488,119 +491,121 @@ export default function TechniqueV2Page() {
               flexDirection: "column",
             }}
           >
-            {/* Top Bar */}
-            <Flex
-              align="center"
-              justify="between"
-              style={{
-                padding: "12px 16px",
-                backgroundColor: "rgba(0, 0, 0, 0.8)",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-              }}
-            >
-              <Flex align="center" gap="3">
-                <Tooltip content="Close video">
-                  <IconButton
-                    size="2"
-                    variant="ghost"
-                    onClick={handleClear}
-                    style={{ color: "white" }}
-                  >
-                    <Cross2Icon width={18} height={18} />
-                  </IconButton>
-                </Tooltip>
-                <Text
-                  size="2"
-                  style={{
-                    color: "rgba(255, 255, 255, 0.7)",
-                    maxWidth: "300px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {selectedSwing ? (
-                    <Flex align="center" gap="2">
-                      <Box
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          backgroundColor: PROTOCOL_EVENT_COLORS["swing-detection-v3"],
-                          borderRadius: "2px",
-                        }}
-                      />
-                      <span>{selectedSwing.label}</span>
-                      <span style={{ color: "rgba(255,255,255,0.4)" }}>
-                        ({selectedSwing.startTime.toFixed(1)}s - {selectedSwing.endTime.toFixed(1)}s)
-                      </span>
-                    </Flex>
-                  ) : viewMode === "swings" ? (
-                    "Detected Swings"
-                  ) : (
-                    loadedUrl
-                  )}
-                </Text>
-              </Flex>
-
-              <Flex align="center" gap="2">
-                {viewMode === "player" && !selectedSwing && (
-                  <Text
-                    size="1"
-                    style={{ color: "rgba(255, 255, 255, 0.5)", marginRight: "8px" }}
-                  >
-                    {viewerState.currentFrame} / {viewerState.totalFrames} •{" "}
-                    {viewerState.currentTime.toFixed(2)}s
-                  </Text>
-                )}
-                {selectedSwing && (
-                  <Tooltip content="Back to full video">
-                    <Button
-                      size="1"
-                      variant="soft"
-                      onClick={() => setSelectedSwing(null)}
-                      style={{ marginRight: "8px" }}
-                    >
-                      <ArrowLeftIcon width={14} height={14} />
-                      Back to Full
-                    </Button>
-                  </Tooltip>
-                )}
-                {/* View Swings / View Player toggle */}
-                {protocolEvents.filter(e => e.protocolId === "swing-detection-v3").length > 0 && (
-                  <Tooltip content={viewMode === "player" ? "View detected swings" : "View full video"}>
+            {/* Top Bar - hidden in lite mode */}
+            {!lite && (
+              <Flex
+                align="center"
+                justify="between"
+                style={{
+                  padding: "12px 16px",
+                  backgroundColor: "rgba(0, 0, 0, 0.8)",
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                <Flex align="center" gap="3">
+                  <Tooltip content="Close video">
                     <IconButton
                       size="2"
-                      variant={viewMode === "swings" ? "solid" : "ghost"}
-                      onClick={() => {
-                        setViewMode(viewMode === "player" ? "swings" : "player");
-                        setSelectedSwing(null);
-                      }}
+                      variant="ghost"
+                      onClick={handleClear}
                       style={{ color: "white" }}
                     >
-                      {viewMode === "player" ? (
-                        <GridIcon width={18} height={18} />
+                      <Cross2Icon width={18} height={18} />
+                    </IconButton>
+                  </Tooltip>
+                  <Text
+                    size="2"
+                    style={{
+                      color: "rgba(255, 255, 255, 0.7)",
+                      maxWidth: "300px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {selectedSwing ? (
+                      <Flex align="center" gap="2">
+                        <Box
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            backgroundColor: PROTOCOL_EVENT_COLORS["swing-detection-v3"],
+                            borderRadius: "2px",
+                          }}
+                        />
+                        <span>{selectedSwing.label}</span>
+                        <span style={{ color: "rgba(255,255,255,0.4)" }}>
+                          ({selectedSwing.startTime.toFixed(1)}s - {selectedSwing.endTime.toFixed(1)}s)
+                        </span>
+                      </Flex>
+                    ) : viewMode === "swings" ? (
+                      "Detected Swings"
+                    ) : (
+                      loadedUrl
+                    )}
+                  </Text>
+                </Flex>
+
+                <Flex align="center" gap="2">
+                  {viewMode === "player" && !selectedSwing && (
+                    <Text
+                      size="1"
+                      style={{ color: "rgba(255, 255, 255, 0.5)", marginRight: "8px" }}
+                    >
+                      {viewerState.currentFrame} / {viewerState.totalFrames} •{" "}
+                      {viewerState.currentTime.toFixed(2)}s
+                    </Text>
+                  )}
+                  {selectedSwing && (
+                    <Tooltip content="Back to full video">
+                      <Button
+                        size="1"
+                        variant="soft"
+                        onClick={() => setSelectedSwing(null)}
+                        style={{ marginRight: "8px" }}
+                      >
+                        <ArrowLeftIcon width={14} height={14} />
+                        Back to Full
+                      </Button>
+                    </Tooltip>
+                  )}
+                  {/* View Swings / View Player toggle */}
+                  {protocolEvents.filter(e => e.protocolId === "swing-detection-v3").length > 0 && (
+                    <Tooltip content={viewMode === "player" ? "View detected swings" : "View full video"}>
+                      <IconButton
+                        size="2"
+                        variant={viewMode === "swings" ? "solid" : "ghost"}
+                        onClick={() => {
+                          setViewMode(viewMode === "player" ? "swings" : "player");
+                          setSelectedSwing(null);
+                        }}
+                        style={{ color: "white" }}
+                      >
+                        {viewMode === "player" ? (
+                          <GridIcon width={18} height={18} />
+                        ) : (
+                          <VideoIcon width={18} height={18} />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip content={showPanel ? "Hide settings" : "Show settings"}>
+                    <IconButton
+                      size="2"
+                      variant={showPanel ? "solid" : "ghost"}
+                      onClick={() => setShowPanel(!showPanel)}
+                      style={{ color: "white" }}
+                    >
+                      {showPanel ? (
+                        <DoubleArrowRightIcon width={18} height={18} />
                       ) : (
-                        <VideoIcon width={18} height={18} />
+                        <GearIcon width={18} height={18} />
                       )}
                     </IconButton>
                   </Tooltip>
-                )}
-                <Tooltip content={showPanel ? "Hide settings" : "Show settings"}>
-                  <IconButton
-                    size="2"
-                    variant={showPanel ? "solid" : "ghost"}
-                    onClick={() => setShowPanel(!showPanel)}
-                    style={{ color: "white" }}
-                  >
-                    {showPanel ? (
-                      <DoubleArrowRightIcon width={18} height={18} />
-                    ) : (
-                      <GearIcon width={18} height={18} />
-                    )}
-                  </IconButton>
-                </Tooltip>
+                </Flex>
               </Flex>
-            </Flex>
+            )}
 
             {/* Video Viewer - always mounted, visibility controlled by viewMode */}
             <Box 
@@ -616,6 +621,7 @@ export default function TechniqueV2Page() {
                 config={config}
                 poseEnabled={selectedSwing ? false : poseEnabled}
                 callbacks={viewerCallbacks}
+                lite={lite}
                 style={{
                   position: "absolute",
                   top: 0,
@@ -626,8 +632,8 @@ export default function TechniqueV2Page() {
               />
             </Box>
 
-            {/* Swings Gallery - only visible when in swings mode */}
-            {viewMode === "swings" && (
+            {/* Swings Gallery - only visible when in swings mode, hidden in lite mode */}
+            {viewMode === "swings" && !lite && (
               /* Swings Gallery View */
               <Box
                 style={{
@@ -888,8 +894,8 @@ export default function TechniqueV2Page() {
               </Box>
             )}
 
-            {/* Timeline Scrubber - only show in player mode */}
-            {viewMode === "player" && (
+            {/* Timeline Scrubber - only show in player mode, hidden in lite mode */}
+            {viewMode === "player" && !lite && (
             <Box
               style={{
                 padding: "8px 16px 12px",
@@ -1105,8 +1111,8 @@ export default function TechniqueV2Page() {
             )}
           </Box>
 
-          {/* Configuration Panel */}
-          {showPanel && (
+          {/* Configuration Panel - hidden in lite mode */}
+          {showPanel && !lite && (
             <Box
               style={{
                 width: "400px",

@@ -87,7 +87,8 @@ export function TaskTile({
             )}
           </Flex>
 
-          {task.status === "completed" && !task.result_s3_key && onFetchResult && (
+          {/* Fetch result button - only for SportAI tasks (not technique) */}
+          {task.status === "completed" && !task.result_s3_key && onFetchResult && task.task_type !== "technique" && (
             <IconButton
               icon={<UpdateIcon />}
               onClick={() => onFetchResult()}

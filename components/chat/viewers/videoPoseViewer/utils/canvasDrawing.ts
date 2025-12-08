@@ -1010,24 +1010,26 @@ export function calculateBodyOrientation(
   // Clamp to reasonable range
   orientationAngle = Math.max(-180, Math.min(180, orientationAngle));
 
-  // Calculate center position (between ankles if available, otherwise between hips)
-  let centerX = hipMidX;
-  let centerY = hipMidY;
+  // Calculate center position
+  // X-axis: Always between the hips (hipMidX)
+  // Y-axis: Vertically down from hip center to between the ankles
+  const centerX = hipMidX;
   
   const leftAnkleValid = leftAnkle && (leftAnkle.score ?? 0) >= minConfidence;
   const rightAnkleValid = rightAnkle && (rightAnkle.score ?? 0) >= minConfidence;
   
+  let centerY: number;
   if (leftAnkleValid && rightAnkleValid) {
-    centerX = (leftAnkle.x + rightAnkle.x) / 2;
-    centerY = Math.max(leftAnkle.y, rightAnkle.y) + shoulderWidth * 0.3; // Slightly below ankles
+    // Both ankles available - use the lowest ankle (max Y) to stay grounded during jumps
+    centerY = Math.max(leftAnkle.y, rightAnkle.y);
   } else if (leftAnkleValid) {
-    centerX = leftAnkle.x;
-    centerY = leftAnkle.y + shoulderWidth * 0.3;
+    // Only left ankle available - assume right ankle is horizontally symmetric
+    centerY = leftAnkle.y;
   } else if (rightAnkleValid) {
-    centerX = rightAnkle.x;
-    centerY = rightAnkle.y + shoulderWidth * 0.3;
+    // Only right ankle available - assume left ankle is horizontally symmetric
+    centerY = rightAnkle.y;
   } else {
-    // Use hip position and estimate ankle position
+    // No ankles available - estimate ankle Y based on hip + torso height
     centerY = hipMidY + torsoHeight * 0.8;
   }
 

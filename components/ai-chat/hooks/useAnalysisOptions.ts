@@ -213,11 +213,15 @@ export function useAnalysisOptions({
     
     const estimatedTime = estimateProAnalysisTime(preAnalysis.durationSeconds ?? null);
     
+    // Determine task type: "statistics" for tactical (full court), "technique" for technique (side camera)
+    const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
+    const taskType = isTechniqueAnalysis ? "technique" : "statistics";
+    
     // Create PRO analysis task
     let taskCreated = false;
     if (user) {
       try {
-        analysisLogger.info("Creating PRO analysis task for URL:", videoUrl);
+        analysisLogger.info(`Creating PRO ${taskType} task for URL:`, videoUrl);
         
         const response = await fetch("/api/tasks", {
           method: "POST",
@@ -226,7 +230,7 @@ export function useAnalysisOptions({
             Authorization: `Bearer ${user.id}`,
           },
           body: JSON.stringify({
-            taskType: "statistics",
+            taskType,
             sport: preAnalysis.sport,
             videoUrl: videoUrl,
             thumbnailUrl: preAnalysis.thumbnailUrl || null,
@@ -237,15 +241,15 @@ export function useAnalysisOptions({
         
         if (response.ok) {
           const { task } = await response.json();
-          analysisLogger.info("PRO analysis task created:", task.id);
+          analysisLogger.info(`PRO ${taskType} task created:`, task.id);
           taskCreated = true;
           refreshLibraryTasks();
         } else {
           const errorData = await response.json().catch(() => ({}));
-          analysisLogger.error("Failed to create PRO analysis task:", errorData);
+          analysisLogger.error(`Failed to create PRO ${taskType} task:`, errorData);
         }
       } catch (err) {
-        analysisLogger.error("Error creating PRO analysis task:", err);
+        analysisLogger.error(`Error creating PRO ${taskType} task:`, err);
       }
     } else {
       analysisLogger.warn("User not authenticated, skipping PRO task creation");
@@ -254,10 +258,15 @@ export function useAnalysisOptions({
     // Add library notification message
     if (taskCreated) {
       const libraryMessageId = generateMessageId();
+      // Technique tasks are immediately completed; tactical tasks need processing time
+      const libraryMessageContent = isTechniqueAnalysis
+        ? `🎯 I've added this video to your **Library** (in the sidebar) under **Technique**. You can revisit it anytime!\n\nNow let me give you some instant feedback...`
+        : `🎯 I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`;
+      
       const libraryMessage: Message = {
         id: libraryMessageId,
         role: "assistant",
-        content: `🎯 I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`,
+        content: libraryMessageContent,
         isStreaming: false,
       };
       addMessage(libraryMessage);

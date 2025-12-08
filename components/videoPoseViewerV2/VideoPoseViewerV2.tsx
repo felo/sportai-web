@@ -67,6 +67,8 @@ interface VideoPoseViewerV2Props {
   className?: string;
   /** Custom style */
   style?: React.CSSProperties;
+  /** Lite mode - hides debug overlay for minimal UI embedding */
+  lite?: boolean;
 }
 
 // ============================================================================
@@ -102,7 +104,7 @@ function shouldUseCrossOrigin(url: string): boolean {
 
 export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
   function VideoPoseViewerV2(
-    { videoUrl, config, poseEnabled, callbacks, className, style },
+    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false },
     ref
   ) {
     // Refs
@@ -1448,8 +1450,8 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           </Flex>
         )}
 
-        {/* Debug Overlay */}
-        {config.debug.showDebugOverlay && (
+        {/* Debug Overlay - hidden in lite mode */}
+        {!lite && config.debug.showDebugOverlay && (
           <Flex
             direction="column"
             gap="1"
@@ -1498,18 +1500,18 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           </Flex>
         )}
 
-        {/* Error Display */}
+        {/* Error Display - more compact in lite mode */}
         {modelError && (
           <Flex
             align="center"
             justify="center"
             style={{
               position: "absolute",
-              bottom: "8px",
-              left: "8px",
-              right: "8px",
+              bottom: lite ? "4px" : "8px",
+              left: lite ? "4px" : "8px",
+              right: lite ? "4px" : "8px",
               backgroundColor: "rgba(220, 38, 38, 0.9)",
-              padding: "8px 12px",
+              padding: lite ? "4px 8px" : "8px 12px",
               borderRadius: "6px",
               zIndex: 25,
             }}

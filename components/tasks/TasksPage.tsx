@@ -30,6 +30,7 @@ import { extractFirstFrameFromUrl, uploadThumbnailToS3 } from "@/utils/video-uti
 
 const TASK_TYPES = [
   { value: "statistics", label: "Statistics" },
+  { value: "technique", label: "Technique" },
   // Add more task types as needed
   // { value: "activity_detection", label: "Activity Detection" },
 ];
@@ -381,7 +382,13 @@ export function TasksPage() {
       return;
     }
     
-    // Need to fetch the result first
+    // Technique tasks don't have SportAI results - navigate directly
+    if (task.task_type === "technique") {
+      router.push(`/library/${taskId}`);
+      return;
+    }
+    
+    // Need to fetch the result first (for SportAI tasks like statistics)
     try {
       const response = await fetch(`/api/tasks/${taskId}/result`, {
         method: "POST",

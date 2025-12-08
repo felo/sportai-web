@@ -10,10 +10,14 @@ const SPORTAI_API_URL = "https://api.sportai.com";
 const SPORTAI_API_KEY = process.env.SPORTAI_API_KEY;
 
 // Task type to API endpoint mapping
+// Note: "technique" tasks don't use SportAI API - they're processed client-side
 const TASK_ENDPOINTS: Record<string, string> = {
   statistics: "/api/statistics",
   activity_detection: "/api/activity_detection",
 };
+
+// Task types that don't require SportAI API (processed client-side)
+const CLIENT_SIDE_TASKS = ["technique"];
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -98,14 +102,6 @@ export async function POST(request: NextRequest) {
     
     const userId = authHeader.replace("Bearer ", "");
     
-    if (!SPORTAI_API_KEY) {
-      logger.error(`[${requestId}] SPORTAI_API_KEY not configured`);
-      return NextResponse.json(
-        { error: "SportAI API not configured" },
-        { status: 503 }
-      );
-    }
-    
     const body = await request.json();
     const { taskType, sport = "padel", videoUrl, thumbnailUrl, thumbnailS3Key, videoLength, params = {} } = body;
     
@@ -131,6 +127,42 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    logger.info(`[${requestId}] Creating ${taskType} task for video: ${videoUrl}`);
+    
+    const supabase = getSupabaseClient();
+    
+    // Handle client-side tasks (like technique) - no SportAI API call needed
+    if (CLIENT_SIDE_TASKS.includes(taskType)) {
+      logger.info(`[${requestId}] Creating client-side ${taskType} task (no SportAI API call)`);
+      
+      const { data: task, error: dbError } = await supabase
+        .from("sportai_tasks")
+        .insert({
+          user_id: userId,
+          task_type: taskType,
+          sport,
+          sportai_task_id: null, // No SportAI task ID for client-side tasks
+          video_url: videoUrl,
+          thumbnail_url: thumbnailUrl || null,
+          thumbnail_s3_key: thumbnailS3Key || null,
+          video_length: videoLength || null,
+          status: "completed", // Client-side tasks are immediately "completed"
+          estimated_compute_time: 0,
+          request_params: params,
+          completed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (dbError) {
+        logger.error(`[${requestId}] Database error:`, dbError);
+        return NextResponse.json({ error: dbError.message }, { status: 500 });
+      }
+      
+      return NextResponse.json({ task }, { status: 201 });
+    }
+    
+    // Server-side tasks require SportAI API
     const endpoint = TASK_ENDPOINTS[taskType];
     if (!endpoint) {
       return NextResponse.json(
@@ -139,9 +171,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    logger.info(`[${requestId}] Creating ${taskType} task for video: ${videoUrl}`);
-    
-    const supabase = getSupabaseClient();
+    if (!SPORTAI_API_KEY) {
+      logger.error(`[${requestId}] SPORTAI_API_KEY not configured`);
+      return NextResponse.json(
+        { error: "SportAI API not configured" },
+        { status: 503 }
+      );
+    }
     
     // Build request body for SportAI API
     const sportaiBody: Record<string, unknown> = {
