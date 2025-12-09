@@ -33,7 +33,7 @@ export function TaskTile({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
 
-  const { thumbnail } = useThumbnail({
+  const { thumbnail, isGenerating, regenerate } = useThumbnail({
     videoUrl: task.video_url,
     thumbnailUrl: task.thumbnail_url,
   });
@@ -141,6 +141,8 @@ export function TaskTile({
         onOpenChange={setShowInfoDialog}
         task={task}
         thumbnail={thumbnail}
+        isRegenerating={isGenerating}
+        onRegenerateThumbnail={regenerate}
       />
 
       <style jsx>{`

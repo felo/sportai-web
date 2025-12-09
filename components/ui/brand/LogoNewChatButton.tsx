@@ -72,6 +72,7 @@ export function LogoNewChatButton({
           alt="SportAI"
           width={width}
           height={height}
+          priority
           style={{ objectFit: "contain", height: "auto", display: "block" }}
         />
       </Box>

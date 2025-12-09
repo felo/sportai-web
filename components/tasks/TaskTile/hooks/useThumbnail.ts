@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface UseThumbnailOptions {
   videoUrl: string;
@@ -10,6 +10,8 @@ interface UseThumbnailOptions {
 interface UseThumbnailReturn {
   thumbnail: string | null;
   hasError: boolean;
+  isGenerating: boolean;
+  regenerate: () => void;
 }
 
 /**
@@ -22,16 +24,26 @@ export function useThumbnail({
 }: UseThumbnailOptions): UseThumbnailReturn {
   const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl);
   const [hasError, setHasError] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [regenerateKey, setRegenerateKey] = useState(0);
+
+  const regenerate = useCallback(() => {
+    setThumbnail(null);
+    setHasError(false);
+    setRegenerateKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
-    // Use stored thumbnail if available
-    if (thumbnailUrl) {
+    // Use stored thumbnail if available (only on first load)
+    if (thumbnailUrl && regenerateKey === 0) {
       setThumbnail(thumbnailUrl);
       return;
     }
 
     // Skip if already have thumbnail or had an error
     if (thumbnail || hasError) return;
+
+    setIsGenerating(true);
 
     // Generate thumbnail from video
     const video = document.createElement("video");
@@ -52,10 +64,12 @@ export function useThumbnail({
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         setThumbnail(canvas.toDataURL("image/jpeg", 0.7));
       }
+      setIsGenerating(false);
     };
 
     video.onerror = () => {
       setHasError(true);
+      setIsGenerating(false);
     };
 
     video.src = videoUrl;
@@ -64,8 +78,9 @@ export function useThumbnail({
       video.pause();
       video.src = "";
     };
-  }, [videoUrl, thumbnailUrl, thumbnail, hasError]);
+  }, [videoUrl, thumbnailUrl, thumbnail, hasError, regenerateKey]);
 
-  return { thumbnail, hasError };
+  return { thumbnail, hasError, isGenerating, regenerate };
 }
+
 

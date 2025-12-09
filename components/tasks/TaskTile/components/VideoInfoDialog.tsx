@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, Flex, Text, Badge, Box, Spinner, Button } from "@radix-ui/themes";
-import { Cross2Icon, CopyIcon, CheckIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, CopyIcon, CheckIcon, ReloadIcon } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
 import type { Task, VideoMetadata } from "../types";
 import { SPORT_COLORS, SPORT_ICONS, SPORT_BG_COLORS, STATUS_CONFIG } from "../constants";
@@ -14,6 +14,8 @@ interface VideoInfoDialogProps {
   onOpenChange: (open: boolean) => void;
   task: Task;
   thumbnail: string | null;
+  isRegenerating?: boolean;
+  onRegenerateThumbnail?: () => void;
 }
 
 /**
@@ -24,6 +26,8 @@ export function VideoInfoDialog({
   onOpenChange,
   task,
   thumbnail,
+  isRegenerating,
+  onRegenerateThumbnail,
 }: VideoInfoDialogProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const { metadata, isLoading, fetchMetadata } = useVideoMetadata({
@@ -72,6 +76,7 @@ export function VideoInfoDialog({
 
         {/* Video Preview */}
         <Box
+          onClick={onRegenerateThumbnail}
           style={{
             position: "relative",
             width: "100%",
@@ -80,14 +85,53 @@ export function VideoInfoDialog({
             overflow: "hidden",
             backgroundColor: "var(--gray-3)",
             marginBottom: "16px",
+            cursor: onRegenerateThumbnail ? "pointer" : "default",
           }}
+          title={onRegenerateThumbnail ? "Click to regenerate thumbnail" : undefined}
         >
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt="Video thumbnail"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+          {isRegenerating ? (
+            <Flex
+              align="center"
+              justify="center"
+              style={{
+                width: "100%",
+                height: "100%",
+                backgroundColor: SPORT_BG_COLORS[task.sport],
+              }}
+            >
+              <Spinner size="3" />
+            </Flex>
+          ) : thumbnail ? (
+            <>
+              <img
+                src={thumbnail}
+                alt="Video thumbnail"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+              {onRegenerateThumbnail && (
+                <Box
+                  style={{
+                    position: "absolute",
+                    bottom: "8px",
+                    right: "8px",
+                    backgroundColor: "rgba(0, 0, 0, 0.6)",
+                    borderRadius: "4px",
+                    padding: "4px 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    opacity: 0.7,
+                    transition: "opacity 0.2s ease",
+                  }}
+                  className="refresh-hint"
+                >
+                  <ReloadIcon width={12} height={12} style={{ color: "white" }} />
+                  <Text size="1" style={{ color: "white" }}>
+                    Refresh
+                  </Text>
+                </Box>
+              )}
+            </>
           ) : (
             <Flex
               align="center"
@@ -239,4 +283,5 @@ function copyButtonStyle(copied: boolean): React.CSSProperties {
     transition: "color 0.2s ease",
   };
 }
+
 

@@ -227,6 +227,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               alt="SportAI"
               width={120}
               height={38}
+              priority
               style={{ objectFit: "contain", height: "auto", display: "block" }}
             />
           )}

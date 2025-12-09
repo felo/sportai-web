@@ -1,6 +1,12 @@
 export {
   useSwingDetectionV3,
   DEFAULT_CONFIG_V3,
+  // Velocity conversion utilities
+  ASSUMED_PERSON_HEIGHT,
+  TORSO_TO_HEIGHT_RATIO,
+  calculateMetersPerPixel,
+  convertVelocityToKmh,
+  // Types
   type DetectedSwingV3,
   type SwingFrameDataV3,
   type SwingDetectionResultV3,

@@ -97,3 +97,4 @@ export async function generateAIChatTitle(messages: Message[]): Promise<string> 
   return generateChatTitle(messages);
 }
 
+

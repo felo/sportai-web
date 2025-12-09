@@ -92,3 +92,4 @@ export function initTheatreModeResizeListener(): void {
   theatreModeResizeListenerInitialized = true;
 }
 
+

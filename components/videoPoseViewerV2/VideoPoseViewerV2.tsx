@@ -16,8 +16,10 @@ import React, {
   useMemo,
   forwardRef,
   useImperativeHandle,
+  ReactNode,
 } from "react";
-import { Box, Flex, Text, Spinner } from "@radix-ui/themes";
+import { Box, Flex, Text, Badge } from "@radix-ui/themes";
+import { PlayIcon, ActivityLogIcon } from "@radix-ui/react-icons";
 import { usePoseDetection } from "@/hooks/usePoseDetection";
 import type { PoseDetectionResult, SupportedModel } from "@/hooks/usePoseDetection";
 import { detectionLogger } from "@/lib/logger";
@@ -35,6 +37,7 @@ import {
 import { useSwingDetection } from "@/components/chat/viewers/videoPoseViewer/hooks/useSwingDetection";
 import { useSwingDetectionV3, type SwingDetectionResultV3 } from "./hooks/useSwingDetectionV3";
 import { useHandednessDetection, type HandednessResult } from "./hooks/useHandednessDetection";
+import { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart } from "./SwingCurveView";
 
 import type {
   ViewerConfig,
@@ -49,6 +52,109 @@ import {
   RESOLUTION_PRESETS,
   PROTOCOL_EVENT_COLORS,
 } from "./types";
+
+// ============================================================================
+// Tab Navigation Types & Component
+// ============================================================================
+
+interface TabDefinition {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  badge?: number;
+  disabled?: boolean;
+}
+
+interface TabNavigationProps {
+  tabs: TabDefinition[];
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+}
+
+function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationProps) {
+  return (
+    <Box
+      style={{
+        borderBottom: "1px solid var(--gray-6)",
+        backgroundColor: "var(--gray-2)",
+        position: "relative",
+        zIndex: 30,
+      }}
+    >
+      <Flex
+        gap="0"
+        style={{
+          overflowX: "auto",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}
+      >
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const isDisabled = tab.disabled;
+
+          return (
+            <Box
+              key={tab.id}
+              onClick={() => !isDisabled && onTabChange(tab.id)}
+              style={{
+                padding: "12px 20px",
+                cursor: isDisabled ? "not-allowed" : "pointer",
+                borderBottom: isActive ? "2px solid var(--mint-9)" : "2px solid transparent",
+                backgroundColor: isActive ? "var(--gray-1)" : "transparent",
+                opacity: isDisabled ? 0.4 : 1,
+                transition: "all 0.15s ease",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive && !isDisabled) {
+                  e.currentTarget.style.backgroundColor = "var(--gray-3)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive && !isDisabled) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }
+              }}
+            >
+              <Flex align="center" gap="2">
+                <Box
+                  style={{
+                    color: isActive ? "var(--mint-11)" : "var(--gray-10)",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {tab.icon}
+                </Box>
+                <Text
+                  size="2"
+                  weight={isActive ? "medium" : "regular"}
+                  style={{
+                    color: isActive ? "var(--gray-12)" : "var(--gray-11)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {tab.label}
+                </Text>
+                {tab.badge !== undefined && (
+                  <Badge size="1" color={isActive ? "mint" : "gray"} variant="soft">
+                    {tab.badge}
+                  </Badge>
+                )}
+                {isDisabled && (
+                  <Badge size="1" color="gray" variant="outline">
+                    Soon
+                  </Badge>
+                )}
+              </Flex>
+            </Box>
+          );
+        })}
+      </Flex>
+    </Box>
+  );
+}
 
 // ============================================================================
 // Props
@@ -69,6 +175,8 @@ interface VideoPoseViewerV2Props {
   style?: React.CSSProperties;
   /** Lite mode - hides debug overlay for minimal UI embedding */
   lite?: boolean;
+  /** Developer mode - shows additional debug info like swing score */
+  developerMode?: boolean;
 }
 
 // ============================================================================
@@ -83,19 +191,13 @@ const COMMON_FPS_VALUES = [24, 25, 30, 50, 60, 120];
 // ============================================================================
 
 function shouldUseCrossOrigin(url: string): boolean {
+  // blob: and data: URLs don't need CORS
   if (url.startsWith("blob:") || url.startsWith("data:")) {
     return false;
   }
-  if (typeof window !== "undefined" && (url.startsWith("http://") || url.startsWith("https://"))) {
-    try {
-      const videoOrigin = new URL(url).origin;
-      const currentOrigin = window.location.origin;
-      return videoOrigin !== currentOrigin;
-    } catch {
-      return true;
-    }
-  }
-  return false;
+  // For all http/https URLs, use crossOrigin to enable canvas operations
+  // The Statistics viewer uses this successfully with S3
+  return true;
 }
 
 // ============================================================================
@@ -104,7 +206,7 @@ function shouldUseCrossOrigin(url: string): boolean {
 
 export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
   function VideoPoseViewerV2(
-    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false },
+    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false },
     ref
   ) {
     // Refs
@@ -137,6 +239,8 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     const [preprocessedPoses, setPreprocessedPoses] = useState<Map<number, PoseDetectionResult[]>>(new Map());
     const [preprocessingFPS, setPreprocessingFPS] = useState(DEFAULT_VIDEO_FPS);
     const preprocessAbortRef = useRef(false);
+    // Ref to track poses synchronously (state updates are async)
+    const preprocessedPosesRef = useRef<Map<number, PoseDetectionResult[]>>(new Map());
     
     // Track if video is ready for display (after FPS detection completes)
     const [isVideoReadyForDisplay, setIsVideoReadyForDisplay] = useState(false);
@@ -149,6 +253,27 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
 
     // Protocol events state
     const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
+
+    // Tab state
+    const [activeTab, setActiveTab] = useState<"swings" | "data-analysis">("swings");
+    
+    // Data Analysis metric state (persists across tab switches)
+    const [selectedMetric, setSelectedMetric] = useState<MetricType>("velocity");
+    const [selectedWrist, setSelectedWrist] = useState<WristType>("both");
+    const [selectedKnee, setSelectedKnee] = useState<KneeType>("both");
+    const [selectedAngleType, setSelectedAngleType] = useState<AngleType>("knee");
+    const [selectedVelocityBodyPart, setSelectedVelocityBodyPart] = useState<VelocityBodyPart>("wrist");
+
+    // Notify parent when active tab changes
+    useEffect(() => {
+      callbacksRef.current?.onActiveTabChange?.(activeTab);
+    }, [activeTab]);
+
+    // Tab definitions
+    const tabs: TabDefinition[] = useMemo(() => [
+      { id: "swings", label: "Swings", icon: <PlayIcon width={16} height={16} /> },
+      { id: "data-analysis", label: "Data Analysis", icon: <ActivityLogIcon width={16} height={16} /> },
+    ], []);
 
     // Swing detection V1 hook
     const {
@@ -425,6 +550,8 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       const height = video.videoHeight;
       const dur = video.duration;
 
+      detectionLogger.debug(`Video loaded: ${width}x${height}, duration: ${dur}s`);
+
       setVideoDimensions({ width, height });
       setIsPortrait(height > width);
       setDuration(dur);
@@ -439,7 +566,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       // Detect FPS
       detectVideoFPS(video);
 
-      // Notify callback (use ref to avoid dependency)
+      // Notify callback
       callbacksRef.current?.onVideoLoad?.(width, height, dur, videoFPS);
     }, [detectVideoFPS, videoFPS]);
 
@@ -467,6 +594,13 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       stopDetection();
       callbacksRef.current?.onPlaybackChange?.(false);
     }, [stopDetection]);
+
+    const handleError = useCallback((event: any) => {
+      console.error("Video error:", event);
+      detectionLogger.error("Video loading error:", event?.detail || event);
+      callbacksRef.current?.onError?.("Video failed to load");
+    }, []);
+
 
     // ========================================================================
     // Pose Detection During Playback
@@ -788,6 +922,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       setIsPreprocessing(true);
       setPreprocessProgress(0);
       setPreprocessedPoses(new Map());
+      preprocessedPosesRef.current = new Map();
       preprocessAbortRef.current = false;
 
       // Pause video during preprocessing
@@ -858,6 +993,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         if (!preprocessAbortRef.current) {
           detectionLogger.debug(`Preprocessing complete: ${allPoses.size} frames at ${fps} FPS`);
           setPreprocessedPoses(allPoses);
+          preprocessedPosesRef.current = allPoses;
           setPreprocessingFPS(fps);
           // Ensure FPS is set consistently
           setVideoFPS(fps);
@@ -891,6 +1027,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
 
     const clearPreprocessing = useCallback(() => {
       setPreprocessedPoses(new Map());
+      preprocessedPosesRef.current = new Map();
       setCurrentPoses([]);
       // Don't reset fpsDetectedRef or videoFPS - keep the detected FPS
     }, []);
@@ -900,6 +1037,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       fpsDetectedRef.current = false;
       setVideoFPS(DEFAULT_VIDEO_FPS);
       setPreprocessedPoses(new Map());
+      preprocessedPosesRef.current = new Map();
       setCurrentPoses([]);
       setProtocolEvents([]);
       setIsVideoReadyForDisplay(false); // Hide video until FPS detection completes
@@ -1035,7 +1173,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             endFrame: swing.frame,
             startTime: swing.timestamp,
             endTime: swing.timestamp,
-            label: `Swing ${i + 1} (${swing.velocityKmh.toFixed(0)} km/h)`,
+            label: `Swing ${i + 1} (${swing.velocityKmh >= 20 ? `${swing.velocityKmh.toFixed(0)} km/h` : "N/A"})`,
             color: PROTOCOL_EVENT_COLORS["swing-detection-v1"],
             metadata: {
               velocity: swing.velocity,
@@ -1064,7 +1202,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             endFrame: swing.clipEndFrame,
             startTime: swing.clipStartTime,
             endTime: swing.clipEndTime,
-            label: `${swing.swingType === "forehand" ? "FH" : swing.swingType === "backhand" ? "BH" : "?"} ${i + 1} (${swing.velocityKmh.toFixed(0)} km/h, ${swing.clipDuration.toFixed(1)}s)`,
+            label: `Swing ${i + 1} (${swing.velocityKmh >= 20 ? `${swing.velocityKmh.toFixed(0)} km/h` : "N/A"}, ${swing.clipDuration.toFixed(1)}s)`,
             color: PROTOCOL_EVENT_COLORS["swing-detection-v3"],
             metadata: {
               swingType: swing.swingType,
@@ -1080,6 +1218,10 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               swingStart: swing.swingStart,
               contactFrame: swing.contactFrame,
               followEnd: swing.followEnd,
+              // Loading peak (max coil position)
+              loadingPeakFrame: swing.loadingPeakFrame,
+              loadingPeakTimestamp: swing.loadingPeakTimestamp,
+              loadingPeakOrientation: swing.loadingPeakOrientation,
               // Clip boundaries for analysis export
               clipStartTime: swing.clipStartTime,
               clipEndTime: swing.clipEndTime,
@@ -1088,6 +1230,98 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               clipDuration: swing.clipDuration,
             },
           });
+          
+          // Add loading position event (point event) for non-serve swings
+          if (swing.loadingPeakFrame !== null && swing.loadingPeakTimestamp !== null) {
+            events.push({
+              id: `loading-v3-${swing.frame}-${i}`,
+              protocolId: "loading-position" as const,
+              type: "loading",
+              startFrame: swing.loadingPeakFrame,
+              endFrame: swing.loadingPeakFrame,
+              startTime: swing.loadingPeakTimestamp,
+              endTime: swing.loadingPeakTimestamp,
+              label: `Load ${i + 1} (${swing.loadingPeakOrientation?.toFixed(0)}°)`,
+              color: "#F59E0B", // Amber color for loading positions
+              metadata: {
+                swingType: swing.swingType,
+                loadingPeakFrame: swing.loadingPeakFrame,
+                loadingPeakTimestamp: swing.loadingPeakTimestamp,
+                loadingPeakOrientation: swing.loadingPeakOrientation,
+                orientationAtContact: swing.orientationAtContact,
+                rotationFromLoadingToContact: swing.loadingPeakOrientation !== null 
+                  ? swing.orientationAtContact - swing.loadingPeakOrientation 
+                  : null,
+                parentSwingId: `swing-v3-${swing.frame}-${i}`,
+              },
+            });
+          }
+          
+          // Add serve preparation event (conditional - only for serves)
+          if (swing.swingType === "serve" && swing.trophyFrame !== null && swing.trophyTimestamp !== null) {
+            events.push({
+              id: `prep-v3-${swing.frame}-${i}`,
+              protocolId: "serve-preparation" as const,
+              type: "preparation",
+              startFrame: swing.trophyFrame,
+              endFrame: swing.trophyFrame,
+              startTime: swing.trophyTimestamp,
+              endTime: swing.trophyTimestamp,
+              label: `Prep ${i + 1} (${swing.trophyArmHeight?.toFixed(1)}x)`,
+              color: "#F59E0B", // Amber color for preparation
+              metadata: {
+                swingType: swing.swingType,
+                preparationFrame: swing.trophyFrame,
+                preparationTimestamp: swing.trophyTimestamp,
+                armHeight: swing.trophyArmHeight,
+                contactFrame: swing.contactFrame,
+                parentSwingId: `swing-v3-${swing.frame}-${i}`,
+              },
+            });
+          }
+          
+          // Add serve contact point event (conditional - only for serves)
+          if (swing.swingType === "serve" && swing.contactPointFrame !== null && swing.contactPointTimestamp !== null) {
+            events.push({
+              id: `contact-v3-${swing.frame}-${i}`,
+              protocolId: "tennis-contact-point" as const,
+              type: "contact",
+              startFrame: swing.contactPointFrame,
+              endFrame: swing.contactPointFrame,
+              startTime: swing.contactPointTimestamp,
+              endTime: swing.contactPointTimestamp,
+              label: `Contact ${i + 1} (${swing.contactPointHeight?.toFixed(1)}x)`,
+              color: "#FFE66D", // Yellow/gold color for contact point
+              metadata: {
+                swingType: swing.swingType,
+                contactPointFrame: swing.contactPointFrame,
+                contactPointTimestamp: swing.contactPointTimestamp,
+                contactPointHeight: swing.contactPointHeight,
+                parentSwingId: `swing-v3-${swing.frame}-${i}`,
+              },
+            });
+          }
+          
+          // Add serve follow-through event (conditional - only for serves)
+          if (swing.swingType === "serve" && swing.landingFrame !== null && swing.landingTimestamp !== null) {
+            events.push({
+              id: `followthrough-v3-${swing.frame}-${i}`,
+              protocolId: "serve-follow-through" as const,
+              type: "follow-through",
+              startFrame: swing.landingFrame,
+              endFrame: swing.landingFrame,
+              startTime: swing.landingTimestamp,
+              endTime: swing.landingTimestamp,
+              label: `Follow ${i + 1}`,
+              color: "#95E1D3", // Mint/teal color for follow-through
+              metadata: {
+                swingType: swing.swingType,
+                followThroughFrame: swing.landingFrame,
+                followThroughTimestamp: swing.landingTimestamp,
+                parentSwingId: `swing-v3-${swing.frame}-${i}`,
+              },
+            });
+          }
         });
       }
 
@@ -1132,10 +1366,16 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
 
     useImperativeHandle(ref, () => ({
       play: () => {
-        videoRef.current?.play();
+        const video = videoRef.current;
+        if (video) {
+          video.play();
+        }
       },
       pause: () => {
-        videoRef.current?.pause();
+        const video = videoRef.current;
+        if (video) {
+          video.pause();
+        }
       },
       togglePlay: () => {
         const video = videoRef.current;
@@ -1163,7 +1403,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         const poseFrame = Math.floor(clampedTime * lookupFPS);
         if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
           setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
-        } else if (detectPose && poseEnabled) {
+        } else if (detectPose && poseEnabled && video) {
           try {
             const poses = await detectPose(video);
             setCurrentPoses(poses);
@@ -1194,7 +1434,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         const poseFrame = Math.floor(clampedTime * lookupFPS);
         if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
           setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
-        } else if (detectPose && poseEnabled) {
+        } else if (detectPose && poseEnabled && video) {
           try {
             const poses = await detectPose(video);
             setCurrentPoses(poses);
@@ -1211,7 +1451,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           setIsPlaying(false);
         }
         const frameDuration = 1 / videoFPS;
-        const newTime = Math.min(video.currentTime + frameDuration, video.duration);
+        const newTime = Math.min(video.currentTime + frameDuration, video.duration || 0);
         video.currentTime = newTime;
         
         // Manually update state and call callback (timeupdate doesn't always fire on seek)
@@ -1224,7 +1464,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         const poseFrame = Math.floor(newTime * lookupFPS);
         if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
           setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
-        } else if (detectPose && poseEnabled) {
+        } else if (detectPose && poseEnabled && video) {
           try {
             const poses = await detectPose(video);
             setCurrentPoses(poses);
@@ -1254,7 +1494,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         const poseFrame = Math.floor(newTime * lookupFPS);
         if (usingPreprocessedPoses && preprocessedPoses.has(poseFrame)) {
           setCurrentPoses(preprocessedPoses.get(poseFrame) || []);
-        } else if (detectPose && poseEnabled) {
+        } else if (detectPose && poseEnabled && video) {
           try {
             const poses = await detectPose(video);
             setCurrentPoses(poses);
@@ -1296,6 +1536,21 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         setProtocolEvents([]);
         detectionLogger.info("🔄 Protocols cleared - will re-run on next cycle");
       },
+      getPreprocessedPoses: () => preprocessedPosesRef.current,
+      setPreprocessedPoses: (poses: Map<number, PoseDetectionResult[]>, fps: number) => {
+        setPreprocessedPoses(poses);
+        preprocessedPosesRef.current = poses;
+        setPreprocessingFPS(fps);
+        // Also set the video FPS and mark as ready (bypassing FPS detection)
+        setVideoFPS(fps);
+        fpsDetectedRef.current = true;
+        setIsVideoReadyForDisplay(true);
+        setFpsDetectionMethod('metadata'); // Indicate FPS came from stored data
+        callbacksRef.current?.onFPSDetected?.(fps, 'metadata');
+        detectionLogger.info(`📥 Loaded ${poses.size} frames of pose data from server (${fps} FPS)`);
+        // Notify parent that preprocessing is "complete" (loaded from server)
+        callbacksRef.current?.onPreprocessComplete?.(poses.size, fps);
+      },
     }), [
       videoFPS,
       usingPreprocessedPoses,
@@ -1336,30 +1591,47 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           height: "100%",
           backgroundColor: "var(--gray-1)",
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
           ...style,
         }}
       >
-        {/* Video Element - hidden during FPS detection to prevent visible playback */}
-        <video
+        {/* Tab Navigation */}
+        <TabNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId) => setActiveTab(tabId as "swings" | "data-analysis")}
+        />
+
+        {/* Swings Tab Content */}
+        <Box
+          style={{
+            position: "relative",
+            flex: 1,
+            display: activeTab === "swings" ? "block" : "none",
+            minHeight: 0, // Allow flex child to shrink
+          }}
+        >
+          {/* Native HTML5 Video Player */}
+          <video
           ref={videoRef}
           src={videoUrl}
           crossOrigin={shouldUseCrossOrigin(videoUrl) ? "anonymous" : undefined}
+          controls
+          playsInline
+          muted={config.playback.muted}
+          loop={config.playback.loop}
+          autoPlay={config.playback.autoPlay}
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={handleTimeUpdate}
           onPlay={handlePlay}
           onPause={handlePause}
           onEnded={handleEnded}
-          autoPlay={config.playback.autoPlay}
-          loop={config.playback.loop}
-          muted={config.playback.muted}
-          playsInline
+          onError={(e) => handleError(e)}
           style={{
-            display: "block",
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            // Hide video until FPS detection completes (unless pose is disabled)
-            visibility: (isVideoReadyForDisplay || !poseEnabled) ? "visible" : "hidden",
           }}
         />
 
@@ -1395,10 +1667,79 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               bottom: 0,
               backgroundColor: "var(--gray-1)",
               zIndex: 20,
+              pointerEvents: "none", // Allow clicks through to video controls
             }}
           >
-            <Flex direction="column" align="center" gap="2">
-              <Spinner size="3" />
+            <Flex direction="column" align="center" gap="3">
+              {/* Bouncing Tennis Ball */}
+              <Box style={{ position: "relative", width: "80px", height: "80px" }}>
+                <Box
+                  style={{
+                    position: "absolute",
+                    width: "40px",
+                    height: "40px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    borderRadius: "50%",
+                    background: "linear-gradient(160deg, #d4e34a 0%, #c5d43e 30%, #a8bc32 60%, #8fa328 100%)",
+                    boxShadow: "inset -3px -3px 6px rgba(0, 0, 0, 0.2), inset 3px 3px 6px rgba(255, 255, 255, 0.25), 0 8px 32px rgba(122, 219, 143, 0.4)",
+                    animation: "taskLoaderBallBounce 1.1s linear infinite",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Ball shine */}
+                  <Box
+                    style={{
+                      position: "absolute",
+                      inset: "3px",
+                      borderRadius: "50%",
+                      background: "radial-gradient(circle at 35% 25%, rgba(255,255,255,0.4), transparent 45%)",
+                    }}
+                  />
+                  {/* Tennis ball seam - top curve */}
+                  <Box
+                    style={{
+                      position: "absolute",
+                      width: "50px",
+                      height: "50px",
+                      borderRadius: "50%",
+                      border: "none",
+                      borderTop: "2px solid rgba(255, 255, 255, 0.9)",
+                      top: "-8px",
+                      left: "50%",
+                      transform: "translateX(-50%) rotate(-30deg)",
+                    }}
+                  />
+                  {/* Tennis ball seam - bottom curve */}
+                  <Box
+                    style={{
+                      position: "absolute",
+                      width: "50px",
+                      height: "50px",
+                      borderRadius: "50%",
+                      border: "none",
+                      borderBottom: "2px solid rgba(255, 255, 255, 0.9)",
+                      bottom: "-8px",
+                      left: "50%",
+                      transform: "translateX(-50%) rotate(-30deg)",
+                    }}
+                  />
+                </Box>
+                {/* Ball Shadow */}
+                <Box
+                  style={{
+                    position: "absolute",
+                    bottom: "8px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: "32px",
+                    height: "6px",
+                    background: "radial-gradient(ellipse, rgba(0, 0, 0, 0.3) 0%, transparent 70%)",
+                    borderRadius: "50%",
+                    animation: "taskLoaderShadowPulse 1.1s linear infinite",
+                  }}
+                />
+              </Box>
               <Text size="2" color="gray">
                 {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
               </Text>
@@ -1406,22 +1747,34 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           </Flex>
         )}
 
-        {/* Preprocessing Overlay - themed background */}
+        {/* Preprocessing Overlay - semi-transparent to show video */}
         {poseEnabled && isVideoReadyForDisplay && isPreprocessing && config.preprocessing.showProgress && (
-          <Flex
-            align="center"
-            justify="center"
+          <Box
             style={{
               position: "absolute",
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: "color-mix(in srgb, var(--gray-1) 90%, transparent)",
+              backgroundColor: "color-mix(in srgb, var(--gray-1) 60%, transparent)",
               zIndex: 20,
+              pointerEvents: "none",
             }}
           >
-            <Flex direction="column" align="center" gap="3" style={{ width: "80%", maxWidth: "300px" }}>
+            {/* Loading indicator positioned in top quarter */}
+            <Flex 
+              direction="column" 
+              align="center" 
+              gap="3" 
+              style={{ 
+                position: "absolute",
+                top: "12.5%", // Center of first quarter (25% / 2)
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "80%", 
+                maxWidth: "300px",
+              }}
+            >
               <Text size="2" weight="medium" color="gray">
                 Processing video frames...
               </Text>
@@ -1447,7 +1800,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
                 {preprocessProgress.toFixed(0)}%
               </Text>
             </Flex>
-          </Flex>
+          </Box>
         )}
 
         {/* Debug Overlay - hidden in lite mode */}
@@ -1520,6 +1873,41 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               {modelError}
             </Text>
           </Flex>
+        )}
+        </Box>
+
+        {/* Data Analysis Tab Content */}
+        {activeTab === "data-analysis" && (
+          <SwingCurveView
+            swingResult={swingResultV3}
+            videoFPS={usingPreprocessedPoses ? preprocessingFPS : videoFPS}
+            currentFrame={currentFrame}
+            totalFrames={totalFrames}
+            developerMode={developerMode}
+            selectedMetric={selectedMetric}
+            onMetricChange={setSelectedMetric}
+            selectedWrist={selectedWrist}
+            onWristChange={setSelectedWrist}
+            selectedKnee={selectedKnee}
+            onKneeChange={setSelectedKnee}
+            selectedAngleType={selectedAngleType}
+            onAngleTypeChange={setSelectedAngleType}
+            selectedVelocityBodyPart={selectedVelocityBodyPart}
+            onVelocityBodyPartChange={setSelectedVelocityBodyPart}
+            onSeekToFrame={(frame) => {
+              const video = videoRef.current;
+              if (!video) return;
+              const time = frame / (usingPreprocessedPoses ? preprocessingFPS : videoFPS);
+              video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+              setCurrentTime(time);
+              // Get pose for new frame from preprocessed data
+              if (usingPreprocessedPoses && preprocessedPoses.has(frame)) {
+                setCurrentPoses(preprocessedPoses.get(frame) || []);
+              }
+            }}
+            isAnalyzing={isSwingAnalyzingV3}
+            style={{ flex: 1, minHeight: 0 }}
+          />
         )}
       </Box>
     );

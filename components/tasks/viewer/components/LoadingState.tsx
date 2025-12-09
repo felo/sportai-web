@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Text, Spinner } from "@radix-ui/themes";
+import { Text } from "@radix-ui/themes";
 
 export type LoadingPhase = "auth" | "task" | "result" | "done";
 
@@ -159,20 +159,18 @@ export function LoadingState({
         />
       </div>
 
-      {/* Loading Text with Radix Spinner */}
-      <Box style={{ textAlign: "center", zIndex: 1, display: "flex", alignItems: "center", gap: "12px" }}>
-        <Spinner size="2" />
-        <Text
-          size="4"
-          weight="medium"
-          style={{
-            color: "var(--gray-11)",
-            letterSpacing: "0.02em",
-          }}
-        >
-          {displayMessage}{".".repeat(dotCount)}
-        </Text>
-      </Box>
+      {/* Loading Text */}
+      <Text
+        size="4"
+        weight="medium"
+        style={{
+          color: "var(--gray-11)",
+          letterSpacing: "0.02em",
+          zIndex: 1,
+        }}
+      >
+        {displayMessage}{".".repeat(dotCount)}
+      </Text>
     </div>
   );
 }

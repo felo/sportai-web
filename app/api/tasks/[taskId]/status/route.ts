@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
+import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
 import type { Database } from "@/types/supabase";
 
 export const runtime = "nodejs";
-
-const SPORTAI_API_URL = "https://api.sportai.com";
-const SPORTAI_API_KEY = process.env.SPORTAI_API_KEY;
 
 // Task type to status endpoint mapping
 const STATUS_ENDPOINTS: Record<string, string> = {
@@ -46,7 +44,11 @@ export async function GET(
     
     const userId = authHeader.replace("Bearer ", "");
     
+    const SPORTAI_API_URL = getSportAIApiUrl();
+    const SPORTAI_API_KEY = getSportAIApiKey();
+    
     if (!SPORTAI_API_KEY) {
+      logger.error(`[${requestId}] SPORTAI_API_KEY not configured for ${getEnvironmentLabel()}`);
       return NextResponse.json(
         { error: "SportAI API not configured" },
         { status: 503 }

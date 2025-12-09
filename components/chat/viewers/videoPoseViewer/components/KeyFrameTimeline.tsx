@@ -339,7 +339,7 @@ export function KeyFrameTimeline({
     swingResult.swings.forEach((swing, i) => {
       swingMarkers.push({
         timestamp: swing.timestamp,
-        label: `Swing ${i + 1} at ${swing.timestamp.toFixed(2)}s (${swing.velocityKmh.toFixed(0)} km/h)`,
+        label: `Swing ${i + 1} at ${swing.timestamp.toFixed(2)}s (${swing.velocityKmh >= 20 ? `${swing.velocityKmh.toFixed(0)} km/h` : "N/A"})`,
         color: "#FFD93D", // Yellow for V1
       });
     });

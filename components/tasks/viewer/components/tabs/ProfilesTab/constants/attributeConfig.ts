@@ -39,3 +39,4 @@ export const ATTRIBUTE_CONFIG: Record<string, AttributeConfig> = {
   },
 };
 
+

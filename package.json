@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
+    "dev:staging": "SPORTAI_API_URL=https://staging.api.sportai.com next dev -H 0.0.0.0",
     "build": "next build",
+    "build:staging": "SPORTAI_API_URL=https://staging.api.sportai.com next build",
     "start": "next start",
+    "start:staging": "SPORTAI_API_URL=https://staging.api.sportai.com next start",
     "lint": "next lint",
     "analyze": "ANALYZE=true next build"
   },

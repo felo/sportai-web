@@ -3,13 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { logger } from "@/lib/logger";
+import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
 import type { Database } from "@/types/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Allow more time for downloading large files
-
-const SPORTAI_API_URL = "https://api.sportai.com";
-const SPORTAI_API_KEY = process.env.SPORTAI_API_KEY;
 
 // S3 Configuration
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "sportai-llm-uploads";
@@ -75,7 +73,11 @@ export async function POST(
     
     const userId = authHeader.replace("Bearer ", "");
     
+    const SPORTAI_API_URL = getSportAIApiUrl();
+    const SPORTAI_API_KEY = getSportAIApiKey();
+    
     if (!SPORTAI_API_KEY) {
+      logger.error(`[${requestId}] SPORTAI_API_KEY not configured for ${getEnvironmentLabel()}`);
       return NextResponse.json(
         { error: "SportAI API not configured" },
         { status: 503 }

@@ -29,7 +29,7 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   moveNetType: "SinglePose.Thunder",
   blazePoseType: "full",
   maxPoses: 1,
-  enableSmoothing: true,
+  enableSmoothing: false,  // Disabled for deterministic results
 };
 
 // ============================================================================
@@ -453,6 +453,9 @@ export type ProtocolId =
   | "swing-detection-v1"
   | "swing-detection-v2"
   | "swing-detection-v3"
+  | "loading-position"
+  | "serve-preparation"
+  | "serve-follow-through"
   | "handedness-detection"
   | "tennis-contact-point"
   | "tennis-landing"
@@ -493,6 +496,12 @@ export const AVAILABLE_PROTOCOLS: ProtocolDefinition[] = [
     category: "swing",
   },
   {
+    id: "loading-position",
+    name: "Loading Position",
+    description: "Detects the peak coil/backswing position in non-serve swings (requires Swing Detection v3)",
+    category: "technique",
+  },
+  {
     id: "handedness-detection",
     name: "Handedness Detection",
     description: "Auto-detects if player is left or right-handed based on wrist velocity patterns",
@@ -501,20 +510,34 @@ export const AVAILABLE_PROTOCOLS: ProtocolDefinition[] = [
   {
     id: "tennis-contact-point",
     name: "Tennis Contact Point",
-    description: "Analyzes ball contact position relative to body",
+    description: "Detects contact point (highest wrist during forward swing) in serves - conditional on Swing Detection v3",
     category: "technique",
   },
   {
-    id: "tennis-landing",
-    name: "Tennis Landing",
-    description: "Detects and analyzes landing mechanics after shots",
+    id: "serve-preparation",
+    name: "Serve Preparation",
+    description: "Detects preparation position (~0.4s before contact) in serves - conditional on Swing Detection v3",
+    category: "technique",
+  },
+  {
+    id: "serve-follow-through",
+    name: "Serve Follow Through",
+    description: "Detects follow-through/landing position after serve - conditional on Swing Detection v3",
     category: "technique",
   },
   {
     id: "tennis-trophy",
     name: "Tennis Trophy Position",
-    description: "Evaluates serve trophy position and timing",
+    description: "Legacy - use serve-preparation instead",
     category: "technique",
+    experimental: true,
+  },
+  {
+    id: "tennis-landing",
+    name: "Tennis Landing",
+    description: "Legacy - use serve-follow-through instead",
+    category: "technique",
+    experimental: true,
   },
   {
     id: "wrist-speed",
@@ -534,7 +557,7 @@ export interface ProtocolsConfig {
 }
 
 export const DEFAULT_PROTOCOLS_CONFIG: ProtocolsConfig = {
-  enabledProtocols: ["swing-detection-v3", "handedness-detection"],
+  enabledProtocols: ["swing-detection-v3", "loading-position", "serve-preparation", "tennis-contact-point", "serve-follow-through", "handedness-detection"],
   showResultsOverlay: true,
   logExecution: false,
 };
@@ -609,8 +632,8 @@ export const DEFAULT_SWING_DETECTION_V3_CONFIG: SwingDetectionV3Config = {
   minConfidence: 0.3,
   classifySwingType: true,
   handedness: "right",
-  showSwingOverlay: true,
-  showPhaseColors: true,
+  showSwingOverlay: false,
+  showPhaseColors: false,
   clipLeadTime: 2.0,
   clipTrailTime: 1.0,
 };
@@ -657,6 +680,9 @@ export const PROTOCOL_EVENT_COLORS: Record<string, string> = {
   "swing-detection-v1": "#FF6B6B",
   "swing-detection-v2": "#4ECDC4",
   "swing-detection-v3": "#8B5CF6",
+  "loading-position": "#F59E0B",  // Amber - marks peak coil/backswing
+  "serve-preparation": "#F59E0B", // Amber - same as loading (rocket icon)
+  "serve-follow-through": "#95E1D3", // Mint - follow through position
   "handedness-detection": "#22D3EE",
   "tennis-contact-point": "#FFE66D",
   "tennis-landing": "#95E1D3",
@@ -798,6 +824,8 @@ export interface ViewerState {
     dominantHand: "left" | "right";
     confidence: number;
   } | null;
+  /** Current active tab inside the viewer (swings or data-analysis) */
+  activeTab: "swings" | "data-analysis";
   /** Error message if any */
   error: string | null;
 }
@@ -827,6 +855,8 @@ export interface ViewerCallbacks {
   onError?: (error: string) => void;
   /** Called when frame is captured (for analysis) */
   onFrameCapture?: (imageBlob: Blob, frame: number, poses: PoseDetectionResult[]) => void;
+  /** Called when active tab changes inside the viewer */
+  onActiveTabChange?: (activeTab: "swings" | "data-analysis") => void;
 }
 
 // ============================================================================
@@ -862,6 +892,10 @@ export interface ViewerActions {
   setSelectedPose: (index: number) => void;
   /** Rerun all enabled protocols */
   rerunProtocols: () => void;
+  /** Get preprocessed poses (for saving to server) */
+  getPreprocessedPoses: () => Map<number, PoseDetectionResult[]>;
+  /** Set preprocessed poses (for loading from server) */
+  setPreprocessedPoses: (poses: Map<number, PoseDetectionResult[]>, fps: number) => void;
 }
 
 // ============================================================================

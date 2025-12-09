@@ -2,10 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Flex, Spinner, Text } from "@radix-ui/themes";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TaskViewer } from "@/components/tasks/viewer/TaskViewer";
 import { TechniqueViewer } from "@/components/tasks/techniqueViewer";
+import { LoadingState } from "@/components/tasks/viewer/components/LoadingState";
+import { useSidebarSettings } from "@/hooks/sidebar";
 
 export default function TaskViewerPage({
   params,
@@ -15,6 +16,7 @@ export default function TaskViewerPage({
   const { taskId } = use(params);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { developerMode } = useSidebarSettings();
   const [taskType, setTaskType] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [sport, setSport] = useState<string | null>(null);
@@ -50,24 +52,9 @@ export default function TaskViewerPage({
     }
   }, [taskId, user, authLoading]);
 
-  // Loading state
+  // Loading state - show bouncing ball animation
   if (authLoading || loading) {
-    return (
-      <Box
-        style={{
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "var(--gray-1)",
-        }}
-      >
-        <Flex direction="column" align="center" gap="3">
-          <Spinner size="3" />
-          <Text size="2" color="gray">Loading...</Text>
-        </Flex>
-      </Box>
-    );
+    return <LoadingState message="Loading video" />;
   }
 
   // Redirect if not authenticated
@@ -82,6 +69,8 @@ export default function TaskViewerPage({
       <TechniqueViewer 
         videoUrl={videoUrl} 
         sport={sport || undefined}
+        taskId={taskId}
+        developerMode={developerMode}
         onBack={() => router.push("/library")}
       />
     );

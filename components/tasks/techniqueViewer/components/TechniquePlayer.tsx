@@ -186,3 +186,4 @@ export const TechniquePlayer = forwardRef<HTMLVideoElement, TechniquePlayerProps
 
 TechniquePlayer.displayName = "TechniquePlayer";
 
+

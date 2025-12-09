@@ -10,7 +10,7 @@ import { MetricConversionModal, convertMetric, type MetricConversion } from "./M
 import { CourtCoordinateModal, type CourtCoordinate, type BallSequenceClick, type CourtZone } from "./CourtCoordinateModal";
 import { SectionSpeaker } from "./SectionSpeaker";
 import type { SwingExplanation } from "@/database";
-import { getHighlightingPreferences, getTTSSettings, type HighlightingPreferences } from "@/utils/storage";
+import { getHighlightingPreferences, getTTSSettings, getDeveloperMode, type HighlightingPreferences } from "@/utils/storage";
 
 interface MarkdownWithSwingsProps {
   children: string;
@@ -58,6 +58,7 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     swings: true,
   });
   const [ttsEnabled, setTTSEnabled] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
 
   useEffect(() => {
     // Load highlighting preferences from localStorage
@@ -65,6 +66,9 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     
     // Load TTS enabled state from localStorage
     setTTSEnabled(getTTSSettings().enabled);
+    
+    // Load developer mode state
+    setDeveloperMode(getDeveloperMode());
 
     // Listen for highlighting preferences changes
     const handleHighlightingPreferencesChange = () => {
@@ -76,12 +80,19 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
       setTTSEnabled(getTTSSettings().enabled);
     };
 
+    // Listen for developer mode changes
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+
     window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
     window.addEventListener("tts-settings-change", handleTTSSettingsChange);
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
 
     return () => {
       window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
       window.removeEventListener("tts-settings-change", handleTTSSettingsChange);
+      window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
     };
   }, []);
 
@@ -118,17 +129,28 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick]
   );
 
+  // Filter out Context & Environment Analysis section when not in developer mode
+  const processedContent = useMemo(() => {
+    if (developerMode) {
+      return children;
+    }
+    // Remove the Context & Environment Analysis collapsible section
+    // Matches: <details>\n<summary>🔍 Context & Environment Analysis</summary>\n...\n</details>
+    const contextSectionRegex = /<details>\s*<summary>\s*🔍\s*Context\s*&?\s*Environment\s*Analysis\s*<\/summary>[\s\S]*?<\/details>/gi;
+    return children.replace(contextSectionRegex, '').trim();
+  }, [children, developerMode]);
+
   // Split content into sections by horizontal rules (---)
   // Each section gets its own speaker button
   const sections = useMemo(() => {
     // Split by --- or *** or ___ (markdown horizontal rules)
-    const sectionParts = children.split(/\n(?:[-*_]){3,}\n/);
+    const sectionParts = processedContent.split(/\n(?:[-*_]){3,}\n/);
     return sectionParts.map((section, index) => ({
       id: index,
       content: section.trim(),
       plainText: stripMarkdownForTTS(section.trim()),
     }));
-  }, [children]);
+  }, [processedContent]);
 
   return (
     <>

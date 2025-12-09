@@ -153,3 +153,4 @@ export function BottomGradientMask({ showControls, isExpanded }: BottomGradientM
   );
 }
 
+

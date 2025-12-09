@@ -81,3 +81,4 @@ function AnimatedNumber({
   return <>{Math.round(display)}</>;
 }
 
+

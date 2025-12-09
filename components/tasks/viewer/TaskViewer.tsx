@@ -234,8 +234,16 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
       }}
     >
       {/* Header */}
-      <Box style={{ padding: "var(--space-4)", paddingBottom: 0 }}>
-        <Box style={{ maxWidth: "1400px", margin: "0 auto" }}>
+      <Box 
+        style={{ 
+          height: "57px",
+          borderBottom: "1px solid var(--gray-6)",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 var(--space-4)",
+        }}
+      >
+        <Box style={{ maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           <TaskHeader
             task={task}
             result={result}

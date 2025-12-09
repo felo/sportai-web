@@ -64,3 +64,4 @@ export type SerializableChat = Omit<Chat, "messages"> & {
   messages: SerializableMessage[];
 };
 
+

@@ -523,10 +523,10 @@ export function UserMenu({
 
           <DropdownMenu.Separator />
 
-          {/* Profile Menu Item - WIP */}
-          <DropdownMenu.Item disabled>
+          {/* Profile Menu Item */}
+          <DropdownMenu.Item onSelect={() => router.push("/profile")}>
             <PersonIcon width="16" height="16" />
-            <Text ml="2">Profile (WIP)</Text>
+            <Text ml="2">Profile</Text>
           </DropdownMenu.Item>
 
           <DropdownMenu.Separator />

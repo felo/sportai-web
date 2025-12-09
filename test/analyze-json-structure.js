@@ -237,3 +237,4 @@ const markdown = generateMarkdown(results, jsonData);
 fs.writeFileSync(outputFile, markdown);
 console.log(`Documentation written to: ${outputFile}`);
 
+

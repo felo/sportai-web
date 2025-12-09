@@ -44,3 +44,4 @@ export function formatIntensity(value: number): string {
   return value > 0 ? `${value.toFixed(2)} shots/s` : "-";
 }
 
+

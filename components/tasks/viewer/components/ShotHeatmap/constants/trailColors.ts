@@ -22,3 +22,4 @@ export function getTrailColor(progress: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+

@@ -16,6 +16,14 @@ import { PROTOCOL_EVENT_COLORS, AVAILABLE_PROTOCOLS } from "./types";
 // Props
 // ============================================================================
 
+/** Boundary adjustment for an event (start and/or end time override) */
+export interface EventBoundaryAdjustment {
+  startTime?: number;
+  startFrame?: number;
+  endTime?: number;
+  endFrame?: number;
+}
+
 interface PlaybackTimelineProps {
   /** Current time in seconds */
   currentTime: number;
@@ -43,6 +51,10 @@ interface PlaybackTimelineProps {
   trackHeight?: number;
   /** Height of event markers */
   eventMarkerHeight?: number;
+  /** Boundary adjustments for events (key is event.id) */
+  eventBoundaryAdjustments?: Map<string, EventBoundaryAdjustment>;
+  /** Callback when user drags an event boundary */
+  onEventBoundaryChange?: (eventId: string, adjustment: EventBoundaryAdjustment) => void;
 }
 
 // ============================================================================
@@ -63,11 +75,23 @@ export function PlaybackTimeline({
   showEventLabels = true,
   trackHeight = 8,
   eventMarkerHeight = 20,
+  eventBoundaryAdjustments,
+  onEventBoundaryChange,
 }: PlaybackTimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const eventLayerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hoveredEvent, setHoveredEvent] = useState<ProtocolEvent | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; time: number } | null>(null);
+  
+  // Edge dragging state
+  const [edgeDrag, setEdgeDrag] = useState<{
+    eventId: string;
+    edge: "start" | "end";
+    originalTime: number;
+    originalFrame: number;
+  } | null>(null);
+  const [edgeDragPreview, setEdgeDragPreview] = useState<{ time: number; frame: number } | null>(null);
 
   // Calculate progress percentage
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -151,6 +175,101 @@ export function PlaybackTimeline({
     return `${mins}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   }, []);
 
+  // Get effective event times (with adjustments applied)
+  const getEffectiveEventTimes = useCallback((event: ProtocolEvent) => {
+    const adjustment = eventBoundaryAdjustments?.get(event.id);
+    return {
+      startTime: adjustment?.startTime ?? event.startTime,
+      startFrame: adjustment?.startFrame ?? event.startFrame,
+      endTime: adjustment?.endTime ?? event.endTime,
+      endFrame: adjustment?.endFrame ?? event.endFrame,
+    };
+  }, [eventBoundaryAdjustments]);
+
+  // Handle edge drag start
+  const handleEdgeDragStart = useCallback((
+    e: React.MouseEvent,
+    eventId: string,
+    edge: "start" | "end",
+    originalTime: number,
+    originalFrame: number
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEdgeDrag({ eventId, edge, originalTime, originalFrame });
+    setEdgeDragPreview({ time: originalTime, frame: originalFrame });
+  }, []);
+
+  // Handle edge drag move (called from document mousemove)
+  const handleEdgeDragMove = useCallback((e: MouseEvent) => {
+    if (!edgeDrag || !eventLayerRef.current) return;
+    
+    const rect = eventLayerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    const newTime = percent * duration;
+    const newFrame = Math.floor(newTime * fps);
+    
+    setEdgeDragPreview({ time: newTime, frame: newFrame });
+    
+    // Also seek video to preview
+    onSeek(newTime);
+  }, [edgeDrag, duration, fps, onSeek]);
+
+  // Handle edge drag end
+  const handleEdgeDragEnd = useCallback(() => {
+    if (!edgeDrag || !edgeDragPreview || !onEventBoundaryChange) {
+      setEdgeDrag(null);
+      setEdgeDragPreview(null);
+      return;
+    }
+    
+    // Find the event to get its current boundaries
+    const event = events.find((e) => e.id === edgeDrag.eventId);
+    if (!event) {
+      setEdgeDrag(null);
+      setEdgeDragPreview(null);
+      return;
+    }
+    
+    const effective = getEffectiveEventTimes(event);
+    
+    // Create adjustment based on which edge was dragged
+    const adjustment: EventBoundaryAdjustment = {};
+    if (edgeDrag.edge === "start") {
+      // Ensure start doesn't go past end
+      const maxStartTime = effective.endTime - 0.1;
+      adjustment.startTime = Math.min(edgeDragPreview.time, maxStartTime);
+      adjustment.startFrame = Math.floor(adjustment.startTime * fps);
+    } else {
+      // Ensure end doesn't go before start
+      const minEndTime = effective.startTime + 0.1;
+      adjustment.endTime = Math.max(edgeDragPreview.time, minEndTime);
+      adjustment.endFrame = Math.floor(adjustment.endTime * fps);
+    }
+    
+    onEventBoundaryChange(edgeDrag.eventId, adjustment);
+    
+    setEdgeDrag(null);
+    setEdgeDragPreview(null);
+  }, [edgeDrag, edgeDragPreview, events, fps, getEffectiveEventTimes, onEventBoundaryChange]);
+
+  // Effect to handle document-level mouse events for edge dragging
+  React.useEffect(() => {
+    if (!edgeDrag) return;
+    
+    const handleMove = (e: MouseEvent) => handleEdgeDragMove(e);
+    const handleUp = () => handleEdgeDragEnd();
+    
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+  }, [edgeDrag, handleEdgeDragMove, handleEdgeDragEnd]);
+
   return (
     <Box
       style={{
@@ -181,6 +300,7 @@ export function PlaybackTimeline({
       >
         {/* Event markers layer */}
         <Box
+          ref={eventLayerRef}
           style={{
             position: "absolute",
             top: 0,
@@ -191,39 +311,131 @@ export function PlaybackTimeline({
           }}
         >
           {events.map((event) => {
-            const startPercent = getPositionPercent(event.startTime);
-            const endPercent = getPositionPercent(event.endTime);
+            const effective = getEffectiveEventTimes(event);
+            const isDraggingThis = edgeDrag?.eventId === event.id;
+            
+            // Use preview position if dragging this event's edge
+            let displayStartTime = effective.startTime;
+            let displayEndTime = effective.endTime;
+            if (isDraggingThis && edgeDragPreview) {
+              if (edgeDrag.edge === "start") {
+                displayStartTime = Math.min(edgeDragPreview.time, effective.endTime - 0.1);
+              } else {
+                displayEndTime = Math.max(edgeDragPreview.time, effective.startTime + 0.1);
+              }
+            }
+            
+            const startPercent = getPositionPercent(displayStartTime);
+            const endPercent = getPositionPercent(displayEndTime);
             const widthPercent = Math.max(0.5, endPercent - startPercent);
             const color = event.color || PROTOCOL_EVENT_COLORS[event.protocolId] || "#888";
             const isRange = event.endFrame !== event.startFrame;
+            const isAdjusted = eventBoundaryAdjustments?.has(event.id);
+            const canDragEdges = isRange && onEventBoundaryChange;
 
             return (
-              <Tooltip key={event.id} content={`${event.label} (${formatTime(event.startTime)})`}>
-                <Box
-                  style={{
-                    position: "absolute",
-                    left: `${startPercent}%`,
-                    width: isRange ? `${widthPercent}%` : "4px",
-                    height: "100%",
-                    backgroundColor: color,
-                    borderRadius: isRange ? "3px" : "2px",
-                    opacity: hoveredEvent?.id === event.id ? 1 : 0.8,
-                    cursor: "pointer",
-                    pointerEvents: "auto",
-                    transition: "opacity 0.15s, transform 0.15s",
-                    transform: hoveredEvent?.id === event.id ? "scaleY(1.1)" : "scaleY(1)",
-                    boxShadow: hoveredEvent?.id === event.id
-                      ? `0 2px 8px ${color}66`
-                      : "none",
-                  }}
-                  onMouseEnter={() => setHoveredEvent(event)}
-                  onMouseLeave={() => setHoveredEvent(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSeek(event.startTime);
-                  }}
-                />
-              </Tooltip>
+              <Box
+                key={event.id}
+                style={{
+                  position: "absolute",
+                  left: `${startPercent}%`,
+                  width: isRange ? `${widthPercent}%` : "4px",
+                  height: "100%",
+                  pointerEvents: "auto",
+                }}
+                onMouseEnter={() => setHoveredEvent(event)}
+                onMouseLeave={() => !edgeDrag && setHoveredEvent(null)}
+              >
+                {/* Main event bar */}
+                <Tooltip content={`${event.label} (${formatTime(displayStartTime)} - ${formatTime(displayEndTime)})`}>
+                  <Box
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      backgroundColor: color,
+                      borderRadius: isRange ? "3px" : "2px",
+                      opacity: hoveredEvent?.id === event.id || isDraggingThis ? 1 : 0.8,
+                      cursor: "pointer",
+                      transition: isDraggingThis ? "none" : "opacity 0.15s, transform 0.15s",
+                      transform: hoveredEvent?.id === event.id ? "scaleY(1.1)" : "scaleY(1)",
+                      boxShadow: hoveredEvent?.id === event.id || isDraggingThis
+                        ? `0 2px 8px ${color}66`
+                        : "none",
+                      border: isAdjusted ? "2px solid white" : "none",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSeek(displayStartTime);
+                    }}
+                  />
+                </Tooltip>
+
+                {/* Left drag handle (start edge) */}
+                {canDragEdges && (hoveredEvent?.id === event.id || isDraggingThis) && (
+                  <Box
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: "8px",
+                      cursor: "ew-resize",
+                      backgroundColor: isDraggingThis && edgeDrag?.edge === "start" 
+                        ? "rgba(255, 255, 255, 0.9)" 
+                        : "rgba(255, 255, 255, 0.6)",
+                      borderRadius: "3px 0 0 3px",
+                      transition: "background-color 0.15s",
+                    }}
+                    onMouseDown={(e) => handleEdgeDragStart(e, event.id, "start", displayStartTime, effective.startFrame)}
+                  >
+                    <Box
+                      style={{
+                        position: "absolute",
+                        left: "2px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: "2px",
+                        height: "60%",
+                        backgroundColor: color,
+                        borderRadius: "1px",
+                      }}
+                    />
+                  </Box>
+                )}
+
+                {/* Right drag handle (end edge) */}
+                {canDragEdges && (hoveredEvent?.id === event.id || isDraggingThis) && (
+                  <Box
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: "8px",
+                      cursor: "ew-resize",
+                      backgroundColor: isDraggingThis && edgeDrag?.edge === "end" 
+                        ? "rgba(255, 255, 255, 0.9)" 
+                        : "rgba(255, 255, 255, 0.6)",
+                      borderRadius: "0 3px 3px 0",
+                      transition: "background-color 0.15s",
+                    }}
+                    onMouseDown={(e) => handleEdgeDragStart(e, event.id, "end", displayEndTime, effective.endFrame)}
+                  >
+                    <Box
+                      style={{
+                        position: "absolute",
+                        right: "2px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: "2px",
+                        height: "60%",
+                        backgroundColor: color,
+                        borderRadius: "1px",
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
             );
           })}
         </Box>
@@ -372,4 +584,5 @@ export function PlaybackTimeline({
 }
 
 export default PlaybackTimeline;
+
 

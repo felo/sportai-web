@@ -56,3 +56,4 @@ export function getTrajectoryStagger(numTrajectories: number): number {
   return Math.max(30, availableTime / (numTrajectories - 1)); // minimum 30ms stagger
 }
 
+

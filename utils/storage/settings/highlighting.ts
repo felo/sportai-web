@@ -65,3 +65,4 @@ export function updateHighlightingPreference(
   setHighlightingPreferences(preferences);
 }
 
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/lib/logger";
 import {
@@ -14,10 +14,9 @@ import {
   Spinner,
   Card,
   Select,
-  Tabs,
   SegmentedControl,
 } from "@radix-ui/themes";
-import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon, ViewGridIcon, ListBulletIcon, ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
+import { PlusIcon, CopyIcon, CheckIcon, DownloadIcon, EyeOpenIcon, UpdateIcon, ViewGridIcon, ListBulletIcon, ChevronUpIcon, ChevronDownIcon, UploadIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Sidebar, useLibraryTasks } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
@@ -26,7 +25,8 @@ import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
-import { extractFirstFrameFromUrl, uploadThumbnailToS3 } from "@/utils/video-utils";
+import { extractFirstFrameFromUrl, extractFirstFrameWithDuration, uploadThumbnailToS3, validateVideoFile } from "@/utils/video-utils";
+import { uploadToS3 } from "@/lib/s3";
 
 const TASK_TYPES = [
   { value: "statistics", label: "Statistics" },
@@ -224,6 +224,12 @@ export function TasksPage() {
   const [fetchingResult, setFetchingResult] = useState<string | null>(null);
   const [deletingTask, setDeletingTask] = useState<string | null>(null);
   const [preparingTask, setPreparingTask] = useState<string | null>(null);
+  
+  // Video upload state (dev mode only)
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Download video from URL
   const downloadVideo = async (task: Task) => {
@@ -514,6 +520,117 @@ export function TasksPage() {
     return () => clearInterval(interval);
   }, [tasks, user, checkAllActiveTasks]);
   
+  // Handle file selection for video upload (dev mode)
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validation = validateVideoFile(file);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid video file");
+        return;
+      }
+      setSelectedFile(file);
+      setVideoUrl(""); // Clear URL when file is selected
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  };
+  
+  // Clear selected file
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+  
+  // Submit new task with uploaded video file
+  const handleFileUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !selectedFile) return;
+    
+    setUploadingVideo(true);
+    setUploadProgress(0);
+    setError(null);
+    
+    try {
+      // Step 1: Get presigned URL for S3 upload
+      const urlResponse = await fetch("/api/s3/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: selectedFile.name,
+          contentType: selectedFile.type,
+        }),
+      });
+      
+      if (!urlResponse.ok) {
+        const errorData = await urlResponse.json();
+        throw new Error(errorData.error || "Failed to get upload URL");
+      }
+      
+      const { url: presignedUrl, downloadUrl, publicUrl } = await urlResponse.json();
+      const videoUrl = downloadUrl || publicUrl;
+      
+      // Step 2: Upload file to S3
+      await uploadToS3(presignedUrl, selectedFile, (progress) => {
+        setUploadProgress(progress);
+      });
+      
+      // Step 3: Extract thumbnail and duration from the file
+      let thumbnailUrl: string | null = null;
+      let thumbnailS3Key: string | null = null;
+      let videoLength: number | null = null;
+      
+      try {
+        logger.debug("[TasksPage] Extracting thumbnail from uploaded file...");
+        const { frameBlob, durationSeconds } = await extractFirstFrameWithDuration(selectedFile, 640, 0.7);
+        videoLength = durationSeconds;
+        
+        if (frameBlob) {
+          const uploadResult = await uploadThumbnailToS3(frameBlob);
+          if (uploadResult) {
+            thumbnailUrl = uploadResult.thumbnailUrl;
+            thumbnailS3Key = uploadResult.thumbnailS3Key;
+          }
+        }
+      } catch (thumbErr) {
+        logger.warn("[TasksPage] Thumbnail extraction failed:", thumbErr);
+      }
+      
+      // Step 4: Create task with the uploaded video URL
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.id}`,
+        },
+        body: JSON.stringify({
+          taskType,
+          sport,
+          videoUrl,
+          thumbnailUrl,
+          thumbnailS3Key,
+          videoLength,
+        }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create task");
+      }
+      
+      const { task } = await response.json();
+      setTasks(prev => [task, ...prev]);
+      clearSelectedFile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload video");
+    } finally {
+      setUploadingVideo(false);
+      setUploadProgress(0);
+    }
+  };
+  
   // Submit new task
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -761,58 +878,149 @@ export function TasksPage() {
         {/* New Task Form - Developer Mode Only */}
         {developerMode && (
           <Card style={{ marginBottom: "24px" }}>
-            <form onSubmit={handleSubmit}>
-              <Flex gap="3" align="end">
-                <Box style={{ width: "120px" }}>
-                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                    Sport
-                  </Text>
-                  <Select.Root value={sport} onValueChange={setSport} disabled={submitting}>
-                    <Select.Trigger style={{ width: "100%" }} />
-                    <Select.Content>
-                      {SPORTS.map(s => (
-                        <Select.Item key={s.value} value={s.value}>
-                          {s.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                </Box>
-                
-                <Box style={{ width: "140px" }}>
-                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                    Analysis Type
-                  </Text>
-                  <Select.Root value={taskType} onValueChange={setTaskType} disabled={submitting}>
-                    <Select.Trigger style={{ width: "100%" }} />
-                    <Select.Content>
-                      {TASK_TYPES.map(type => (
-                        <Select.Item key={type.value} value={type.value}>
-                          {type.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                </Box>
-                
-                <Box style={{ flex: 1 }}>
-                  <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
-                    Video URL
-                  </Text>
-                  <TextField.Root
-                    placeholder="https://example.com/video.mp4"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    disabled={submitting}
-                  />
-                </Box>
-                
-                <Button type="submit" disabled={submitting || !videoUrl.trim()}>
+            <Flex gap="3" align="end" wrap="wrap">
+              <Box style={{ width: "120px" }}>
+                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                  Sport
+                </Text>
+                <Select.Root value={sport} onValueChange={setSport} disabled={submitting || uploadingVideo}>
+                  <Select.Trigger style={{ width: "100%" }} />
+                  <Select.Content>
+                    {SPORTS.map(s => (
+                      <Select.Item key={s.value} value={s.value}>
+                        {s.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Box>
+              
+              <Box style={{ width: "140px" }}>
+                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                  Analysis Type
+                </Text>
+                <Select.Root value={taskType} onValueChange={setTaskType} disabled={submitting || uploadingVideo}>
+                  <Select.Trigger style={{ width: "100%" }} />
+                  <Select.Content>
+                    {TASK_TYPES.map(type => (
+                      <Select.Item key={type.value} value={type.value}>
+                        {type.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Box>
+              
+              {/* URL Input */}
+              <Box style={{ flex: 1, minWidth: "200px" }}>
+                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                  Video URL
+                </Text>
+                <TextField.Root
+                  placeholder="https://example.com/video.mp4"
+                  value={videoUrl}
+                  onChange={(e) => {
+                    setVideoUrl(e.target.value);
+                    if (e.target.value) clearSelectedFile(); // Clear file when URL is entered
+                  }}
+                  disabled={submitting || uploadingVideo || !!selectedFile}
+                />
+              </Box>
+              
+              <Text size="2" color="gray" style={{ alignSelf: "center", paddingBottom: "6px" }}>or</Text>
+              
+              {/* File Upload */}
+              <Box>
+                <Text as="label" size="2" weight="medium" mb="1" style={{ display: "block" }}>
+                  Upload Video
+                </Text>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  disabled={submitting || uploadingVideo}
+                  style={{ display: "none" }}
+                />
+                {selectedFile ? (
+                  <Flex gap="2" align="center">
+                    <Badge size="2" variant="soft" color="blue">
+                      {selectedFile.name.length > 20 
+                        ? `${selectedFile.name.slice(0, 17)}...` 
+                        : selectedFile.name}
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="1" 
+                      onClick={clearSelectedFile}
+                      disabled={uploadingVideo}
+                    >
+                      <Cross2Icon />
+                    </Button>
+                  </Flex>
+                ) : (
+                  <Button
+                    variant="soft"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={submitting || uploadingVideo || !!videoUrl.trim()}
+                  >
+                    <UploadIcon />
+                    Choose File
+                  </Button>
+                )}
+              </Box>
+              
+              {/* Submit Button - handles both URL and file upload */}
+              {selectedFile ? (
+                <Button 
+                  onClick={(e) => handleFileUploadSubmit(e as unknown as React.FormEvent)}
+                  disabled={uploadingVideo}
+                >
+                  {uploadingVideo ? (
+                    <>
+                      <Spinner size="1" />
+                      {uploadProgress > 0 ? `${Math.round(uploadProgress)}%` : "Uploading..."}
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon />
+                      Upload & Analyse
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button 
+                  onClick={(e) => handleSubmit(e as unknown as React.FormEvent)}
+                  disabled={submitting || !videoUrl.trim()}
+                >
                   {submitting ? <Spinner size="1" /> : <PlusIcon />}
                   Analyse
                 </Button>
-              </Flex>
-            </form>
+              )}
+            </Flex>
+            
+            {/* Upload Progress Bar */}
+            {uploadingVideo && uploadProgress > 0 && (
+              <Box style={{ marginTop: "12px" }}>
+                <Box 
+                  style={{ 
+                    height: "4px", 
+                    backgroundColor: "var(--gray-4)", 
+                    borderRadius: "2px",
+                    overflow: "hidden"
+                  }}
+                >
+                  <Box 
+                    style={{ 
+                      height: "100%", 
+                      width: `${uploadProgress}%`,
+                      backgroundColor: "var(--accent-9)",
+                      transition: "width 0.2s ease-out"
+                    }}
+                  />
+                </Box>
+              </Box>
+            )}
           </Card>
         )}
         

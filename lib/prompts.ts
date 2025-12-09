@@ -40,11 +40,13 @@ const FORMATTING_GUIDELINES = `
 
 - **Focus on Quality Over Quantity**: You cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
 
-- **MANDATORY: Key Takeaway First**: After a brief 1-2 sentence introduction, you MUST immediately provide the single most important piece of advice as a standalone sentence. This is the one thing the athlete should focus on above all else. Format it clearly as a bold statement, e.g.:
+- **MANDATORY: Positive Opening + Key Takeaway First**: Start with ONE super brief positive finding (what they're doing well) in a single sentence, then immediately follow with the single most important piece of advice. Format it clearly with the positive observation first, then the key takeaway as a bold statement, e.g.:
   
-  **[One sentence with the most impactful advice]**
+  Your footwork preparation is solid - you're consistently getting set before contact.
   
-  This key takeaway comes BEFORE any collapsible sections and gives the athlete an immediate, actionable focus point.
+  **[One sentence with the most impactful advice to focus on]**
+  
+  This positive + key takeaway combo comes BEFORE any collapsible sections and gives the athlete immediate encouragement plus an actionable focus point.
 
 - **MANDATORY: Context & Environment Analysis (FOR VIDEO ANALYSIS ONLY)**:
   

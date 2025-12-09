@@ -20,11 +20,11 @@ export const SPORT_COLORS: Record<Task["sport"], "cyan" | "orange" | "green"> = 
   pickleball: "green",
 };
 
-// Sport emoji icons
+// Sport placeholder text (shown when no thumbnail)
 export const SPORT_ICONS: Record<Task["sport"], string> = {
-  padel: "🎾",
-  tennis: "🎾",
-  pickleball: "🏓",
+  padel: "P",
+  tennis: "T",
+  pickleball: "PB",
 };
 
 // Background colors for no-thumbnail state
@@ -41,4 +41,5 @@ export const STATUS_CONFIG: Record<Task["status"], StatusConfig> = {
   completed: { color: "green", icon: CheckCircledIcon, label: "Completed" },
   failed: { color: "red", icon: CrossCircledIcon, label: "Failed" },
 };
+
 

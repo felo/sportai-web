@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { Box, Flex, Text, Badge, Progress, DropdownMenu, Spinner } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -12,6 +13,9 @@ import {
 import type { Task, TaskProgress } from "../types";
 import { SPORT_COLORS, SPORT_ICONS, SPORT_BG_COLORS, STATUS_CONFIG } from "../constants";
 import { formatDuration } from "../utils";
+
+const MAX_THUMBNAIL_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
 
 interface TaskTileThumbnailProps {
   task: Task;
@@ -37,8 +41,29 @@ export function TaskTileThumbnail({
   onDownloadVideo,
   onExportData,
 }: TaskTileThumbnailProps) {
+  const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryKey, setRetryKey] = useState(0); // Force re-render of img element
+  
   const isActive = task.status === "processing" || task.status === "pending";
   const canView = task.status === "completed";
+  
+  // Handle image load error with retry logic
+  const handleImageError = useCallback(() => {
+    if (retryCount < MAX_THUMBNAIL_RETRIES) {
+      // Schedule a retry after delay
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setRetryKey(prev => prev + 1); // Force img element to re-mount and retry
+      }, RETRY_DELAY_MS);
+    } else {
+      // Max retries reached, show placeholder
+      setImageError(true);
+    }
+  }, [retryCount]);
+  
+  // Show placeholder if no thumbnail or if image failed after all retries
+  const showPlaceholder = !thumbnail || imageError;
 
   return (
     <Box
@@ -51,13 +76,7 @@ export function TaskTileThumbnail({
       }}
     >
       {/* Thumbnail Image */}
-      {thumbnail ? (
-        <img
-          src={thumbnail}
-          alt={`Video thumbnail for ${task.sport}`}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
+      {showPlaceholder ? (
         <Flex
           align="center"
           justify="center"
@@ -71,6 +90,14 @@ export function TaskTileThumbnail({
             {SPORT_ICONS[task.sport]}
           </Text>
         </Flex>
+      ) : (
+        <img
+          key={retryKey} // Force re-mount on retry
+          src={thumbnail!}
+          alt={`Video thumbnail for ${task.sport}`}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={handleImageError}
+        />
       )}
 
       {/* Sport Badge */}
@@ -235,4 +262,5 @@ export function TaskTileThumbnail({
     </Box>
   );
 }
+
 

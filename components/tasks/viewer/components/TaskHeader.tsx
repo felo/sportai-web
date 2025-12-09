@@ -38,7 +38,7 @@ export function TaskHeader({
   }, []);
   
   return (
-    <Flex justify="between" align="center" mb="5">
+    <Flex justify="between" align="center">
       <Flex align="center" gap="4">
         <IconButton
           icon={<ArrowLeftIcon />}

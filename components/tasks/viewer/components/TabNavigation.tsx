@@ -21,7 +21,7 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
   return (
     <Box
       style={{
-        borderBottom: "1px solid var(--gray-5)",
+        borderBottom: "1px solid var(--gray-6)",
         backgroundColor: "var(--gray-2)",
         position: "sticky",
         top: 0,

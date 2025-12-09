@@ -36,3 +36,4 @@ export function generateHelpQuestion(termName: string): string {
   return `Can you give me tips about ${termName.toLowerCase()} in game?`;
 }
 
+

@@ -10,3 +10,4 @@ export function formatDuration(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
+
