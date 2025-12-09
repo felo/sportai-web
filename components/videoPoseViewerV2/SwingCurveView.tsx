@@ -28,6 +28,7 @@ export type WristType = "left" | "right" | "both";
 export type KneeType = "left" | "right" | "both";
 export type AngleType = "knee" | "shoulder" | "elbow" | "hip"; // Which joint angle to show
 export type VelocityBodyPart = "wrist" | "ankle" | "knee" | "hip" | "shoulder" | "elbow"; // Which body part velocity to show
+export type OrientationType = "body" | "hipAngular" | "shoulderAngular" | "xFactor"; // Which orientation metric to show
 
 export interface SwingCurveViewProps {
   /** Swing detection result with frame data */
@@ -64,6 +65,10 @@ export interface SwingCurveViewProps {
   selectedVelocityBodyPart?: VelocityBodyPart;
   /** Callback when velocity body part changes */
   onVelocityBodyPartChange?: (bodyPart: VelocityBodyPart) => void;
+  /** Selected orientation type for orientation view (controlled) */
+  selectedOrientationType?: OrientationType;
+  /** Callback when orientation type changes */
+  onOrientationTypeChange?: (orientationType: OrientationType) => void;
   /** Custom class name */
   className?: string;
   /** Custom style */
@@ -151,6 +156,7 @@ interface ChartProps {
   secondaryLabel?: string;
   lowConfidenceRegions?: Array<{ startFrame: number; endFrame: number }>; // Regions where wrist confidence is low
   velocityBodyPart?: VelocityBodyPart; // Which body part for velocity view
+  orientationType?: OrientationType; // Which orientation metric for orientation view
 }
 
 function SwingChart({
@@ -166,6 +172,7 @@ function SwingChart({
   secondaryLabel,
   lowConfidenceRegions = [],
   velocityBodyPart = "wrist",
+  orientationType = "body",
 }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<ChartDataPoint | null>(null);
@@ -468,10 +475,18 @@ function SwingChart({
     elbow: "Elbow",
   };
   
+  // Dynamic label for orientation type
+  const orientationLabels: Record<OrientationType, string> = {
+    body: "Body Orientation (°)",
+    hipAngular: "Hip Angular Vel (°/s)",
+    shoulderAngular: "Shoulder Angular Vel (°/s)",
+    xFactor: "X-Factor (°)",
+  };
+  
   const metricLabel = {
     velocity: `${bodyPartLabels[velocityBodyPart]} Velocity (km/h)`,
-    acceleration: "Wrist Acceleration (km/h/s)",
-    orientation: "Body Orientation (°)",
+    acceleration: `${bodyPartLabels[velocityBodyPart]} Acceleration (km/h/s)`,
+    orientation: orientationLabels[orientationType],
     kneeBend: "Angles (°)",
     score: "Swing Score",
   }[metricType];
@@ -937,6 +952,8 @@ export function SwingCurveView({
   onAngleTypeChange,
   selectedVelocityBodyPart: controlledVelocityBodyPart,
   onVelocityBodyPartChange,
+  selectedOrientationType: controlledOrientationType,
+  onOrientationTypeChange,
   className,
   style,
 }: SwingCurveViewProps) {
@@ -948,6 +965,7 @@ export function SwingCurveView({
   const [internalWrist, setInternalWrist] = useState<WristType>("both");
   const [internalKnee, setInternalKnee] = useState<KneeType>("both");
   const [internalVelocityBodyPart, setInternalVelocityBodyPart] = useState<VelocityBodyPart>("wrist");
+  const [internalOrientationType, setInternalOrientationType] = useState<OrientationType>("body");
   const [showPhases, setShowPhases] = useState(true);
   
   // Confidence threshold for highlighting missing wrist data (adjustable)
@@ -962,6 +980,7 @@ export function SwingCurveView({
   const selectedKnee = controlledKnee ?? internalKnee;
   const angleType = controlledAngleType ?? internalAngleType;
   const velocityBodyPart = controlledVelocityBodyPart ?? internalVelocityBodyPart;
+  const orientationType = controlledOrientationType ?? internalOrientationType;
   
   const setSelectedMetric = (metric: MetricType) => {
     if (onMetricChange) {
@@ -984,6 +1003,14 @@ export function SwingCurveView({
       onVelocityBodyPartChange(bodyPart);
     } else {
       setInternalVelocityBodyPart(bodyPart);
+    }
+  };
+  
+  const setOrientationType = (type: OrientationType) => {
+    if (onOrientationTypeChange) {
+      onOrientationTypeChange(type);
+    } else {
+      setInternalOrientationType(type);
     }
   };
   
@@ -1122,21 +1149,104 @@ export function SwingCurveView({
           }
           break;
         case "acceleration":
-          // Use selected wrist's acceleration
-          switch (selectedWrist) {
-            case "left":
-              value = fd.leftWristAcceleration;
+          // Use selected body part's acceleration
+          switch (velocityBodyPart) {
+            case "wrist":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftWristAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightWristAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxWristAcceleration;
+                  break;
+              }
               break;
-            case "right":
-              value = fd.rightWristAcceleration;
+            case "ankle":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftAnkleAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightAnkleAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxAnkleAcceleration;
+                  break;
+              }
               break;
-            case "both":
-              value = fd.maxWristAcceleration;
+            case "knee":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftKneeAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightKneeAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxKneeAcceleration;
+                  break;
+              }
+              break;
+            case "hip":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftHipAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightHipAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxHipAcceleration;
+                  break;
+              }
+              break;
+            case "shoulder":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftShoulderAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightShoulderAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxShoulderAcceleration;
+                  break;
+              }
+              break;
+            case "elbow":
+              switch (selectedWrist) {
+                case "left":
+                  value = fd.leftElbowAcceleration;
+                  break;
+                case "right":
+                  value = fd.rightElbowAcceleration;
+                  break;
+                case "both":
+                  value = fd.maxElbowAcceleration;
+                  break;
+              }
               break;
           }
           break;
         case "orientation":
-          value = fd.bodyOrientation;
+          // Use selected orientation metric based on orientationType
+          switch (orientationType) {
+            case "body":
+              value = fd.bodyOrientation;
+              break;
+            case "hipAngular":
+              value = fd.hipAngularVelocity;
+              break;
+            case "shoulderAngular":
+              value = fd.shoulderAngularVelocity;
+              break;
+            case "xFactor":
+              value = fd.xFactor;
+              break;
+          }
           break;
         case "kneeBend":
           // Use the selected joint angle based on angleType
@@ -1212,7 +1322,7 @@ export function SwingCurveView({
         phase: fd.phase,
       };
     });
-  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart]);
+  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart, orientationType]);
 
   // Raw data (before any processing) - for comparison (velocity and knee bend)
   const rawChartData = useMemo((): ChartDataPoint[] => {
@@ -1582,8 +1692,8 @@ export function SwingCurveView({
             )}
           </SegmentedControl.Root>
           
-          {/* Body part dropdown for velocity view */}
-          {selectedMetric === "velocity" && (
+          {/* Body part dropdown for velocity and acceleration views */}
+          {(selectedMetric === "velocity" || selectedMetric === "acceleration") && (
             <Select.Root 
               size="1" 
               value={velocityBodyPart} 
@@ -1618,6 +1728,23 @@ export function SwingCurveView({
                 <Select.Item value="left">Left</Select.Item>
                 <Select.Item value="right">Right</Select.Item>
                 <Select.Item value="both">Both (Max)</Select.Item>
+              </Select.Content>
+            </Select.Root>
+          )}
+          
+          {/* Orientation type selector */}
+          {selectedMetric === "orientation" && (
+            <Select.Root 
+              size="1" 
+              value={orientationType} 
+              onValueChange={(value) => setOrientationType(value as OrientationType)}
+            >
+              <Select.Trigger variant="soft" style={{ marginLeft: "12px" }} />
+              <Select.Content>
+                <Select.Item value="body">Body Orientation</Select.Item>
+                <Select.Item value="hipAngular">Hip Angular Velocity</Select.Item>
+                <Select.Item value="shoulderAngular">Shoulder Angular Velocity</Select.Item>
+                <Select.Item value="xFactor">X-Factor (Separation)</Select.Item>
               </Select.Content>
             </Select.Root>
           )}
@@ -1783,6 +1910,7 @@ export function SwingCurveView({
           showPhases={showPhases}
           lowConfidenceRegions={lowConfidenceRegions}
           velocityBodyPart={velocityBodyPart}
+          orientationType={orientationType}
         />
       </Box>
     </Box>

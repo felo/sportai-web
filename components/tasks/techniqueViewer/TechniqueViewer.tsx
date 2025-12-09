@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Flex, IconButton, Tooltip, Text, Button, Badge, ContextMenu } from "@radix-ui/themes";
+import { Box, Flex, IconButton, Tooltip, Text, Button, Badge, ContextMenu, DropdownMenu } from "@radix-ui/themes";
 import { 
   ArrowLeftIcon, 
   GearIcon, 
@@ -13,6 +13,7 @@ import {
   ResetIcon,
   TrashIcon,
   ChatBubbleIcon,
+  AngleIcon,
 } from "@radix-ui/react-icons";
 import {
   VideoPoseViewerV2,
@@ -25,6 +26,7 @@ import {
   type ProtocolEvent,
   PROTOCOL_EVENT_COLORS,
   AVAILABLE_PROTOCOLS,
+  ANGLE_PRESETS,
 } from "@/components/videoPoseViewerV2";
 import { getSportColor } from "@/components/tasks/viewer/utils";
 import { LoadingState } from "@/components/tasks/viewer/components/LoadingState";
@@ -783,6 +785,42 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     return protocolEvents.filter(e => e.protocolId === "swing-detection-v3").length;
   }, [protocolEvents]);
 
+  // Angle preset helpers
+  const isAngleActive = useCallback((angle: [number, number, number]) => {
+    return config.angles.measuredAngles.some(
+      (a) => a[0] === angle[0] && a[1] === angle[1] && a[2] === angle[2]
+    );
+  }, [config.angles.measuredAngles]);
+
+  const toggleAngle = useCallback((angle: [number, number, number]) => {
+    const existing = config.angles.measuredAngles.findIndex(
+      (a) => a[0] === angle[0] && a[1] === angle[1] && a[2] === angle[2]
+    );
+    
+    if (existing !== -1) {
+      // Remove angle
+      setConfig(prev => ({
+        ...prev,
+        angles: {
+          ...prev.angles,
+          measuredAngles: prev.angles.measuredAngles.filter((_, i) => i !== existing),
+        },
+      }));
+    } else {
+      // Add angle
+      setConfig(prev => ({
+        ...prev,
+        angles: {
+          ...prev.angles,
+          measuredAngles: [...prev.angles.measuredAngles, angle],
+        },
+      }));
+    }
+  }, [config.angles.measuredAngles]);
+
+  // Check if any angles are active
+  const hasActiveAngles = config.angles.measuredAngles.length > 0;
+
   // Auto-load pose data from server if available (runs once)
   useEffect(() => {
     async function loadFromServer() {
@@ -923,7 +961,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
 
             </Flex>
 
-            <Flex align="center" gap="3">
+            <Flex align="center" gap="4">
               {/* Annotation Mode Toggle - like Figma's comment mode */}
               {viewMode === "player" && (
                 <Tooltip content={annotationMode ? "Exit annotation mode" : "Add annotations"}>
@@ -939,6 +977,126 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                     <ChatBubbleIcon width={18} height={18} />
                   </IconButton>
                 </Tooltip>
+              )}
+
+              {/* Angles Dropdown Menu - toggle angle measurements on overlay */}
+              {viewMode === "player" && (
+                <DropdownMenu.Root>
+                  <Tooltip content="Angle measurements">
+                    <DropdownMenu.Trigger>
+                      <IconButton
+                        size="2"
+                        variant={config.angles.showAngles && hasActiveAngles ? "solid" : "ghost"}
+                        style={{ 
+                          color: config.angles.showAngles && hasActiveAngles ? "var(--gray-1)" : "white",
+                          backgroundColor: config.angles.showAngles && hasActiveAngles ? "var(--accent-9)" : undefined,
+                        }}
+                      >
+                        <AngleIcon width={18} height={18} />
+                      </IconButton>
+                    </DropdownMenu.Trigger>
+                  </Tooltip>
+                  <DropdownMenu.Content size="1" style={{ minWidth: "180px" }}>
+                    {/* Master toggle */}
+                    <DropdownMenu.CheckboxItem
+                      checked={config.angles.showAngles}
+                      onCheckedChange={(checked) => setConfig(prev => ({
+                        ...prev,
+                        angles: { ...prev.angles, showAngles: checked }
+                      }))}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Show Angles
+                    </DropdownMenu.CheckboxItem>
+                    
+                    <DropdownMenu.Separator />
+                    
+                    {/* Arms section */}
+                    <DropdownMenu.Label>Arms</DropdownMenu.Label>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.leftElbow)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.leftElbow)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Left Elbow
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.rightElbow)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.rightElbow)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Right Elbow
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.leftShoulder)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.leftShoulder)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Left Shoulder
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.rightShoulder)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.rightShoulder)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Right Shoulder
+                    </DropdownMenu.CheckboxItem>
+                    
+                    <DropdownMenu.Separator />
+                    
+                    {/* Legs section */}
+                    <DropdownMenu.Label>Legs</DropdownMenu.Label>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.leftKnee)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.leftKnee)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Left Knee
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.rightKnee)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.rightKnee)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Right Knee
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.leftHip)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.leftHip)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Left Hip
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.rightHip)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.rightHip)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Right Hip
+                    </DropdownMenu.CheckboxItem>
+                    
+                    <DropdownMenu.Separator />
+                    
+                    {/* Torso section */}
+                    <DropdownMenu.Label>Torso</DropdownMenu.Label>
+                    <DropdownMenu.CheckboxItem
+                      checked={isAngleActive(ANGLE_PRESETS.torsoTilt)}
+                      onCheckedChange={() => toggleAngle(ANGLE_PRESETS.torsoTilt)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Torso Tilt
+                    </DropdownMenu.CheckboxItem>
+                    
+                    <DropdownMenu.Separator />
+                    
+                    {/* Count indicator */}
+                    <Box style={{ padding: "4px 12px" }}>
+                      <Text size="1" color="gray">
+                        {config.angles.measuredAngles.length} angle{config.angles.measuredAngles.length !== 1 ? "s" : ""} selected
+                      </Text>
+                    </Box>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
               )}
 
               {/* View Swings / View Player toggle */}

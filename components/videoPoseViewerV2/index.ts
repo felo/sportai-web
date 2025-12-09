@@ -8,7 +8,7 @@
 export { VideoPoseViewerV2 } from "./VideoPoseViewerV2";
 export { PoseConfigurationPanel } from "./PoseConfigurationPanel";
 export { PlaybackTimeline, type EventBoundaryAdjustment } from "./PlaybackTimeline";
-export { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart } from "./SwingCurveView";
+export { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart, type OrientationType } from "./SwingCurveView";
 
 // Types
 export * from "./types";

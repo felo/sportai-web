@@ -197,10 +197,30 @@ export interface SwingFrameDataV3 {
   leftElbowVelocityKmh: number | null;   // smoothed
   rightElbowVelocityKmh: number | null;  // smoothed
   
-  // Acceleration - per wrist (km/h per second, derived from smoothed velocity)
+  // Acceleration - per body part (km/h per second, derived from smoothed velocity)
   leftWristAcceleration: number | null;
   rightWristAcceleration: number | null;
-  maxWristAcceleration: number | null;   // max(abs(left), abs(right))
+  maxWristAcceleration: number | null;
+  
+  leftAnkleAcceleration: number | null;
+  rightAnkleAcceleration: number | null;
+  maxAnkleAcceleration: number | null;
+  
+  leftKneeAcceleration: number | null;
+  rightKneeAcceleration: number | null;
+  maxKneeAcceleration: number | null;
+  
+  leftHipAcceleration: number | null;
+  rightHipAcceleration: number | null;
+  maxHipAcceleration: number | null;
+  
+  leftShoulderAcceleration: number | null;
+  rightShoulderAcceleration: number | null;
+  maxShoulderAcceleration: number | null;
+  
+  leftElbowAcceleration: number | null;
+  rightElbowAcceleration: number | null;
+  maxElbowAcceleration: number | null;
   
   radialVelocity: number | null;
   
@@ -236,6 +256,18 @@ export interface SwingFrameDataV3 {
   // Orientation
   bodyOrientation: number | null;
   orientationVelocity: number | null;  // degrees/frame
+  
+  // Hip and Shoulder line angles (for measuring rotation of body segments)
+  // These measure the angle of the line connecting left-to-right keypoints
+  hipLineAngle: number | null;         // angle of left hip -> right hip line (degrees)
+  shoulderLineAngle: number | null;    // angle of left shoulder -> right shoulder line (degrees)
+  
+  // Angular velocities (degrees/second) - how fast each segment is rotating
+  hipAngularVelocity: number | null;       // rate of hip line rotation (deg/sec)
+  shoulderAngularVelocity: number | null;  // rate of shoulder line rotation (deg/sec)
+  
+  // X-Factor: separation between shoulder and hip rotation (important for sports biomechanics)
+  xFactor: number | null;              // shoulderLineAngle - hipLineAngle (degrees)
   
   // Combined metrics
   swingScore: number | null;           // velocity * |orientationVelocity|
@@ -1209,10 +1241,25 @@ export function useSwingDetectionV3({
           rawRightElbowVelocityKmh: null,
           leftElbowVelocityKmh: null,
           rightElbowVelocityKmh: null,
-          // Acceleration
+          // Acceleration - all body parts
           leftWristAcceleration: null,
           rightWristAcceleration: null,
           maxWristAcceleration: null,
+          leftAnkleAcceleration: null,
+          rightAnkleAcceleration: null,
+          maxAnkleAcceleration: null,
+          leftKneeAcceleration: null,
+          rightKneeAcceleration: null,
+          maxKneeAcceleration: null,
+          leftHipAcceleration: null,
+          rightHipAcceleration: null,
+          maxHipAcceleration: null,
+          leftShoulderAcceleration: null,
+          rightShoulderAcceleration: null,
+          maxShoulderAcceleration: null,
+          leftElbowAcceleration: null,
+          rightElbowAcceleration: null,
+          maxElbowAcceleration: null,
           radialVelocity: null,
           rawLeftKneeBend: null,
           rawRightKneeBend: null,
@@ -1234,6 +1281,11 @@ export function useSwingDetectionV3({
           rightHipAngle: null,
           bodyOrientation: null,
           orientationVelocity: null,
+          hipLineAngle: null,
+          shoulderLineAngle: null,
+          hipAngularVelocity: null,
+          shoulderAngularVelocity: null,
+          xFactor: null,
           swingScore: null,
           phase: "neutral",
         };
@@ -1277,6 +1329,43 @@ export function useSwingDetectionV3({
           config.minConfidence
         );
         dataPoint.bodyOrientation = orientation?.angle ?? null;
+        
+        // Calculate hip and shoulder line angles (for angular velocity measurement)
+        // Hip line angle: angle of the line from left hip to right hip
+        // Shoulder line angle: angle of the line from left shoulder to right shoulder
+        const leftHipKp = pose.keypoints[indices.leftHip];
+        const rightHipKp = pose.keypoints[indices.rightHip];
+        const leftShoulderKp = pose.keypoints[indices.leftShoulder];
+        const rightShoulderKp = pose.keypoints[indices.rightShoulder];
+        
+        // Calculate hip line angle (only if both hips have good confidence)
+        if (leftHipKp && rightHipKp && 
+            (leftHipKp.score ?? 0) >= config.minConfidence && 
+            (rightHipKp.score ?? 0) >= config.minConfidence) {
+          dataPoint.hipLineAngle = Math.atan2(
+            rightHipKp.y - leftHipKp.y,
+            rightHipKp.x - leftHipKp.x
+          ) * (180 / Math.PI);
+        }
+        
+        // Calculate shoulder line angle (only if both shoulders have good confidence)
+        if (leftShoulderKp && rightShoulderKp && 
+            (leftShoulderKp.score ?? 0) >= config.minConfidence && 
+            (rightShoulderKp.score ?? 0) >= config.minConfidence) {
+          dataPoint.shoulderLineAngle = Math.atan2(
+            rightShoulderKp.y - leftShoulderKp.y,
+            rightShoulderKp.x - leftShoulderKp.x
+          ) * (180 / Math.PI);
+        }
+        
+        // Calculate X-Factor (separation between shoulder and hip rotation)
+        if (dataPoint.hipLineAngle !== null && dataPoint.shoulderLineAngle !== null) {
+          let xFactor = dataPoint.shoulderLineAngle - dataPoint.hipLineAngle;
+          // Normalize to -180 to 180
+          if (xFactor > 180) xFactor -= 360;
+          if (xFactor < -180) xFactor += 360;
+          dataPoint.xFactor = xFactor;
+        }
         
         // Calculate knee bend angles
         const leftKneeAngle = calculateKneeAngle(
@@ -1434,6 +1523,46 @@ export function useSwingDetectionV3({
               if (orientDiff > 180) orientDiff -= 360;
               if (orientDiff < -180) orientDiff += 360;
               dataPoint.orientationVelocity = orientDiff;
+            }
+            
+            // Hip angular velocity (degrees per second)
+            const prevLeftHipKp = prevPose.keypoints[indices.leftHip];
+            const prevRightHipKp = prevPose.keypoints[indices.rightHip];
+            if (dataPoint.hipLineAngle !== null &&
+                prevLeftHipKp && prevRightHipKp &&
+                (prevLeftHipKp.score ?? 0) >= config.minConfidence &&
+                (prevRightHipKp.score ?? 0) >= config.minConfidence) {
+              const prevHipLineAngle = Math.atan2(
+                prevRightHipKp.y - prevLeftHipKp.y,
+                prevRightHipKp.x - prevLeftHipKp.x
+              ) * (180 / Math.PI);
+              
+              let hipAngleDiff = dataPoint.hipLineAngle - prevHipLineAngle;
+              // Handle wrap-around
+              if (hipAngleDiff > 180) hipAngleDiff -= 360;
+              if (hipAngleDiff < -180) hipAngleDiff += 360;
+              // Convert to degrees per second
+              dataPoint.hipAngularVelocity = hipAngleDiff * videoFPS;
+            }
+            
+            // Shoulder angular velocity (degrees per second)
+            const prevLeftShoulderKp = prevPose.keypoints[indices.leftShoulder];
+            const prevRightShoulderKp = prevPose.keypoints[indices.rightShoulder];
+            if (dataPoint.shoulderLineAngle !== null &&
+                prevLeftShoulderKp && prevRightShoulderKp &&
+                (prevLeftShoulderKp.score ?? 0) >= config.minConfidence &&
+                (prevRightShoulderKp.score ?? 0) >= config.minConfidence) {
+              const prevShoulderLineAngle = Math.atan2(
+                prevRightShoulderKp.y - prevLeftShoulderKp.y,
+                prevRightShoulderKp.x - prevLeftShoulderKp.x
+              ) * (180 / Math.PI);
+              
+              let shoulderAngleDiff = dataPoint.shoulderLineAngle - prevShoulderLineAngle;
+              // Handle wrap-around
+              if (shoulderAngleDiff > 180) shoulderAngleDiff -= 360;
+              if (shoulderAngleDiff < -180) shoulderAngleDiff += 360;
+              // Convert to degrees per second
+              dataPoint.shoulderAngularVelocity = shoulderAngleDiff * videoFPS;
             }
           }
         }
@@ -1654,13 +1783,118 @@ export function useSwingDetectionV3({
             fd.rightWristAcceleration = (nextRightV - prevRightV) / (2 * dt);
           }
           
-          // Max acceleration (max absolute value, preserving sign of the larger one)
+          // Max wrist acceleration (max absolute value, preserving sign of the larger one)
           if (fd.leftWristAcceleration !== null || fd.rightWristAcceleration !== null) {
             const leftAbs = Math.abs(fd.leftWristAcceleration ?? 0);
             const rightAbs = Math.abs(fd.rightWristAcceleration ?? 0);
             fd.maxWristAcceleration = leftAbs >= rightAbs 
               ? fd.leftWristAcceleration 
               : fd.rightWristAcceleration;
+          }
+          
+          // Ankle acceleration
+          const prevLeftAnkleV = frameData[i - 1]?.leftAnkleVelocityKmh;
+          const nextLeftAnkleV = smoothedLeftAnkleVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedLeftAnkleVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevLeftAnkleV !== null && nextLeftAnkleV !== null) {
+            fd.leftAnkleAcceleration = (nextLeftAnkleV - prevLeftAnkleV) / (2 * dt);
+          }
+          const prevRightAnkleV = frameData[i - 1]?.rightAnkleVelocityKmh;
+          const nextRightAnkleV = smoothedRightAnkleVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedRightAnkleVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevRightAnkleV !== null && nextRightAnkleV !== null) {
+            fd.rightAnkleAcceleration = (nextRightAnkleV - prevRightAnkleV) / (2 * dt);
+          }
+          if (fd.leftAnkleAcceleration !== null || fd.rightAnkleAcceleration !== null) {
+            const leftAbs = Math.abs(fd.leftAnkleAcceleration ?? 0);
+            const rightAbs = Math.abs(fd.rightAnkleAcceleration ?? 0);
+            fd.maxAnkleAcceleration = leftAbs >= rightAbs ? fd.leftAnkleAcceleration : fd.rightAnkleAcceleration;
+          }
+          
+          // Knee acceleration
+          const prevLeftKneeV = frameData[i - 1]?.leftKneeVelocityKmh;
+          const nextLeftKneeV = smoothedLeftKneeVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedLeftKneeVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevLeftKneeV !== null && nextLeftKneeV !== null) {
+            fd.leftKneeAcceleration = (nextLeftKneeV - prevLeftKneeV) / (2 * dt);
+          }
+          const prevRightKneeV = frameData[i - 1]?.rightKneeVelocityKmh;
+          const nextRightKneeV = smoothedRightKneeVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedRightKneeVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevRightKneeV !== null && nextRightKneeV !== null) {
+            fd.rightKneeAcceleration = (nextRightKneeV - prevRightKneeV) / (2 * dt);
+          }
+          if (fd.leftKneeAcceleration !== null || fd.rightKneeAcceleration !== null) {
+            const leftAbs = Math.abs(fd.leftKneeAcceleration ?? 0);
+            const rightAbs = Math.abs(fd.rightKneeAcceleration ?? 0);
+            fd.maxKneeAcceleration = leftAbs >= rightAbs ? fd.leftKneeAcceleration : fd.rightKneeAcceleration;
+          }
+          
+          // Hip acceleration
+          const prevLeftHipV = frameData[i - 1]?.leftHipVelocityKmh;
+          const nextLeftHipV = smoothedLeftHipVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedLeftHipVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevLeftHipV !== null && nextLeftHipV !== null) {
+            fd.leftHipAcceleration = (nextLeftHipV - prevLeftHipV) / (2 * dt);
+          }
+          const prevRightHipV = frameData[i - 1]?.rightHipVelocityKmh;
+          const nextRightHipV = smoothedRightHipVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedRightHipVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevRightHipV !== null && nextRightHipV !== null) {
+            fd.rightHipAcceleration = (nextRightHipV - prevRightHipV) / (2 * dt);
+          }
+          if (fd.leftHipAcceleration !== null || fd.rightHipAcceleration !== null) {
+            const leftAbs = Math.abs(fd.leftHipAcceleration ?? 0);
+            const rightAbs = Math.abs(fd.rightHipAcceleration ?? 0);
+            fd.maxHipAcceleration = leftAbs >= rightAbs ? fd.leftHipAcceleration : fd.rightHipAcceleration;
+          }
+          
+          // Shoulder acceleration
+          const prevLeftShoulderV = frameData[i - 1]?.leftShoulderVelocityKmh;
+          const nextLeftShoulderV = smoothedLeftShoulderVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedLeftShoulderVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevLeftShoulderV !== null && nextLeftShoulderV !== null) {
+            fd.leftShoulderAcceleration = (nextLeftShoulderV - prevLeftShoulderV) / (2 * dt);
+          }
+          const prevRightShoulderV = frameData[i - 1]?.rightShoulderVelocityKmh;
+          const nextRightShoulderV = smoothedRightShoulderVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedRightShoulderVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevRightShoulderV !== null && nextRightShoulderV !== null) {
+            fd.rightShoulderAcceleration = (nextRightShoulderV - prevRightShoulderV) / (2 * dt);
+          }
+          if (fd.leftShoulderAcceleration !== null || fd.rightShoulderAcceleration !== null) {
+            const leftAbs = Math.abs(fd.leftShoulderAcceleration ?? 0);
+            const rightAbs = Math.abs(fd.rightShoulderAcceleration ?? 0);
+            fd.maxShoulderAcceleration = leftAbs >= rightAbs ? fd.leftShoulderAcceleration : fd.rightShoulderAcceleration;
+          }
+          
+          // Elbow acceleration
+          const prevLeftElbowV = frameData[i - 1]?.leftElbowVelocityKmh;
+          const nextLeftElbowV = smoothedLeftElbowVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedLeftElbowVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevLeftElbowV !== null && nextLeftElbowV !== null) {
+            fd.leftElbowAcceleration = (nextLeftElbowV - prevLeftElbowV) / (2 * dt);
+          }
+          const prevRightElbowV = frameData[i - 1]?.rightElbowVelocityKmh;
+          const nextRightElbowV = smoothedRightElbowVel[i + 1] !== null 
+            ? convertVelocityToKmh(smoothedRightElbowVel[i + 1]!, metersPerPixel, videoFPS) 
+            : null;
+          if (prevRightElbowV !== null && nextRightElbowV !== null) {
+            fd.rightElbowAcceleration = (nextRightElbowV - prevRightElbowV) / (2 * dt);
+          }
+          if (fd.leftElbowAcceleration !== null || fd.rightElbowAcceleration !== null) {
+            const leftAbs = Math.abs(fd.leftElbowAcceleration ?? 0);
+            const rightAbs = Math.abs(fd.rightElbowAcceleration ?? 0);
+            fd.maxElbowAcceleration = leftAbs >= rightAbs ? fd.leftElbowAcceleration : fd.rightElbowAcceleration;
           }
         }
         

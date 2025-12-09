@@ -37,7 +37,7 @@ import {
 import { useSwingDetection } from "@/components/chat/viewers/videoPoseViewer/hooks/useSwingDetection";
 import { useSwingDetectionV3, type SwingDetectionResultV3 } from "./hooks/useSwingDetectionV3";
 import { useHandednessDetection, type HandednessResult } from "./hooks/useHandednessDetection";
-import { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart } from "./SwingCurveView";
+import { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart, type OrientationType } from "./SwingCurveView";
 
 import type {
   ViewerConfig,
@@ -263,6 +263,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     const [selectedKnee, setSelectedKnee] = useState<KneeType>("both");
     const [selectedAngleType, setSelectedAngleType] = useState<AngleType>("knee");
     const [selectedVelocityBodyPart, setSelectedVelocityBodyPart] = useState<VelocityBodyPart>("wrist");
+    const [selectedOrientationType, setSelectedOrientationType] = useState<OrientationType>("body");
 
     // Notify parent when active tab changes
     useEffect(() => {
@@ -1894,6 +1895,8 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             onAngleTypeChange={setSelectedAngleType}
             selectedVelocityBodyPart={selectedVelocityBodyPart}
             onVelocityBodyPartChange={setSelectedVelocityBodyPart}
+            selectedOrientationType={selectedOrientationType}
+            onOrientationTypeChange={setSelectedOrientationType}
             onSeekToFrame={(frame) => {
               const video = videoRef.current;
               if (!video) return;
