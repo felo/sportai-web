@@ -79,7 +79,7 @@ export function SidebarContent({
 
       <Separator size="4" />
 
-      <SidebarNavigation onLinkClick={onLinkClick} />
+      <SidebarNavigation onLinkClick={onLinkClick} onNavigationAttempt={onNavigationAttempt} />
     </Flex>
   );
 }

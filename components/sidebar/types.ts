@@ -97,6 +97,7 @@ export interface LibraryButtonProps {
 // Navigation props
 export interface SidebarNavigationProps {
   onLinkClick?: () => void;
+  onNavigationAttempt?: () => Promise<boolean> | boolean;
 }
 
 // Dialogs props
