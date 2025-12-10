@@ -255,21 +255,39 @@ export function useAnalysisOptions({
       analysisLogger.warn("User not authenticated, skipping PRO task creation");
     }
     
-    // Add library notification message
+    // Add library notification message with gradual typing effect
     if (taskCreated) {
       const libraryMessageId = generateMessageId();
       // Technique tasks are immediately completed; tactical tasks need processing time
       const libraryMessageContent = isTechniqueAnalysis
-        ? `🎯 I've added this video to your **Library** (in the sidebar) under **Technique**. You can revisit it anytime!\n\nNow let me give you some instant feedback...`
-        : `🎯 I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`;
+        ? `I've added this video to your **Library** (in the sidebar) under **Technique**. You can revisit it anytime!\n\nNow let me give you some instant feedback...`
+        : `I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`;
       
+      // Start with empty content and streaming state
       const libraryMessage: Message = {
         id: libraryMessageId,
         role: "assistant",
-        content: libraryMessageContent,
-        isStreaming: false,
+        content: "",
+        isStreaming: true,
       };
       addMessage(libraryMessage);
+      
+      // Gradually reveal text character by character
+      const charsPerUpdate = 3;
+      const delayMs = 15;
+      for (let i = 0; i <= libraryMessageContent.length; i += charsPerUpdate) {
+        updateMessage(libraryMessageId, {
+          content: libraryMessageContent.slice(0, i),
+          isStreaming: true,
+        });
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+      
+      // Finalize the message
+      updateMessage(libraryMessageId, {
+        content: libraryMessageContent,
+        isStreaming: false,
+      });
       
       await new Promise(resolve => setTimeout(resolve, 100));
     }

@@ -95,6 +95,8 @@ export function TaskTileThumbnail({
           key={retryKey} // Force re-mount on retry
           src={thumbnail!}
           alt={`Video thumbnail for ${task.sport}`}
+          loading="lazy"
+          decoding="async"
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
           onError={handleImageError}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UseThumbnailOptions {
   videoUrl: string;
@@ -12,11 +12,12 @@ interface UseThumbnailReturn {
   hasError: boolean;
   isGenerating: boolean;
   regenerate: () => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
- * Hook to manage video thumbnails
- * Uses stored thumbnail if available, otherwise generates from video
+ * Hook to manage video thumbnails with lazy loading
+ * Uses stored thumbnail if available, otherwise generates from video when in view
  */
 export function useThumbnail({
   videoUrl,
@@ -26,12 +27,40 @@ export function useThumbnail({
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenerateKey, setRegenerateKey] = useState(0);
+  const [isInView, setIsInView] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const regenerate = useCallback(() => {
     setThumbnail(null);
     setHasError(false);
     setRegenerateKey((k) => k + 1);
   }, []);
+
+  // Intersection Observer for lazy loading
+  useEffect(() => {
+    // If we already have a stored thumbnail, no need to observe
+    if (thumbnailUrl) {
+      setIsInView(true);
+      return;
+    }
+
+    const element = containerRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" } // Start loading 200px before entering viewport
+    );
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [thumbnailUrl]);
 
   useEffect(() => {
     // Use stored thumbnail if available (only on first load)
@@ -42,6 +71,9 @@ export function useThumbnail({
 
     // Skip if already have thumbnail or had an error
     if (thumbnail || hasError) return;
+
+    // Wait until in view before generating thumbnail
+    if (!isInView) return;
 
     setIsGenerating(true);
 
@@ -78,9 +110,9 @@ export function useThumbnail({
       video.pause();
       video.src = "";
     };
-  }, [videoUrl, thumbnailUrl, thumbnail, hasError, regenerateKey]);
+  }, [videoUrl, thumbnailUrl, thumbnail, hasError, regenerateKey, isInView]);
 
-  return { thumbnail, hasError, isGenerating, regenerate };
+  return { thumbnail, hasError, isGenerating, regenerate, containerRef };
 }
 
 

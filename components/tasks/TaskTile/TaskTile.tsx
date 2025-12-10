@@ -33,7 +33,7 @@ export function TaskTile({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
 
-  const { thumbnail, isGenerating, regenerate } = useThumbnail({
+  const { thumbnail, isGenerating, regenerate, containerRef } = useThumbnail({
     videoUrl: task.video_url,
     thumbnailUrl: task.thumbnail_url,
   });
@@ -46,6 +46,7 @@ export function TaskTile({
 
   return (
     <Card
+      ref={containerRef}
       style={{
         cursor: canView && !isPreparing ? "pointer" : "default",
         transition: "all 0.2s ease",

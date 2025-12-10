@@ -154,29 +154,41 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     (message.videoFile?.type.startsWith("image/"))
   );
   
-  // Check if this conversation involves a video (for showing progress bar during analysis)
-  // Looks for any user message with video OR any analysis_options message in the conversation
+  // Check if this is a recent video analysis (for showing video-style thinking messages)
+  // Only shows video messages if <= 2 user messages since the last video
   const userSentVideo = (() => {
     if (message.role !== "assistant" || messageIndex === 0) return false;
     
-    // Look through ALL previous messages to find if this is a video analysis conversation
+    // Find the most recent video or analysis_options message
+    let lastVideoIndex = -1;
     for (let i = messageIndex - 1; i >= 0; i--) {
       const prevMessage = allMessages[i];
       
-      // If there's an analysis_options message, this is definitely a video conversation
+      // If there's an analysis_options message, this is a video conversation
       if (prevMessage.messageType === "analysis_options") {
-        return true;
+        lastVideoIndex = i;
+        break;
       }
       
       // Check if any user message has a video
       if (prevMessage.role === "user") {
         const hasVideo = !!(prevMessage.videoUrl || prevMessage.videoPreview || prevMessage.videoFile || prevMessage.videoS3Key);
         if (hasVideo) {
-          return true;
+          lastVideoIndex = i;
+          break;
         }
       }
     }
-    return false;
+    
+    if (lastVideoIndex === -1) return false;
+    
+    // Count user messages after the video
+    const userMessagesAfterVideo = allMessages
+      .slice(lastVideoIndex + 1, messageIndex)
+      .filter(m => m.role === "user").length;
+    
+    // Only show video thinking messages if <= 1 user message since video
+    return userMessagesAfterVideo <= 1;
   })();
   
   // Check if this is the first assistant message in the conversation
