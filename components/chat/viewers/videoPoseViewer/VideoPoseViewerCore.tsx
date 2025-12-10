@@ -363,7 +363,7 @@ export function VideoPoseViewer({
   } = useLandingDetection({ preprocessedPoses: new Map(), selectedModel, videoFPS, selectedPoseIndex });
 
   // Protocol selector state
-  const [selectedProtocol, setSelectedProtocol] = useState<"serve" | "swings" | "swings-v2">("swings-v2");
+  const [selectedProtocol, setSelectedProtocol] = useState<"serve" | "swings" | "swings-v2">("serve");
   
   // Swing detection config
   const [swingRequireOutwardMotion, setSwingRequireOutwardMotion] = useState(true);
