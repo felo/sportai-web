@@ -71,6 +71,9 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
   const [serverDataChecked, setServerDataChecked] = useState(false); // Prevents retry loop
   const [isLoadingServerData, setIsLoadingServerData] = useState(false);
   const [autoSaved, setAutoSaved] = useState(false); // Track if we've auto-saved
+  
+  // Overall pose detection confidence (average across all frames)
+  const [overallConfidence, setOverallConfidence] = useState<number | null>(null);
 
   // Protocol events (detected by enabled protocols after preprocessing)
   const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
@@ -230,6 +233,30 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
       preprocessedFrameCount: frameCount,
       isPreprocessing: false,
     }));
+
+    // Calculate overall confidence from preprocessed poses
+    if (viewerRef.current) {
+      const poses = viewerRef.current.getPreprocessedPoses();
+      if (poses.size > 0) {
+        let totalScore = 0;
+        let scoreCount = 0;
+        
+        poses.forEach((framePoses) => {
+          framePoses.forEach((pose) => {
+            if (pose.score !== undefined && pose.score > 0) {
+              totalScore += pose.score;
+              scoreCount++;
+            }
+          });
+        });
+        
+        if (scoreCount > 0) {
+          const avgConfidence = totalScore / scoreCount;
+          setOverallConfidence(avgConfidence);
+          console.log(`[TechniqueViewer] Average pose confidence: ${(avgConfidence * 100).toFixed(1)}%`);
+        }
+      }
+    }
 
     // Auto-save to server after preprocessing completes
     // Only save if: we have a taskId, data wasn't loaded from server, and we haven't already saved
@@ -842,6 +869,27 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
           viewerRef.current.setPreprocessedPoses(posesMap, result.data.videoFPS);
           setServerDataLoaded(true);
           
+          // Calculate overall confidence from loaded poses
+          if (posesMap.size > 0) {
+            let totalScore = 0;
+            let scoreCount = 0;
+            
+            posesMap.forEach((framePoses) => {
+              framePoses.forEach((pose) => {
+                if (pose.score !== undefined && pose.score > 0) {
+                  totalScore += pose.score;
+                  scoreCount++;
+                }
+              });
+            });
+            
+            if (scoreCount > 0) {
+              const avgConfidence = totalScore / scoreCount;
+              setOverallConfidence(avgConfidence);
+              console.log(`[TechniqueViewer] Loaded confidence from server: ${(avgConfidence * 100).toFixed(1)}%`);
+            }
+          }
+          
           // Load custom events if present
           if (result.data.customEvents && result.data.customEvents.length > 0) {
             setCustomEvents(result.data.customEvents);
@@ -957,6 +1005,29 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                 <Badge color="blue" size="2">
                   {swingCount} Swing{swingCount !== 1 ? "s" : ""}
                 </Badge>
+              )}
+              {overallConfidence !== null && (
+                <Tooltip 
+                  content={
+                    <Text size="1" style={{ display: "block", maxWidth: "240px" }}>
+                      How reliably the AI tracks body movement.
+                      <br /><br />
+                      • 70%+ Excellent — highly accurate tracking
+                      <br />
+                      • 50-70% Good — reliable for most analysis
+                      <br />
+                      • Below 50% — consider re-recording with better visibility
+                    </Text>
+                  }
+                >
+                  <Badge 
+                    color={overallConfidence >= 0.7 ? "green" : overallConfidence >= 0.5 ? "yellow" : "orange"} 
+                    size="2"
+                    style={{ cursor: "help" }}
+                  >
+                    {(overallConfidence * 100).toFixed(0)}% Confidence
+                  </Badge>
+                </Tooltip>
               )}
 
             </Flex>

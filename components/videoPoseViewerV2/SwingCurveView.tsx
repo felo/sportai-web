@@ -1848,18 +1848,18 @@ export function SwingCurveView({
                 />
                 <Text size="1" color="gray">Raw</Text>
               </Flex>
-              <Flex align="center" gap="2" style={{ marginLeft: "8px" }}>
-                <Box
-                  style={{
-                    width: 16,
-                    height: 10,
-                    borderRadius: "2px",
-                    backgroundColor: "rgba(239, 68, 68, 0.25)",
-                    border: "1px dashed rgba(239, 68, 68, 0.6)",
-                  }}
-                />
-                <Text size="1" color="gray">Low confidence</Text>
-                <Tooltip content={`Highlight frames where ${velocityBodyPart} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+              <Tooltip content={`Highlight frames where ${velocityBodyPart} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+                <Flex align="center" gap="2" style={{ marginLeft: "8px" }}>
+                  <Box
+                    style={{
+                      width: 16,
+                      height: 10,
+                      borderRadius: "2px",
+                      backgroundColor: "rgba(239, 68, 68, 0.25)",
+                      border: "1px dashed rgba(239, 68, 68, 0.6)",
+                    }}
+                  />
+                  <Text size="1" color="gray">Confidence</Text>
                   <Flex align="center" gap="1" style={{ marginLeft: "4px" }}>
                     <Text size="1" style={{ color: "var(--gray-11)", fontWeight: 500, minWidth: "32px" }}>
                       {(confidenceThreshold * 100).toFixed(0)}%
@@ -1879,8 +1879,8 @@ export function SwingCurveView({
                       }}
                     />
                   </Flex>
-                </Tooltip>
-              </Flex>
+                </Flex>
+              </Tooltip>
             </Flex>
           )}
           
@@ -1943,18 +1943,18 @@ export function SwingCurveView({
                 />
                 <Text size="1" color="gray">Raw</Text>
               </Flex>
-              <Flex align="center" gap="2" style={{ marginLeft: "8px" }}>
-                <Box
-                  style={{
-                    width: 16,
-                    height: 10,
-                    borderRadius: "2px",
-                    backgroundColor: "rgba(239, 68, 68, 0.25)",
-                    border: "1px dashed rgba(239, 68, 68, 0.6)",
-                  }}
-                />
-                <Text size="1" color="gray">Low confidence</Text>
-                <Tooltip content={`Highlight frames where ${angleType} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+              <Tooltip content={`Highlight frames where ${angleType} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+                <Flex align="center" gap="2" style={{ marginLeft: "8px" }}>
+                  <Box
+                    style={{
+                      width: 16,
+                      height: 10,
+                      borderRadius: "2px",
+                      backgroundColor: "rgba(239, 68, 68, 0.25)",
+                      border: "1px dashed rgba(239, 68, 68, 0.6)",
+                    }}
+                  />
+                  <Text size="1" color="gray">Confidence</Text>
                   <Flex align="center" gap="1" style={{ marginLeft: "4px" }}>
                     <Text size="1" style={{ color: "var(--gray-11)", fontWeight: 500, minWidth: "32px" }}>
                       {(confidenceThreshold * 100).toFixed(0)}%
@@ -1974,8 +1974,8 @@ export function SwingCurveView({
                       }}
                     />
                   </Flex>
-                </Tooltip>
-              </Flex>
+                </Flex>
+              </Tooltip>
             </Flex>
           )}
         </Flex>
