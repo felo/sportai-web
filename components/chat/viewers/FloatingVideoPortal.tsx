@@ -591,8 +591,8 @@ export function FloatingVideoPortal() {
               </IconButton>
             </Tooltip>
             
-            {/* AI Overlay toggle */}
-            <Tooltip content={poseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"} side="right">
+            {/* Movement Analysis toggle */}
+            <Tooltip content={poseEnabled ? "Disable Movement Analysis" : "Analyse Movement"} side="right">
               <IconButton
                 size="1"
                 variant="solid"

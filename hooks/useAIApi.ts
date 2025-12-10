@@ -248,6 +248,17 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           const historyLength = conversationHistory?.length || 0;
           const thinkingBudget = calculateThinkingBudget(thinkingMode, false, promptTokens, historyLength, isSimpleQuery);
           
+          // Log telemetry data being saved (for debugging)
+          apiLogger.debug("Final telemetry update (text-only):", {
+            assistantMessageId,
+            duration,
+            timeToFirstToken,
+            modelUsed,
+            modelReason,
+            cacheUsed,
+            hasContextUsage: !!contextUsageInfo,
+          });
+          
           updateMessage(assistantMessageId, {
             responseDuration: duration,
             timeToFirstToken: timeToFirstToken,
@@ -655,6 +666,18 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           const promptTokens = estimateTextTokens(prompt);
           const historyLength = conversationHistory?.length || 0;
           const thinkingBudget = calculateThinkingBudget(thinkingMode, true, promptTokens, historyLength);
+          
+          // Log telemetry data being saved (for debugging)
+          apiLogger.debug("Final telemetry update (video):", {
+            assistantMessageId,
+            duration,
+            timeToFirstToken,
+            modelUsed,
+            modelReason,
+            cacheUsed,
+            cacheName: cacheName ? 'set' : 'not set',
+            hasContextUsage: !!contextUsageInfo,
+          });
           
           updateMessage(assistantMessageId, {
             responseDuration: duration,

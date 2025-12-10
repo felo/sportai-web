@@ -71,6 +71,9 @@ import { CONFIDENCE_PRESETS, RESOLUTION_PRESETS, DEFAULT_VIDEO_FPS } from "./con
 // Types
 import type { ObjectDetectionResult, ProjectileDetectionResult } from "@/types/detection";
 
+// Pose data persistence
+import { loadPoseData, savePoseData, convertToPreprocessedPoses } from "@/lib/poseDataService";
+
 interface VideoPoseViewerProps {
   videoUrl: string;
   width?: number;
@@ -100,6 +103,12 @@ interface VideoPoseViewerProps {
   onPoseChange?: (poses: PoseDetectionResult[]) => void;
   compactMode?: boolean;
   allowPreprocessing?: boolean;
+  // S3 storage for pose data caching
+  videoS3Key?: string;
+  poseDataS3Key?: string;
+  onPoseDataSaved?: (s3Key: string) => void;
+  // Skip preprocessing - used when video is floating (just playback, no analysis)
+  skipPreprocessing?: boolean;
 }
 
 // Helper to determine if crossOrigin should be used for a URL
@@ -173,6 +182,10 @@ export function VideoPoseViewer({
   onPoseChange,
   compactMode = false,
   allowPreprocessing = true,
+  videoS3Key,
+  poseDataS3Key,
+  onPoseDataSaved,
+  skipPreprocessing = false,
 }: VideoPoseViewerProps) {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -190,9 +203,11 @@ export function VideoPoseViewer({
   // Pose enabled state (controlled/uncontrolled)
   const isControlled = controlledPoseEnabled !== undefined;
   const [internalPoseEnabled, setInternalPoseEnabled] = useState(initialPoseEnabled);
+  const [hasEverEnabledOverlay, setHasEverEnabledOverlay] = useState(initialPoseEnabled);
   const isPoseEnabled = isControlled ? controlledPoseEnabled : internalPoseEnabled;
   const setIsPoseEnabled = useCallback((enabled: boolean) => {
     if (!isControlled) setInternalPoseEnabled(enabled);
+    if (enabled) setHasEverEnabledOverlay(true);
     onPoseEnabledChange?.(enabled);
   }, [isControlled, onPoseEnabledChange]);
 
@@ -250,6 +265,11 @@ export function VideoPoseViewer({
   const [showDisplacementChart, setShowDisplacementChart] = useState(false);
   // Joint acceleration chart
   const [showAccelerationChart, setShowAccelerationChart] = useState(false);
+
+  // Pose data persistence (S3 cache)
+  const [serverPoseDataLoaded, setServerPoseDataLoaded] = useState(false);
+  const [serverPoseDataChecked, setServerPoseDataChecked] = useState(false);
+  const [poseDataSaved, setPoseDataSaved] = useState(false);
 
   // Object detection
   const [isObjectDetectionEnabled, setIsObjectDetectionEnabled] = useState(false);
@@ -602,7 +622,83 @@ export function VideoPoseViewer({
 
   useEffect(() => {
     setIsVideoMetadataLoaded(false);
+    // Reset pose data state when video URL changes
+    setServerPoseDataLoaded(false);
+    setServerPoseDataChecked(false);
+    setPoseDataSaved(false);
   }, [videoUrl]);
+
+  // Load pose data from S3 if available (runs once when video is ready)
+  useEffect(() => {
+    async function loadFromServer() {
+      // Only try once, need videoS3Key and video must be ready
+      if (!videoS3Key || serverPoseDataChecked || !isVideoMetadataLoaded || skipPreprocessing) return;
+      
+      try {
+        detectionLogger.info(`[VideoPoseViewer] Checking for cached pose data: ${videoS3Key}`);
+        const result = await loadPoseData(videoS3Key);
+        
+        if (result.success && result.data) {
+          // Convert stored data to Map format
+          const posesMap = convertToPreprocessedPoses(result.data);
+          
+          if (posesMap.size > 0) {
+            // Load cached poses into preprocessing hook
+            preprocessing.loadExternalPoses(posesMap, result.data.videoFPS || 30);
+            setServerPoseDataLoaded(true);
+            // Auto-enable movement analysis since cached data loads instantly
+            setIsPoseEnabled(true);
+            detectionLogger.info(`[VideoPoseViewer] Loaded ${posesMap.size} frames from S3 cache at ${result.data.videoFPS} FPS, auto-enabled overlay`);
+          }
+        } else {
+          detectionLogger.debug(`[VideoPoseViewer] No cached pose data found for ${videoS3Key}`);
+        }
+      } catch (error) {
+        detectionLogger.error(`[VideoPoseViewer] Failed to load pose data:`, error);
+      } finally {
+        setServerPoseDataChecked(true);
+      }
+    }
+    
+    loadFromServer();
+  }, [videoS3Key, serverPoseDataChecked, isVideoMetadataLoaded, skipPreprocessing]);
+
+  // Save pose data to S3 after preprocessing completes
+  useEffect(() => {
+    async function saveToServer() {
+      // Only save if: we have videoS3Key, preprocessing completed, and haven't saved yet
+      if (!videoS3Key || 
+          !preprocessing.usePreprocessing || 
+          preprocessing.preprocessedPoses.size === 0 ||
+          poseDataSaved ||
+          serverPoseDataLoaded ||  // Don't save if we loaded from server (already saved)
+          skipPreprocessing) {
+        return;
+      }
+      
+      try {
+        detectionLogger.info(`[VideoPoseViewer] Saving ${preprocessing.preprocessedPoses.size} frames to S3...`);
+        const result = await savePoseData(
+          videoS3Key,
+          preprocessing.preprocessedPoses,
+          preprocessing.preprocessingFPS,
+          selectedModel
+        );
+        
+        if (result.success) {
+          setPoseDataSaved(true);
+          onPoseDataSaved?.(result.s3Key || "");
+          detectionLogger.info(`[VideoPoseViewer] Pose data saved to S3 successfully`);
+        } else {
+          detectionLogger.error(`[VideoPoseViewer] Failed to save pose data:`, result.error);
+        }
+      } catch (error) {
+        detectionLogger.error(`[VideoPoseViewer] Error saving pose data:`, error);
+      }
+    }
+    
+    saveToServer();
+  }, [videoS3Key, preprocessing.usePreprocessing, preprocessing.preprocessedPoses.size, preprocessing.preprocessingFPS, poseDataSaved, serverPoseDataLoaded, selectedModel, onPoseDataSaved, skipPreprocessing]);
 
   // Pose detection during playback
   useEffect(() => {
@@ -904,7 +1000,7 @@ export function VideoPoseViewer({
   const handleImageInsight = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !selectedPose) {
-      setImageInsightError("No pose detected. Enable AI Overlay and ensure a player is visible.");
+      setImageInsightError("No pose detected. Enable Analyse Movement and ensure a player is visible.");
       return;
     }
     setIsImageInsightLoading(true);
@@ -1119,20 +1215,24 @@ export function VideoPoseViewer({
           )}
 
           {!compactMode && (
-            <Tooltip content={isPoseEnabled ? "Disable AI Overlay" : "Enable AI Overlay"}>
+            <Tooltip content={isPoseEnabled ? "Disable Movement Analysis" : "Analyse Movement"}>
               <Button
-                className={buttonStyles.actionButtonSquare}
+                className={`${buttonStyles.actionButtonSquare} ${!preprocessing.usePreprocessing ? buttonStyles.actionButtonPulse : ""}`}
                 onClick={handleTogglePose}
                 style={{
                   height: isPortraitVideo || isMobile ? "24px" : "28px",
                   padding: isPortraitVideo || isMobile ? "0 8px" : "0 10px",
                   fontSize: isMobile ? "10px" : "11px",
-                  opacity: isPoseEnabled ? 1 : 0.7,
+                  minWidth: preprocessing.usePreprocessing ? (isPortraitVideo || isMobile ? "24px" : "28px") : undefined,
                 }}
               >
-                <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
-                  AI Overlay
-                </Text>
+                {preprocessing.usePreprocessing ? (
+                  <MagicWandIcon width={isPortraitVideo || isMobile ? 12 : 14} height={isPortraitVideo || isMobile ? 12 : 14} />
+                ) : (
+                  <Text size="2" weight="medium" style={{ fontSize: isMobile ? "10px" : "11px" }}>
+                    Analyse Movement
+                  </Text>
+                )}
               </Button>
             </Tooltip>
           )}

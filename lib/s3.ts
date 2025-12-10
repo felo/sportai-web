@@ -43,6 +43,30 @@ export interface PresignedUrlResponse {
 }
 
 /**
+ * Extract S3 key from an S3 URL (works with both public and presigned URLs)
+ * @param url - S3 URL (e.g., https://bucket.s3.region.amazonaws.com/key?... )
+ * @returns The S3 key, or null if URL format is not recognized
+ */
+export function extractS3KeyFromUrl(url: string): string | null {
+  if (!url) return null;
+  
+  // Try standard format: https://bucket.s3.region.amazonaws.com/key
+  let urlMatch = url.match(/https:\/\/([^\.]+)\.s3\.([^\.]+)\.amazonaws\.com\/([^?]+)/);
+  if (!urlMatch) {
+    // Try alternative format: https://bucket.s3-region.amazonaws.com/key
+    urlMatch = url.match(/https:\/\/([^\.]+)\.s3-([^\.]+)\.amazonaws\.com\/([^?]+)/);
+  }
+  
+  if (!urlMatch) {
+    return null;
+  }
+  
+  // Decode the key (it might be URL encoded)
+  const key = decodeURIComponent(urlMatch[3]);
+  return key;
+}
+
+/**
  * Generate a presigned URL for downloading a file from S3
  * @param key - S3 object key
  * @param expiresIn - URL expiration time in seconds (default: 7 days)

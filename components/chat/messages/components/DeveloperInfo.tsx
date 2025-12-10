@@ -102,14 +102,27 @@ export function DeveloperInfo({
 
   // Check if we have any data to show
   const hasTokenData = messageTokens.input > 0 || messageTokens.output > 0;
-  const hasTimingData = responseDuration !== undefined;
+  const hasTimingData = responseDuration !== undefined && responseDuration > 0;
   const hasModelData = !!modelUsed;
-  const hasModelSettings = !!modelSettings;
-  const hasContextUsage = !!contextUsage;
+  const hasModelSettings = !!modelSettings && (modelSettings.thinkingMode || modelSettings.mediaResolution);
+  const hasContextUsage = !!contextUsage && contextUsage.messagesInContext > 0;
   const hasCacheInfo = cacheUsed !== undefined;
   const hasTTSData = ttsUsage.requestCount > 0;
   
   const hasAnyData = hasTokenData || hasTimingData || hasModelData || hasModelSettings || hasContextUsage || hasCacheInfo || hasTTSData;
+  
+  // Debug: Log what data is available (only in development)
+  if (process.env.NODE_ENV === 'development' && !hasAnyData) {
+    console.debug('[DeveloperInfo] No telemetry data. Raw values:', {
+      messageTokens,
+      responseDuration,
+      modelUsed,
+      modelSettings,
+      contextUsage,
+      cacheUsed,
+      ttsUsage,
+    });
+  }
 
   return (
     <Box
@@ -136,7 +149,7 @@ export function DeveloperInfo({
         <Flex direction="column" gap="1" pl="2">
           {!hasAnyData && (
             <Text size="1" style={{ color: "var(--gray-10)", fontStyle: "italic" }}>
-              No telemetry data available for this message. Token usage and timing are captured on new responses.
+              No telemetry data available for this message. This typically means the message was created before telemetry tracking was enabled, or the response is still streaming. New responses will capture: token usage, response time, model info, and cache status.
             </Text>
           )}
           {hasTokenData && (

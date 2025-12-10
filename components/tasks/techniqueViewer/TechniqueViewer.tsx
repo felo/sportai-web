@@ -41,6 +41,7 @@ import {
   type StoredCustomEvent,
   type StoredVideoComment,
 } from "@/lib/poseDataService";
+import { extractS3KeyFromUrl } from "@/lib/s3";
 
 interface TechniqueViewerProps {
   videoUrl: string;
@@ -57,8 +58,10 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
   // Viewer configuration (externally controlled)
   const [config, setConfig] = useState<ViewerConfig>(DEFAULT_VIEWER_CONFIG);
 
-  // Pose enabled state - start disabled if we have taskId (to check server first)
-  const [poseEnabled, setPoseEnabled] = useState(!taskId);
+  // Pose enabled state - start disabled if we have videoS3Key (to check server first)
+  // Note: videoS3Key is derived from videoUrl via useMemo, but we need this check early
+  const hasVideoS3Key = !!extractS3KeyFromUrl(videoUrl);
+  const [poseEnabled, setPoseEnabled] = useState(!hasVideoS3Key);
 
   // Panel visibility
   const [showPanel, setShowPanel] = useState(false);
@@ -74,6 +77,9 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
   
   // Overall pose detection confidence (average across all frames)
   const [overallConfidence, setOverallConfidence] = useState<number | null>(null);
+  
+  // Confidence threshold for data analysis chart (user preference, persisted per task)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.3);
 
   // Protocol events (detected by enabled protocols after preprocessing)
   const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
@@ -117,6 +123,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     swingBoundaries: false,
     protocolAdjustments: false,
     customEvents: false,
+    userPreferences: false,
   });
 
   // Context menu state for right-click actions
@@ -126,6 +133,10 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     id?: string;
     eventType?: string;
   } | null>(null);
+
+  // Extract video S3 key from URL for pose data persistence
+  // This allows pose data to be shared between Chat and TechniqueViewer
+  const videoS3Key = useMemo(() => extractS3KeyFromUrl(videoUrl), [videoUrl]);
 
   // Video comments (position-based markers on the video)
   const [videoComments, setVideoComments] = useState<VideoComment[]>([]);
@@ -259,16 +270,16 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     }
 
     // Auto-save to server after preprocessing completes
-    // Only save if: we have a taskId, data wasn't loaded from server, and we haven't already saved
-    console.log(`[TechniqueViewer] Auto-save check: taskId=${taskId}, serverDataLoaded=${serverDataLoaded}, autoSaved=${autoSaved}, hasRef=${!!viewerRef.current}`);
+    // Only save if: we have a videoS3Key, data wasn't loaded from server, and we haven't already saved
+    console.log(`[TechniqueViewer] Auto-save check: videoS3Key=${videoS3Key}, serverDataLoaded=${serverDataLoaded}, autoSaved=${autoSaved}, hasRef=${!!viewerRef.current}`);
     
-    if (taskId && !serverDataLoaded && !autoSaved && viewerRef.current) {
+    if (videoS3Key && !serverDataLoaded && !autoSaved && viewerRef.current) {
       const poses = viewerRef.current.getPreprocessedPoses();
       console.log(`[TechniqueViewer] Got ${poses.size} poses from viewer`);
       if (poses.size > 0) {
         console.log(`[TechniqueViewer] Auto-saving ${poses.size} frames to server...`);
         try {
-          const result = await savePoseData(taskId, poses, fps, config.model.model);
+          const result = await savePoseData(videoS3Key, poses, fps, config.model.model);
           if (result.success) {
             setAutoSaved(true);
             console.log(`[TechniqueViewer] Auto-saved successfully`);
@@ -282,7 +293,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     } else {
       console.log(`[TechniqueViewer] Skipping auto-save (conditions not met)`);
     }
-  }, [taskId, serverDataLoaded, autoSaved, config.model.model]);
+  }, [videoS3Key, serverDataLoaded, autoSaved, config.model.model]);
 
   const handleError = useCallback((error: string) => {
     setViewerState((prev) => ({ ...prev, error }));
@@ -301,6 +312,12 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
 
   const handleActiveTabChange = useCallback((activeTab: "swings" | "data-analysis") => {
     setViewerState((prev) => ({ ...prev, activeTab }));
+  }, []);
+
+  // Handle confidence threshold change (for data analysis chart)
+  const handleConfidenceThresholdChange = useCallback((threshold: number) => {
+    setConfidenceThreshold(threshold);
+    setDirtyFlags(prev => ({ ...prev, userPreferences: true }));
   }, []);
 
   // Handle custom event creation
@@ -638,10 +655,11 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
   // Unified debounced save for all dirty data (prevents race conditions between different save types)
   useEffect(() => {
     const hasDirtyData = dirtyFlags.videoComments || dirtyFlags.swingBoundaries || 
-                         dirtyFlags.protocolAdjustments || dirtyFlags.customEvents;
+                         dirtyFlags.protocolAdjustments || dirtyFlags.customEvents ||
+                         dirtyFlags.userPreferences;
     
     // Don't save until server data has been checked - prevents overwriting with empty state on mount
-    if (!taskId || !hasDirtyData || !serverDataChecked) {
+    if (!videoS3Key || !hasDirtyData || !serverDataChecked) {
       if (hasDirtyData && !serverDataChecked) {
         console.log(`[TechniqueViewer] Skipping save - server data not yet checked`);
       }
@@ -652,16 +670,24 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
       try {
         // Load current server data once
         const { loadPoseData } = await import("@/lib/poseDataService");
-        const existing = await loadPoseData(taskId);
-        
-        if (!existing.success) {
-          console.error(`[TechniqueViewer] Failed to load existing data for save`);
-          return;
-        }
+        const existing = await loadPoseData(videoS3Key);
         
         // Build updated data with all current state
+        // Start with existing data if available, otherwise create minimal structure
+        const baseData = existing.success && existing.data 
+          ? existing.data 
+          : {
+              version: "1.0.0",
+              createdAt: new Date().toISOString(),
+              videoFPS: viewerState.videoFPS || 30,
+              totalFrames: viewerState.totalFrames || 0,
+              modelUsed: config.model.model || "none",
+              poses: {},
+            };
+        
         const updatedData = {
-          ...existing.data,
+          videoS3Key,
+          ...baseData,
           // Always include current state for all fields that might be dirty
           ...(dirtyFlags.videoComments && { 
             videoComments: videoComments.map(c => ({
@@ -705,10 +731,15 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
               createdAt: e.createdAt,
             }))
           }),
+          ...(dirtyFlags.userPreferences && {
+            userPreferences: {
+              confidenceThreshold,
+            }
+          }),
         };
         
-        // Save all at once
-        const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+        // Save all at once using new API
+        const response = await fetch("/api/pose-data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedData),
@@ -716,7 +747,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
         
         if (response.ok) {
           console.log(`[TechniqueViewer] Unified save completed`);
-          setDirtyFlags({ videoComments: false, swingBoundaries: false, protocolAdjustments: false, customEvents: false });
+          setDirtyFlags({ videoComments: false, swingBoundaries: false, protocolAdjustments: false, customEvents: false, userPreferences: false });
         } else {
           console.error(`[TechniqueViewer] Unified save failed:`, await response.text());
         }
@@ -726,7 +757,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     }, 500); // Debounce 500ms
     
     return () => clearTimeout(timeoutId);
-  }, [taskId, dirtyFlags, videoComments, swingBoundaryAdjustments, protocolAdjustments, customEvents, serverDataChecked]);
+  }, [videoS3Key, dirtyFlags, videoComments, swingBoundaryAdjustments, protocolAdjustments, customEvents, confidenceThreshold, serverDataChecked, viewerState.videoFPS, viewerState.totalFrames, config.model.model]);
 
   // Helper to get effective swing boundaries (with adjustments)
   const getEffectiveSwingBoundaries = useCallback((event: ProtocolEvent) => {
@@ -852,14 +883,14 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
   useEffect(() => {
     async function loadFromServer() {
       // Only try once - don't retry on failure
-      if (!taskId || serverDataChecked || isLoadingServerData) return;
+      if (!videoS3Key || serverDataChecked || isLoadingServerData) return;
       if (!viewerState.isVideoReady) return; // Wait for video to be ready
       if (!viewerRef.current) return;
       
       setIsLoadingServerData(true);
       
       try {
-        const result = await loadPoseData(taskId);
+        const result = await loadPoseData(videoS3Key);
         
         if (result.success && result.data) {
           // Convert stored data to Map format
@@ -916,6 +947,14 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
             console.log(`[TechniqueViewer] Loaded ${result.data.swingBoundaryAdjustments.length} swing boundary adjustments from server`);
           }
           
+          // Load user preferences if present
+          if (result.data.userPreferences) {
+            if (result.data.userPreferences.confidenceThreshold !== undefined) {
+              setConfidenceThreshold(result.data.userPreferences.confidenceThreshold);
+              console.log(`[TechniqueViewer] Loaded confidence threshold from server: ${(result.data.userPreferences.confidenceThreshold * 100).toFixed(0)}%`);
+            }
+          }
+          
           console.log(`[TechniqueViewer] Loaded ${posesMap.size} frames from server`);
         } else {
           console.log(`[TechniqueViewer] No server data found, will need preprocessing`);
@@ -932,12 +971,12 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     }
     
     loadFromServer();
-  }, [taskId, viewerState.isVideoReady, serverDataChecked, isLoadingServerData]);
+  }, [videoS3Key, viewerState.isVideoReady, serverDataChecked, isLoadingServerData]);
 
   // Show loading overlay until viewer is ready to use
   // - If server data exists: show until poses are loaded and ready
   // - If no server data: show until preprocessing starts
-  const showServerLoadingOverlay = taskId && (
+  const showServerLoadingOverlay = videoS3Key && (
     !serverDataChecked || // Still checking server
     (serverDataLoaded && !viewerState.usingPreprocessedPoses) // Data loaded but viewer not ready yet
   );
@@ -1230,6 +1269,8 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
               poseEnabled={poseEnabled}
               developerMode={developerMode}
               callbacks={viewerCallbacks}
+              confidenceThreshold={confidenceThreshold}
+              onConfidenceThresholdChange={handleConfidenceThresholdChange}
               style={{
                 position: "absolute",
                 top: 0,
@@ -2203,6 +2244,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
             {/* Server Data Debug Panel */}
             <Box style={{ padding: "16px" }}>
               <ServerDataDebugPanel
+                videoS3Key={videoS3Key}
                 taskId={taskId || null}
                 preprocessedPoses={viewerRef.current?.getPreprocessedPoses() || null}
                 videoFPS={viewerState.videoFPS}

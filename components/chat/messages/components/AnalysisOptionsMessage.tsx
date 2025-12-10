@@ -75,6 +75,33 @@ const PRO_FEATURES: FeatureInfo[] = [
   },
 ];
 
+const TECHNIQUE_PRO_FEATURES: FeatureInfo[] = [
+  {
+    icon: <VideoIcon width={14} height={14} />,
+    text: "SportAI Technique Studio for deep analysis of your swing",
+  },
+  {
+    icon: <PersonIcon width={14} height={14} />,
+    text: "Compare your swing to previous swings and PRO's",
+  },
+  {
+    icon: <StarIcon width={14} height={14} />,
+    text: "Annotate the video and add events to your timeline",
+  },
+  {
+    icon: <BarChartIcon width={14} height={14} />,
+    text: "Comprehensive data analysis tools",
+  },
+  {
+    icon: <TargetIcon width={14} height={14} />,
+    text: "Export data",
+  },
+  {
+    icon: <RocketIcon width={14} height={14} />,
+    text: "Powered by more advanced AI models",
+  },
+];
+
 // ============================================================================
 // Typewriter Hook
 // ============================================================================
@@ -203,6 +230,7 @@ export function AnalysisOptionsMessage({
   }, [introMessage]);
 
   const isEligible = preAnalysis.isProEligible || preAnalysis.isTechniqueLiteEligible;
+  const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
 
   return (
     <Box>
@@ -213,18 +241,20 @@ export function AnalysisOptionsMessage({
             {typedIntro}
           </p>
 
-          {/* Estimated time note */}
-          <p 
-            className="text-base leading-relaxed mb-4"
-            style={{
-              color: "var(--gray-12)",
-              opacity: showBoxes ? 1 : 0,
-              transition: "opacity 0.4s ease-out",
-            }}
-          >
-            <ClockIcon width={14} height={14} style={{ color: "var(--gray-10)", display: "inline", verticalAlign: "middle", marginRight: "8px" }} />
-            PRO takes <strong style={{ color: MINT_COLOR }}>{estimatedTime}</strong> — chat or analyze more videos while you wait.
-          </p>
+          {/* Estimated time note - only for tactical analysis */}
+          {!isTechniqueAnalysis && (
+            <p 
+              className="text-base leading-relaxed mb-4"
+              style={{
+                color: "var(--gray-12)",
+                opacity: showBoxes ? 1 : 0,
+                transition: "opacity 0.4s ease-out",
+              }}
+            >
+              <ClockIcon width={14} height={14} style={{ color: "var(--gray-10)", display: "inline", verticalAlign: "middle", marginRight: "8px" }} />
+              PRO takes <strong style={{ color: MINT_COLOR }}>{estimatedTime}</strong> — chat or analyze more videos while you wait.
+            </p>
+          )}
 
           {/* Side by side feature boxes */}
           <Grid 
@@ -299,7 +329,7 @@ export function AnalysisOptionsMessage({
                   </Text>
                 </Flex>
                 <Flex direction="column" gap="2">
-                  {PRO_FEATURES.map((feature, index) => (
+                  {(isTechniqueAnalysis ? TECHNIQUE_PRO_FEATURES : PRO_FEATURES).map((feature, index) => (
                     <SimpleFeature
                       key={index}
                       icon={feature.icon}

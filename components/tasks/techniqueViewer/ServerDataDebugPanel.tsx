@@ -7,7 +7,8 @@ import { loadPoseData, savePoseData, deletePoseData, type StoredPoseData } from 
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 
 interface ServerDataDebugPanelProps {
-  taskId: string | null;
+  videoS3Key: string | null;
+  taskId?: string | null; // Optional, just for display reference
   preprocessedPoses: Map<number, PoseDetectionResult[]> | null;
   videoFPS: number;
   modelUsed: string;
@@ -15,7 +16,14 @@ interface ServerDataDebugPanelProps {
   wasAutoLoaded?: boolean;
 }
 
+// Helper to show the S3 path that would be used for storage
+function getPoseDataPath(videoS3Key: string): string {
+  const sanitizedKey = videoS3Key.replace(/\//g, "_");
+  return `pose-data/videos/${sanitizedKey}/poses.json.gz`;
+}
+
 export function ServerDataDebugPanel({
+  videoS3Key,
   taskId,
   preprocessedPoses,
   videoFPS,
@@ -32,12 +40,12 @@ export function ServerDataDebugPanel({
 
   // Load server data on mount
   const loadServerData = useCallback(async () => {
-    if (!taskId) return;
+    if (!videoS3Key) return;
     
     setIsLoading(true);
     setError(null);
     
-    const result = await loadPoseData(taskId);
+    const result = await loadPoseData(videoS3Key);
     
     if (result.success && result.data) {
       setServerData(result.data);
@@ -48,7 +56,7 @@ export function ServerDataDebugPanel({
     }
     
     setIsLoading(false);
-  }, [taskId, onPoseDataLoaded]);
+  }, [videoS3Key, onPoseDataLoaded]);
 
   useEffect(() => {
     loadServerData();
@@ -56,15 +64,15 @@ export function ServerDataDebugPanel({
 
   // Save current poses to server
   const handleSave = async () => {
-    if (!taskId || !preprocessedPoses || preprocessedPoses.size === 0) {
-      setError("No pose data to save");
+    if (!videoS3Key || !preprocessedPoses || preprocessedPoses.size === 0) {
+      setError(videoS3Key ? "No pose data to save" : "No video S3 key");
       return;
     }
 
     setIsSaving(true);
     setError(null);
 
-    const result = await savePoseData(taskId, preprocessedPoses, videoFPS, modelUsed);
+    const result = await savePoseData(videoS3Key, preprocessedPoses, videoFPS, modelUsed);
 
     if (result.success) {
       setLastAction(`Saved ${preprocessedPoses.size} frames`);
@@ -78,12 +86,12 @@ export function ServerDataDebugPanel({
 
   // Delete server data
   const handleDelete = async () => {
-    if (!taskId) return;
+    if (!videoS3Key) return;
 
     setIsDeleting(true);
     setError(null);
 
-    const success = await deletePoseData(taskId);
+    const success = await deletePoseData(videoS3Key);
 
     if (success) {
       setServerData(null);
@@ -129,16 +137,33 @@ export function ServerDataDebugPanel({
               </Badge>
             )}
           </Flex>
-          {taskId ? (
-            <Badge size="1" color="blue">
-              Task: {taskId.slice(0, 8)}...
+          {videoS3Key ? (
+            <Badge size="1" color="blue" title={videoS3Key}>
+              S3: {videoS3Key.length > 20 ? `...${videoS3Key.slice(-20)}` : videoS3Key}
             </Badge>
           ) : (
             <Badge size="1" color="red">
-              No Task ID
+              No S3 Key
             </Badge>
           )}
         </Flex>
+
+        {/* Storage Info */}
+        {videoS3Key && (
+          <Box
+            style={{
+              padding: "6px 8px",
+              backgroundColor: "var(--gray-3)",
+              borderRadius: "4px",
+              fontSize: "10px",
+              fontFamily: "monospace",
+              wordBreak: "break-all",
+            }}
+          >
+            <Text size="1" color="gray">S3 Path: </Text>
+            <Text size="1" style={{ opacity: 0.8 }}>{getPoseDataPath(videoS3Key)}</Text>
+          </Box>
+        )}
 
         {/* Status */}
         {error && (
@@ -227,7 +252,7 @@ export function ServerDataDebugPanel({
             size="1"
             variant="soft"
             onClick={loadServerData}
-            disabled={isLoading || !taskId}
+            disabled={isLoading || !videoS3Key}
           >
             <ReloadIcon />
             {isLoading ? "Loading..." : "Reload"}
@@ -238,7 +263,7 @@ export function ServerDataDebugPanel({
             variant="soft"
             color="green"
             onClick={handleSave}
-            disabled={isSaving || !taskId || !preprocessedPoses || preprocessedPoses.size === 0}
+            disabled={isSaving || !videoS3Key || !preprocessedPoses || preprocessedPoses.size === 0}
           >
             <UploadIcon />
             {isSaving ? "Saving..." : "Save"}
@@ -249,7 +274,7 @@ export function ServerDataDebugPanel({
             variant="soft"
             color="red"
             onClick={handleDelete}
-            disabled={isDeleting || !taskId || !serverData}
+            disabled={isDeleting || !videoS3Key || !serverData}
           >
             <TrashIcon />
             {isDeleting ? "Deleting..." : "Delete"}

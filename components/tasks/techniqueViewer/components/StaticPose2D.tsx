@@ -178,7 +178,7 @@ export function StaticPose2D({
           }}
         >
           <Text size="2" color="gray">
-            Enable AI Overlay to see pose
+            Enable Analyse Movement to see pose
           </Text>
         </Box>
       )}

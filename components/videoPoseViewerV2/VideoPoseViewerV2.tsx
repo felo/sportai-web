@@ -177,6 +177,10 @@ interface VideoPoseViewerV2Props {
   lite?: boolean;
   /** Developer mode - shows additional debug info like swing score */
   developerMode?: boolean;
+  /** Confidence threshold for highlighting low-confidence frames in data analysis (0-1) */
+  confidenceThreshold?: number;
+  /** Callback when confidence threshold changes */
+  onConfidenceThresholdChange?: (threshold: number) => void;
 }
 
 // ============================================================================
@@ -206,7 +210,7 @@ function shouldUseCrossOrigin(url: string): boolean {
 
 export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
   function VideoPoseViewerV2(
-    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false },
+    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false, confidenceThreshold, onConfidenceThresholdChange },
     ref
   ) {
     // Refs
@@ -1898,6 +1902,8 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             onVelocityBodyPartChange={setSelectedVelocityBodyPart}
             selectedOrientationType={selectedOrientationType}
             onOrientationTypeChange={setSelectedOrientationType}
+            confidenceThreshold={confidenceThreshold}
+            onConfidenceThresholdChange={onConfidenceThresholdChange}
             onSeekToFrame={(frame) => {
               const video = videoRef.current;
               if (!video) return;

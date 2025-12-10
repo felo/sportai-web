@@ -101,6 +101,12 @@ export interface StoredPoseData {
   // User adjustments to swing boundaries (start/end times)
   swingBoundaryAdjustments?: StoredSwingBoundaryAdjustment[];
   
+  // User preferences for data analysis view
+  userPreferences?: {
+    /** Confidence threshold for highlighting low-confidence frames (0-1) */
+    confidenceThreshold?: number;
+  };
+  
   // Metadata
   metadata?: {
     videoDuration?: number;
@@ -125,9 +131,10 @@ export interface LoadPoseDataResponse {
 
 /**
  * Save pose data to S3 via API
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
 export async function savePoseData(
-  taskId: string,
+  videoS3Key: string,
   preprocessedPoses: Map<number, PoseDetectionResult[]>,
   videoFPS: number,
   modelUsed: string,
@@ -140,7 +147,8 @@ export async function savePoseData(
       posesObject[frame] = poses;
     });
 
-    const data: StoredPoseData = {
+    const data = {
+      videoS3Key,
       version: "1.0.0",
       createdAt: new Date().toISOString(),
       videoFPS,
@@ -150,7 +158,7 @@ export async function savePoseData(
       metadata,
     };
 
-    const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+    const response = await fetch("/api/pose-data", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -175,10 +183,11 @@ export async function savePoseData(
 
 /**
  * Load pose data from S3 via API
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
-export async function loadPoseData(taskId: string): Promise<LoadPoseDataResponse> {
+export async function loadPoseData(videoS3Key: string): Promise<LoadPoseDataResponse> {
   try {
-    const response = await fetch(`/api/tasks/${taskId}/pose-data`);
+    const response = await fetch(`/api/pose-data?videoS3Key=${encodeURIComponent(videoS3Key)}`);
 
     if (response.status === 404) {
       return { success: false, error: "No pose data found" };
@@ -218,11 +227,12 @@ export function convertToPreprocessedPoses(
 }
 
 /**
- * Check if pose data exists for a task
+ * Check if pose data exists for a video
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
-export async function hasPoseData(taskId: string): Promise<boolean> {
+export async function hasPoseData(videoS3Key: string): Promise<boolean> {
   try {
-    const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+    const response = await fetch(`/api/pose-data?videoS3Key=${encodeURIComponent(videoS3Key)}`, {
       method: "HEAD",
     });
     return response.ok;
@@ -232,11 +242,12 @@ export async function hasPoseData(taskId: string): Promise<boolean> {
 }
 
 /**
- * Delete pose data for a task
+ * Delete pose data for a video
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
-export async function deletePoseData(taskId: string): Promise<boolean> {
+export async function deletePoseData(videoS3Key: string): Promise<boolean> {
   try {
-    const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+    const response = await fetch(`/api/pose-data?videoS3Key=${encodeURIComponent(videoS3Key)}`, {
       method: "DELETE",
     });
     return response.ok;
@@ -246,25 +257,27 @@ export async function deletePoseData(taskId: string): Promise<boolean> {
 }
 
 /**
- * Save or update custom events for a task
+ * Save or update custom events for a video
  * This merges with existing pose data (if any) to avoid losing pose data
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
 export async function saveCustomEvents(
-  taskId: string,
+  videoS3Key: string,
   customEvents: StoredCustomEvent[]
 ): Promise<SavePoseDataResponse> {
   try {
     // First, load existing data
-    const existing = await loadPoseData(taskId);
+    const existing = await loadPoseData(videoS3Key);
     
     if (existing.success && existing.data) {
       // Update existing data with new custom events
-      const updatedData: StoredPoseData = {
+      const updatedData = {
+        videoS3Key,
         ...existing.data,
         customEvents,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -281,7 +294,8 @@ export async function saveCustomEvents(
       return { success: true, s3Key: result.s3Key };
     } else {
       // No existing pose data - create minimal structure with just custom events
-      const data: StoredPoseData = {
+      const data = {
+        videoS3Key,
         version: "1.0.0",
         createdAt: new Date().toISOString(),
         videoFPS: 30, // Will be updated when pose data is added
@@ -291,7 +305,7 @@ export async function saveCustomEvents(
         customEvents,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -316,16 +330,17 @@ export async function saveCustomEvents(
 }
 
 /**
- * Save or update protocol adjustments for a task
+ * Save or update protocol adjustments for a video
  * This stores user modifications to AI-detected event positions
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
 export async function saveProtocolAdjustments(
-  taskId: string,
+  videoS3Key: string,
   adjustments: Map<string, { time: number; frame: number; protocolId?: string }>
 ): Promise<SavePoseDataResponse> {
   try {
     // First, load existing data
-    const existing = await loadPoseData(taskId);
+    const existing = await loadPoseData(videoS3Key);
     
     // Convert Map to array for storage
     const protocolAdjustments: StoredProtocolAdjustment[] = [];
@@ -341,12 +356,13 @@ export async function saveProtocolAdjustments(
     
     if (existing.success && existing.data) {
       // Update existing data with new protocol adjustments
-      const updatedData: StoredPoseData = {
+      const updatedData = {
+        videoS3Key,
         ...existing.data,
         protocolAdjustments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -363,7 +379,8 @@ export async function saveProtocolAdjustments(
       return { success: true, s3Key: result.s3Key };
     } else {
       // No existing pose data - create minimal structure with just adjustments
-      const data: StoredPoseData = {
+      const data = {
+        videoS3Key,
         version: "1.0.0",
         createdAt: new Date().toISOString(),
         videoFPS: 30,
@@ -373,7 +390,7 @@ export async function saveProtocolAdjustments(
         protocolAdjustments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -415,25 +432,27 @@ export function convertToProtocolAdjustments(
 }
 
 /**
- * Save or update video comments for a task
+ * Save or update video comments for a video
  * Video comments are position-based markers tied to specific pixels on the video
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
 export async function saveVideoComments(
-  taskId: string,
+  videoS3Key: string,
   videoComments: StoredVideoComment[]
 ): Promise<SavePoseDataResponse> {
   try {
     // First, load existing data
-    const existing = await loadPoseData(taskId);
+    const existing = await loadPoseData(videoS3Key);
     
     if (existing.success && existing.data) {
       // Update existing data with new video comments
-      const updatedData: StoredPoseData = {
+      const updatedData = {
+        videoS3Key,
         ...existing.data,
         videoComments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -450,7 +469,8 @@ export async function saveVideoComments(
       return { success: true, s3Key: result.s3Key };
     } else {
       // No existing pose data - create minimal structure with just video comments
-      const data: StoredPoseData = {
+      const data = {
+        videoS3Key,
         version: "1.0.0",
         createdAt: new Date().toISOString(),
         videoFPS: 30,
@@ -460,7 +480,7 @@ export async function saveVideoComments(
         videoComments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -485,16 +505,17 @@ export async function saveVideoComments(
 }
 
 /**
- * Save or update swing boundary adjustments for a task
+ * Save or update swing boundary adjustments for a video
  * This stores user modifications to swing start/end times
+ * @param videoS3Key - The S3 key of the video (unique identifier)
  */
 export async function saveSwingBoundaryAdjustments(
-  taskId: string,
+  videoS3Key: string,
   adjustments: Map<string, { startTime?: number; startFrame?: number; endTime?: number; endFrame?: number }>
 ): Promise<SavePoseDataResponse> {
   try {
     // First, load existing data
-    const existing = await loadPoseData(taskId);
+    const existing = await loadPoseData(videoS3Key);
     
     // Convert Map to array for storage
     const swingBoundaryAdjustments: StoredSwingBoundaryAdjustment[] = [];
@@ -511,12 +532,13 @@ export async function saveSwingBoundaryAdjustments(
     
     if (existing.success && existing.data) {
       // Update existing data with new swing boundary adjustments
-      const updatedData: StoredPoseData = {
+      const updatedData = {
+        videoS3Key,
         ...existing.data,
         swingBoundaryAdjustments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -533,7 +555,8 @@ export async function saveSwingBoundaryAdjustments(
       return { success: true, s3Key: result.s3Key };
     } else {
       // No existing pose data - create minimal structure with just adjustments
-      const data: StoredPoseData = {
+      const data = {
+        videoS3Key,
         version: "1.0.0",
         createdAt: new Date().toISOString(),
         videoFPS: 30,
@@ -543,7 +566,7 @@ export async function saveSwingBoundaryAdjustments(
         swingBoundaryAdjustments,
       };
       
-      const response = await fetch(`/api/tasks/${taskId}/pose-data`, {
+      const response = await fetch("/api/pose-data", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

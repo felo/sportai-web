@@ -34,6 +34,7 @@ export interface VideoPreprocessingActions {
   cancelBackgroundPreprocess: () => void;
   setUsePreprocessing: (use: boolean) => void;
   clearPreprocessedPoses: () => void;
+  loadExternalPoses: (poses: Map<number, PoseDetectionResult[]>, fps: number) => void;
 }
 
 /**
@@ -329,6 +330,19 @@ export function useVideoPreprocessing({
     setPreprocessedPoses(new Map());
   }, []);
 
+  /**
+   * Load externally provided pose data (e.g., from S3 cache)
+   * This allows skipping preprocessing when cached data is available
+   */
+  const loadExternalPoses = useCallback((poses: Map<number, PoseDetectionResult[]>, fps: number) => {
+    if (poses.size === 0) return;
+    
+    detectionLogger.info(`[useVideoPreprocessing] Loading ${poses.size} external poses at ${fps} FPS`);
+    setPreprocessedPoses(poses);
+    setPreprocessingFPS(fps);
+    setUsePreprocessing(true);
+  }, []);
+
   // Auto-start preprocessing when AI overlay is enabled
   useEffect(() => {
     const canPreprocess =
@@ -394,6 +408,7 @@ export function useVideoPreprocessing({
     cancelBackgroundPreprocess,
     setUsePreprocessing,
     clearPreprocessedPoses,
+    loadExternalPoses,
   };
 }
 

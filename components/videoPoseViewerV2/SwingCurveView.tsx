@@ -69,6 +69,10 @@ export interface SwingCurveViewProps {
   selectedOrientationType?: OrientationType;
   /** Callback when orientation type changes */
   onOrientationTypeChange?: (orientationType: OrientationType) => void;
+  /** Confidence threshold for highlighting low-confidence frames (0-1) (controlled) */
+  confidenceThreshold?: number;
+  /** Callback when confidence threshold changes */
+  onConfidenceThresholdChange?: (threshold: number) => void;
   /** Custom class name */
   className?: string;
   /** Custom style */
@@ -954,6 +958,8 @@ export function SwingCurveView({
   onVelocityBodyPartChange,
   selectedOrientationType: controlledOrientationType,
   onOrientationTypeChange,
+  confidenceThreshold: controlledConfidenceThreshold,
+  onConfidenceThresholdChange,
   className,
   style,
 }: SwingCurveViewProps) {
@@ -968,8 +974,8 @@ export function SwingCurveView({
   const [internalOrientationType, setInternalOrientationType] = useState<OrientationType>("body");
   const [showPhases, setShowPhases] = useState(false); // Hidden for now
   
-  // Confidence threshold for highlighting missing wrist data (adjustable)
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
+  // Confidence threshold for highlighting low-confidence frames (adjustable)
+  const [internalConfidenceThreshold, setInternalConfidenceThreshold] = useState(0.3);
   
   // Angle type selection (knee vs shoulder vs elbow vs hip) for the Angles view
   const [internalAngleType, setInternalAngleType] = useState<AngleType>("knee");
@@ -981,6 +987,7 @@ export function SwingCurveView({
   const angleType = controlledAngleType ?? internalAngleType;
   const velocityBodyPart = controlledVelocityBodyPart ?? internalVelocityBodyPart;
   const orientationType = controlledOrientationType ?? internalOrientationType;
+  const confidenceThreshold = controlledConfidenceThreshold ?? internalConfidenceThreshold;
   
   const setSelectedMetric = (metric: MetricType) => {
     if (onMetricChange) {
@@ -1027,6 +1034,14 @@ export function SwingCurveView({
       onAngleTypeChange(type);
     } else {
       setInternalAngleType(type);
+    }
+  };
+  
+  const setConfidenceThreshold = (threshold: number) => {
+    if (onConfidenceThresholdChange) {
+      onConfidenceThresholdChange(threshold);
+    } else {
+      setInternalConfidenceThreshold(threshold);
     }
   };
 

@@ -277,10 +277,20 @@ export function useAIChat() {
       }
       
       if (messages.length > 0) {
+        // Log telemetry data for last assistant message to help debug
+        const lastAssistantMsg = [...messages].reverse().find(m => m.role === "assistant");
         chatLogger.debug("Saving messages:", {
           count: messages.length,
           chatId: currentChatId,
           messageIds: messages.map(m => m.id),
+          lastAssistantTelemetry: lastAssistantMsg ? {
+            hasInputTokens: !!lastAssistantMsg.inputTokens,
+            hasOutputTokens: !!lastAssistantMsg.outputTokens,
+            hasResponseDuration: !!lastAssistantMsg.responseDuration,
+            hasModelUsed: !!lastAssistantMsg.modelUsed,
+            hasModelSettings: !!lastAssistantMsg.modelSettings,
+            isStreaming: lastAssistantMsg.isStreaming,
+          } : 'no assistant message',
         });
         saveMessagesToStorage(messages);
         

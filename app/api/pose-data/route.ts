@@ -1,10 +1,13 @@
 /**
- * API Route for saving/loading pose data per task
+ * API Route for saving/loading pose data keyed by video S3 key
  * 
- * POST /api/tasks/[taskId]/pose-data - Save pose data to S3
- * GET /api/tasks/[taskId]/pose-data - Load pose data from S3
- * HEAD /api/tasks/[taskId]/pose-data - Check if pose data exists
- * DELETE /api/tasks/[taskId]/pose-data - Delete pose data
+ * This allows pose data to be shared between Chat and TechniqueViewer
+ * since the same video will have the same S3 key regardless of context.
+ * 
+ * POST /api/pose-data - Save pose data to S3
+ * GET /api/pose-data?videoS3Key=... - Load pose data from S3
+ * HEAD /api/pose-data?videoS3Key=... - Check if pose data exists
+ * DELETE /api/pose-data?videoS3Key=... - Delete pose data
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -32,30 +35,40 @@ const s3Client = new S3Client({
     : undefined,
 });
 
-function getPoseDataKey(taskId: string): string {
-  return `pose-data/${taskId}/poses.json.gz`;
+/**
+ * Generate the S3 key for pose data based on the video's S3 key
+ * The video key is sanitized to create a valid path
+ */
+function getPoseDataKey(videoS3Key: string): string {
+  // Sanitize the video key to use as a folder name
+  // Replace slashes with underscores to flatten the path
+  const sanitizedKey = videoS3Key.replace(/\//g, "_");
+  return `pose-data/videos/${sanitizedKey}/poses.json.gz`;
 }
 
 /**
  * POST - Save pose data to S3
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
-) {
+export async function POST(request: NextRequest) {
   const requestId = `pose_save_${Date.now()}`;
   
   try {
-    const { taskId } = await params;
+    const body = await request.json();
+    const { videoS3Key, ...data } = body;
 
-    logger.info(`[${requestId}] Saving pose data for task ${taskId}`);
+    if (!videoS3Key) {
+      return NextResponse.json(
+        { error: "videoS3Key is required" },
+        { status: 400 }
+      );
+    }
 
-    const data = await request.json();
-    const key = getPoseDataKey(taskId);
+    logger.info(`[${requestId}] Saving pose data for video ${videoS3Key}`);
 
-    // Minify: remove undefined/null values, then compress with gzip (async)
+    const key = getPoseDataKey(videoS3Key);
+
+    // Minify: remove undefined/null values, then compress with gzip
     const jsonString = JSON.stringify(data, (key, value) => {
-      // Remove undefined and null values to reduce size
       if (value === undefined || value === null) return undefined;
       return value;
     });
@@ -94,18 +107,23 @@ export async function POST(
 /**
  * GET - Load pose data from S3
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
-) {
+export async function GET(request: NextRequest) {
   const requestId = `pose_load_${Date.now()}`;
   
   try {
-    const { taskId } = await params;
+    const { searchParams } = new URL(request.url);
+    const videoS3Key = searchParams.get("videoS3Key");
 
-    logger.info(`[${requestId}] Loading pose data for task ${taskId}`);
+    if (!videoS3Key) {
+      return NextResponse.json(
+        { error: "videoS3Key query parameter is required" },
+        { status: 400 }
+      );
+    }
 
-    const key = getPoseDataKey(taskId);
+    logger.info(`[${requestId}] Loading pose data for video ${videoS3Key}`);
+
+    const key = getPoseDataKey(videoS3Key);
 
     // Download from S3
     const command = new GetObjectCommand({
@@ -119,7 +137,7 @@ export async function GET(
       return NextResponse.json({ error: "No data found" }, { status: 404 });
     }
 
-    // Convert stream to buffer and decompress (async)
+    // Convert stream to buffer and decompress
     const compressedBuffer = Buffer.from(await response.Body.transformToByteArray());
     const decompressed = await gunzipAsync(compressedBuffer);
     const data = JSON.parse(decompressed.toString());
@@ -129,7 +147,6 @@ export async function GET(
     return NextResponse.json(data);
   } catch (error: unknown) {
     // Check for NoSuchKey or AccessDenied errors (treat both as "not found")
-    // AccessDenied on GetObject happens when key doesn't exist and we lack ListBucket permission
     const errorCode = error && typeof error === 'object' && 'Code' in error ? (error as { Code: string }).Code : '';
     const errorName = error && typeof error === 'object' && 'name' in error ? (error as { name: string }).name : '';
     
@@ -149,14 +166,16 @@ export async function GET(
 /**
  * HEAD - Check if pose data exists
  */
-export async function HEAD(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
-) {
+export async function HEAD(request: NextRequest) {
   try {
-    const { taskId } = await params;
+    const { searchParams } = new URL(request.url);
+    const videoS3Key = searchParams.get("videoS3Key");
+
+    if (!videoS3Key) {
+      return new NextResponse(null, { status: 400 });
+    }
     
-    const key = getPoseDataKey(taskId);
+    const key = getPoseDataKey(videoS3Key);
 
     const command = new HeadObjectCommand({
       Bucket: BUCKET_NAME,
@@ -177,18 +196,23 @@ export async function HEAD(
 /**
  * DELETE - Delete pose data
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
-) {
+export async function DELETE(request: NextRequest) {
   const requestId = `pose_delete_${Date.now()}`;
   
   try {
-    const { taskId } = await params;
+    const { searchParams } = new URL(request.url);
+    const videoS3Key = searchParams.get("videoS3Key");
 
-    logger.info(`[${requestId}] Deleting pose data for task ${taskId}`);
+    if (!videoS3Key) {
+      return NextResponse.json(
+        { error: "videoS3Key query parameter is required" },
+        { status: 400 }
+      );
+    }
 
-    const key = getPoseDataKey(taskId);
+    logger.info(`[${requestId}] Deleting pose data for video ${videoS3Key}`);
+
+    const key = getPoseDataKey(videoS3Key);
 
     const command = new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
@@ -208,4 +232,3 @@ export async function DELETE(
     );
   }
 }
-

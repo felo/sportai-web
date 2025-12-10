@@ -146,7 +146,7 @@ export function FrameAnalysisSettingsPanel({
             </Button>
             {!hasPose && (
               <Text size="1" color="gray" style={{ fontStyle: "italic" }}>
-                Enable AI Overlay and ensure a player is visible.
+                Enable Analyse Movement and ensure a player is visible.
               </Text>
             )}
             {imageInsightError && (

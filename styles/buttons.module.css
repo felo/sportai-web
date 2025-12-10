@@ -228,6 +228,35 @@
   color: var(--gray-9) !important;
 }
 
+/* Pulse glow effect for attention-grabbing buttons */
+.actionButtonPulse {
+  animation: pulseGlow 1.5s ease-in-out infinite !important;
+  opacity: 1 !important;
+}
+
+/* Override the static box-shadow when pulse is active */
+.actionButtonSquare.actionButtonPulse,
+.actionButton.actionButtonPulse {
+  box-shadow: none !important;
+  animation: pulseGlow 1.5s ease-in-out infinite !important;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 6px rgba(122, 219, 143, 0.8),
+      0 0 15px rgba(122, 219, 143, 0.5),
+      0 0 25px rgba(122, 219, 143, 0.3) !important;
+  }
+  50% {
+    box-shadow: 
+      0 0 10px rgba(122, 219, 143, 1),
+      0 0 25px rgba(122, 219, 143, 0.9),
+      0 0 45px rgba(122, 219, 143, 0.6),
+      0 0 60px rgba(122, 219, 143, 0.4) !important;
+  }
+}
+
 /* Light mode text adjustment */
 :global(.radix-themes) .actionButton,
 :global(.radix-themes) .actionButtonSquare {

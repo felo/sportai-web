@@ -198,11 +198,16 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       const prevMessage = allMessages[i];
       if (prevMessage.role === "user" && prevMessage.content) {
         const content = prevMessage.content.toLowerCase();
-        // Complex query indicators
+        
+        // Short messages (< 50 chars) are not considered complex
+        // This prevents simple questions like "why?" from showing deep thinking
+        if (content.length < 50) return false;
+        
+        // Complex query indicators - require more specific patterns
         const complexPatterns = [
-          /\b(compare|versus|vs\.?|difference)\b/,
+          /\b(compare|versus|vs\.?|difference between)\b/,
           /\b(analyze|analyse|evaluate|review|assess)\b/,
-          /\b(explain|why|how does|what causes)\b/,
+          /\b(explain (how|why|the|in detail)|why (do|does|is|are|would|should))/,
           /\b(strategy|tactical|approach|technique)\b/,
           /\b(summarize|summary|overall|throughout)\b/,
           /\b(step by step|detailed|in-depth)\b/,
