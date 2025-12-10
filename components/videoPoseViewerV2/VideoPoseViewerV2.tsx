@@ -786,6 +786,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           selectedAngleJoints: config.angles.selectedAngleJoints,
           labelPositionState: labelPositionStateRef.current,
           isPlaying,
+          useComplementaryAngles: config.angles.useComplementaryAngles,
         });
         labelPositionStateRef.current = newLabelState;
       }
@@ -1741,7 +1742,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
                   }}
                 />
               </Box>
-              <Text size="2" color="gray">
+              <Text size="2" color="gray" style={{ textAlign: "center" }}>
                 {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
               </Text>
             </Flex>

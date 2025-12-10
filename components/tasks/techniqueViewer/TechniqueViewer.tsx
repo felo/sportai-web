@@ -996,7 +996,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                       </IconButton>
                     </DropdownMenu.Trigger>
                   </Tooltip>
-                  <DropdownMenu.Content size="1" style={{ minWidth: "180px" }}>
+                  <DropdownMenu.Content size="1" style={{ minWidth: "200px" }}>
                     {/* Master toggle */}
                     <DropdownMenu.CheckboxItem
                       checked={config.angles.showAngles}
@@ -1007,6 +1007,16 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                       onSelect={(e) => e.preventDefault()}
                     >
                       Show Angles
+                    </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={config.angles.useComplementaryAngles}
+                      onCheckedChange={(checked) => setConfig(prev => ({
+                        ...prev,
+                        angles: { ...prev.angles, useComplementaryAngles: checked }
+                      }))}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Use Outer Angles (180°−)
                     </DropdownMenu.CheckboxItem>
                     
                     <DropdownMenu.Separator />
@@ -1180,17 +1190,22 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                   const isDragging = draggedComment?.id === comment.id;
                   const displayX = isDragging && dragPreviewPosition ? dragPreviewPosition.x : comment.x;
                   const displayY = isDragging && dragPreviewPosition ? dragPreviewPosition.y : comment.y;
+                  const tooltipContent = comment.description 
+                    ? `${comment.title}: ${comment.description} (${comment.time.toFixed(2)}s • Frame ${comment.frame})`
+                    : `${comment.title} (${comment.time.toFixed(2)}s • Frame ${comment.frame})`;
                   
                   return (
                     <Tooltip
                       key={comment.id}
-                      content={comment.description ? `${comment.title}: ${comment.description}` : comment.title}
+                      content={tooltipContent}
                     >
                       <Box
                         data-video-comment
                         onClick={(e) => {
                           if (isDragging) return; // Don't toggle selection when dragging
                           e.stopPropagation();
+                          // Seek to the comment's frame and select it
+                          viewerRef.current?.seekTo(comment.time);
                           setSelectedVideoComment(selectedVideoComment === comment.id ? null : comment.id);
                         }}
                         onMouseDown={(e) => handleCommentDragStart(e, comment.id)}
@@ -1934,7 +1949,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
                     return (
                       <Tooltip 
                         key={comment.id} 
-                        content={`📍 ${comment.title} (${comment.time.toFixed(2)}s) - click to jump`}
+                        content={`📍 ${comment.title} (${comment.time.toFixed(2)}s • Frame ${comment.frame}) - click to jump`}
                       >
                         <Box
                           onClick={(e) => {

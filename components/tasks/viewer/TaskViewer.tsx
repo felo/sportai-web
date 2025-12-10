@@ -153,47 +153,18 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     ) || 300;
   }, [task?.video_length, result?.rallies, enhancedBallBounces]);
 
-  // Calculate team count from team_sessions (only count teams with 2 players)
-  const teamCount = useMemo(() => {
-    const teamSessions = result?.team_sessions || [];
-    const uniqueTeams = new Set<string>();
-    teamSessions.forEach(session => {
-      if (session.team_front?.length === 2) {
-        uniqueTeams.add(JSON.stringify([...session.team_front].sort((a, b) => a - b)));
-      }
-      if (session.team_back?.length === 2) {
-        uniqueTeams.add(JSON.stringify([...session.team_back].sort((a, b) => a - b)));
-      }
-    });
-    return uniqueTeams.size;
-  }, [result?.team_sessions]);
-
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(() => [
     { id: "rallies", label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
     { id: "summary", label: "Match Summary", icon: <BarChartIcon width={16} height={16} /> },
-    { 
-      id: "players", 
-      label: "Player Stats", 
-      icon: <PersonIcon width={16} height={16} />, 
-      badge: validPlayers.length > 0 ? validPlayers.length : undefined 
-    },
-    { 
-      id: "teams", 
-      label: "Team Stats", 
-      icon: <TeamIcon width={16} height={16} />, 
-      badge: teamCount > 0 ? teamCount : undefined 
-    },
-    { 
-      id: "highlights", 
-      label: "Highlights", 
-      icon: <StarIcon width={16} height={16} />,
-    },
+    { id: "players", label: "Player Stats", icon: <PersonIcon width={16} height={16} /> },
+    { id: "teams", label: "Team Stats", icon: <TeamIcon width={16} height={16} /> },
+    { id: "highlights", label: "Highlights", icon: <StarIcon width={16} height={16} /> },
     { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
     { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
     { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} /> },
     { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
-  ], [validPlayers.length, teamCount, result?.highlights?.length]);
+  ], []);
 
   // Pause video when switching away from rallies tab
   useEffect(() => {

@@ -433,6 +433,7 @@ export interface DrawAnglesOptions {
   selectedAngleJoints: number[];
   labelPositionState: Map<string, LabelPositionState>;
   isPlaying: boolean;
+  useComplementaryAngles?: boolean;
 }
 
 /**
@@ -448,6 +449,7 @@ export function drawAngles({
   selectedAngleJoints,
   labelPositionState,
   isPlaying,
+  useComplementaryAngles = false,
 }: DrawAnglesOptions): Map<string, LabelPositionState> {
   const newLabelState = new Map(labelPositionState);
 
@@ -520,6 +522,7 @@ export function drawAngles({
       framesSinceChange: labelState?.framesSinceChange ?? 0,
       stabilityFrames: LABEL_POSITION_STABILITY_FRAMES,
       isPlaying: isPlaying,
+      useComplementaryAngles,
     });
 
     if (result) {

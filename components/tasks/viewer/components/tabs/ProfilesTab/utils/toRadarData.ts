@@ -20,7 +20,7 @@ export function toRadarData(
   return attributeKeys.map((key) => {
     const config = ATTRIBUTE_CONFIG[key];
     const dataPoint: { attribute: string; [key: string]: number | string } = {
-      attribute: `${config.emoji} ${config.label}`,
+      attribute: config.label,
     };
     profiles.forEach((profile) => {
       dataPoint[profile.playerName] = profile.attributes[key as keyof typeof profile.attributes];

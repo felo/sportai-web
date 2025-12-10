@@ -1,10 +1,17 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, ReactNode } from "react";
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { useAnimatedProgress } from "../../hooks/useAnimatedProgress";
 import { Confetti } from "./Confetti";
 import { MedalDisplay } from "./Medal";
+import {
+  PersonIcon,
+  DoubleArrowRightIcon,
+  RocketIcon,
+  LightningBoltIcon,
+  TimerIcon,
+} from "@radix-ui/react-icons";
 
 export interface ProgressRingGradient {
   /** Gradient stops as [offset, color] pairs */
@@ -24,8 +31,8 @@ export interface ProgressRingProps {
   playerId: number;
   /** Gradient colors for the ring */
   gradient: ProgressRingGradient;
-  /** Icon emoji to show on the ring */
-  icon: string;
+  /** Icon to show on the ring (React node or string) */
+  icon: ReactNode;
   /** Unit label to show below the value */
   unit: string;
   /** Winner nickname for 1st place */
@@ -167,14 +174,22 @@ export function ProgressRing({
                   stroke={`url(#${id.current}-gradient)`}
                   strokeWidth="3"
                 />
-                <text
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="16"
-                  style={{ userSelect: "none" }}
-                >
-                  {icon}
-                </text>
+                {typeof icon === "string" ? (
+                  <text
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="16"
+                    style={{ userSelect: "none" }}
+                  >
+                    {icon}
+                  </text>
+                ) : (
+                  <foreignObject x="-8" y="-8" width="16" height="16">
+                    <Box style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, color: "var(--gray-11)" }}>
+                      {icon}
+                    </Box>
+                  </foreignObject>
+                )}
               </g>
             );
           })()}
@@ -257,11 +272,11 @@ export const RING_GRADIENTS = {
   },
 } as const;
 
-// Ring icon mapping
+// Ring icon mapping (React components)
 export const RING_ICONS = {
-  distance: "🏃",
-  sprint: "⚡",
-  activity: "🎾",
-  power: "💥",
-} as const;
+  distance: <TimerIcon width={14} height={14} />,
+  sprint: <LightningBoltIcon width={14} height={14} />,
+  activity: <DoubleArrowRightIcon width={14} height={14} />,
+  power: <RocketIcon width={14} height={14} />,
+};
 

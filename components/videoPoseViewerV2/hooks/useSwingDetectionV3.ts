@@ -143,9 +143,19 @@ export interface SwingFrameDataV3 {
   maxWristVelocityKmh: number | null;    // smoothed max(left, right)
   rawMaxWristVelocityKmh: number | null; // raw max(left, right)
   
-  // Wrist confidence scores (0-1, for visualizing where wrist detection failed)
-  leftWristConfidence: number | null;    // confidence score at this frame
-  rightWristConfidence: number | null;   // confidence score at this frame
+  // Confidence scores (0-1, for visualizing where keypoint detection failed)
+  leftWristConfidence: number | null;
+  rightWristConfidence: number | null;
+  leftElbowConfidence: number | null;
+  rightElbowConfidence: number | null;
+  leftShoulderConfidence: number | null;
+  rightShoulderConfidence: number | null;
+  leftHipConfidence: number | null;
+  rightHipConfidence: number | null;
+  leftKneeConfidence: number | null;
+  rightKneeConfidence: number | null;
+  leftAnkleConfidence: number | null;
+  rightAnkleConfidence: number | null;
   
   // Ankle velocity (px/frame and km/h)
   rawLeftAnkleVelocity: number | null;
@@ -1196,6 +1206,16 @@ export function useSwingDetectionV3({
           rawMaxWristVelocityKmh: null,
           leftWristConfidence: null,
           rightWristConfidence: null,
+          leftElbowConfidence: null,
+          rightElbowConfidence: null,
+          leftShoulderConfidence: null,
+          rightShoulderConfidence: null,
+          leftHipConfidence: null,
+          rightHipConfidence: null,
+          leftKneeConfidence: null,
+          rightKneeConfidence: null,
+          leftAnkleConfidence: null,
+          rightAnkleConfidence: null,
           // Ankle velocity
           rawLeftAnkleVelocity: null,
           rawRightAnkleVelocity: null,
@@ -1295,11 +1315,28 @@ export function useSwingDetectionV3({
           continue;
         }
         
-        // Track wrist confidence scores for visualization
+        // Track keypoint confidence scores for visualization
         const leftWrist = pose.keypoints[indices.leftWrist];
         const rightWrist = pose.keypoints[indices.rightWrist];
+        const leftElbow = pose.keypoints[indices.leftElbow];
+        const rightElbow = pose.keypoints[indices.rightElbow];
+        const leftAnkle = pose.keypoints[indices.leftAnkle];
+        const rightAnkle = pose.keypoints[indices.rightAnkle];
+        const leftKnee = pose.keypoints[indices.leftKnee];
+        const rightKnee = pose.keypoints[indices.rightKnee];
+        
         dataPoint.leftWristConfidence = leftWrist?.score ?? null;
         dataPoint.rightWristConfidence = rightWrist?.score ?? null;
+        dataPoint.leftElbowConfidence = leftElbow?.score ?? null;
+        dataPoint.rightElbowConfidence = rightElbow?.score ?? null;
+        dataPoint.leftShoulderConfidence = pose.keypoints[indices.leftShoulder]?.score ?? null;
+        dataPoint.rightShoulderConfidence = pose.keypoints[indices.rightShoulder]?.score ?? null;
+        dataPoint.leftHipConfidence = pose.keypoints[indices.leftHip]?.score ?? null;
+        dataPoint.rightHipConfidence = pose.keypoints[indices.rightHip]?.score ?? null;
+        dataPoint.leftKneeConfidence = leftKnee?.score ?? null;
+        dataPoint.rightKneeConfidence = rightKnee?.score ?? null;
+        dataPoint.leftAnkleConfidence = leftAnkle?.score ?? null;
+        dataPoint.rightAnkleConfidence = rightAnkle?.score ?? null;
         
         // Track torso height for velocity normalization
         // Torso = shoulder to hip distance

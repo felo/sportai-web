@@ -350,6 +350,7 @@ export function drawAngle(
     framesSinceChange?: number;
     stabilityFrames?: number;
     isPlaying?: boolean;
+    useComplementaryAngles?: boolean;
   } = {}
 ): { bounds: LabelBounds; multiplier: number; verticalOffset: number } | null {
   const {
@@ -365,6 +366,7 @@ export function drawAngle(
     framesSinceChange = 0,
     stabilityFrames = 5,
     isPlaying = true,
+    useComplementaryAngles = false,
   } = options;
 
   const [idxA, idxB, idxC] = jointIndices;
@@ -384,7 +386,8 @@ export function drawAngle(
   }
 
   // Calculate angle
-  const angle = calculateAngle(pointA, pointB, pointC);
+  const rawAngle = calculateAngle(pointA, pointB, pointC);
+  const angle = useComplementaryAngles ? 180 - rawAngle : rawAngle;
 
   // Draw lines from vertex to the two points
   ctx.strokeStyle = lineColor;

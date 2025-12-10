@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Box, Flex, Grid, Text, Card, Heading, Separator, Tooltip } from "@radix-ui/themes";
-import { PersonIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { PersonIcon, ChevronLeftIcon, ChevronRightIcon, DoubleArrowRightIcon, RocketIcon, TimerIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult, TeamSession, Player, Swing } from "../../types";
 import { ProgressRing, TeamMedalDisplay, OverallMedal } from "../shared";
 import type { ProgressRingGradient, EarnedMedal } from "../shared";
@@ -645,7 +645,7 @@ function TeamCard({
             isVisible={isVisible}
             playerId={teamIndex}
             gradient={SHOTS_GRADIENT}
-            icon="🎾"
+            icon={<DoubleArrowRightIcon width={14} height={14} />}
             unit="shots"
             size={120}
             strokeWidth={10}
@@ -659,7 +659,7 @@ function TeamCard({
             isVisible={isVisible}
             playerId={teamIndex + 10}
             gradient={POWER_GRADIENT}
-            icon="💥"
+            icon={<RocketIcon width={14} height={14} />}
             unit="km/h"
             size={120}
             strokeWidth={10}
@@ -673,7 +673,7 @@ function TeamCard({
             isVisible={isVisible}
             playerId={teamIndex + 20}
             gradient={DISTANCE_GRADIENT}
-            icon="🏃"
+            icon={<TimerIcon width={14} height={14} />}
             unit="meters"
             size={120}
             strokeWidth={10}
@@ -687,7 +687,7 @@ function TeamCard({
             isVisible={isVisible}
             playerId={teamIndex + 30}
             gradient={SPRINT_GRADIENT}
-            icon="⚡"
+            icon={<LightningBoltIcon width={14} height={14} />}
             unit="km/h"
             size={120}
             strokeWidth={10}

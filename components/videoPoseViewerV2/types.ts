@@ -206,6 +206,8 @@ export interface AngleConfig {
   textColor: string;
   /** Angle font size */
   fontSize: number;
+  /** Use complementary angles (180° - angle) - shows the "outside" angle instead of "inside" */
+  useComplementaryAngles: boolean;
 }
 
 // Common angle presets for racket sports
@@ -233,6 +235,7 @@ export const DEFAULT_ANGLE_CONFIG: AngleConfig = {
   arcColor: "rgba(168, 85, 247, 0.3)",
   textColor: "#FFFFFF",
   fontSize: 20,
+  useComplementaryAngles: false,
 };
 
 // ============================================================================

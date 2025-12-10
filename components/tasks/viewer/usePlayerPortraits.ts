@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { videoLogger } from "@/lib/logger";
 import type { ThumbnailCrop } from "./types";
+import { enhancePortraitWithSharp } from "@/utils/portrait-enhance";
 
 /**
  * Crop size variants available in thumbnail_crops.
@@ -14,6 +15,12 @@ export type CropSize = 0 | 1 | 2 | 3;
 interface UsePlayerPortraitsOptions {
   /** Which crop size to use (0-3, default: 3 for full person - shows most context) */
   cropSize?: CropSize;
+  /** Whether to enhance portraits using Sharp (default: true) */
+  enhance?: boolean;
+  /** Enhancement preset (default: "standard") */
+  enhancePreset?: "subtle" | "standard" | "premium";
+  /** Output size for enhanced portraits (default: 400) */
+  enhanceSize?: number;
 }
 
 /**
@@ -29,7 +36,13 @@ export function usePlayerPortraits(
   videoUrl: string | undefined,
   options: UsePlayerPortraitsOptions = {}
 ) {
-  const { cropSize = 3 } = options; // Default to full person (largest, shows most context)
+  const { 
+    cropSize = 3,  // Use head+chest crop (more pixels on face = better quality)
+    enhance = true,  // Default to enhancing portraits
+    enhancePreset = "premium",  // Use premium for best quality
+    enhanceSize = 400,  // 400px is sufficient
+  } = options;
+  
   const [portraits, setPortraits] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -45,7 +58,9 @@ export function usePlayerPortraits(
     const extractPortraits = async (hiddenVideo: HTMLVideoElement) => {
       setLoading(true);
       const newPortraits: Record<number, string> = {};
+      const extractedPortraits: Record<number, string> = {};
 
+      // Phase 1: Extract raw portraits from video
       for (const [playerIdStr, crops] of Object.entries(thumbnailCrops)) {
         const playerId = parseInt(playerIdStr, 10);
         if (isNaN(playerId) || !crops || crops.length === 0) continue;
@@ -109,7 +124,7 @@ export function usePlayerPortraits(
 
             // Convert to data URL (will throw if CORS blocked)
             const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-            newPortraits[playerId] = dataUrl;
+            extractedPortraits[playerId] = dataUrl;
           } catch (corsError) {
             // Canvas is tainted by cross-origin video - silently skip
             videoLogger.warn(`CORS blocked portrait extraction for player ${playerId}`);
@@ -118,6 +133,39 @@ export function usePlayerPortraits(
         } catch (error) {
           videoLogger.error(`Failed to extract portrait for player ${playerId}:`, error);
         }
+      }
+
+      // Phase 2: Enhance portraits if enabled
+      if (enhance && Object.keys(extractedPortraits).length > 0) {
+        videoLogger.info(`Enhancing ${Object.keys(extractedPortraits).length} portraits with Sharp...`);
+        
+        // Enhance portraits in parallel
+        const enhancePromises = Object.entries(extractedPortraits).map(
+          async ([playerIdStr, dataUrl]) => {
+            const playerId = parseInt(playerIdStr, 10);
+            try {
+              const enhanced = await enhancePortraitWithSharp(dataUrl, {
+                width: enhanceSize,
+                height: enhanceSize,
+                preset: enhancePreset,
+              });
+              return { playerId, portrait: enhanced };
+            } catch (error) {
+              videoLogger.error(`Failed to enhance portrait for player ${playerId}:`, error);
+              return { playerId, portrait: dataUrl }; // Use original on failure
+            }
+          }
+        );
+
+        const results = await Promise.all(enhancePromises);
+        for (const { playerId, portrait } of results) {
+          newPortraits[playerId] = portrait;
+        }
+        
+        videoLogger.info(`Portrait enhancement complete`);
+      } else {
+        // Use extracted portraits without enhancement
+        Object.assign(newPortraits, extractedPortraits);
       }
 
       setPortraits(newPortraits);

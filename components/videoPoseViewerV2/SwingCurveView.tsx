@@ -889,7 +889,7 @@ function SwingChart({
             fontWeight="600"
             fontFamily="system-ui, sans-serif"
           >
-            {hoveredPoint.value.toFixed(2)} • {getPhaseLabel(hoveredPoint.phase)}
+            {hoveredPoint.value.toFixed(2)}
           </text>
         </g>
       )}
@@ -966,7 +966,7 @@ export function SwingCurveView({
   const [internalKnee, setInternalKnee] = useState<KneeType>("both");
   const [internalVelocityBodyPart, setInternalVelocityBodyPart] = useState<VelocityBodyPart>("wrist");
   const [internalOrientationType, setInternalOrientationType] = useState<OrientationType>("body");
-  const [showPhases, setShowPhases] = useState(true);
+  const [showPhases, setShowPhases] = useState(false); // Hidden for now
   
   // Confidence threshold for highlighting missing wrist data (adjustable)
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
@@ -1485,10 +1485,61 @@ export function SwingCurveView({
     });
   }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart]);
 
-  // Calculate low confidence regions based on wrist confidence scores
-  // This shows where the wrist was not reliably detected (matches what's drawn on video)
+  // Helper to get confidence for a body part
+  const getConfidenceForBodyPart = useCallback((fd: SwingFrameDataV3, bodyPart: VelocityBodyPart, side: "left" | "right"): number | null => {
+    switch (bodyPart) {
+      case "wrist":
+        return side === "left" ? fd.leftWristConfidence : fd.rightWristConfidence;
+      case "elbow":
+        return side === "left" ? fd.leftElbowConfidence : fd.rightElbowConfidence;
+      case "shoulder":
+        return side === "left" ? fd.leftShoulderConfidence : fd.rightShoulderConfidence;
+      case "hip":
+        return side === "left" ? fd.leftHipConfidence : fd.rightHipConfidence;
+      case "knee":
+        return side === "left" ? fd.leftKneeConfidence : fd.rightKneeConfidence;
+      case "ankle":
+        return side === "left" ? fd.leftAnkleConfidence : fd.rightAnkleConfidence;
+      default:
+        return null;
+    }
+  }, []);
+
+  // Helper to get confidence for an angle type (checks multiple joints involved)
+  const getConfidenceForAngleType = useCallback((fd: SwingFrameDataV3, type: AngleType, side: "left" | "right"): number | null => {
+    // Each angle involves multiple joints - return the minimum confidence
+    switch (type) {
+      case "shoulder": // shoulder-elbow angle
+        const shoulderConf = side === "left" ? fd.leftShoulderConfidence : fd.rightShoulderConfidence;
+        const elbowConfSh = side === "left" ? fd.leftElbowConfidence : fd.rightElbowConfidence;
+        if (shoulderConf === null || elbowConfSh === null) return null;
+        return Math.min(shoulderConf, elbowConfSh);
+      case "elbow": // elbow-wrist angle
+        const elbowConf = side === "left" ? fd.leftElbowConfidence : fd.rightElbowConfidence;
+        const wristConf = side === "left" ? fd.leftWristConfidence : fd.rightWristConfidence;
+        if (elbowConf === null || wristConf === null) return null;
+        return Math.min(elbowConf, wristConf);
+      case "hip": // hip-knee angle
+        const hipConf = side === "left" ? fd.leftHipConfidence : fd.rightHipConfidence;
+        const kneeConfHip = side === "left" ? fd.leftKneeConfidence : fd.rightKneeConfidence;
+        if (hipConf === null || kneeConfHip === null) return null;
+        return Math.min(hipConf, kneeConfHip);
+      case "knee": // knee-ankle angle
+        const kneeConf = side === "left" ? fd.leftKneeConfidence : fd.rightKneeConfidence;
+        const ankleConf = side === "left" ? fd.leftAnkleConfidence : fd.rightAnkleConfidence;
+        if (kneeConf === null || ankleConf === null) return null;
+        return Math.min(kneeConf, ankleConf);
+      default:
+        return null;
+    }
+  }, []);
+
+  // Calculate low confidence regions based on the selected metric and joint
   const lowConfidenceRegions = useMemo((): Array<{ startFrame: number; endFrame: number }> => {
-    if (!swingResult?.frameData || selectedMetric !== "velocity") return [];
+    if (!swingResult?.frameData) return [];
+    
+    // Only show for velocity and angle views
+    if (selectedMetric !== "velocity" && selectedMetric !== "kneeBend") return [];
     
     const regions: Array<{ startFrame: number; endFrame: number }> = [];
     let inLowConfRegion = false;
@@ -1497,29 +1548,51 @@ export function SwingCurveView({
     for (let i = 0; i < swingResult.frameData.length; i++) {
       const fd = swingResult.frameData[i];
       
-      // Check confidence based on selected wrist
       let isLowConfidence = false;
-      switch (selectedWrist) {
-        case "left":
-          isLowConfidence = fd.leftWristConfidence === null || fd.leftWristConfidence < confidenceThreshold;
-          break;
-        case "right":
-          isLowConfidence = fd.rightWristConfidence === null || fd.rightWristConfidence < confidenceThreshold;
-          break;
-        case "both":
-          // For "both", show low confidence if BOTH wrists are low
-          isLowConfidence = 
-            (fd.leftWristConfidence === null || fd.leftWristConfidence < confidenceThreshold) &&
-            (fd.rightWristConfidence === null || fd.rightWristConfidence < confidenceThreshold);
-          break;
+      
+      if (selectedMetric === "velocity") {
+        // For velocity view, check the selected body part confidence
+        const leftConf = getConfidenceForBodyPart(fd, velocityBodyPart, "left");
+        const rightConf = getConfidenceForBodyPart(fd, velocityBodyPart, "right");
+        
+        switch (selectedWrist) {
+          case "left":
+            isLowConfidence = leftConf === null || leftConf < confidenceThreshold;
+            break;
+          case "right":
+            isLowConfidence = rightConf === null || rightConf < confidenceThreshold;
+            break;
+          case "both":
+            // For "both", show low confidence if BOTH sides are low
+            isLowConfidence = 
+              (leftConf === null || leftConf < confidenceThreshold) &&
+              (rightConf === null || rightConf < confidenceThreshold);
+            break;
+        }
+      } else if (selectedMetric === "kneeBend") {
+        // For angle view, check the joints involved in the selected angle
+        const leftConf = getConfidenceForAngleType(fd, angleType, "left");
+        const rightConf = getConfidenceForAngleType(fd, angleType, "right");
+        
+        switch (selectedKnee) {
+          case "left":
+            isLowConfidence = leftConf === null || leftConf < confidenceThreshold;
+            break;
+          case "right":
+            isLowConfidence = rightConf === null || rightConf < confidenceThreshold;
+            break;
+          case "both":
+            isLowConfidence = 
+              (leftConf === null || leftConf < confidenceThreshold) &&
+              (rightConf === null || rightConf < confidenceThreshold);
+            break;
+        }
       }
       
       if (isLowConfidence && !inLowConfRegion) {
-        // Start of low confidence region
         inLowConfRegion = true;
         regionStart = fd.frame;
       } else if (!isLowConfidence && inLowConfRegion) {
-        // End of low confidence region
         inLowConfRegion = false;
         regions.push({ startFrame: regionStart, endFrame: swingResult.frameData[i - 1].frame });
       }
@@ -1534,7 +1607,7 @@ export function SwingCurveView({
     }
 
     return regions;
-  }, [swingResult, selectedMetric, selectedWrist, confidenceThreshold]);
+  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, velocityBodyPart, angleType, confidenceThreshold, getConfidenceForBodyPart, getConfidenceForAngleType]);
 
   // No data state
   if (!swingResult || swingResult.frameData.length === 0) {
@@ -1786,9 +1859,9 @@ export function SwingCurveView({
                   }}
                 />
                 <Text size="1" color="gray">Low confidence</Text>
-                <Tooltip content={`Highlight frames where wrist confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+                <Tooltip content={`Highlight frames where ${velocityBodyPart} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
                   <Flex align="center" gap="1" style={{ marginLeft: "4px" }}>
-                    <Text size="1" style={{ color: "var(--red-9)", fontWeight: 500, minWidth: "32px" }}>
+                    <Text size="1" style={{ color: "var(--gray-11)", fontWeight: 500, minWidth: "32px" }}>
                       {(confidenceThreshold * 100).toFixed(0)}%
                     </Text>
                     <input
@@ -1802,7 +1875,7 @@ export function SwingCurveView({
                         width: "60px",
                         height: "4px",
                         cursor: "pointer",
-                        accentColor: "var(--red-9)",
+                        accentColor: "var(--gray-9)",
                       }}
                     />
                   </Flex>
@@ -1870,31 +1943,66 @@ export function SwingCurveView({
                 />
                 <Text size="1" color="gray">Raw</Text>
               </Flex>
+              <Flex align="center" gap="2" style={{ marginLeft: "8px" }}>
+                <Box
+                  style={{
+                    width: 16,
+                    height: 10,
+                    borderRadius: "2px",
+                    backgroundColor: "rgba(239, 68, 68, 0.25)",
+                    border: "1px dashed rgba(239, 68, 68, 0.6)",
+                  }}
+                />
+                <Text size="1" color="gray">Low confidence</Text>
+                <Tooltip content={`Highlight frames where ${angleType} confidence < ${(confidenceThreshold * 100).toFixed(0)}%`}>
+                  <Flex align="center" gap="1" style={{ marginLeft: "4px" }}>
+                    <Text size="1" style={{ color: "var(--gray-11)", fontWeight: 500, minWidth: "32px" }}>
+                      {(confidenceThreshold * 100).toFixed(0)}%
+                    </Text>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={confidenceThreshold * 100}
+                      onChange={(e) => setConfidenceThreshold(Number(e.target.value) / 100)}
+                      style={{
+                        width: "60px",
+                        height: "4px",
+                        cursor: "pointer",
+                        accentColor: "var(--gray-9)",
+                      }}
+                    />
+                  </Flex>
+                </Tooltip>
+              </Flex>
             </Flex>
           )}
         </Flex>
 
-        {/* Show phases toggle */}
-        <Tooltip content={showPhases ? "Hide swing phases" : "Show swing phases"}>
-          <Box
-            onClick={() => setShowPhases(!showPhases)}
-            style={{
-              padding: "6px 10px",
-              borderRadius: "6px",
-              backgroundColor: showPhases ? "var(--mint-3)" : "var(--gray-3)",
-              border: `1px solid ${showPhases ? "var(--mint-7)" : "var(--gray-6)"}`,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <Flex align="center" gap="1">
-              <MixerHorizontalIcon width={14} height={14} style={{ color: showPhases ? "var(--mint-11)" : "var(--gray-10)" }} />
-              <Text size="1" style={{ color: showPhases ? "var(--mint-11)" : "var(--gray-10)" }}>
-                Phases
-              </Text>
-            </Flex>
-          </Box>
-        </Tooltip>
+        {/* Show phases toggle - hidden for now */}
+        {false && (
+          <Tooltip content={showPhases ? "Hide swing phases" : "Show swing phases"}>
+            <Box
+              onClick={() => setShowPhases(!showPhases)}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "6px",
+                backgroundColor: showPhases ? "var(--mint-3)" : "var(--gray-3)",
+                border: `1px solid ${showPhases ? "var(--mint-7)" : "var(--gray-6)"}`,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <Flex align="center" gap="1">
+                <MixerHorizontalIcon width={14} height={14} style={{ color: showPhases ? "var(--mint-11)" : "var(--gray-10)" }} />
+                <Text size="1" style={{ color: showPhases ? "var(--mint-11)" : "var(--gray-10)" }}>
+                  Phases
+                </Text>
+              </Flex>
+            </Box>
+          </Tooltip>
+        )}
       </Flex>
 
       {/* Chart */}

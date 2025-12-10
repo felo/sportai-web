@@ -67,25 +67,21 @@ export function BouncesDisplay({ total, bounceCounts }: BouncesDisplayProps) {
         <BounceTypeStat
           label="Floor Bounces"
           value={Math.round(bounceCounts.floor * animationProgress)}
-          icon="🎾"
           color="mint"
         />
         <BounceTypeStat
           label="Glass Bounces"
           value={Math.round(bounceCounts.wall * animationProgress)}
-          icon="🪟"
           color="orange"
         />
         <BounceTypeStat
           label="Shot Contacts"
           value={Math.round(bounceCounts.swing * animationProgress)}
-          icon="🏓"
           color="purple"
         />
         <BounceTypeStat
           label="Other"
           value={Math.round(bounceCounts.other * animationProgress)}
-          icon="✨"
           color="cyan"
         />
       </Grid>
@@ -96,12 +92,10 @@ export function BouncesDisplay({ total, bounceCounts }: BouncesDisplayProps) {
 function BounceTypeStat({
   label,
   value,
-  icon,
   color,
 }: {
   label: string;
   value: number;
-  icon: string;
   color: "mint" | "orange" | "purple" | "cyan";
 }) {
   return (
@@ -114,7 +108,14 @@ function BounceTypeStat({
         borderRadius: "var(--radius-2)" 
       }}
     >
-      <Text style={{ fontSize: 16 }}>{icon}</Text>
+      <Box 
+        style={{ 
+          width: 8, 
+          height: 8, 
+          borderRadius: "50%", 
+          background: `var(--${color}-9)` 
+        }} 
+      />
       <Flex direction="column" gap="0">
         <Text size="1" color="gray">{label}</Text>
         <Text size="3" weight="bold" style={{ color: `var(--${color}-11)`, fontVariantNumeric: "tabular-nums" }}>

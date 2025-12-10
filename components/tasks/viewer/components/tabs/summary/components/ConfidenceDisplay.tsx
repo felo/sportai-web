@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Flex, Text, Card, Heading, Grid } from "@radix-ui/themes";
+import { PersonIcon, DoubleArrowRightIcon, CircleIcon, GearIcon } from "@radix-ui/react-icons";
 import { ProgressRing } from "../../../shared";
 import type { ProgressRingGradient } from "../../../shared";
 import type { Confidences } from "../types";
@@ -16,12 +17,12 @@ const CONFIDENCE_GRADIENT: ProgressRingGradient = {
 };
 
 const AI_IMPROVEMENT_MESSAGES = [
-  "SportAI gets smarter with every match – like a coach who never sleeps ☕",
-  "Still in training! SportAI watches more matches than your most dedicated fan 📺",
-  "These scores improve with every rally. SportAI never skips training day 💪",
-  "SportAI is doing its homework on every match – rain or shine, no rest days 🤖",
-  "Like a rookie turning pro, SportAI learns something new from every game 🎾",
-  "Work in progress – SportAI is grinding harder than a baseline warrior 🏃",
+  "SportAI gets smarter with every match – like a coach who never sleeps.",
+  "Still in training! SportAI watches more matches than your most dedicated fan.",
+  "These scores improve with every rally. SportAI never skips training day.",
+  "SportAI is doing its homework on every match – rain or shine, no rest days.",
+  "Like a rookie turning pro, SportAI learns something new from every game.",
+  "Work in progress – SportAI is grinding harder than a baseline warrior.",
 ];
 
 interface ConfidenceDisplayProps {
@@ -64,7 +65,7 @@ export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
             isVisible={isVisible}
             playerId={1}
             gradient={CONFIDENCE_GRADIENT}
-            icon="🧍"
+            icon={<PersonIcon width={14} height={14} />}
             unit="Pose"
             size={100}
             strokeWidth={8}
@@ -76,7 +77,7 @@ export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
             isVisible={isVisible}
             playerId={2}
             gradient={CONFIDENCE_GRADIENT}
-            icon="🏓"
+            icon={<DoubleArrowRightIcon width={14} height={14} />}
             unit="Swing"
             size={100}
             strokeWidth={8}
@@ -88,7 +89,7 @@ export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
             isVisible={isVisible}
             playerId={3}
             gradient={CONFIDENCE_GRADIENT}
-            icon="🎾"
+            icon={<CircleIcon width={14} height={14} />}
             unit="Ball"
             size={100}
             strokeWidth={8}
@@ -100,7 +101,7 @@ export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
             isVisible={isVisible}
             playerId={4}
             gradient={CONFIDENCE_GRADIENT}
-            icon="🤖"
+            icon={<GearIcon width={14} height={14} />}
             unit="Overall"
             size={100}
             strokeWidth={8}

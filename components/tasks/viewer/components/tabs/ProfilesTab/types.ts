@@ -17,7 +17,7 @@ export interface ProfileColor {
 }
 
 export interface AttributeConfig {
-  emoji: string;
+  icon: React.ComponentType<{ width?: number; height?: number; style?: React.CSSProperties }>;
   label: string;
   description: string;
 }
