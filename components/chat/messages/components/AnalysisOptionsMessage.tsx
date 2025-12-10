@@ -386,7 +386,7 @@ export function AnalysisOptionsMessage({
                 {/* PRO Analysis button */}
                 <Button
                   size="3"
-                  className={buttonStyles.actionButtonSquare}
+                  className={`${buttonStyles.actionButtonSquare} ${buttonStyles.actionButtonPulse}`}
                   onClick={onSelectProPlusQuick}
                   disabled={isLoading}
                   style={{ flex: "1", minWidth: "180px" }}
