@@ -910,7 +910,7 @@ export function ChatInput({
             <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
               {isMobile ? (
                 <>
-                  This is a demo, for enterprise level precision, please{" "}
+                  Enjoy the free BETA, for enterprise level precision, please{" "}
                   <a 
                     href="https://sportai.com/contact" 
                     target="_blank" 
@@ -922,15 +922,7 @@ export function ChatInput({
                 </>
               ) : (
                 <>
-                  This is a demo of the{" "}
-                  <a 
-                    href="https://sportai.com/platform" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ color: "inherit", textDecoration: "underline" }}
-                  >
-                    SportAI API
-                  </a>. For enterprise-level precision, performance, and dedicated support, please{" "}
+                  Enjoy the free BETA. For enterprise-level precision, performance, and dedicated support, please{" "}
                   <a 
                     href="https://sportai.com/contact" 
                     target="_blank" 

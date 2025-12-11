@@ -18,6 +18,7 @@ import { MomentCard, type Moment, type MomentType } from "./MomentCard";
 import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
 import type { CustomEvent } from "./CustomEventDialog";
 import type { VideoComment } from "./VideoCommentDialog";
+import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 
 // ============================================================================
 // Types
@@ -48,6 +49,12 @@ interface MomentsGalleryViewProps {
   onViewMoment: (time: number) => void;
   /** Callback when user clicks Analyse on a moment */
   onAnalyseMoment: (moment: Moment) => void;
+  /** Preprocessed pose data by frame number */
+  poseData?: Map<number, PoseDetectionResult[]>;
+  /** Callback when user deletes a custom event or comment */
+  onDeleteMoment?: (moment: Moment) => void;
+  /** Callback when user resets a protocol event adjustment */
+  onResetAdjustment?: (moment: Moment) => void;
 }
 
 // ============================================================================
@@ -80,9 +87,31 @@ export function MomentsGalleryView({
   videoElement,
   onViewMoment,
   onAnalyseMoment,
+  poseData,
+  onDeleteMoment,
+  onResetAdjustment,
 }: MomentsGalleryViewProps) {
   const [filter, setFilter] = useState<FilterOption>("all");
   const [sort, setSort] = useState<SortOption>("time");
+
+  // Get pose confidence for a specific frame
+  const getPoseConfidence = useCallback((frame: number): number | null => {
+    if (!poseData) return null;
+    const poses = poseData.get(frame);
+    if (!poses || poses.length === 0) return null;
+    // Return the score of the first (primary) pose
+    return poses[0].score ?? null;
+  }, [poseData]);
+
+  // Handle delete
+  const handleDelete = useCallback((moment: Moment) => {
+    onDeleteMoment?.(moment);
+  }, [onDeleteMoment]);
+
+  // Handle reset adjustment
+  const handleResetAdjustment = useCallback((moment: Moment) => {
+    onResetAdjustment?.(moment);
+  }, [onResetAdjustment]);
 
   // Get effective time for a protocol event (with adjustment)
   const getEffectiveTime = useCallback((event: ProtocolEvent) => {
@@ -136,28 +165,24 @@ export function MomentsGalleryView({
     const seenIds = new Set<string>();
 
     // Add protocol events (with deduplication)
+    // Skip swing events - they're already shown in the Swings tab
     protocolEvents.forEach((event) => {
       // Skip if we've already seen this ID
       if (seenIds.has(event.id)) return;
+      
+      // Skip swing detection events - shown in Swings tab
+      const isSwing = event.protocolId === "swing-detection-v3" ||
+                      event.protocolId === "swing-detection-v2" ||
+                      event.protocolId === "swing-detection-v1";
+      if (isSwing) return;
+      
       seenIds.add(event.id);
-      const isSwing = event.protocolId === "swing-detection-v3";
       const effectiveTime = getEffectiveTime(event);
       const effectiveFrame = getEffectiveFrame(event);
       const isAdjusted = protocolAdjustments.has(event.id);
-      
-      let endTime: number | undefined;
-      let endFrame: number | undefined;
-      let swingIsAdjusted = false;
-      
-      if (isSwing) {
-        const bounds = getEffectiveSwingBoundaries(event);
-        endTime = bounds.endTime;
-        endFrame = bounds.endFrame;
-        swingIsAdjusted = bounds.isAdjusted;
-      }
 
-      // Find parent swing for non-swing protocol events
-      const parentSwing = !isSwing ? findParentSwing(event) : null;
+      // Find parent swing for this protocol event
+      const parentSwing = findParentSwing(event);
 
       moments.push({
         id: event.id,
@@ -165,11 +190,9 @@ export function MomentsGalleryView({
         label: event.label,
         time: effectiveTime,
         frame: effectiveFrame,
-        endTime: isSwing ? endTime : undefined,
-        endFrame: isSwing ? endFrame : undefined,
         color: getProtocolEventColor(event.protocolId),
         protocolId: event.protocolId,
-        isAdjusted: isAdjusted || swingIsAdjusted,
+        isAdjusted: isAdjusted,
         parentSwingId: parentSwing?.id,
         parentSwingLabel: parentSwing?.label,
         metadata: event.metadata,
@@ -222,7 +245,6 @@ export function MomentsGalleryView({
     protocolAdjustments,
     getEffectiveTime,
     getEffectiveFrame,
-    getEffectiveSwingBoundaries,
     findParentSwing,
   ]);
 
@@ -254,13 +276,8 @@ export function MomentsGalleryView({
         filtered = allMoments.filter(m => m.type === "comment");
         break;
       default:
-        // Filter by specific swing ID
-        if (filter.startsWith("swing-")) {
-          const swingId = filter;
-          filtered = allMoments.filter(m => 
-            m.id === swingId || m.parentSwingId === swingId
-          );
-        }
+        // Filter by parent swing ID (moments belonging to a specific swing)
+        filtered = allMoments.filter(m => m.parentSwingId === filter);
         break;
     }
 
@@ -277,11 +294,11 @@ export function MomentsGalleryView({
         break;
       case "type":
         sorted.sort((a, b) => {
-          // Order: swings first, then protocol events, then custom, then comments
+          // Order: protocol events first, then custom, then comments
           const typeOrder: Record<MomentType, number> = {
-            protocol: a.protocolId === "swing-detection-v3" ? 0 : 1,
-            custom: 2,
-            comment: 3,
+            protocol: 0,
+            custom: 1,
+            comment: 2,
           };
           const orderA = typeOrder[a.type];
           const orderB = typeOrder[b.type];
@@ -315,7 +332,6 @@ export function MomentsGalleryView({
   const counts = useMemo(() => ({
     total: allMoments.length,
     protocols: allMoments.filter(m => m.type === "protocol").length,
-    swings: allMoments.filter(m => m.protocolId === "swing-detection-v3").length,
     custom: allMoments.filter(m => m.type === "custom").length,
     comments: allMoments.filter(m => m.type === "comment").length,
   }), [allMoments]);
@@ -396,6 +412,9 @@ export function MomentsGalleryView({
               videoElement={videoElement}
               onView={handleView}
               onAnalyse={handleAnalyse}
+              poseConfidence={getPoseConfidence(moment.frame)}
+              onDelete={handleDelete}
+              onResetAdjustment={handleResetAdjustment}
             />
           ))}
         </Flex>

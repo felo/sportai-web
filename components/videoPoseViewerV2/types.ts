@@ -908,6 +908,10 @@ export interface MomentsConfig {
   onViewMoment?: (time: number) => void;
   /** Callback when user clicks Analyse on a moment */
   onAnalyseMoment?: (moment: unknown) => void;
+  /** Callback when user deletes a custom event or comment */
+  onDeleteMoment?: (moment: unknown) => void;
+  /** Callback when user resets a protocol event adjustment */
+  onResetAdjustment?: (moment: unknown) => void;
 }
 
 // ============================================================================

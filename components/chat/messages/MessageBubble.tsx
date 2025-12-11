@@ -7,7 +7,7 @@ import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/stor
 import { calculatePricing } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -46,14 +46,12 @@ interface MessageBubbleProps {
   // Analysis options handlers
   onSelectProPlusQuick?: (messageId: string) => void;
   onSelectQuickOnly?: (messageId: string) => void;
-  // Technique Studio handler
-  onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Progress state for upload/processing/analyzing
   progressStage?: ProgressStage;
   uploadProgress?: number;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, progressStage = "idle", uploadProgress = 0 }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, progressStage = "idle", uploadProgress = 0 }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -518,23 +516,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                   onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
                   isLoading={message.isStreaming}
                 />
-              ) : message.messageType === "technique_studio_prompt" && message.techniqueStudioPrompt ? (
-                <TechniqueStudioPrompt
-                  videoUrl={message.techniqueStudioPrompt.videoUrl}
-                  taskId={message.techniqueStudioPrompt.taskId}
-                  onOpenStudio={() => onOpenTechniqueStudio?.(
-                    message.techniqueStudioPrompt!.videoUrl,
-                    message.techniqueStudioPrompt!.taskId
-                  )}
-                  onTTSUsage={handleTTSUsage}
-                />
               ) : (
                 <>
                   <AssistantMessage
                     messageId={message.id}
                     chatId={getCurrentChatId() || undefined}
                     content={message.content}
-                    videoUrl={message.videoUrl || message.video_url}
                     isStreaming={message.isStreaming}
                     isIncomplete={message.isIncomplete}
                     thinkingMessage={(() => {

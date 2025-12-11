@@ -14,6 +14,9 @@ import {
   TrashIcon,
   ChatBubbleIcon,
   AngleIcon,
+  RocketIcon,
+  TargetIcon,
+  CheckCircledIcon,
 } from "@radix-ui/react-icons";
 import {
   VideoPoseViewerV2,
@@ -1302,6 +1305,23 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                   viewerRef.current?.seekTo(time);
                 },
                 onAnalyseMoment: handleAnalyseMoment,
+                onDeleteMoment: (moment: { id: string; type: string }) => {
+                  if (moment.type === "custom") {
+                    setCustomEvents((prev) => prev.filter((e) => e.id !== moment.id));
+                    setDirtyFlags((prev) => ({ ...prev, customEvents: true }));
+                  } else if (moment.type === "comment") {
+                    setVideoComments((prev) => prev.filter((c) => c.id !== moment.id));
+                    setDirtyFlags((prev) => ({ ...prev, videoComments: true }));
+                  }
+                },
+                onResetAdjustment: (moment: { id: string }) => {
+                  setProtocolAdjustments((prev) => {
+                    const next = new Map(prev);
+                    next.delete(moment.id);
+                    return next;
+                  });
+                  setDirtyFlags((prev) => ({ ...prev, protocolAdjustments: true }));
+                },
               }}
               style={{
                 position: "absolute",
@@ -1867,7 +1887,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                               opacity: isDragging ? 0.9 : 1,
                             }}
                           >
-                            <span style={{ fontSize: "11px" }}>🚀</span>
+                            <RocketIcon width={12} height={12} style={{ color: "black" }} />
                           </Box>
                         </Tooltip>
                       );
@@ -1922,7 +1942,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                               opacity: isDragging ? 0.9 : 1,
                             }}
                           >
-                            <span style={{ fontSize: "11px" }}>🚀</span>
+                            <RocketIcon width={12} height={12} style={{ color: "black" }} />
                           </Box>
                         </Tooltip>
                       );
@@ -1977,7 +1997,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                               opacity: isDragging ? 0.9 : 1,
                             }}
                           >
-                            <span style={{ fontSize: "11px" }}>🎯</span>
+                            <TargetIcon width={12} height={12} style={{ color: "black" }} />
                           </Box>
                         </Tooltip>
                       );
@@ -2030,7 +2050,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                               opacity: isDragging ? 0.9 : 1,
                             }}
                           >
-                            <span style={{ fontSize: "11px" }}>✅</span>
+                            <CheckCircledIcon width={12} height={12} style={{ color: "black" }} />
                           </Box>
                         </Tooltip>
                       );

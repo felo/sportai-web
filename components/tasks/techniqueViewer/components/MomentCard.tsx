@@ -5,10 +5,12 @@
  *
  * A card component displaying a single "moment" (protocol event, custom event, or video comment)
  * with a frame preview thumbnail, metadata, and action buttons.
+ * 
+ * Design aligned with TaskTile component for consistent library UI.
  */
 
 import { useEffect, useState } from "react";
-import { Box, Flex, Text, Button, Badge, Tooltip } from "@radix-ui/themes";
+import { Box, Flex, Text, Badge, Card, DropdownMenu, Spinner } from "@radix-ui/themes";
 import {
   RocketIcon,
   TargetIcon,
@@ -19,6 +21,9 @@ import {
   MagicWandIcon,
   DragHandleDots2Icon,
   Pencil1Icon,
+  DotsVerticalIcon,
+  TrashIcon,
+  ResetIcon,
 } from "@radix-ui/react-icons";
 import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
 import type { CustomEvent } from "./CustomEventDialog";
@@ -291,6 +296,12 @@ interface MomentCardProps {
   onAnalyse: (moment: Moment) => void;
   /** Whether this card is currently selected */
   isSelected?: boolean;
+  /** Pose confidence for this frame (0-1) - provided by parent from pose data */
+  poseConfidence?: number | null;
+  /** Callback when "Delete marker" is clicked (only for custom events/comments) */
+  onDelete?: (moment: Moment) => void;
+  /** Callback when "Reset adjustment" is clicked (only for adjusted moments) */
+  onResetAdjustment?: (moment: Moment) => void;
 }
 
 // ============================================================================
@@ -357,6 +368,9 @@ export function MomentCard({
   onView,
   onAnalyse,
   isSelected = false,
+  poseConfidence,
+  onDelete,
+  onResetAdjustment,
 }: MomentCardProps) {
   // Initialize from cache if available
   const initialCached = videoElement ? getCachedThumbnail(videoElement.src, moment.frame) : null;
@@ -407,99 +421,89 @@ export function MomentCard({
 
   // Format time display
   const formatTime = (seconds: number) => {
-    return seconds.toFixed(2) + "s";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return mins > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : `${seconds.toFixed(1)}s`;
   };
 
-  // Check if this is a range event (swing)
-  const isRange = moment.endTime !== undefined && moment.endTime !== moment.time;
-  const duration = isRange ? (moment.endTime! - moment.time).toFixed(2) : null;
+  // Use pose confidence if available, otherwise fall back to metadata confidence
+  const confidence = poseConfidence ?? (moment.metadata?.confidence as number | undefined);
 
-  // Extract useful metadata
-  const velocityKmh = moment.metadata?.velocityKmh as number | undefined;
-  const confidence = moment.metadata?.confidence as number | undefined;
-  const orientation = moment.metadata?.loadingPeakOrientation as number | undefined;
-  const contactHeight = moment.metadata?.contactPointHeight as number | undefined;
-  const armHeight = moment.metadata?.armHeight as number | undefined;
+  // Get label for display
+  const typeLabel = moment.protocolId
+    ? getProtocolLabel(moment.protocolId)
+    : moment.type === "comment"
+    ? "Comment"
+    : "Marker";
 
   return (
-    <Box
+    <Card
+      className="moment-card"
       style={{
-        width: "200px",
-        backgroundColor: isSelected ? "var(--accent-a3)" : "rgba(30, 30, 30, 0.9)",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
         border: isSelected
           ? "2px solid var(--accent-9)"
           : moment.isAdjusted
-          ? "2px solid rgba(255, 255, 255, 0.5)"
+          ? "2px solid var(--amber-7)"
           : "1px solid var(--gray-6)",
-        borderRadius: "8px",
         overflow: "hidden",
-        transition: "all 0.2s ease",
-        cursor: "pointer",
+        position: "relative",
       }}
       onClick={() => onView(moment)}
     >
-      {/* Thumbnail Area */}
+      {/* Thumbnail Area - 16:9 aspect ratio like TaskTile */}
       <Box
         style={{
           position: "relative",
-          height: "112px",
+          width: "100%",
+          aspectRatio: "16/9",
           backgroundColor: "var(--gray-3)",
           overflow: "hidden",
         }}
       >
-        {/* Cached thumbnail image */}
-        {thumbnailUrl && (
+        {/* Thumbnail Image */}
+        {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={moment.label}
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              opacity: 1,
             }}
           />
-        )}
-
-        {/* Placeholder when no thumbnail */}
-        {!thumbnailUrl && (
+        ) : (
           <Flex
             align="center"
             justify="center"
-            direction="column"
-            gap="2"
             style={{
-              position: "absolute",
-              inset: 0,
-              background: `linear-gradient(135deg, ${moment.color}20 0%, transparent 50%)`,
+              width: "100%",
+              height: "100%",
+              background: `linear-gradient(135deg, ${moment.color}30 0%, var(--gray-3) 100%)`,
             }}
           >
-            <Box
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                backgroundColor: moment.color,
-                opacity: 0.4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {getMomentIcon(moment)}
-            </Box>
-            {isCapturing && (
-              <Text size="1" style={{ color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
-                Loading...
-              </Text>
+            {isCapturing ? (
+              <Spinner size="2" />
+            ) : (
+              <Box
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "50%",
+                  backgroundColor: `${moment.color}40`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {getMomentIcon(moment)}
+              </Box>
             )}
           </Flex>
         )}
 
-        {/* Type badge */}
+        {/* Type Badge - top left (using marker color) */}
         <Box
           style={{
             position: "absolute",
@@ -518,65 +522,157 @@ export function MomentCard({
           }}
         >
           {getMomentIcon(moment)}
-          <span>
-            {moment.protocolId
-              ? getProtocolLabel(moment.protocolId)
-              : moment.type === "comment"
-              ? "Comment"
-              : "Marker"}
-          </span>
+          <span>{typeLabel}</span>
         </Box>
 
-        {/* Adjusted indicator */}
-        {moment.isAdjusted && (
-          <Tooltip content="Position adjusted by user">
-            <Box
-              style={{
-                position: "absolute",
-                top: "8px",
-                right: "8px",
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                color: "var(--gray-12)",
-                padding: "2px 6px",
-                borderRadius: "4px",
-                fontSize: "10px",
-                fontWeight: 500,
-              }}
-            >
-              Adjusted
-            </Box>
-          </Tooltip>
+        {/* Menu Dropdown - top right (like TaskTile) */}
+        <Box
+          style={{ position: "absolute", top: "8px", right: "8px", zIndex: 10 }}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.6)",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                <DotsVerticalIcon width={16} height={16} color="white" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content>
+              <DropdownMenu.Item onSelect={() => onView(moment)}>
+                <PlayIcon width={14} height={14} />
+                <Text ml="2">View frame</Text>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={() => onAnalyse(moment)}>
+                <MagicWandIcon width={14} height={14} />
+                <Text ml="2">Analyse moment</Text>
+              </DropdownMenu.Item>
+              {/* Reset adjustment - only for adjusted protocol events */}
+              {moment.isAdjusted && onResetAdjustment && (
+                <>
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Item onSelect={() => onResetAdjustment(moment)}>
+                    <ResetIcon width={14} height={14} />
+                    <Text ml="2">Reset adjustment</Text>
+                  </DropdownMenu.Item>
+                </>
+              )}
+              {/* Delete marker - only for custom events and comments */}
+              {(moment.type === "custom" || moment.type === "comment") && onDelete && (
+                <>
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Item color="red" onSelect={() => onDelete(moment)}>
+                    <TrashIcon width={14} height={14} />
+                    <Text ml="2">Delete marker</Text>
+                  </DropdownMenu.Item>
+                </>
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </Box>
+
+        {/* Confidence Badge - bottom left */}
+        {confidence != null && (
+          <Box
+            style={{
+              position: "absolute",
+              bottom: "8px",
+              left: "8px",
+              backgroundColor: confidence >= 0.7 ? "rgba(34, 197, 94, 0.9)" : "rgba(100, 100, 100, 0.9)",
+              padding: "2px 6px",
+              borderRadius: "4px",
+            }}
+          >
+            <Text size="1" style={{ color: "white", fontWeight: 500 }}>
+              {(confidence * 100).toFixed(0)}%
+            </Text>
+          </Box>
         )}
 
-        {/* Time overlay */}
+        {/* Duration/Time Badge - bottom right (like TaskTile) */}
         <Box
           style={{
             position: "absolute",
             bottom: "8px",
             right: "8px",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            color: "white",
+            backgroundColor: "rgba(0,0,0,0.75)",
             padding: "2px 6px",
             borderRadius: "4px",
-            fontSize: "11px",
-            fontFamily: "monospace",
           }}
         >
-          {formatTime(moment.time)}
-          {isRange && ` - ${formatTime(moment.endTime!)}`}
+          <Text size="1" style={{ color: "white", fontWeight: 500 }}>
+            {formatTime(moment.time)}
+          </Text>
         </Box>
+
+        {/* Play Overlay - appears on hover (like TaskTile) */}
+        <Flex
+          align="center"
+          justify="center"
+          className="play-overlay"
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.3)",
+            opacity: 0,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          <Box
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              backgroundColor: "var(--mint-9)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            }}
+          >
+            <PlayIcon width={24} height={24} color="white" />
+          </Box>
+        </Flex>
       </Box>
 
-      {/* Content Area */}
-      <Box style={{ padding: "12px" }}>
-        {/* Label */}
+      {/* Content Area - structured like TaskTile */}
+      <Flex direction="column" gap="2" p="3">
+        {/* Status row with badges */}
+        <Flex justify="between" align="center">
+          <Flex align="center" gap="2">
+            {/* Adjusted indicator */}
+            {moment.isAdjusted && (
+              <Badge color="amber" variant="soft" size="1">
+                Adjusted
+              </Badge>
+            )}
+            {/* Parent swing context */}
+            {moment.parentSwingLabel && (
+              <Badge color="blue" variant="soft" size="1">
+                {moment.parentSwingLabel}
+              </Badge>
+            )}
+          </Flex>
+        </Flex>
+
+        {/* Title - moment label */}
         <Text
           size="2"
           weight="medium"
           style={{
-            color: "white",
-            display: "block",
-            marginBottom: "4px",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -584,92 +680,21 @@ export function MomentCard({
         >
           {moment.label}
         </Text>
+      </Flex>
 
-        {/* Frame info */}
-        <Text size="1" style={{ color: "rgba(255,255,255,0.5)", display: "block" }}>
-          Frame #{moment.frame}
-          {isRange && ` - #${moment.endFrame}`}
-        </Text>
+      {/* Hover styles - matching TaskTile */}
+      <style jsx>{`
+        :global(.moment-card:hover) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+          border-color: var(--mint-9) !important;
+        }
 
-        {/* Parent swing context */}
-        {moment.parentSwingLabel && (
-          <Text
-            size="1"
-            style={{
-              color: "var(--blue-9)",
-              display: "block",
-              marginTop: "2px",
-            }}
-          >
-            {moment.parentSwingLabel}
-          </Text>
-        )}
-
-        {/* Metadata */}
-        {((velocityKmh != null && velocityKmh >= 20) || confidence != null || orientation != null || contactHeight != null || armHeight != null || duration) && (
-          <Flex gap="2" wrap="wrap" style={{ marginTop: "8px" }}>
-            {velocityKmh != null && velocityKmh >= 20 && (
-              <Badge size="1" color="blue">
-                {velocityKmh.toFixed(0)} km/h
-              </Badge>
-            )}
-            {duration && (
-              <Badge size="1" color="gray">
-                {duration}s
-              </Badge>
-            )}
-            {orientation != null && (
-              <Badge size="1" color="amber">
-                {orientation.toFixed(0)}°
-              </Badge>
-            )}
-            {contactHeight != null && (
-              <Badge size="1" color="yellow">
-                {contactHeight.toFixed(1)}x
-              </Badge>
-            )}
-            {armHeight != null && (
-              <Badge size="1" color="orange">
-                {armHeight.toFixed(1)}x
-              </Badge>
-            )}
-            {confidence != null && (
-              <Badge size="1" color={confidence >= 0.7 ? "green" : "gray"}>
-                {(confidence * 100).toFixed(0)}%
-              </Badge>
-            )}
-          </Flex>
-        )}
-
-        {/* Action buttons */}
-        <Flex gap="2" style={{ marginTop: "12px" }}>
-          <Button
-            size="1"
-            variant="soft"
-            onClick={(e) => {
-              e.stopPropagation();
-              onView(moment);
-            }}
-            style={{ flex: 1 }}
-          >
-            <PlayIcon width={12} height={12} />
-            View
-          </Button>
-          <Button
-            size="1"
-            variant="solid"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAnalyse(moment);
-            }}
-            style={{ flex: 1 }}
-          >
-            <MagicWandIcon width={12} height={12} />
-            Analyse
-          </Button>
-        </Flex>
-      </Box>
-    </Box>
+        :global(.moment-card:hover .play-overlay) {
+          opacity: 1 !important;
+        }
+      `}</style>
+    </Card>
   );
 }
 

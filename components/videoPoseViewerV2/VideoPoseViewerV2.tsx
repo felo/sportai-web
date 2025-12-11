@@ -1286,7 +1286,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               endFrame: swing.trophyFrame,
               startTime: swing.trophyTimestamp,
               endTime: swing.trophyTimestamp,
-              label: `Prep ${i + 1} (${swing.trophyArmHeight?.toFixed(1)}x)`,
+              label: `Prep ${i + 1}`,
               color: "#F59E0B", // Amber color for preparation
               metadata: {
                 swingType: swing.swingType,
@@ -1309,7 +1309,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               endFrame: swing.contactPointFrame,
               startTime: swing.contactPointTimestamp,
               endTime: swing.contactPointTimestamp,
-              label: `Contact ${i + 1} (${swing.contactPointHeight?.toFixed(1)}x)`,
+              label: `Contact ${i + 1}`,
               color: "#FFE66D", // Yellow/gold color for contact point
               metadata: {
                 swingType: swing.swingType,
@@ -1906,6 +1906,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             protocolAdjustments={momentsConfig.protocolAdjustments}
             swingBoundaryAdjustments={momentsConfig.swingBoundaryAdjustments}
             videoElement={videoRef.current}
+            poseData={preprocessedPoses}
             onViewMoment={(time) => {
               momentsConfig.onViewMoment?.(time);
               // Also seek within this viewer
@@ -1919,6 +1920,12 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             }}
             onAnalyseMoment={(moment) => {
               momentsConfig.onAnalyseMoment?.(moment);
+            }}
+            onDeleteMoment={(moment) => {
+              momentsConfig.onDeleteMoment?.(moment);
+            }}
+            onResetAdjustment={(moment) => {
+              momentsConfig.onResetAdjustment?.(moment);
             }}
           />
         )}

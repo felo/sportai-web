@@ -106,13 +106,16 @@ const TECHNIQUE_PRO_FEATURES: FeatureInfo[] = [
 // Typewriter Hook
 // ============================================================================
 
+const TYPEWRITER_STORAGE_KEY = "analysis-options-intro-typed";
+
 function useTypewriter(text: string, speed: number = 30, enabled: boolean = true): string {
-  const [displayText, setDisplayText] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayText, setDisplayText] = useState(() => (enabled ? "" : text));
+  const [currentIndex, setCurrentIndex] = useState(() => (enabled ? 0 : text.length));
 
   useEffect(() => {
     if (!enabled) {
       setDisplayText(text);
+      setCurrentIndex(text.length);
       return;
     }
 
@@ -126,10 +129,16 @@ function useTypewriter(text: string, speed: number = 30, enabled: boolean = true
   }, [currentIndex, text, speed, enabled]);
 
   useEffect(() => {
-    // Reset when text changes
-    setDisplayText("");
-    setCurrentIndex(0);
-  }, [text]);
+    // Reset when text or enabled flag changes
+    if (enabled) {
+      setDisplayText("");
+      setCurrentIndex(0);
+      return;
+    }
+
+    setDisplayText(text);
+    setCurrentIndex(text.length);
+  }, [text, enabled]);
 
   return displayText;
 }
@@ -186,6 +195,7 @@ export function AnalysisOptionsMessage({
   isLoading = false,
   selectedOption = null,
 }: AnalysisOptionsMessageProps) {
+  const [shouldTypewriterRun, setShouldTypewriterRun] = useState<boolean | null>(null);
   const [showBoxes, setShowBoxes] = useState(false);
   const [showButtons, setShowButtons] = useState(false);
 
@@ -215,11 +225,31 @@ export function AnalysisOptionsMessage({
     return msg;
   }, [sportName, cameraLabel, analysisType]);
 
-  const typedIntro = useTypewriter(introMessage, 18, true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hasSeenIntro = localStorage.getItem(TYPEWRITER_STORAGE_KEY) === "true";
+    setShouldTypewriterRun(!hasSeenIntro);
+
+    if (!hasSeenIntro) {
+      localStorage.setItem(TYPEWRITER_STORAGE_KEY, "true");
+    }
+  }, []);
+
+  const typedIntro = useTypewriter(introMessage, 18, shouldTypewriterRun === true);
+  const introText = shouldTypewriterRun === null
+    ? ""
+    : shouldTypewriterRun
+      ? typedIntro
+      : introMessage;
 
   // Trigger animations after intro finishes
   useEffect(() => {
-    const introDelay = introMessage.length * 18 + 300;
+    if (shouldTypewriterRun === null) return;
+
+    const introDelay = shouldTypewriterRun
+      ? introMessage.length * 18 + 300
+      : 300;
     const boxesTimer = setTimeout(() => setShowBoxes(true), introDelay);
     const buttonsTimer = setTimeout(() => setShowButtons(true), introDelay + 600);
     
@@ -227,7 +257,7 @@ export function AnalysisOptionsMessage({
       clearTimeout(boxesTimer);
       clearTimeout(buttonsTimer);
     };
-  }, [introMessage]);
+  }, [introMessage, shouldTypewriterRun]);
 
   const isEligible = preAnalysis.isProEligible || preAnalysis.isTechniqueLiteEligible;
   const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
@@ -237,9 +267,11 @@ export function AnalysisOptionsMessage({
       {isEligible ? (
         <>
           {/* Intro message with typewriter effect */}
-          <p className="text-base leading-relaxed mb-4" style={{ color: "var(--gray-12)" }}>
-            {typedIntro}
-          </p>
+          {introText && (
+            <p className="text-base leading-relaxed mb-4" style={{ color: "var(--gray-12)" }}>
+              {introText}
+            </p>
+          )}
 
           {/* Estimated time note - only for tactical analysis */}
           {!isTechniqueAnalysis && (
