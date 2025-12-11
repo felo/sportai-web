@@ -7,7 +7,7 @@
  * with a frame preview thumbnail, metadata, and action buttons.
  */
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Box, Flex, Text, Button, Badge, Tooltip } from "@radix-ui/themes";
 import {
   RocketIcon,
@@ -25,107 +25,196 @@ import type { CustomEvent } from "./CustomEventDialog";
 import type { VideoComment } from "./VideoCommentDialog";
 
 // ============================================================================
-// Thumbnail Cache (module-level, persists across component instances)
+// Thumbnail Cache & Queue (module-level, persists across component instances)
 // ============================================================================
 
-// Cache key: "videoSrc:frame" -> data URL
+const DEBUG = true;
+function log(...args: unknown[]) {
+  if (DEBUG) console.log("[Thumbnails]", ...args);
+}
+
+// Cache: "videoSrc:frame" -> data URL
 const thumbnailCache = new Map<string, string>();
 
-// Track ongoing captures to prevent duplicate requests
-const pendingCaptures = new Map<string, Promise<string | null>>();
+// Pending promises: components waiting for their thumbnail
+const pendingCallbacks = new Map<string, Array<(url: string) => void>>();
+
+// Queue for sequential capture
+type CaptureRequest = {
+  key: string;
+  time: number;
+  frame: number;
+};
+let captureQueue: CaptureRequest[] = [];
+let isProcessingQueue = false;
+let currentVideoElement: HTMLVideoElement | null = null;
 
 function getCacheKey(videoSrc: string, frame: number): string {
-  // Use video src + frame as cache key
-  // Extract just the filename/key part to keep cache keys reasonable
   const srcKey = videoSrc.split("/").pop() || videoSrc.slice(-50);
   return `${srcKey}:${frame}`;
 }
 
-async function captureFrameThumbnail(
+// Get cached thumbnail (sync)
+function getCachedThumbnail(videoSrc: string, frame: number): string | null {
+  const key = getCacheKey(videoSrc, frame);
+  return thumbnailCache.get(key) ?? null;
+}
+
+// Request thumbnail capture - returns a promise that resolves when ready
+function requestThumbnailCapture(
   videoElement: HTMLVideoElement,
   time: number,
   frame: number
 ): Promise<string | null> {
-  const cacheKey = getCacheKey(videoElement.src, frame);
+  const key = getCacheKey(videoElement.src, frame);
+  log(`Request: frame=${frame}, key=${key}`);
 
-  // Check cache first
-  if (thumbnailCache.has(cacheKey)) {
-    return thumbnailCache.get(cacheKey)!;
+  // Already cached - return immediately
+  if (thumbnailCache.has(key)) {
+    log(`  -> Already cached`);
+    return Promise.resolve(thumbnailCache.get(key)!);
   }
 
-  // Check if capture is already in progress
-  if (pendingCaptures.has(cacheKey)) {
-    return pendingCaptures.get(cacheKey)!;
+  // Create promise for this request
+  return new Promise((resolve) => {
+    // Add callback to pending list
+    if (!pendingCallbacks.has(key)) {
+      pendingCallbacks.set(key, []);
+    }
+    pendingCallbacks.get(key)!.push(resolve);
+    log(`  -> Added callback, total waiting: ${pendingCallbacks.get(key)!.length}`);
+
+    // Add to queue if not already there
+    if (!captureQueue.some(r => r.key === key)) {
+      captureQueue.push({ key, time, frame });
+      log(`  -> Added to queue, queue length: ${captureQueue.length}`);
+      currentVideoElement = videoElement;
+      processQueue();
+    } else {
+      log(`  -> Already in queue`);
+    }
+  });
+}
+
+async function processQueue() {
+  if (isProcessingQueue) {
+    log(`processQueue: Already processing, returning`);
+    return;
+  }
+  if (captureQueue.length === 0) {
+    log(`processQueue: Queue empty, returning`);
+    return;
+  }
+  if (!currentVideoElement) {
+    log(`processQueue: No video element, returning`);
+    return;
   }
 
-  // Create capture promise
-  const capturePromise = (async () => {
+  isProcessingQueue = true;
+  const videoElement = currentVideoElement;
+  log(`processQueue: Starting, queue length: ${captureQueue.length}`);
+
+  // Store original state
+  const originalTime = videoElement.currentTime;
+  const wasPlaying = !videoElement.paused;
+  log(`  Original state: time=${originalTime.toFixed(2)}, playing=${wasPlaying}`);
+
+  if (wasPlaying) {
+    videoElement.pause();
+  }
+
+  // Process all requests
+  let processed = 0;
+  while (captureQueue.length > 0) {
+    const request = captureQueue.shift()!;
+    log(`  Processing: frame=${request.frame}, remaining: ${captureQueue.length}`);
+
+    // Skip if already cached
+    if (thumbnailCache.has(request.key)) {
+      log(`    -> Already cached, notifying callbacks`);
+      notifyCallbacks(request.key, thumbnailCache.get(request.key)!);
+      continue;
+    }
+
     try {
-      // Store current state
-      const originalTime = videoElement.currentTime;
-      const wasPlaying = !videoElement.paused;
+      // Seek to frame
+      log(`    -> Seeking to ${request.time.toFixed(2)}s`);
+      videoElement.currentTime = request.time;
 
-      if (wasPlaying) {
-        videoElement.pause();
-      }
-
-      // Seek to the moment's time
-      videoElement.currentTime = time;
-
-      // Wait for the seek to complete
+      // Wait for seek
       await new Promise<void>((resolve) => {
+        let resolved = false;
         const handleSeeked = () => {
-          videoElement.removeEventListener("seeked", handleSeeked);
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            videoElement.removeEventListener("seeked", handleSeeked);
+            log(`    -> Seeked event received`);
+            resolve();
+          }
         };
         videoElement.addEventListener("seeked", handleSeeked);
-        // Timeout fallback
         setTimeout(() => {
-          videoElement.removeEventListener("seeked", handleSeeked);
-          resolve();
-        }, 500);
+          if (!resolved) {
+            resolved = true;
+            videoElement.removeEventListener("seeked", handleSeeked);
+            log(`    -> Seek timeout`);
+            resolve();
+          }
+        }, 200);
       });
 
-      // Create offscreen canvas for capture
+      // Small delay for frame render
+      await new Promise(r => setTimeout(r, 50));
+
+      // Capture
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
-
-      // Set thumbnail dimensions (small for cache efficiency)
-      const aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
-      canvas.width = 200;
-      canvas.height = Math.round(200 / aspectRatio);
-
-      // Draw the frame
-      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-      // Convert to data URL (JPEG for smaller size)
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-
-      // Store in cache
-      thumbnailCache.set(cacheKey, dataUrl);
-
-      // Restore original time
-      videoElement.currentTime = originalTime;
-
-      if (wasPlaying) {
-        videoElement.play();
+      if (ctx && videoElement.videoWidth > 0) {
+        const aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
+        canvas.width = 200;
+        canvas.height = Math.round(200 / aspectRatio);
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        thumbnailCache.set(request.key, dataUrl);
+        log(`    -> Captured and cached`);
+        
+        // Notify waiting components
+        notifyCallbacks(request.key, dataUrl);
+        processed++;
+      } else {
+        log(`    -> Failed: no context or video not ready`);
+        notifyCallbacks(request.key, null as unknown as string);
       }
-
-      return dataUrl;
     } catch (error) {
-      console.error("[MomentCard] Failed to capture thumbnail:", error);
-      return null;
-    } finally {
-      // Remove from pending
-      pendingCaptures.delete(cacheKey);
+      log(`    -> Error:`, error);
+      notifyCallbacks(request.key, null as unknown as string);
     }
-  })();
+  }
 
-  // Store in pending
-  pendingCaptures.set(cacheKey, capturePromise);
+  // Restore original state
+  log(`  Restoring: time=${originalTime.toFixed(2)}, playing=${wasPlaying}`);
+  videoElement.currentTime = originalTime;
+  if (wasPlaying) {
+    videoElement.play();
+  }
 
-  return capturePromise;
+  log(`processQueue: Done, processed ${processed} items`);
+  isProcessingQueue = false;
+  
+  // Check if more items were added while processing
+  if (captureQueue.length > 0) {
+    log(`  More items in queue, scheduling next run`);
+    setTimeout(processQueue, 10);
+  }
+}
+
+function notifyCallbacks(key: string, url: string) {
+  const callbacks = pendingCallbacks.get(key);
+  if (callbacks && callbacks.length > 0) {
+    log(`  Notifying ${callbacks.length} callbacks for ${key}`);
+    callbacks.forEach(cb => cb(url));
+    pendingCallbacks.delete(key);
+  }
 }
 
 // ============================================================================
@@ -243,44 +332,60 @@ export function MomentCard({
   onAnalyse,
   isSelected = false,
 }: MomentCardProps) {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const captureAttempted = useRef(false);
+  // Initialize from cache if available
+  const initialCached = videoElement ? getCachedThumbnail(videoElement.src, moment.frame) : null;
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initialCached);
+  const [isCapturing, setIsCapturing] = useState(!initialCached);
 
-  // Check cache and capture thumbnail if needed
+  // Request capture if not cached
   useEffect(() => {
-    if (!videoElement || videoElement.readyState < 2) return;
-    if (captureAttempted.current) return;
-
-    const cacheKey = getCacheKey(videoElement.src, moment.frame);
-
-    // Check cache first (sync)
-    if (thumbnailCache.has(cacheKey)) {
-      setThumbnailUrl(thumbnailCache.get(cacheKey)!);
+    // Already have thumbnail
+    if (thumbnailUrl) {
+      log(`MomentCard[${moment.frame}]: Already have thumbnail`);
+      return;
+    }
+    
+    if (!videoElement) {
+      log(`MomentCard[${moment.frame}]: No video element`);
       return;
     }
 
-    // Mark as attempted to prevent re-runs
-    captureAttempted.current = true;
-    setIsCapturing(true);
-
-    // Capture with small random delay to stagger captures
-    const delay = 50 + Math.random() * 150;
-    const timeout = setTimeout(async () => {
-      const url = await captureFrameThumbnail(videoElement, moment.time, moment.frame);
-      if (url) {
-        setThumbnailUrl(url);
-      }
+    // Check cache again
+    const cached = getCachedThumbnail(videoElement.src, moment.frame);
+    if (cached) {
+      log(`MomentCard[${moment.frame}]: Found in cache on effect run`);
+      setThumbnailUrl(cached);
       setIsCapturing(false);
-    }, delay);
+      return;
+    }
 
-    return () => clearTimeout(timeout);
-  }, [videoElement, moment.time, moment.frame]);
+    if (videoElement.readyState < 2) {
+      log(`MomentCard[${moment.frame}]: Video not ready (readyState=${videoElement.readyState})`);
+      return;
+    }
 
-  // Reset capture flag if moment changes significantly
-  useEffect(() => {
-    captureAttempted.current = false;
-  }, [moment.id]);
+    // Request capture - promise will resolve when ready
+    log(`MomentCard[${moment.frame}]: Requesting capture`);
+    setIsCapturing(true);
+    let cancelled = false;
+
+    requestThumbnailCapture(videoElement, moment.time, moment.frame)
+      .then((url) => {
+        if (!cancelled && url) {
+          log(`MomentCard[${moment.frame}]: Promise resolved with thumbnail`);
+          setThumbnailUrl(url);
+          setIsCapturing(false);
+        } else if (!cancelled) {
+          log(`MomentCard[${moment.frame}]: Promise resolved with null`);
+          setIsCapturing(false);
+        }
+      });
+
+    return () => {
+      log(`MomentCard[${moment.frame}]: Cleanup, setting cancelled=true`);
+      cancelled = true;
+    };
+  }, [videoElement, moment.time, moment.frame, thumbnailUrl]);
 
   // Format time display
   const formatTime = (seconds: number) => {
@@ -346,6 +451,8 @@ export function MomentCard({
           <Flex
             align="center"
             justify="center"
+            direction="column"
+            gap="2"
             style={{
               position: "absolute",
               inset: 0,
@@ -354,19 +461,23 @@ export function MomentCard({
           >
             <Box
               style={{
-                width: "40px",
-                height: "40px",
+                width: "36px",
+                height: "36px",
                 borderRadius: "50%",
                 backgroundColor: moment.color,
-                opacity: isCapturing ? 0.5 : 0.3,
+                opacity: 0.4,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                animation: isCapturing ? "pulse 1s infinite" : undefined,
               }}
             >
               {getMomentIcon(moment)}
             </Box>
+            {isCapturing && (
+              <Text size="1" style={{ color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
+                Loading...
+              </Text>
+            )}
           </Flex>
         )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { EnterFullScreenIcon, ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
+import { ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -28,9 +28,6 @@ const THEATRE_BASE_HEIGHT = Math.round(STANDARD_BASE_HEIGHT * THEATRE_SCALE);
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 800;
 const MAX_HEIGHT = 700; // Accommodate tall portrait videos in theatre mode
-
-// Minimized size
-const MINIMIZED_SIZE = 56;
 
 const EDGE_PADDING = 16;
 const HEADER_OFFSET = 80;
@@ -120,7 +117,6 @@ export function FloatingVideoPortal() {
   // Calculate dimensions that ALWAYS respect the video's aspect ratio
   // Theatre mode scales up proportionally while maintaining the same aspect ratio
   const getDimensions = (): { width: number; height: number } => {
-    if (isMinimized) return { width: MINIMIZED_SIZE, height: MINIMIZED_SIZE };
     if (customSize) return customSize;
     
     const aspectRatio = getAspectRatio();
@@ -423,52 +419,15 @@ export function FloatingVideoPortal() {
     };
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
-  const handleMinimizeToggle = useCallback((e: React.MouseEvent) => {
+  // Minimize the floating video - the ChatNavigationButtons video button will appear
+  const handleMinimize = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const newMinimized = !isMinimized;
-    setIsMinimized(newMinimized);
-    
-    // Calculate dimensions immediately (not in setTimeout) to avoid stale closure issues
-    let newWidth: number;
-    let newHeight: number;
-    
-    if (newMinimized) {
-      newWidth = MINIMIZED_SIZE;
-      newHeight = MINIMIZED_SIZE;
-    } else if (customSize) {
-      newWidth = customSize.width;
-      newHeight = customSize.height;
-    } else {
-      // Calculate expanded dimensions based on aspect ratio
-      const aspectRatio = getAspectRatio();
-      const isPortrait = aspectRatio < 1;
-      
-      if (isPortrait) {
-        const baseHeight = theatreMode ? THEATRE_BASE_HEIGHT : STANDARD_BASE_HEIGHT;
-        newHeight = Math.min(MAX_HEIGHT, baseHeight);
-        newWidth = newHeight * aspectRatio;
-        if (newWidth < MIN_WIDTH) {
-          newWidth = MIN_WIDTH;
-          newHeight = newWidth / aspectRatio;
-        }
-      } else {
-        const baseWidth = theatreMode ? THEATRE_BASE_WIDTH : STANDARD_BASE_WIDTH;
-        newWidth = Math.min(MAX_WIDTH, baseWidth);
-        newHeight = newWidth / aspectRatio;
-        if (newHeight > MAX_HEIGHT) {
-          newHeight = MAX_HEIGHT;
-          newWidth = newHeight * aspectRatio;
-        }
-      }
-      newWidth = Math.round(newWidth);
-      newHeight = Math.round(newHeight);
-    }
-    
-    const pos = getCornerPosition(dockedCorner, newWidth, newHeight);
-    setPosition(pos);
-  }, [isMinimized, theatreMode, dockedCorner, customSize, setIsMinimized, setPosition, activeVideoId, registeredVideos]);
+    setIsMinimized(true);
+  }, [setIsMinimized]);
 
-  if (!mounted || !isFloating || !activeVideoId) {
+  // Don't render if not mounted, not floating, no active video, or minimized
+  // When minimized, the ChatNavigationButtons video button takes over
+  if (!mounted || !isFloating || !activeVideoId || isMinimized) {
     return null;
   }
 
@@ -492,9 +451,9 @@ export function FloatingVideoPortal() {
         width,
         height,
         zIndex: 50,
-        borderRadius: isMinimized ? "50%" : "8px",
+        borderRadius: "8px",
         overflow: "hidden",
-        border: isMinimized ? "2px solid white" : "1px solid #7ADB8F",
+        border: "1px solid #7ADB8F",
         boxShadow: `
           0 0 10px rgba(122, 219, 143, 0.3),
           0 0 20px rgba(122, 219, 143, 0.2),
@@ -516,10 +475,7 @@ export function FloatingVideoPortal() {
       onMouseLeave={handleMouseLeave}
       onClick={handleTap}
     >
-      {/* Video content */}
-      {!isMinimized && (
-        <>
-          {/* Dedicated drag zone at top - always active */}
+      {/* Dedicated drag zone at top - always active */}
           <Box
             style={{
               position: "absolute",
@@ -623,7 +579,7 @@ export function FloatingVideoPortal() {
                   width: 28,
                   height: 28,
                 }}
-                onClick={handleMinimizeToggle}
+                onClick={handleMinimize}
               >
                 <ExitFullScreenIcon width={14} height={14} />
               </IconButton>
@@ -695,28 +651,6 @@ export function FloatingVideoPortal() {
               </Box>
             );
           })}
-        </>
-      )}
-
-      {/* Minimized state - circular button */}
-      {isMinimized && (
-        <Tooltip content="Expand floating video">
-          <Box
-            style={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#7ADB8F",
-              cursor: "pointer",
-            }}
-            onClick={handleMinimizeToggle}
-          >
-            <EnterFullScreenIcon style={{ color: "#1a1a1a", width: 20, height: 20 }} />
-          </Box>
-        </Tooltip>
-      )}
     </Box>
   );
 

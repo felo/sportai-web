@@ -27,6 +27,7 @@ export type { FeedbackData } from "./feedback/FeedbackModal";
 export { ScrollToBottom } from "./navigation/ScrollToBottom";
 export { ScrollToVideo } from "./navigation/ScrollToVideo";
 export { ShowFloatingVideo } from "./navigation/ShowFloatingVideo";
+export { ChatNavigationButtons } from "./navigation/ChatNavigationButtons";
 
 // Overlays
 export { DragOverlay } from "./overlays/DragOverlay";

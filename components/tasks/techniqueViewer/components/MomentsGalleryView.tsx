@@ -133,9 +133,13 @@ export function MomentsGalleryView({
   // Convert all events to unified Moment format
   const allMoments = useMemo(() => {
     const moments: Moment[] = [];
+    const seenIds = new Set<string>();
 
-    // Add protocol events
+    // Add protocol events (with deduplication)
     protocolEvents.forEach((event) => {
+      // Skip if we've already seen this ID
+      if (seenIds.has(event.id)) return;
+      seenIds.add(event.id);
       const isSwing = event.protocolId === "swing-detection-v3";
       const effectiveTime = getEffectiveTime(event);
       const effectiveFrame = getEffectiveFrame(event);
@@ -173,8 +177,11 @@ export function MomentsGalleryView({
       });
     });
 
-    // Add custom events
+    // Add custom events (with deduplication)
     customEvents.forEach((event) => {
+      if (seenIds.has(event.id)) return;
+      seenIds.add(event.id);
+      
       moments.push({
         id: event.id,
         type: "custom",
@@ -186,8 +193,11 @@ export function MomentsGalleryView({
       });
     });
 
-    // Add video comments
+    // Add video comments (with deduplication)
     videoComments.forEach((comment) => {
+      if (seenIds.has(comment.id)) return;
+      seenIds.add(comment.id);
+      
       moments.push({
         id: comment.id,
         type: "comment",
