@@ -10,7 +10,7 @@ export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  messageType?: "standard" | "analysis_options"; // Type of message (default is standard)
+  messageType?: "standard" | "analysis_options" | "technique_studio_prompt"; // Type of message (default is standard)
   videoFile?: File | null;
   videoPreview?: string | null;
   videoUrl?: string | null; // S3 URL for video playback
@@ -74,6 +74,11 @@ export type Message = {
   poseDataS3Key?: string | null; // S3 key for preprocessed pose detection data
   // Technique LITE eligibility - enables pose preprocessing when true (side camera + < 20s)
   isTechniqueLiteEligible?: boolean;
+  // Technique Studio prompt (for messageType === "technique_studio_prompt")
+  techniqueStudioPrompt?: {
+    videoUrl: string;
+    taskId?: string; // If a technique task was already created
+  };
 };
 
 export type Chat = {

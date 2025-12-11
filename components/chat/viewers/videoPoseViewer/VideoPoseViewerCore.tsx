@@ -13,6 +13,7 @@ import {
   EnterFullScreenIcon,
   ExitFullScreenIcon,
   ExternalLinkIcon,
+  CameraIcon,
 } from "@radix-ui/react-icons";
 import { detectionLogger } from "@/lib/logger";
 import { usePoseDetection, type SupportedModel } from "@/hooks/usePoseDetection";
@@ -53,7 +54,6 @@ import {
   ObjectDetectionSettingsPanel,
   ProjectileDetectionSettingsPanel,
   FrameAnalysisSettingsPanel,
-  KeyFrameTimeline,
   AnglesDropdownMenu,
   StatsOverlay,
   Pose3DSection,
@@ -532,11 +532,15 @@ export function VideoPoseViewer({
     });
 
   // Canvas drawing hook
+  // Hide pose overlay during preprocessing - user shouldn't see the scanning
+  const drawingPoses = preprocessing.isBackgroundPreprocessing ? [] : displayPoses;
+  const drawingSelectedPose = preprocessing.isBackgroundPreprocessing ? null : selectedPose;
+  
   useCanvasDrawing({
     canvasRef,
     videoRef,
-    currentPoses: displayPoses,
-    selectedPose,
+    currentPoses: drawingPoses,
+    selectedPose: drawingSelectedPose,
     selectedModel,
     showSkeleton,
     showFaceLandmarks,
@@ -778,6 +782,25 @@ export function VideoPoseViewer({
     syncPoses();
     return () => { if (rafId) cancelAnimationFrame(rafId); };
   }, [preprocessing.usePreprocessing, isPlaying, preprocessing.preprocessingFPS, preprocessing.preprocessedPoses]);
+
+  // Sync poses when user seeks/scrubs the timeline (works when paused)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !preprocessing.usePreprocessing) return;
+
+    const handleSeeked = () => {
+      const frame = Math.floor(video.currentTime * preprocessing.preprocessingFPS);
+      if (preprocessing.preprocessedPoses.has(frame)) {
+        const poses = preprocessing.preprocessedPoses.get(frame);
+        if (poses?.length) {
+          setCurrentPoses(poses);
+        }
+      }
+    };
+
+    video.addEventListener("seeked", handleSeeked);
+    return () => video.removeEventListener("seeked", handleSeeked);
+  }, [preprocessing.usePreprocessing, preprocessing.preprocessingFPS, preprocessing.preprocessedPoses]);
 
   // Auto-play
   useEffect(() => {
@@ -1355,6 +1378,17 @@ export function VideoPoseViewer({
                       <ChevronRightIcon width="16" height="16" />
                     </Button>
                   </Tooltip>
+                  <Tooltip content="Frame Insight – Analyze this frame with AI">
+                    <Button
+                      onClick={handleImageInsight}
+                      disabled={isImageInsightLoading || !selectedPose}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{ opacity: selectedPose ? 1 : 0.5 }}
+                    >
+                      {isImageInsightLoading ? <Spinner size="1" /> : <CameraIcon width="16" height="16" />}
+                    </Button>
+                  </Tooltip>
                   <AnglesDropdownMenu
                     measuredAngles={measuredAngles}
                     isOpen={angleMenuOpen}
@@ -1384,6 +1418,17 @@ export function VideoPoseViewer({
                       <ChevronRightIcon width="16" height="16" />
                     </Button>
                   </Tooltip>
+                  <Tooltip content="Frame Insight – Analyze this frame with AI">
+                    <Button
+                      onClick={handleImageInsight}
+                      disabled={isImageInsightLoading || !selectedPose}
+                      className={buttonStyles.actionButtonSquare}
+                      size="2"
+                      style={{ opacity: selectedPose ? 1 : 0.5 }}
+                    >
+                      {isImageInsightLoading ? <Spinner size="1" /> : <CameraIcon width="16" height="16" />}
+                    </Button>
+                  </Tooltip>
                   <AnglesDropdownMenu
                     measuredAngles={measuredAngles}
                     isOpen={angleMenuOpen}
@@ -1394,32 +1439,6 @@ export function VideoPoseViewer({
                 </>
               )}
             </Flex>
-
-            {/* Key Frame Timeline */}
-            {!preprocessing.isPreprocessing && preprocessing.usePreprocessing && (
-              <KeyFrameTimeline
-                videoRef={videoRef}
-                selectedProtocol={selectedProtocol}
-                trophyResult={trophyResult}
-                contactResult={contactResult}
-                landingResult={landingResult}
-                swingResult={swingResult}
-                swingV2Result={swingV2Result}
-                isTrophyAnalyzing={isTrophyAnalyzing}
-                isContactAnalyzing={isContactAnalyzing}
-                isLandingAnalyzing={isLandingAnalyzing}
-                isSwingAnalyzing={isSwingAnalyzing}
-                isSwingV2Analyzing={isSwingV2Analyzing}
-                onDetectTrophy={handleDetectTrophy}
-                onDetectContact={handleDetectContact}
-                onDetectLanding={handleDetectLanding}
-                onDetectSwings={detectSwings}
-                onDetectSwingsV2={detectSwingsV2}
-                onImageInsight={handleImageInsight}
-                isImageInsightLoading={isImageInsightLoading}
-                hasPose={!!selectedPose}
-              />
-            )}
 
             {/* Advanced Settings */}
             <CollapsibleSection

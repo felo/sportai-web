@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Button, DropdownMenu, Text, Tooltip } from "@radix-ui/themes";
-import { RulerSquareIcon } from "@radix-ui/react-icons";
+import { AngleIcon } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
 
 export interface AnglesDropdownMenuProps {
@@ -60,7 +60,7 @@ export function AnglesDropdownMenu({
                 opacity: measuredAngles.length > 0 ? 1 : 0.5,
               }}
             >
-              <RulerSquareIcon width="16" height="16" />
+              <AngleIcon width="16" height="16" />
             </Button>
           </DropdownMenu.Trigger>
         </Tooltip>

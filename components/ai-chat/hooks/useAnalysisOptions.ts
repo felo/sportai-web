@@ -53,7 +53,8 @@ export function useAnalysisOptions({
     optionsMessageId: string, 
     sport: string,
     storedVideoUrl?: string,
-    storedUserPrompt?: string
+    storedUserPrompt?: string,
+    options?: { showTechniqueStudioPrompt?: boolean; taskId?: string }
   ) => {
     let videoUrl: string | null = storedVideoUrl || null;
     let userPrompt = storedUserPrompt || "";
@@ -152,6 +153,24 @@ export function useAnalysisOptions({
           content: stripStreamMetadata(accumulatedText),
           isStreaming: false,
         });
+        
+        // Add Technique Studio prompt if requested and video URL is available
+        if (options?.showTechniqueStudioPrompt && videoUrl) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          const studioPromptId = generateMessageId();
+          const studioPromptMessage: Message = {
+            id: studioPromptId,
+            role: "assistant",
+            content: "",
+            messageType: "technique_studio_prompt",
+            techniqueStudioPrompt: {
+              videoUrl: videoUrl,
+              taskId: options.taskId,
+            },
+          };
+          addMessage(studioPromptMessage);
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -219,6 +238,7 @@ export function useAnalysisOptions({
     
     // Create PRO analysis task
     let taskCreated = false;
+    let createdTaskId: string | undefined;
     if (user) {
       try {
         analysisLogger.info(`Creating PRO ${taskType} task for URL:`, videoUrl);
@@ -243,6 +263,7 @@ export function useAnalysisOptions({
           const { task } = await response.json();
           analysisLogger.info(`PRO ${taskType} task created:`, task.id);
           taskCreated = true;
+          createdTaskId = task.id;
           refreshLibraryTasks();
         } else {
           const errorData = await response.json().catch(() => ({}));
@@ -292,7 +313,10 @@ export function useAnalysisOptions({
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, storedUserPrompt);
+    await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, storedUserPrompt, {
+      showTechniqueStudioPrompt: isTechniqueAnalysis && taskCreated,
+      taskId: createdTaskId,
+    });
   }, [messages, user, addMessage, updateMessage, scrollToBottom, startQuickAnalysis, refreshLibraryTasks]);
 
   /**

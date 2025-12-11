@@ -81,10 +81,10 @@ export const STARTER_PROMPTS: readonly StarterPromptConfig[] = [
       useAccurateMode: true, // Thunder
       confidenceMode: "low", // Challenging conditions
       resolutionMode: "accurate", // 384x384
-      showTrackingId: true,
+      showTrackingId: false,
       showTrajectories: false,
       selectedJoints: [10], // Right Wrist
-      showVelocity: true,
+      showVelocity: false,
       velocityWrist: "right"
     }
   },

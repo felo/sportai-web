@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -52,6 +53,7 @@ export function AIChatForm() {
   // Context & external hooks
   const { user } = useAuth();
   const { refresh: refreshLibraryTasks } = useLibraryTasks();
+  const router = useRouter();
 
   // Local state
   const [prompt, setPrompt] = useState("");
@@ -165,6 +167,17 @@ export function AIChatForm() {
     setProgressStage: (stage) => setProgressStage(stage as ProgressStage),
     refreshLibraryTasks,
   });
+
+  // Handler for opening Technique Studio
+  const handleOpenTechniqueStudio = useCallback((videoUrl: string, taskId?: string) => {
+    if (taskId) {
+      // Navigate to the library page with the task
+      router.push(`/library/${taskId}`);
+    } else {
+      // If no task ID, could open a modal or create a new task
+      console.log("Opening Technique Studio for video:", videoUrl);
+    }
+  }, [router]);
 
   // Message retry hook
   const { retryingMessageId, handleRetryMessage, retryAbortRef } = useMessageRetry({
@@ -413,6 +426,7 @@ export function AIChatForm() {
                 retryingMessageId={retryingMessageId}
                 onSelectProPlusQuick={handleSelectProPlusQuick}
                 onSelectQuickOnly={handleSelectQuickOnly}
+                onOpenTechniqueStudio={handleOpenTechniqueStudio}
               />
             )}
           </ChatLayout>

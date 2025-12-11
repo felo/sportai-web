@@ -35,10 +35,11 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
   const isTechniqueLiteEligible = poseData?.isTechniqueLiteEligible;
   const messageType = poseData?.messageType;
   const analysisOptions = poseData?.analysisOptions;
+  const techniqueStudioPrompt = poseData?.techniqueStudioPrompt;
   
   // Remove special fields from poseData to keep it clean
   const cleanPoseData = poseData ? (() => {
-    const { isTechniqueLiteEligible: _, messageType: __, analysisOptions: ___, ...rest } = poseData;
+    const { isTechniqueLiteEligible: _, messageType: __, analysisOptions: ___, techniqueStudioPrompt: ____, ...rest } = poseData;
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
   
@@ -63,6 +64,7 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     content: dbMsg.content,
     messageType: messageType || undefined,
     analysisOptions: analysisOptions || undefined,
+    techniqueStudioPrompt: techniqueStudioPrompt || undefined,
     videoUrl: dbMsg.video_url || undefined,
     videoS3Key: dbMsg.video_s3_key || undefined,
     thumbnailUrl: dbMsg.thumbnail_url || undefined,
@@ -116,7 +118,8 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
   const hasSpecialFields = message.poseData || 
     message.isTechniqueLiteEligible !== undefined ||
     message.messageType ||
-    message.analysisOptions;
+    message.analysisOptions ||
+    message.techniqueStudioPrompt;
     
   const poseDataWithExtras = hasSpecialFields
     ? {
@@ -124,6 +127,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
         ...(message.isTechniqueLiteEligible !== undefined ? { isTechniqueLiteEligible: message.isTechniqueLiteEligible } : {}),
         ...(message.messageType ? { messageType: message.messageType } : {}),
         ...(message.analysisOptions ? { analysisOptions: message.analysisOptions } : {}),
+        ...(message.techniqueStudioPrompt ? { techniqueStudioPrompt: message.techniqueStudioPrompt } : {}),
       }
     : null;
   

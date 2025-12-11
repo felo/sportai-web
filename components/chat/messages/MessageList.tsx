@@ -23,6 +23,8 @@ interface MessageListProps {
   // Analysis options handlers for PRO eligibility
   onSelectProPlusQuick?: (messageId: string) => void;
   onSelectQuickOnly?: (messageId: string) => void;
+  // Technique Studio handler
+  onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
 }
 
 export function MessageList({
@@ -38,6 +40,7 @@ export function MessageList({
   retryingMessageId,
   onSelectProPlusQuick,
   onSelectQuickOnly,
+  onOpenTechniqueStudio,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -115,6 +118,7 @@ export function MessageList({
           isRetrying={retryingMessageId === message.id}
           onSelectProPlusQuick={onSelectProPlusQuick}
           onSelectQuickOnly={onSelectQuickOnly}
+          onOpenTechniqueStudio={onOpenTechniqueStudio}
           // Pass progress info to the last message (the assistant message being generated)
           progressStage={index === messages.length - 1 ? progressStage : "idle"}
           uploadProgress={index === messages.length - 1 ? uploadProgress : 0}
