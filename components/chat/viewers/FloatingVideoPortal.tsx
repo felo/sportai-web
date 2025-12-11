@@ -81,6 +81,8 @@ export function FloatingVideoPortal() {
     setDockedCorner,
     setIsMinimized,
     positionManuallySetRef,
+    autoPlayOnOpenRef,
+    seekOnOpenRef,
   } = useFloatingVideoContext();
   
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -175,6 +177,9 @@ export function FloatingVideoPortal() {
     return () => setFloatingContainer(null);
   }, [isFloating, isMinimized, setFloatingContainer, mounted]);
 
+  // Track if we've applied initial seek/autoplay for this floating session
+  const hasAppliedInitialPlaybackRef = useRef(false);
+
   // Initialize position when floating starts
   useEffect(() => {
     if (isFloating && !hasInitializedRef.current) {
@@ -190,9 +195,46 @@ export function FloatingVideoPortal() {
       hasInitializedRef.current = true;
     } else if (!isFloating) {
       hasInitializedRef.current = false;
+      hasAppliedInitialPlaybackRef.current = false; // Reset for next floating session
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFloating, dockedCorner, setPosition, theatreMode, isMinimized]);
+
+  // Apply seek and autoPlay settings when floating video opens
+  useEffect(() => {
+    if (!isFloating || isMinimized || hasAppliedInitialPlaybackRef.current) return;
+    
+    // Small delay to ensure video element is mounted
+    const timeoutId = setTimeout(() => {
+      const container = videoContainerRef.current;
+      if (!container) return;
+      
+      const videoEl = container.querySelector('video') as HTMLVideoElement | null;
+      if (!videoEl) return;
+      
+      const seekTime = seekOnOpenRef.current;
+      const shouldAutoPlay = autoPlayOnOpenRef.current;
+      
+      // Apply seek time
+      if (seekTime > 0) {
+        videoEl.currentTime = seekTime;
+      }
+      
+      // Control playback
+      if (shouldAutoPlay) {
+        videoEl.play().catch(() => {});
+      } else {
+        videoEl.pause();
+      }
+      
+      // Reset refs and mark as applied
+      autoPlayOnOpenRef.current = true;
+      seekOnOpenRef.current = 0;
+      hasAppliedInitialPlaybackRef.current = true;
+    }, 150);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isFloating, isMinimized, autoPlayOnOpenRef, seekOnOpenRef]);
 
   // Handle window resize
   useEffect(() => {
@@ -507,6 +549,7 @@ export function FloatingVideoPortal() {
           {/* Container for video content - fills entire space */}
           <Box
             ref={videoContainerRef}
+            className="floating-video-content"
             style={{
               position: "absolute",
               top: 0,
@@ -530,12 +573,12 @@ export function FloatingVideoPortal() {
                 : null;
               if (content) return content;
               // Fallback: render a basic video element using the videoUrl
+              // Note: autoPlay and seek are handled by the useEffect above
               return (
                 <video
                   key={registration.id}
                   src={registration.videoUrl}
                   controls
-                  autoPlay
                   playsInline
                   style={{
                     maxWidth: "100%",

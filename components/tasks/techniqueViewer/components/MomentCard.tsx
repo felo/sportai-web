@@ -114,6 +114,32 @@ async function processQueue() {
   const videoElement = currentVideoElement;
   log(`processQueue: Starting, queue length: ${captureQueue.length}`);
 
+  // Wait for video to be ready if needed
+  if (videoElement.readyState < 2) {
+    log(`processQueue: Waiting for video to be ready (readyState=${videoElement.readyState})`);
+    await new Promise<void>((resolve) => {
+      const checkReady = () => {
+        if (videoElement.readyState >= 2) {
+          log(`processQueue: Video now ready`);
+          videoElement.removeEventListener("canplay", checkReady);
+          videoElement.removeEventListener("loadeddata", checkReady);
+          resolve();
+        }
+      };
+      videoElement.addEventListener("canplay", checkReady);
+      videoElement.addEventListener("loadeddata", checkReady);
+      // Also check immediately in case it became ready
+      checkReady();
+      // Timeout fallback
+      setTimeout(() => {
+        log(`processQueue: Video ready timeout, proceeding anyway`);
+        videoElement.removeEventListener("canplay", checkReady);
+        videoElement.removeEventListener("loadeddata", checkReady);
+        resolve();
+      }, 2000);
+    });
+  }
+
   // Store original state
   const originalTime = videoElement.currentTime;
   const wasPlaying = !videoElement.paused;
@@ -359,32 +385,24 @@ export function MomentCard({
       return;
     }
 
-    if (videoElement.readyState < 2) {
-      log(`MomentCard[${moment.frame}]: Video not ready (readyState=${videoElement.readyState})`);
-      return;
-    }
-
-    // Request capture - promise will resolve when ready
+    // Request capture - don't check readyState, let the queue handle it
     log(`MomentCard[${moment.frame}]: Requesting capture`);
     setIsCapturing(true);
-    let cancelled = false;
 
     requestThumbnailCapture(videoElement, moment.time, moment.frame)
       .then((url) => {
-        if (!cancelled && url) {
+        // Always update state if we got a valid URL
+        // Don't use cancelled flag - if thumbnail is valid, use it
+        if (url) {
           log(`MomentCard[${moment.frame}]: Promise resolved with thumbnail`);
           setThumbnailUrl(url);
-          setIsCapturing(false);
-        } else if (!cancelled) {
+        } else {
           log(`MomentCard[${moment.frame}]: Promise resolved with null`);
-          setIsCapturing(false);
         }
+        setIsCapturing(false);
       });
 
-    return () => {
-      log(`MomentCard[${moment.frame}]: Cleanup, setting cancelled=true`);
-      cancelled = true;
-    };
+    // No cleanup needed - we want the thumbnail even if component re-renders
   }, [videoElement, moment.time, moment.frame, thumbnailUrl]);
 
   // Format time display

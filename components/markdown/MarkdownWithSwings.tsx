@@ -130,13 +130,14 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   const floatingCtxRef = useRef(floatingCtx);
   floatingCtxRef.current = floatingCtx;
 
-  // Handle timestamp clicks - bring up floating video and seek to timestamp
+  // Handle timestamp clicks - bring up floating video and seek to timestamp (paused)
   const handleTimestampClick = useCallback((timestamp: string) => {
     const ctx = floatingCtxRef.current;
     if (!ctx) return;
     
     const seconds = timestampToSeconds(timestamp);
-    ctx.showFloatingVideoAtTime(seconds);
+    // Pass false for autoPlay - video should pause at the timestamp so user can press play
+    ctx.showFloatingVideoAtTime(seconds, false);
   }, []);
 
   // Memoize markdown components to prevent recreating them on every render

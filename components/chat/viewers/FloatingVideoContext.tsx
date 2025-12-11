@@ -11,7 +11,7 @@ interface VideoRegistration {
   videoUrl: string;
   renderContent: () => ReactNode;
   aspectRatio?: number; // width / height (e.g., 16/9 for landscape, 9/16 for portrait)
-  seekTo?: (seconds: number) => void; // Callback to seek video to a specific time
+  seekTo?: (seconds: number, shouldPlay?: boolean) => void; // Callback to seek video to a specific time
 }
 
 interface FloatingVideoContextValue {
@@ -50,9 +50,12 @@ interface FloatingVideoContextValue {
   setIsMinimized: (minimized: boolean) => void;
   scrollToVideo: () => void;
   closeFloating: () => void;
-  showFloatingVideoAtTime: (seconds: number) => void;
+  showFloatingVideoAtTime: (seconds: number, autoPlay?: boolean) => void;
   // Ref to check if position was manually set (to prevent auto-positioning)
   positionManuallySetRef: React.MutableRefObject<boolean>;
+  // Refs for controlling video playback when opening
+  autoPlayOnOpenRef: React.MutableRefObject<boolean>;
+  seekOnOpenRef: React.MutableRefObject<number>;
 }
 
 const FloatingVideoContext = createContext<FloatingVideoContextValue | null>(null);
@@ -80,6 +83,9 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   const registeredVideosRef = useRef<Map<string, VideoRegistration>>(new Map());
   // Track if position was manually set (to prevent auto-positioning from overriding)
   const positionManuallySetRef = useRef(false);
+  // Track autoPlay and seek time when opening floating video
+  const autoPlayOnOpenRef = useRef(true);
+  const seekOnOpenRef = useRef(0);
   // Track version to trigger re-renders only when needed
   const [registrationVersion, setRegistrationVersion] = useState(0);
   
@@ -202,8 +208,9 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     }, 100);
   }, [scrollToVideo]);
 
-  // Show floating video at a specific timestamp (single attempt; no retries)
-  const showFloatingVideoAtTime = useCallback((seconds: number) => {
+  // Show floating video at a specific timestamp
+  // autoPlay: true = start playing immediately (video button click), false = pause at timestamp (timestamp click)
+  const showFloatingVideoAtTime = useCallback((seconds: number, autoPlay: boolean = true) => {
     const ensureDomVideoRegistered = () => {
       if (typeof document === "undefined") return false;
       const allVideos = document.querySelectorAll("video");
@@ -222,9 +229,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
         // renderContent returns null - FloatingVideoPortal will use videoUrl fallback
         renderContent: () => null,
         aspectRatio: undefined,
-        seekTo: (s: number) => {
+        seekTo: (s: number, shouldPlay: boolean = false) => {
           (videoEl as HTMLVideoElement).currentTime = s;
-          (videoEl as HTMLVideoElement).play().catch(() => {});
+          if (shouldPlay) {
+            (videoEl as HTMLVideoElement).play().catch(() => {});
+          } else {
+            (videoEl as HTMLVideoElement).pause();
+          }
         },
       });
       setRegistrationVersion(v => v + 1);
@@ -239,6 +250,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     let videos = Array.from(registeredVideosRef.current.values());
     videoLogger.debug("[FloatingVideoContext] showFloatingVideoAtTime called", {
       seconds,
+      autoPlay,
       registeredVideoCount: videos.length,
       videoIds: videos.map(v => v.id),
       isFloating,
@@ -257,6 +269,24 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     
     const video = videos[0]; // Use first registered video
     
+    // If video is already floating and expanded, just seek to the timestamp
+    if (isFloating && !isMinimized && activeVideoId) {
+      videoLogger.debug("[FloatingVideoContext] Video already open, seeking to timestamp", { seconds, autoPlay });
+      // Find the video element in the DOM and seek directly
+      const floatingVideo = document.querySelector('.floating-video-content video') as HTMLVideoElement | null;
+      if (floatingVideo) {
+        floatingVideo.currentTime = seconds;
+        if (!autoPlay) {
+          floatingVideo.pause();
+        }
+      } else {
+        // Fallback to registration's seekTo
+        const activeVideo = registeredVideosRef.current.get(activeVideoId);
+        activeVideo?.seekTo?.(seconds, autoPlay);
+      }
+      return;
+    }
+    
     // Calculate a safe position for the expanded video (top-right, within viewport)
     const EDGE_PADDING = 16;
     const HEADER_OFFSET = 80;
@@ -272,19 +302,16 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     // Mark that position was manually set, to prevent auto-positioning from overriding
     positionManuallySetRef.current = true;
     
+    // Store autoPlay preference for the portal to use
+    autoPlayOnOpenRef.current = autoPlay;
+    seekOnOpenRef.current = seconds;
+    
     // Set position BEFORE setting floating state to avoid race conditions
     setPosition({ x: safeX, y: safeY });
     setActiveVideoId(video.id);
     setIsFloating(true);
     setIsMinimized(false);
-    
-    // Seek after a brief delay to ensure video is ready
-    if (seconds > 0) {
-      setTimeout(() => {
-        video.seekTo?.(seconds);
-      }, 100);
-    }
-  }, []);
+  }, [isFloating, isMinimized, activeVideoId]);
 
   // Create a stable ref object that points to the current floating container
   const stableFloatingContainerRef = useRef<HTMLDivElement>(null);
@@ -320,6 +347,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     closeFloating,
     showFloatingVideoAtTime,
     positionManuallySetRef,
+    autoPlayOnOpenRef,
+    seekOnOpenRef,
   }), [
     activeVideoId,
     isFloating,
