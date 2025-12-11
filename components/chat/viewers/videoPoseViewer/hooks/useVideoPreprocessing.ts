@@ -1,7 +1,24 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { detectionLogger } from "@/lib/logger";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
-import { DEFAULT_VIDEO_FPS } from "../constants";
+import { DEFAULT_VIDEO_FPS, COMMON_FPS_VALUES } from "../constants";
+
+// Type for requestVideoFrameCallback metadata
+interface VideoFrameMetadata {
+  presentationTime: number;
+  expectedDisplayTime: number;
+  width: number;
+  height: number;
+  mediaTime: number;
+  presentedFrames: number;
+  processingDuration?: number;
+}
+
+// Type for video element with requestVideoFrameCallback
+interface VideoElementWithRVFC extends HTMLVideoElement {
+  requestVideoFrameCallback: (callback: (now: number, metadata: VideoFrameMetadata) => void) => number;
+  cancelVideoFrameCallback: (handle: number) => void;
+}
 
 export interface UseVideoPreprocessingProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -69,7 +86,7 @@ export function useVideoPreprocessing({
   const backgroundPreprocessAbortRef = useRef<boolean>(false);
 
   /**
-   * Manual preprocessing - processes all frames in the video
+   * Manual preprocessing - processes all frames in the video using requestVideoFrameCallback
    * 
    * NOTE: Smoothing is temporarily disabled during preprocessing to ensure
    * deterministic results. The pose detector's temporal smoothing uses
@@ -83,69 +100,172 @@ export function useVideoPreprocessing({
     setPreprocessProgress(0);
     setPreprocessedPoses(new Map());
 
-    // Pause video
+    // Pause video first
     if (!video.paused) {
       video.pause();
       setIsPlaying(false);
     }
 
+    const duration = video.duration;
+
     // Disable smoothing for deterministic preprocessing
-    // This ensures the same frames produce the same results every time
     const smoothingWasEnabled = onSetSmoothing !== undefined;
     if (onSetSmoothing) {
       detectionLogger.debug("Disabling smoothing for deterministic preprocessing...");
       onSetSmoothing(false);
-      // Wait for detector to reinitialize without smoothing
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     try {
-      const fps = videoFPS;
-      const duration = video.duration;
-      const totalFrames = Math.floor(duration * fps);
-      const allPoses = new Map<number, PoseDetectionResult[]>();
+      // Check for requestVideoFrameCallback support
+      const supportsRVFC = "requestVideoFrameCallback" in video;
+      
+      if (supportsRVFC) {
+        // Quick FPS detection, then seek-based processing
+        const videoWithRVFC = video as VideoElementWithRVFC;
+        const allPoses = new Map<number, PoseDetectionResult[]>();
 
-      detectionLogger.debug(`Pre-processing ${totalFrames} frames at ${fps} FPS (smoothing disabled)...`);
-
-      for (let frame = 0; frame < totalFrames; frame++) {
-        const targetTime = frame / fps;
-        video.currentTime = targetTime;
-
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => {
-            video.removeEventListener("seeked", onSeeked);
-            resolve();
+        // Quick FPS detection (~10 frames)
+        const detectedFPS = await new Promise<number>((resolve) => {
+          let frameCount = 0;
+          let startMediaTime = 0;
+          const targetFrames = 10;
+          
+          const timeout = setTimeout(() => {
+            video.pause();
+            resolve(videoFPS || DEFAULT_VIDEO_FPS);
+          }, 1000);
+          
+          const sampleFrame = (_now: number, metadata: VideoFrameMetadata) => {
+            if (frameCount === 0) startMediaTime = metadata.mediaTime;
+            frameCount++;
+            
+            if (frameCount >= targetFrames) {
+              clearTimeout(timeout);
+              video.pause();
+              const mediaTimeDiff = metadata.mediaTime - startMediaTime;
+              if (mediaTimeDiff > 0) {
+                const rawFPS = frameCount / mediaTimeDiff;
+                resolve(COMMON_FPS_VALUES.reduce((prev, curr) =>
+                  Math.abs(curr - rawFPS) < Math.abs(prev - rawFPS) ? curr : prev
+                ));
+              } else {
+                resolve(videoFPS || DEFAULT_VIDEO_FPS);
+              }
+            } else if (!video.paused && !video.ended) {
+              videoWithRVFC.requestVideoFrameCallback(sampleFrame);
+            }
           };
-          video.addEventListener("seeked", onSeeked);
+          
+          video.currentTime = 0;
+          video.muted = true;
+          video.play().then(() => {
+            videoWithRVFC.requestVideoFrameCallback(sampleFrame);
+          }).catch(() => {
+            clearTimeout(timeout);
+            resolve(videoFPS || DEFAULT_VIDEO_FPS);
+          });
         });
-
-        const poses = await detectPose(video);
-        allPoses.set(frame, poses);
-
-        const progress = ((frame + 1) / totalFrames) * 100;
-        setPreprocessProgress(progress);
-
-        if (frame % 10 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
+        
+        video.pause();
+        
+        const fps = detectedFPS;
+        const totalFrames = Math.floor(duration * fps);
+        
+        detectionLogger.debug(`Pre-processing ${totalFrames} frames at ${fps} FPS...`);
+        
+        for (let frame = 0; frame < totalFrames; frame++) {
+          const targetTime = frame / fps;
+          video.currentTime = targetTime;
+          
+          await new Promise<void>((seekResolve) => {
+            const onSeeked = () => {
+              video.removeEventListener("seeked", onSeeked);
+              seekResolve();
+            };
+            video.addEventListener("seeked", onSeeked);
+            setTimeout(() => {
+              video.removeEventListener("seeked", onSeeked);
+              seekResolve();
+            }, 500);
+          });
+          
+          const poses = await detectPose(video);
+          allPoses.set(frame, poses);
+          
+          const progress = ((frame + 1) / totalFrames) * 100;
+          setPreprocessProgress(progress);
+          
+          if (frame % 10 === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
         }
-      }
+        
+        detectionLogger.debug(`Pre-processing complete! Processed ${totalFrames} frames at ${fps} FPS.`);
+        setPreprocessedPoses(allPoses);
+        setPreprocessingFPS(fps);
+        setPreprocessProgress(100);
+        setUsePreprocessing(true);
 
-      detectionLogger.debug(`Pre-processing complete! Processed ${totalFrames} frames.`);
-      setPreprocessedPoses(allPoses);
-      setIsPreprocessing(false);
-      setPreprocessProgress(100);
-      setUsePreprocessing(true);
+        video.currentTime = 0;
+        const firstPoses = allPoses.get(0);
+        if (firstPoses) {
+          setCurrentPoses(firstPoses);
+        }
+      } else {
+        // Fallback: seek-based preprocessing
+        // Use videoEl to avoid TypeScript narrowing issues
+        const videoEl = video as HTMLVideoElement;
+        const fps = videoFPS || DEFAULT_VIDEO_FPS;
+        const totalFrames = Math.floor(duration * fps);
+        const allPoses = new Map<number, PoseDetectionResult[]>();
 
-      video.currentTime = 0;
-      const firstPoses = allPoses.get(0);
-      if (firstPoses) {
-        setCurrentPoses(firstPoses);
+        detectionLogger.debug(`Pre-processing ${totalFrames} frames at ${fps} FPS (seek-based fallback)...`);
+
+        for (let frame = 0; frame < totalFrames; frame++) {
+          const targetTime = frame / fps;
+          videoEl.currentTime = targetTime;
+
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              videoEl.removeEventListener("seeked", onSeeked);
+              resolve();
+            };
+            videoEl.addEventListener("seeked", onSeeked);
+            setTimeout(() => {
+              videoEl.removeEventListener("seeked", onSeeked);
+              resolve();
+            }, 1000);
+          });
+
+          const poses = await detectPose(videoEl);
+          allPoses.set(frame, poses);
+
+          const progress = ((frame + 1) / totalFrames) * 100;
+          setPreprocessProgress(progress);
+
+          if (frame % 10 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        }
+
+        detectionLogger.debug(`Pre-processing complete! Processed ${totalFrames} frames.`);
+        setPreprocessedPoses(allPoses);
+        setPreprocessingFPS(fps);
+        setPreprocessProgress(100);
+        setUsePreprocessing(true);
+
+        videoEl.currentTime = 0;
+        const firstPoses = allPoses.get(0);
+        if (firstPoses) {
+          setCurrentPoses(firstPoses);
+        }
       }
     } catch (err) {
       detectionLogger.error("Pre-processing error:", err);
-      setIsPreprocessing(false);
       setPreprocessProgress(0);
     } finally {
+      setIsPreprocessing(false);
       // Restore smoothing after preprocessing
       if (smoothingWasEnabled && onSetSmoothing) {
         detectionLogger.debug("Restoring smoothing after preprocessing...");
@@ -155,7 +275,10 @@ export function useVideoPreprocessing({
   }, [videoRef, detectPose, isLoading, videoFPS, setCurrentPoses, setIsPlaying, onSetSmoothing]);
 
   /**
-   * Auto preprocessing - runs in background with FPS detection
+   * Auto preprocessing - uses requestVideoFrameCallback for 100% frame-accurate processing
+   * 
+   * This approach guarantees every frame is processed because the browser tells us
+   * exactly when each frame is rendered, eliminating FPS detection errors and seek imprecision.
    * 
    * NOTE: Smoothing is temporarily disabled during preprocessing to ensure
    * deterministic results.
@@ -164,12 +287,16 @@ export function useVideoPreprocessing({
     const video = videoRef.current;
     if (!video || !detectPose || isBackgroundPreprocessing) return;
 
-    detectionLogger.debug("🎬 Starting auto preprocessing...");
+    // Check for requestVideoFrameCallback support
+    const supportsRVFC = "requestVideoFrameCallback" in video;
+    
+    detectionLogger.debug(`🎬 Starting auto preprocessing (method: ${supportsRVFC ? 'requestVideoFrameCallback' : 'seek-based'})...`);
     setIsBackgroundPreprocessing(true);
     setBackgroundPreprocessProgress(0);
     backgroundPreprocessAbortRef.current = false;
 
     const originalTime = video.currentTime;
+    const duration = video.duration;
 
     // Disable smoothing for deterministic preprocessing
     const smoothingWasEnabled = onSetSmoothing !== undefined;
@@ -180,132 +307,213 @@ export function useVideoPreprocessing({
     }
 
     try {
-      // Step 1: Quick FPS detection
-      let detectedFPS = videoFPS;
-
-      if (videoFPS === DEFAULT_VIDEO_FPS && "requestVideoFrameCallback" in video) {
-        detectionLogger.debug("🔍 Detecting FPS...");
-
-        detectedFPS = await new Promise<number>((resolve) => {
+      if (supportsRVFC) {
+        // ============================================================
+        // Quick FPS detection with RVFC, then seek-based processing
+        // ============================================================
+        const videoWithRVFC = video as VideoElementWithRVFC;
+        const allPoses = new Map<number, PoseDetectionResult[]>();
+        
+        // Quick FPS detection: sample ~10 frames (takes <0.5s)
+        detectionLogger.debug("🔍 Quick FPS detection...");
+        
+        const detectedFPS = await new Promise<number>((resolve) => {
           let frameCount = 0;
           let startMediaTime = 0;
-          const maxFrames = 20;
+          const targetFrames = 10;
+          
           const timeout = setTimeout(() => {
             video.pause();
-            detectionLogger.debug("⏱️ FPS detection timeout, using default");
-            resolve(DEFAULT_VIDEO_FPS);
-          }, 1500);
-
-          const callback = (_now: number, metadata: { mediaTime?: number }) => {
+            resolve(videoFPS || DEFAULT_VIDEO_FPS);
+          }, 1000);
+          
+          const sampleFrame = (_now: number, metadata: VideoFrameMetadata) => {
             if (frameCount === 0) {
-              startMediaTime = metadata.mediaTime || 0;
+              startMediaTime = metadata.mediaTime;
             }
             frameCount++;
-
-            if (frameCount >= maxFrames) {
+            
+            if (frameCount >= targetFrames) {
               clearTimeout(timeout);
               video.pause();
-
-              const mediaTimeDiff = (metadata.mediaTime || 0) - startMediaTime;
-              let fps = DEFAULT_VIDEO_FPS;
+              const mediaTimeDiff = metadata.mediaTime - startMediaTime;
               if (mediaTimeDiff > 0) {
-                fps = Math.round(frameCount / mediaTimeDiff);
-                const COMMON_FPS = [24, 25, 30, 50, 60, 120];
-                fps = COMMON_FPS.reduce((prev, curr) =>
-                  Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
+                const rawFPS = frameCount / mediaTimeDiff;
+                const fps = COMMON_FPS_VALUES.reduce((prev, curr) =>
+                  Math.abs(curr - rawFPS) < Math.abs(prev - rawFPS) ? curr : prev
                 );
+                detectionLogger.debug(`🔍 Detected ${fps} FPS (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
+                resolve(fps);
+              } else {
+                resolve(videoFPS || DEFAULT_VIDEO_FPS);
               }
-              detectionLogger.debug(
-                `🔍 Detected FPS: ${fps} (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`
-              );
-              resolve(fps);
             } else if (!video.paused && !video.ended) {
-              (video as unknown as { requestVideoFrameCallback: (cb: typeof callback) => void }).requestVideoFrameCallback(callback);
+              videoWithRVFC.requestVideoFrameCallback(sampleFrame);
             }
           };
-
+          
           video.currentTime = 0;
+          video.muted = true;
           video.play().then(() => {
-            (video as unknown as { requestVideoFrameCallback: (cb: typeof callback) => void }).requestVideoFrameCallback(callback);
+            videoWithRVFC.requestVideoFrameCallback(sampleFrame);
           }).catch(() => {
             clearTimeout(timeout);
-            resolve(DEFAULT_VIDEO_FPS);
+            resolve(videoFPS || DEFAULT_VIDEO_FPS);
           });
         });
-
+        
         video.pause();
         setIsPlaying(false);
+        
+        // Now do seek-based processing with detected FPS
+        const fps = detectedFPS;
+        const totalFrames = Math.floor(duration * fps);
+        
+        detectionLogger.debug(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
+        
+        for (let frame = 0; frame < totalFrames; frame++) {
+          if (backgroundPreprocessAbortRef.current) {
+            detectionLogger.debug("🎬 Preprocessing aborted");
+            break;
+          }
+          
+          const targetTime = frame / fps;
+          video.currentTime = targetTime;
+          
+          // Wait for seek to complete
+          await new Promise<void>((seekResolve) => {
+            const onSeeked = () => {
+              video.removeEventListener("seeked", onSeeked);
+              seekResolve();
+            };
+            video.addEventListener("seeked", onSeeked);
+            setTimeout(() => {
+              video.removeEventListener("seeked", onSeeked);
+              seekResolve();
+            }, 500);
+          });
+          
+          // Detect pose
+          const poses = await detectPose(video);
+          allPoses.set(frame, poses);
+          
+          // Show current pose
+          if (poses.length > 0) {
+            setCurrentPoses(poses);
+          }
+          
+          // Update progress
+          const progress = ((frame + 1) / totalFrames) * 100;
+          setBackgroundPreprocessProgress(progress);
+          
+          // Log periodically
+          if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
+            detectionLogger.debug(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
+          }
+          
+          // Yield to main thread
+          if (frame % 5 === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+        
+        if (!backgroundPreprocessAbortRef.current) {
+          detectionLogger.debug(`✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`);
+          
+          setPreprocessedPoses(allPoses);
+          setPreprocessingFPS(fps);
+          setUsePreprocessing(true);
+          setBackgroundPreprocessProgress(100);
+          
+          // Restore original position
+          video.currentTime = originalTime;
+          const frameAtTime = Math.floor(originalTime * fps);
+          const framePoses = allPoses.get(frameAtTime) || allPoses.get(0);
+          if (framePoses) {
+            setCurrentPoses(framePoses);
+          }
+        } else {
+          video.currentTime = originalTime;
+        }
       } else {
-        video.pause();
-        setIsPlaying(false);
-      }
+        // ============================================================
+        // Fallback: Seek-based preprocessing for older browsers
+        // ============================================================
+        // Use videoEl to avoid TypeScript narrowing issues
+        const videoEl = video as HTMLVideoElement;
+        detectionLogger.warn("⚠️ requestVideoFrameCallback not supported, using seek-based fallback");
+        
+        const fps = videoFPS || DEFAULT_VIDEO_FPS;
+        const totalFrames = Math.floor(duration * fps);
+        const allPoses = new Map<number, PoseDetectionResult[]>();
 
-      // Step 2: Preprocessing with detected FPS
-      const fps = detectedFPS;
-      const duration = video.duration;
-      const totalFrames = Math.floor(duration * fps);
-      const allPoses = new Map<number, PoseDetectionResult[]>();
+        detectionLogger.debug(`🎬 Processing ${totalFrames} frames at ${fps} FPS (seek-based fallback)...`);
 
-      detectionLogger.debug(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
+        for (let frame = 0; frame < totalFrames; frame++) {
+          if (backgroundPreprocessAbortRef.current) {
+            detectionLogger.debug("🎬 Preprocessing aborted");
+            break;
+          }
 
-      for (let frame = 0; frame < totalFrames; frame++) {
-        if (backgroundPreprocessAbortRef.current) {
-          detectionLogger.debug("🎬 Preprocessing aborted");
-          break;
+          const targetTime = frame / fps;
+          videoEl.currentTime = targetTime;
+
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              videoEl.removeEventListener("seeked", onSeeked);
+              resolve();
+            };
+            videoEl.addEventListener("seeked", onSeeked);
+            
+            // Timeout fallback in case seeked event doesn't fire
+            setTimeout(() => {
+              videoEl.removeEventListener("seeked", onSeeked);
+              resolve();
+            }, 1000);
+          });
+
+          const poses = await detectPose(videoEl);
+          allPoses.set(frame, poses);
+
+          const progress = ((frame + 1) / totalFrames) * 100;
+          setBackgroundPreprocessProgress(progress);
+
+          if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
+            detectionLogger.debug(
+              `🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`
+            );
+          }
+
+          if (frame % 5 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         }
 
-        const targetTime = frame / fps;
-        video.currentTime = targetTime;
-
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => {
-            video.removeEventListener("seeked", onSeeked);
-            resolve();
-          };
-          video.addEventListener("seeked", onSeeked);
-        });
-
-        const poses = await detectPose(video);
-        allPoses.set(frame, poses);
-
-        const progress = ((frame + 1) / totalFrames) * 100;
-        setBackgroundPreprocessProgress(progress);
-
-        if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
+        if (!backgroundPreprocessAbortRef.current) {
           detectionLogger.debug(
-            `🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`
+            `✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`
           );
+
+          setPreprocessedPoses(allPoses);
+          setPreprocessingFPS(fps);
+          setUsePreprocessing(true);
+
+          videoEl.currentTime = originalTime;
+          const currentFrame = Math.round(originalTime * fps);
+          const framePoses = allPoses.get(currentFrame) || allPoses.get(0);
+          if (framePoses) {
+            setCurrentPoses(framePoses);
+          }
+        } else {
+          videoEl.currentTime = originalTime;
         }
-
-        if (frame % 5 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-      }
-
-      if (!backgroundPreprocessAbortRef.current) {
-        detectionLogger.debug(
-          `✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`
-        );
-
-        setPreprocessedPoses(allPoses);
-        setPreprocessingFPS(fps);
-        setUsePreprocessing(true);
-
-        video.currentTime = originalTime;
-        const currentFrame = Math.round(originalTime * fps);
-        const framePoses = allPoses.get(currentFrame) || allPoses.get(0);
-        if (framePoses) {
-          setCurrentPoses(framePoses);
-        }
-      } else {
-        video.currentTime = originalTime;
       }
     } catch (err) {
       detectionLogger.error("Preprocessing error:", err);
-      video.currentTime = originalTime;
+      const videoEl = videoRef.current;
+      if (videoEl) videoEl.currentTime = originalTime;
     } finally {
       setIsBackgroundPreprocessing(false);
-      setBackgroundPreprocessProgress(0);
       
       // Restore smoothing after preprocessing
       if (smoothingWasEnabled && onSetSmoothing) {

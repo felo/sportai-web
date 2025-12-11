@@ -29,6 +29,8 @@ export function TaskTile({
   onDownloadVideo,
   onExportData,
   isNew,
+  userId,
+  onTaskUpdated,
 }: TaskTileProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
@@ -36,6 +38,11 @@ export function TaskTile({
   const { thumbnail, isGenerating, regenerate, containerRef } = useThumbnail({
     videoUrl: task.video_url,
     thumbnailUrl: task.thumbnail_url,
+    taskId: task.id,
+    userId,
+    onThumbnailPersisted: (newThumbnailUrl) => {
+      onTaskUpdated?.(task.id, { thumbnail_url: newThumbnailUrl });
+    },
   });
 
   const progress = useTaskProgress({ task });

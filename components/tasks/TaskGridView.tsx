@@ -15,9 +15,11 @@ interface TaskGridViewProps {
   onDownloadVideo?: (task: Task) => void;
   onExportData?: (taskId: string) => void;
   isTaskNew?: (taskId: string) => boolean;
+  userId?: string;
+  onTaskUpdated?: (taskId: string, updates: Partial<Task>) => void;
 }
 
-export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew }: TaskGridViewProps) {
+export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew, userId, onTaskUpdated }: TaskGridViewProps) {
   if (tasks.length === 0) {
     return (
       <Flex align="center" justify="center" py="8">
@@ -69,6 +71,8 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
               onDownloadVideo={onDownloadVideo ? () => onDownloadVideo(task) : undefined}
               onExportData={onExportData ? () => onExportData(task.id) : undefined}
               isNew={isTaskNew?.(task.id)}
+              userId={userId}
+              onTaskUpdated={onTaskUpdated}
             />
           ))}
         </Grid>

@@ -22,7 +22,7 @@ import { Sidebar, useLibraryTasks } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PageHeader } from "@/components/ui";
-import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
+import { createChat, setCurrentChatId } from "@/utils/storage";
 import { getDeveloperMode } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
 import { extractFirstFrameFromUrl, extractFirstFrameWithDuration, uploadThumbnailToS3, validateVideoFile } from "@/utils/video-utils";
@@ -817,9 +817,11 @@ export function TasksPage() {
   );
   
   // Handle creating a new chat and navigating to it
-  const handleNewChat = useCallback(async () => {
-    const newChat = await createNewChat();
+  const handleNewChat = useCallback(() => {
+    // Create chat synchronously in localStorage (fast, no network calls)
+    const newChat = createChat();
     setCurrentChatId(newChat.id);
+    // Navigate immediately - the chat page will pick up the new ID
     router.push("/");
   }, [router]);
   
@@ -1096,6 +1098,12 @@ export function TasksPage() {
             onDownloadVideo={downloadVideo}
             onExportData={downloadResult}
             isTaskNew={isTaskNew}
+            userId={user?.id}
+            onTaskUpdated={(taskId, updates) => {
+              setTasks(prev => prev.map(t => 
+                t.id === taskId ? { ...t, ...updates } : t
+              ));
+            }}
           />
         )}
         

@@ -552,11 +552,18 @@ export function PoseConfigurationPanel({
                     {state.currentTime.toFixed(2)}s / {state.duration.toFixed(2)}s
                   </Text>
                 </Flex>
-                <Flex justify="between">
+                <Flex justify="between" align="center">
                   <Text size="1" color="gray">FPS</Text>
-                  <Text size="1" weight="medium">
-                    {state.videoFPS} ({state.fpsDetectionMethod})
-                  </Text>
+                  <Flex align="center" gap="1">
+                    <Text size="1" weight="medium">
+                      {state.videoFPS} ({state.fpsDetectionMethod})
+                    </Text>
+                    {state.detectedVideoFPS && state.detectedVideoFPS !== state.videoFPS && (
+                      <Badge color="orange" size="1" title={`Video is ${state.detectedVideoFPS}fps but pose data was saved at ${state.videoFPS}fps. Consider reprocessing.`}>
+                        ⚠️ {state.detectedVideoFPS}fps detected
+                      </Badge>
+                    )}
+                  </Flex>
                 </Flex>
                 <Flex justify="between">
                   <Text size="1" color="gray">Size</Text>

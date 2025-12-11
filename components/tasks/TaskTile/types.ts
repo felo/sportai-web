@@ -42,6 +42,10 @@ export interface TaskTileProps {
   onDownloadVideo?: () => void;
   onExportData?: () => void;
   isNew?: boolean;
+  /** User ID for API authentication (enables thumbnail persistence) */
+  userId?: string;
+  /** Callback when task thumbnail is updated */
+  onTaskUpdated?: (taskId: string, updates: Partial<Task>) => void;
 }
 
 // Progress state for processing tasks

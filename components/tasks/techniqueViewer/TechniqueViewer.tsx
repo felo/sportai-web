@@ -174,6 +174,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     currentFrame: 0,
     totalFrames: 0,
     videoFPS: 30,
+    detectedVideoFPS: null,
     fpsDetectionMethod: 'default',
     videoDimensions: { width: 0, height: 0 },
     isPortrait: false,
@@ -230,6 +231,8 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
     setViewerState((prev) => ({
       ...prev,
       videoFPS: fps,
+      // Only update detectedVideoFPS when actually detected from video, not when loaded from metadata
+      detectedVideoFPS: method !== 'metadata' ? fps : prev.detectedVideoFPS,
       fpsDetectionMethod: method,
       totalFrames: Math.floor(prev.duration * fps),
     }));

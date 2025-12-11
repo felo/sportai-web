@@ -19,6 +19,83 @@ function getSupabaseClient() {
 }
 
 /**
+ * PATCH /api/tasks/[taskId]
+ * Update task fields (currently supports thumbnail updates)
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  const { taskId } = await params;
+  const requestId = `task_update_${Date.now()}`;
+  
+  try {
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const userId = authHeader.replace("Bearer ", "");
+    const body = await request.json();
+    
+    logger.info(`[${requestId}] Updating task: ${taskId} for user: ${userId}`);
+    
+    const supabase = getSupabaseClient();
+    
+    // First verify the task belongs to the user
+    const { data: task, error: fetchError } = await supabase
+      .from("sportai_tasks")
+      .select("id, user_id")
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .single();
+    
+    if (fetchError || !task) {
+      logger.warn(`[${requestId}] Task not found or unauthorized: ${taskId}`);
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+    
+    // Build update object with allowed fields only
+    const allowedFields = ["thumbnail_url", "thumbnail_s3_key", "video_length"];
+    const updateData: Record<string, unknown> = {};
+    
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field];
+      }
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+    
+    // Update the task
+    const { data: updatedTask, error: updateError } = await supabase
+      .from("sportai_tasks")
+      .update(updateData)
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+    
+    if (updateError) {
+      logger.error(`[${requestId}] Failed to update task:`, updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+    
+    logger.info(`[${requestId}] Successfully updated task: ${taskId}`, updateData);
+    
+    return NextResponse.json({ task: updatedTask });
+  } catch (error) {
+    logger.error(`[${requestId}] Unexpected error:`, error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update task" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/tasks/[taskId]
  * Delete a task from the database (not from S3)
  */

@@ -765,8 +765,20 @@ export function VideoPoseViewer({
     const syncPoses = () => {
       if (!video.paused && !video.ended) {
         const frame = Math.floor(video.currentTime * preprocessing.preprocessingFPS);
-        if (frame !== lastFrame && preprocessing.preprocessedPoses.has(frame)) {
-          const poses = preprocessing.preprocessedPoses.get(frame);
+        
+        if (frame !== lastFrame) {
+          // Try exact frame first
+          let poses = preprocessing.preprocessedPoses.get(frame);
+          
+          // Fallback: try nearest frames if exact frame not found
+          if (!poses) {
+            for (let offset = 1; offset <= 2; offset++) {
+              poses = preprocessing.preprocessedPoses.get(frame - offset) 
+                   || preprocessing.preprocessedPoses.get(frame + offset);
+              if (poses) break;
+            }
+          }
+          
           if (poses?.length) {
             setCurrentPoses(poses);
             lastFrame = frame;

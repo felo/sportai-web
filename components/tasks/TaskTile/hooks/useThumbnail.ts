@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { uploadThumbnailToS3 } from "@/utils/video-utils";
+import { logger } from "@/lib/logger";
 
 interface UseThumbnailOptions {
   videoUrl: string;
   thumbnailUrl: string | null;
+  /** Task ID for persisting thumbnail to database */
+  taskId?: string;
+  /** User ID for API authentication */
+  userId?: string;
+  /** Callback when thumbnail is successfully persisted */
+  onThumbnailPersisted?: (thumbnailUrl: string) => void;
 }
 
 interface UseThumbnailReturn {
@@ -18,23 +26,77 @@ interface UseThumbnailReturn {
 /**
  * Hook to manage video thumbnails with lazy loading
  * Uses stored thumbnail if available, otherwise generates from video when in view
+ * Can optionally persist generated thumbnails to S3 and database
  */
 export function useThumbnail({
   videoUrl,
   thumbnailUrl,
+  taskId,
+  userId,
+  onThumbnailPersisted,
 }: UseThumbnailOptions): UseThumbnailReturn {
   const [thumbnail, setThumbnail] = useState<string | null>(thumbnailUrl);
   const [hasError, setHasError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenerateKey, setRegenerateKey] = useState(0);
   const [isInView, setIsInView] = useState(false);
+  const [shouldPersist, setShouldPersist] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const regenerate = useCallback(() => {
     setThumbnail(null);
     setHasError(false);
+    setShouldPersist(true); // Mark that this regeneration should be persisted
     setRegenerateKey((k) => k + 1);
   }, []);
+  
+  /**
+   * Persist a generated thumbnail to S3 and update the task in the database
+   */
+  const persistThumbnail = useCallback(async (dataUrl: string) => {
+    if (!taskId || !userId) {
+      logger.debug("[useThumbnail] Cannot persist - missing taskId or userId");
+      return;
+    }
+    
+    try {
+      logger.debug("[useThumbnail] Persisting thumbnail for task:", taskId);
+      
+      // Convert data URL to blob
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      
+      // Upload to S3
+      const uploadResult = await uploadThumbnailToS3(blob);
+      if (!uploadResult) {
+        logger.warn("[useThumbnail] Failed to upload thumbnail to S3");
+        return;
+      }
+      
+      // Update task in database
+      const updateResponse = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          thumbnail_url: uploadResult.thumbnailUrl,
+          thumbnail_s3_key: uploadResult.thumbnailS3Key,
+        }),
+      });
+      
+      if (!updateResponse.ok) {
+        logger.warn("[useThumbnail] Failed to update task with thumbnail");
+        return;
+      }
+      
+      logger.info("[useThumbnail] ✅ Thumbnail persisted for task:", taskId);
+      onThumbnailPersisted?.(uploadResult.thumbnailUrl);
+    } catch (err) {
+      logger.warn("[useThumbnail] Error persisting thumbnail:", err);
+    }
+  }, [taskId, userId, onThumbnailPersisted]);
 
   // Intersection Observer for lazy loading
   useEffect(() => {
@@ -94,7 +156,14 @@ export function useThumbnail({
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        setThumbnail(canvas.toDataURL("image/jpeg", 0.7));
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        setThumbnail(dataUrl);
+        
+        // Persist thumbnail if this was a manual regeneration
+        if (shouldPersist) {
+          persistThumbnail(dataUrl);
+          setShouldPersist(false);
+        }
       }
       setIsGenerating(false);
     };
@@ -110,7 +179,7 @@ export function useThumbnail({
       video.pause();
       video.src = "";
     };
-  }, [videoUrl, thumbnailUrl, thumbnail, hasError, regenerateKey, isInView]);
+  }, [videoUrl, thumbnailUrl, thumbnail, hasError, regenerateKey, isInView, shouldPersist, persistThumbnail]);
 
   return { thumbnail, hasError, isGenerating, regenerate, containerRef };
 }

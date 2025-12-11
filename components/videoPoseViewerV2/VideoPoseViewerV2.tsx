@@ -191,6 +191,25 @@ const DEFAULT_VIDEO_FPS = 30;
 const COMMON_FPS_VALUES = [24, 25, 30, 50, 60, 120];
 
 // ============================================================================
+// Types for requestVideoFrameCallback
+// ============================================================================
+
+interface VideoFrameMetadata {
+  presentationTime: number;
+  expectedDisplayTime: number;
+  width: number;
+  height: number;
+  mediaTime: number;
+  presentedFrames: number;
+  processingDuration?: number;
+}
+
+interface VideoElementWithRVFC extends HTMLVideoElement {
+  requestVideoFrameCallback: (callback: (now: number, metadata: VideoFrameMetadata) => void) => number;
+  cancelVideoFrameCallback: (handle: number) => void;
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -230,6 +249,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [videoFPS, setVideoFPS] = useState(DEFAULT_VIDEO_FPS);
+    const [detectedVideoFPS, setDetectedVideoFPS] = useState<number | null>(null); // Actual video FPS from detection
     const [videoDimensions, setVideoDimensions] = useState({ width: 640, height: 480 });
     const [isPortrait, setIsPortrait] = useState(false);
 
@@ -420,6 +440,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           setIsDetectingFPS(false);
           setIsVideoReadyForDisplay(true); // Video can now be shown
           setFpsDetectionMethod(method);
+          setDetectedVideoFPS(fps); // Track actual detected FPS
           callbacksRef.current?.onFPSDetected?.(fps, method);
           resolve(fps);
         };
@@ -526,6 +547,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             }
             fpsDetectedRef.current = true;
             setVideoFPS(fps);
+            setDetectedVideoFPS(fps);
             detectionLogger.debug(`Detected FPS on play: ${fps}`);
           } else if (!video.paused && !video.ended) {
             (video as any).requestVideoFrameCallback(callback);
@@ -669,8 +691,20 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       const syncPoses = () => {
         if (!video.paused && !video.ended) {
           const frame = Math.floor(video.currentTime * preprocessingFPS);
-          if (frame !== lastFrame && preprocessedPoses.has(frame)) {
-            const poses = preprocessedPoses.get(frame);
+          
+          if (frame !== lastFrame) {
+            // Try exact frame first
+            let poses = preprocessedPoses.get(frame);
+            
+            // Fallback: try nearest frames if exact frame not found
+            if (!poses) {
+              for (let offset = 1; offset <= 2; offset++) {
+                poses = preprocessedPoses.get(frame - offset) 
+                     || preprocessedPoses.get(frame + offset);
+                if (poses) break;
+              }
+            }
+            
             if (poses?.length) {
               setCurrentPoses(poses);
               callbacksRef.current?.onPoseChange?.(poses, frame);
@@ -925,101 +959,242 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       const video = videoRef.current;
       if (!video || !detectPose || isModelLoading) return;
 
+      // Check for requestVideoFrameCallback support
+      const supportsRVFC = "requestVideoFrameCallback" in video;
+
       setIsPreprocessing(true);
       setPreprocessProgress(0);
       setPreprocessedPoses(new Map());
       preprocessedPosesRef.current = new Map();
       preprocessAbortRef.current = false;
 
-      // Pause video during preprocessing
+      // Pause video first
       if (!video.paused) {
         video.pause();
         setIsPlaying(false);
       }
 
       const originalTime = video.currentTime;
+      const duration = video.duration;
+
+      detectionLogger.debug(`🎬 Starting preprocessing (method: ${supportsRVFC ? 'requestVideoFrameCallback' : 'seek-based'})...`);
 
       try {
-        // FIRST: Detect actual video FPS before preprocessing
-        let fps: number;
-        if (config.preprocessing.targetFPS) {
-          // User explicitly set a target FPS
-          fps = config.preprocessing.targetFPS;
-          detectionLogger.debug(`Using user-specified FPS: ${fps}`);
-        } else if (!fpsDetectedRef.current) {
-          // Detect actual FPS from video
-          detectionLogger.debug("Detecting video FPS before preprocessing...");
-          fps = await detectVideoFPSAsync(video);
-          fpsDetectedRef.current = true;
-          setVideoFPS(fps);
-        } else {
-          fps = videoFPS;
-        }
-
-        const dur = video.duration;
-        const total = Math.floor(dur * fps);
-        const allPoses = new Map<number, PoseDetectionResult[]>();
-
-        detectionLogger.debug(`Preprocessing ${total} frames at ${fps} FPS (duration: ${dur.toFixed(2)}s)...`);
-
-        for (let frame = 0; frame < total; frame += config.preprocessing.frameSkip) {
-          if (preprocessAbortRef.current) {
-            detectionLogger.debug("Preprocessing aborted");
-            break;
-          }
-
-          const targetTime = frame / fps;
-          video.currentTime = targetTime;
-
-          await new Promise<void>((resolve) => {
-            const onSeeked = () => {
-              video.removeEventListener("seeked", onSeeked);
-              resolve();
-            };
-            video.addEventListener("seeked", onSeeked);
-          });
-
-          const poses = await detectPose(video);
-          allPoses.set(frame, poses);
+        if (supportsRVFC && !config.preprocessing.targetFPS) {
+          // ============================================================
+          // Quick FPS detection with RVFC, then seek-based processing
+          // ============================================================
+          const videoWithRVFC = video as VideoElementWithRVFC;
+          const allPoses = new Map<number, PoseDetectionResult[]>();
           
-          // Show current pose during preprocessing (real-time feedback)
-          if (poses.length > 0) {
-            setCurrentPoses(poses);
+          // Quick FPS detection: sample ~10 frames (takes <0.5s)
+          detectionLogger.debug(`🔍 Quick FPS detection...`);
+          
+          const detectedFPS = await new Promise<number>((resolve) => {
+            let frameCount = 0;
+            let startMediaTime = 0;
+            const targetFrames = 10;
+            
+            const timeout = setTimeout(() => {
+              video.pause();
+              resolve(videoFPS || DEFAULT_VIDEO_FPS);
+            }, 1000);
+            
+            const sampleFrame = (_now: number, metadata: VideoFrameMetadata) => {
+              if (frameCount === 0) {
+                startMediaTime = metadata.mediaTime;
+              }
+              frameCount++;
+              
+              if (frameCount >= targetFrames) {
+                clearTimeout(timeout);
+                video.pause();
+                const mediaTimeDiff = metadata.mediaTime - startMediaTime;
+                if (mediaTimeDiff > 0) {
+                  const rawFPS = frameCount / mediaTimeDiff;
+                  const fps = COMMON_FPS_VALUES.reduce((prev, curr) =>
+                    Math.abs(curr - rawFPS) < Math.abs(prev - rawFPS) ? curr : prev
+                  );
+                  detectionLogger.debug(`🔍 Detected ${fps} FPS (from ${frameCount} frames in ${mediaTimeDiff.toFixed(3)}s)`);
+                  resolve(fps);
+                } else {
+                  resolve(videoFPS || DEFAULT_VIDEO_FPS);
+                }
+              } else if (!video.paused && !video.ended) {
+                videoWithRVFC.requestVideoFrameCallback(sampleFrame);
+              }
+            };
+            
+            video.currentTime = 0;
+            video.muted = true;
+            video.play().then(() => {
+              videoWithRVFC.requestVideoFrameCallback(sampleFrame);
+            }).catch(() => {
+              clearTimeout(timeout);
+              resolve(videoFPS || DEFAULT_VIDEO_FPS);
+            });
+          });
+          
+          video.pause();
+          setIsPlaying(false);
+          
+          // Now do seek-based processing with detected FPS
+          const fps = detectedFPS;
+          const totalFrames = Math.floor(duration * fps);
+          
+          detectionLogger.debug(`🎬 Processing ${totalFrames} frames at ${fps} FPS...`);
+          
+          for (let frame = 0; frame < totalFrames; frame += config.preprocessing.frameSkip) {
+            if (preprocessAbortRef.current) {
+              detectionLogger.debug("🎬 Preprocessing aborted");
+              break;
+            }
+            
+            const targetTime = frame / fps;
+            video.currentTime = targetTime;
+            
+            // Wait for seek to complete
+            await new Promise<void>((seekResolve) => {
+              const onSeeked = () => {
+                video.removeEventListener("seeked", onSeeked);
+                seekResolve();
+              };
+              video.addEventListener("seeked", onSeeked);
+              setTimeout(() => {
+                video.removeEventListener("seeked", onSeeked);
+                seekResolve();
+              }, 500);
+            });
+            
+            // Detect pose
+            const poses = await detectPose(video);
+            allPoses.set(frame, poses);
+            
+            // Show current pose during preprocessing
+            if (poses.length > 0) {
+              setCurrentPoses(poses);
+            }
+            
+            // Update progress
+            const progress = ((frame + 1) / totalFrames) * 100;
+            setPreprocessProgress(progress);
+            
+            // Log periodically
+            if (frame % Math.max(1, Math.floor(totalFrames / 10)) === 0) {
+              detectionLogger.debug(`🎬 Preprocessing: ${progress.toFixed(0)}% (frame ${frame}/${totalFrames})`);
+            }
+            
+            // Yield to main thread
+            if (frame % 5 === 0) {
+              await new Promise((r) => setTimeout(r, 0));
+            }
           }
-
-          const progress = ((frame + 1) / total) * 100;
-          setPreprocessProgress(progress);
-
-          // Yield to main thread periodically
-          if (frame % 5 === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-          }
-        }
-
-        if (!preprocessAbortRef.current) {
-          detectionLogger.debug(`Preprocessing complete: ${allPoses.size} frames at ${fps} FPS`);
-          setPreprocessedPoses(allPoses);
-          preprocessedPosesRef.current = allPoses;
-          setPreprocessingFPS(fps);
-          // Ensure FPS is set consistently
-          setVideoFPS(fps);
-          fpsDetectedRef.current = true;
-          callbacksRef.current?.onPreprocessComplete?.(allPoses.size, fps);
-
-          // Restore position and show first frame poses
-          video.currentTime = originalTime;
-          const frameAtTime = Math.floor(originalTime * fps);
-          const posesAtFrame = allPoses.get(frameAtTime) || allPoses.get(0);
-          if (posesAtFrame) {
-            setCurrentPoses(posesAtFrame);
+          
+          if (!preprocessAbortRef.current) {
+            detectionLogger.debug(`✅ Preprocessing complete! Processed ${allPoses.size} frames at ${fps} FPS.`);
+            
+            setPreprocessedPoses(allPoses);
+            preprocessedPosesRef.current = allPoses;
+            setPreprocessingFPS(fps);
+            setVideoFPS(fps);
+            fpsDetectedRef.current = true;
+            setFpsDetectionMethod('counted');
+            setPreprocessProgress(100);
+            callbacksRef.current?.onPreprocessComplete?.(allPoses.size, fps);
+            
+            // Restore original position
+            video.currentTime = originalTime;
+            const frameAtTime = Math.floor(originalTime * fps);
+            const posesAtFrame = allPoses.get(frameAtTime) || allPoses.get(0);
+            if (posesAtFrame) {
+              setCurrentPoses(posesAtFrame);
+            }
+          } else {
+            video.currentTime = originalTime;
           }
         } else {
-          video.currentTime = originalTime;
+          // ============================================================
+          // Seek-based preprocessing (fallback or when targetFPS is set)
+          // ============================================================
+          let fps: number;
+          if (config.preprocessing.targetFPS) {
+            fps = config.preprocessing.targetFPS;
+            detectionLogger.debug(`Using user-specified FPS: ${fps}`);
+          } else if (!fpsDetectedRef.current) {
+            detectionLogger.debug("Detecting video FPS before preprocessing...");
+            fps = await detectVideoFPSAsync(video);
+            fpsDetectedRef.current = true;
+            setVideoFPS(fps);
+          } else {
+            fps = videoFPS;
+          }
+
+          const total = Math.floor(duration * fps);
+          const allPoses = new Map<number, PoseDetectionResult[]>();
+
+          detectionLogger.debug(`🎬 Processing ${total} frames at ${fps} FPS (seek-based)...`);
+
+          for (let frame = 0; frame < total; frame += config.preprocessing.frameSkip) {
+            if (preprocessAbortRef.current) {
+              detectionLogger.debug("🎬 Preprocessing aborted");
+              break;
+            }
+
+            const targetTime = frame / fps;
+            video.currentTime = targetTime;
+
+            await new Promise<void>((resolve) => {
+              const onSeeked = () => {
+                video.removeEventListener("seeked", onSeeked);
+                resolve();
+              };
+              video.addEventListener("seeked", onSeeked);
+              // Timeout fallback in case seeked event doesn't fire
+              setTimeout(() => {
+                video.removeEventListener("seeked", onSeeked);
+                resolve();
+              }, 1000);
+            });
+
+            const poses = await detectPose(video);
+            allPoses.set(frame, poses);
+            
+            // Show current pose during preprocessing
+            if (poses.length > 0) {
+              setCurrentPoses(poses);
+            }
+
+            const progress = ((frame + 1) / total) * 100;
+            setPreprocessProgress(progress);
+
+            // Yield to main thread periodically
+            if (frame % 5 === 0) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+
+          if (!preprocessAbortRef.current) {
+            detectionLogger.debug(`✅ Preprocessing complete: ${allPoses.size} frames at ${fps} FPS`);
+            setPreprocessedPoses(allPoses);
+            preprocessedPosesRef.current = allPoses;
+            setPreprocessingFPS(fps);
+            setVideoFPS(fps);
+            fpsDetectedRef.current = true;
+            callbacksRef.current?.onPreprocessComplete?.(allPoses.size, fps);
+
+            video.currentTime = originalTime;
+            const frameAtTime = Math.floor(originalTime * fps);
+            const posesAtFrame = allPoses.get(frameAtTime) || allPoses.get(0);
+            if (posesAtFrame) {
+              setCurrentPoses(posesAtFrame);
+            }
+          } else {
+            video.currentTime = originalTime;
+          }
         }
       } catch (err) {
         detectionLogger.error("Preprocessing error:", err);
         callbacksRef.current?.onError?.(err instanceof Error ? err.message : "Preprocessing failed");
-        const video = videoRef.current;
         if (video) video.currentTime = originalTime;
       } finally {
         setIsPreprocessing(false);
@@ -1556,6 +1731,50 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         detectionLogger.info(`📥 Loaded ${poses.size} frames of pose data from server (${fps} FPS)`);
         // Notify parent that preprocessing is "complete" (loaded from server)
         callbacksRef.current?.onPreprocessComplete?.(poses.size, fps);
+        
+        // Also detect actual video FPS in background to detect mismatches
+        const video = videoRef.current;
+        if (video && "requestVideoFrameCallback" in video) {
+          // Quick FPS sample
+          let frameCount = 0;
+          let startMediaTime = 0;
+          const targetFrames = 10;
+          
+          const sampleFrame = (_now: number, metadata: VideoFrameMetadata) => {
+            if (frameCount === 0) startMediaTime = metadata.mediaTime;
+            frameCount++;
+            
+            if (frameCount >= targetFrames) {
+              video.pause();
+              const mediaTimeDiff = metadata.mediaTime - startMediaTime;
+              if (mediaTimeDiff > 0) {
+                const rawFPS = frameCount / mediaTimeDiff;
+                const actualFPS = COMMON_FPS_VALUES.reduce((prev, curr) =>
+                  Math.abs(curr - rawFPS) < Math.abs(prev - rawFPS) ? curr : prev
+                );
+                setDetectedVideoFPS(actualFPS);
+                if (actualFPS !== fps) {
+                  detectionLogger.warn(`⚠️ FPS mismatch: video is ${actualFPS}fps but pose data was saved at ${fps}fps`);
+                }
+              }
+            } else if (!video.paused && !video.ended) {
+              (video as VideoElementWithRVFC).requestVideoFrameCallback(sampleFrame);
+            }
+          };
+          
+          const originalTime = video.currentTime;
+          video.currentTime = 0;
+          video.muted = true;
+          video.play().then(() => {
+            (video as VideoElementWithRVFC).requestVideoFrameCallback(sampleFrame);
+          }).catch(() => {});
+          
+          // Timeout and cleanup
+          setTimeout(() => {
+            video.pause();
+            video.currentTime = originalTime;
+          }, 1000);
+        }
       },
     }), [
       videoFPS,

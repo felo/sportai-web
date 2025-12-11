@@ -798,6 +798,8 @@ export interface ViewerState {
   totalFrames: number;
   /** Detected video FPS */
   videoFPS: number;
+  /** Actual detected video FPS (may differ from videoFPS if loaded from stored data) */
+  detectedVideoFPS: number | null;
   /** How FPS was detected: 'default' | 'counted' | 'metadata' */
   fpsDetectionMethod: 'default' | 'counted' | 'metadata';
   /** Video dimensions */
