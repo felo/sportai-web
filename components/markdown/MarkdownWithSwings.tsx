@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { createMarkdownComponents } from "./markdown-components";
+import { createMarkdownComponents, timestampToSeconds } from "./markdown-components";
 import { SwingExplanationModal } from "./SwingExplanationModal";
 import { MetricConversionModal, convertMetric, type MetricConversion } from "./MetricConversionModal";
 import { CourtCoordinateModal, type CourtCoordinate, type BallSequenceClick, type CourtZone } from "./CourtCoordinateModal";
 import { SectionSpeaker } from "./SectionSpeaker";
+import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 import type { SwingExplanation } from "@/database";
 import { getHighlightingPreferences, getTTSSettings, getDeveloperMode, type HighlightingPreferences } from "@/utils/storage";
 
@@ -122,11 +123,27 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     setCoordinateModalOpen(true);
   }, []);
 
+  // Floating video context for timestamp clicks
+  const floatingCtx = useFloatingVideoContextOptional();
+  
+  // Store floatingCtx in a ref so we always have the latest value
+  const floatingCtxRef = useRef(floatingCtx);
+  floatingCtxRef.current = floatingCtx;
+
+  // Handle timestamp clicks - bring up floating video and seek to timestamp
+  const handleTimestampClick = useCallback((timestamp: string) => {
+    const ctx = floatingCtxRef.current;
+    if (!ctx) return;
+    
+    const seconds = timestampToSeconds(timestamp);
+    ctx.showFloatingVideoAtTime(seconds);
+  }, []);
+
   // Memoize markdown components to prevent recreating them on every render
   // This prevents flickering when hovering over links/collapsible sections during streaming
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick),
-    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick]
+    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick),
+    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick]
   );
 
   // Filter out Context & Environment Analysis section when not in developer mode

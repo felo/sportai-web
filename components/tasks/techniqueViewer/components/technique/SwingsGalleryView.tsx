@@ -534,3 +534,4 @@ function TipCard({ icon, title, tip }: { icon: string; title: string; tip: strin
   );
 }
 
+

@@ -115,6 +115,25 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     return () => clearTimeout(timeoutId);
   }, [floatingContext?.scrollContainerRef, scrollContainerElement]);
 
+  // Create seekTo callback ref for timestamp navigation (stable reference)
+  const seekToRef = useRef<(seconds: number) => void>();
+  seekToRef.current = (seconds: number) => {
+    // Find the video element within this container
+    const videoElement = videoContainerRef.current?.querySelector('video');
+    if (videoElement) {
+      videoElement.currentTime = seconds;
+      videoElement.playbackRate = 0.25; // Slow motion for analysis
+      videoElement.play().catch(() => {
+        // Autoplay may be blocked, that's ok
+      });
+    }
+  };
+  
+  // Stable seekTo function that uses the ref
+  const seekTo = useCallback((seconds: number) => {
+    seekToRef.current?.(seconds);
+  }, []);
+
   // Register this video with the floating context (only once per videoSrc change)
   useEffect(() => {
     const ctx = floatingContextRef.current;
@@ -124,7 +143,9 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       message.id,
       videoContainerRef as React.RefObject<HTMLElement>,
       videoSrc,
-      () => null // renderContent not used with portal approach
+      () => null, // renderContent not used with portal approach
+      undefined, // aspectRatio - will be updated later
+      seekTo
     );
     
     return () => {
@@ -132,7 +153,14 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     };
     // Only depend on message.id and videoSrc, not the full context
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message.id, videoSrc, isImage]);
+  }, [message.id, videoSrc, isImage, seekTo]);
+  
+  // Keep seekTo callback updated in the context
+  useEffect(() => {
+    const ctx = floatingContextRef.current;
+    if (!ctx || !videoSrc || isImage) return;
+    ctx.updateVideoSeekTo(message.id, seekTo);
+  }, [message.id, videoSrc, isImage, seekTo]);
   
   // Continuously track dimensions when NOT floating using ResizeObserver
   // This ensures we always have the correct pre-float dimensions ready

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Box, Container, Flex, Text, Card, TextField, Button, Heading } from "@radix-ui/themes";
 import { PlayIcon, Link2Icon } from "@radix-ui/react-icons";
 import { TechniqueViewer } from "@/components/tasks/techniqueViewer";
@@ -9,8 +9,12 @@ import buttonStyles from "@/styles/buttons.module.css";
 
 export default function TechniquePage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+
+  // Get the source of navigation (chat, library, or undefined for direct access)
+  const fromSource = useMemo(() => searchParams.get("from"), [searchParams]);
 
   // Load video from URL query parameter on mount
   useEffect(() => {
@@ -33,10 +37,27 @@ export default function TechniquePage() {
     }
   };
 
-  const handleClear = () => {
-    setLoadedUrl(null);
-    setVideoUrl("");
-  };
+  // Handle back navigation based on source
+  const handleBack = useCallback(() => {
+    if (fromSource === "chat") {
+      // Navigate back to chat (main page)
+      router.push("/");
+    } else if (fromSource === "library") {
+      // Navigate back to library
+      router.push("/library");
+    } else {
+      // Default: just clear the video (stay on page)
+      setLoadedUrl(null);
+      setVideoUrl("");
+    }
+  }, [fromSource, router]);
+
+  // Get appropriate back button label based on source
+  const backLabel = useMemo(() => {
+    if (fromSource === "chat") return "Back to Chat";
+    if (fromSource === "library") return "Back to Library";
+    return "Back";
+  }, [fromSource]);
 
   return (
     <Box
@@ -97,7 +118,8 @@ export default function TechniquePage() {
         // Viewer State - Fullscreen
         <TechniqueViewer 
           videoUrl={loadedUrl} 
-          onBack={handleClear}
+          onBack={handleBack}
+          backLabel={backLabel}
         />
       )}
     </Box>

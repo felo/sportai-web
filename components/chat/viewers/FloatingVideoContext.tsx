@@ -11,6 +11,7 @@ interface VideoRegistration {
   videoUrl: string;
   renderContent: () => ReactNode;
   aspectRatio?: number; // width / height (e.g., 16/9 for landscape, 9/16 for portrait)
+  seekTo?: (seconds: number) => void; // Callback to seek video to a specific time
 }
 
 interface FloatingVideoContextValue {
@@ -37,8 +38,9 @@ interface FloatingVideoContextValue {
   scrollContainerRef?: React.RefObject<HTMLElement>;
   
   // Actions
-  registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode, aspectRatio?: number) => void;
+  registerVideo: (id: string, ref: React.RefObject<HTMLElement>, videoUrl: string, renderContent: () => ReactNode, aspectRatio?: number, seekTo?: (seconds: number) => void) => void;
   updateVideoAspectRatio: (id: string, aspectRatio: number) => void;
+  updateVideoSeekTo: (id: string, seekTo: (seconds: number) => void) => void;
   unregisterVideo: (id: string) => void;
   setActiveVideo: (id: string | null) => void;
   setFloating: (floating: boolean) => void;
@@ -48,6 +50,9 @@ interface FloatingVideoContextValue {
   setIsMinimized: (minimized: boolean) => void;
   scrollToVideo: () => void;
   closeFloating: () => void;
+  showFloatingVideoAtTime: (seconds: number) => void;
+  // Ref to check if position was manually set (to prevent auto-positioning)
+  positionManuallySetRef: React.MutableRefObject<boolean>;
 }
 
 const FloatingVideoContext = createContext<FloatingVideoContextValue | null>(null);
@@ -73,6 +78,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
   const [poseEnabled, setPoseEnabled] = useState(false);
   
   const registeredVideosRef = useRef<Map<string, VideoRegistration>>(new Map());
+  // Track if position was manually set (to prevent auto-positioning from overriding)
+  const positionManuallySetRef = useRef(false);
   // Track version to trigger re-renders only when needed
   const [registrationVersion, setRegistrationVersion] = useState(0);
   
@@ -112,12 +119,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     ref: React.RefObject<HTMLElement>,
     videoUrl: string,
     renderContent: () => ReactNode,
-    aspectRatio?: number
+    aspectRatio?: number,
+    seekTo?: (seconds: number) => void
   ) => {
     // Only update if this is actually a new registration
     const existing = registeredVideosRef.current.get(id);
     if (!existing || existing.videoUrl !== videoUrl) {
-      registeredVideosRef.current.set(id, { id, ref, videoUrl, renderContent, aspectRatio });
+      registeredVideosRef.current.set(id, { id, ref, videoUrl, renderContent, aspectRatio, seekTo });
       setRegistrationVersion(v => v + 1);
     }
   }, []);
@@ -127,6 +135,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     if (existing && existing.aspectRatio !== aspectRatio) {
       registeredVideosRef.current.set(id, { ...existing, aspectRatio });
       setRegistrationVersion(v => v + 1);
+    }
+  }, []);
+
+  const updateVideoSeekTo = useCallback((id: string, seekTo: (seconds: number) => void) => {
+    const existing = registeredVideosRef.current.get(id);
+    if (existing) {
+      registeredVideosRef.current.set(id, { ...existing, seekTo });
     }
   }, []);
 
@@ -187,6 +202,51 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     }, 100);
   }, [scrollToVideo]);
 
+  // Show floating video at a specific timestamp
+  const showFloatingVideoAtTime = useCallback((seconds: number) => {
+    const videos = Array.from(registeredVideosRef.current.values());
+    videoLogger.debug("[FloatingVideoContext] showFloatingVideoAtTime called", {
+      seconds,
+      registeredVideoCount: videos.length,
+      videoIds: videos.map(v => v.id),
+    });
+    
+    if (videos.length === 0) {
+      videoLogger.warn("[FloatingVideoContext] No registered videos to show");
+      return;
+    }
+    
+    const video = videos[0]; // Use first registered video
+    
+    // Calculate a safe position for the expanded video (top-right, within viewport)
+    const EDGE_PADDING = 16;
+    const HEADER_OFFSET = 80;
+    const BASE_WIDTH = 320;
+    const aspectRatio = video.aspectRatio ?? 16/9;
+    const width = BASE_WIDTH;
+    const height = width / aspectRatio;
+    
+    // Position in top-right corner, ensuring it stays within viewport
+    const safeX = Math.max(EDGE_PADDING, window.innerWidth - width - EDGE_PADDING);
+    const safeY = EDGE_PADDING + HEADER_OFFSET;
+    
+    // Mark that position was manually set, to prevent auto-positioning from overriding
+    positionManuallySetRef.current = true;
+    
+    // Set position BEFORE setting floating state to avoid race conditions
+    setPosition({ x: safeX, y: safeY });
+    setActiveVideoId(video.id);
+    setIsFloating(true);
+    setIsMinimized(false);
+    
+    // Seek after a brief delay to ensure video is ready
+    if (seconds > 0) {
+      setTimeout(() => {
+        video.seekTo?.(seconds);
+      }, 100);
+    }
+  }, []);
+
   // Create a stable ref object that points to the current floating container
   const stableFloatingContainerRef = useRef<HTMLDivElement>(null);
   // Keep the stable ref updated
@@ -209,6 +269,7 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     scrollContainerRef,
     registerVideo,
     updateVideoAspectRatio,
+    updateVideoSeekTo,
     unregisterVideo,
     setActiveVideo,
     setFloating,
@@ -218,6 +279,8 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     setIsMinimized,
     scrollToVideo,
     closeFloating,
+    showFloatingVideoAtTime,
+    positionManuallySetRef,
   }), [
     activeVideoId,
     isFloating,
@@ -231,11 +294,13 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     scrollContainerRef,
     registerVideo,
     updateVideoAspectRatio,
+    updateVideoSeekTo,
     unregisterVideo,
     setActiveVideo,
     setFloating,
     scrollToVideo,
     closeFloating,
+    showFloatingVideoAtTime,
     registrationVersion, // Trigger re-render when registrations (including aspectRatio) change
   ]);
 

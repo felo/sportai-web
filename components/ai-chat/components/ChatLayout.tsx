@@ -9,6 +9,7 @@ import { useSidebar } from "@/components/SidebarContext";
 import { DragOverlay } from "@/components/chat/overlays/DragOverlay";
 import { ScrollToBottom } from "@/components/chat/navigation/ScrollToBottom";
 import { ScrollToVideo } from "@/components/chat/navigation/ScrollToVideo";
+import { ShowFloatingVideo } from "@/components/chat/navigation/ShowFloatingVideo";
 import { AudioStopButton } from "@/components/chat/input/AudioStopButton";
 
 interface ChatLayoutProps {
@@ -48,6 +49,7 @@ export const ChatLayout = forwardRef<HTMLDivElement, ChatLayoutProps>(function C
           
           {hasMessages && (
             <>
+              <ShowFloatingVideo scrollContainerRef={scrollContainerRef} />
               <ScrollToVideo scrollContainerRef={scrollContainerRef} />
               <ScrollToBottom 
                 scrollContainerRef={scrollContainerRef}

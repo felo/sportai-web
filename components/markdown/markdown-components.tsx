@@ -162,7 +162,7 @@ function getTermCategory(term: string): 'swing' | 'terminology' | 'technique' | 
  * Convert timestamp string to seconds
  * Supports formats: M:SS, MM:SS, H:MM:SS
  */
-function timestampToSeconds(timestamp: string): number {
+export function timestampToSeconds(timestamp: string): number {
   const parts = timestamp.split(':').map(p => parseInt(p, 10));
   
   if (parts.length === 2) {
@@ -315,7 +315,8 @@ function processTextWithTimestampsAndMetrics(
   highlightingPrefs?: HighlightingPreferences,
   onCoordinateClick?: (coordinate: CourtCoordinate) => void,
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
-  onCourtZoneClick?: (zone: CourtZone) => void
+  onCourtZoneClick?: (zone: CourtZone) => void,
+  onTimestampClick?: (timestamp: string) => void
 ): React.ReactNode[] {
   // Default to all enabled if not provided
   const prefs = highlightingPrefs || {
@@ -553,7 +554,11 @@ function processTextWithTimestampsAndMetrics(
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              jumpToTimestamp(matchItem.text);
+              if (onTimestampClick) {
+                onTimestampClick(matchItem.text);
+              } else {
+                jumpToTimestamp(matchItem.text);
+              }
             }}
             className={styles.timestampLink}
           >
@@ -710,15 +715,16 @@ const TextWithTimestamps: React.FC<{
   onCoordinateClick?: (coordinate: CourtCoordinate) => void;
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
   onCourtZoneClick?: (zone: CourtZone) => void;
-}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick }) => {
+  onTimestampClick?: (timestamp: string) => void;
+}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick }) => {
   if (typeof children === 'string') {
-    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick)}</>;
+    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick)}</>;
   }
   
   if (Array.isArray(children)) {
     return <>{children.map((child, index) => {
       if (typeof child === 'string') {
-        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick)}</React.Fragment>;
+        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick)}</React.Fragment>;
       }
       return <React.Fragment key={index}>{child}</React.Fragment>;
     })}</>;
@@ -727,14 +733,15 @@ const TextWithTimestamps: React.FC<{
   return <>{children}</>;
 };
 
-// Factory function to create markdown components with swing, metric, coordinate, ball sequence, and court zone click handlers
+// Factory function to create markdown components with swing, metric, coordinate, ball sequence, court zone, and timestamp click handlers
 export const createMarkdownComponents = (
   onSwingClick?: (swing: SwingExplanation) => void,
   onMetricClick?: (value: number, unit: string, originalText: string) => void,
   highlightingPrefs?: HighlightingPreferences,
   onCoordinateClick?: (coordinate: CourtCoordinate) => void,
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
-  onCourtZoneClick?: (zone: CourtZone) => void
+  onCourtZoneClick?: (zone: CourtZone) => void,
+  onTimestampClick?: (timestamp: string) => void
 ) => ({
   h1: ({ node, ...props }: any) => (
     <h1
@@ -763,7 +770,7 @@ export const createMarkdownComponents = (
       style={{ color: "var(--gray-12)" }}
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick}>{children}</TextWithTimestamps>
     </p>
   ),
   ul: ({ node, ...props }: any) => (
@@ -785,7 +792,7 @@ export const createMarkdownComponents = (
       className="markdown-li"
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick}>{children}</TextWithTimestamps>
     </li>
   ),
   code: ({ node, inline, ...props }: any) =>
@@ -814,12 +821,12 @@ export const createMarkdownComponents = (
   ),
   strong: ({ node, children, ...props }: any) => (
     <strong className="font-semibold" style={{ color: "var(--gray-12)" }} {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick}>{children}</TextWithTimestamps>
     </strong>
   ),
   em: ({ node, children, ...props }: any) => (
     <em className="italic" {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick}>{children}</TextWithTimestamps>
     </em>
   ),
   a: ({ node, href, children, ...props }: any) => {

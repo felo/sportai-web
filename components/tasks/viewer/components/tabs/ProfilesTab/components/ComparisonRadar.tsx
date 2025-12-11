@@ -267,3 +267,4 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
 }
 
 
+

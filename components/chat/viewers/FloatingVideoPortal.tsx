@@ -83,6 +83,7 @@ export function FloatingVideoPortal() {
     setIsDragging,
     setDockedCorner,
     setIsMinimized,
+    positionManuallySetRef,
   } = useFloatingVideoContext();
   
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
@@ -181,12 +182,20 @@ export function FloatingVideoPortal() {
   // Initialize position when floating starts
   useEffect(() => {
     if (isFloating && !hasInitializedRef.current) {
+      // Skip auto-positioning if position was manually set (e.g., by showFloatingVideoAtTime)
+      if (positionManuallySetRef.current) {
+        positionManuallySetRef.current = false; // Reset for next time
+        hasInitializedRef.current = true;
+        return;
+      }
+      
       const pos = getCornerPosition(dockedCorner, getWidth(), getHeight());
       setPosition(pos);
       hasInitializedRef.current = true;
     } else if (!isFloating) {
       hasInitializedRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFloating, dockedCorner, setPosition, theatreMode, isMinimized]);
 
   // Handle window resize

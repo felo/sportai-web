@@ -72,6 +72,7 @@ export default function TaskViewerPage({
         taskId={taskId}
         developerMode={developerMode}
         onBack={() => router.push("/library")}
+        backLabel="Back to Library"
       />
     );
   }

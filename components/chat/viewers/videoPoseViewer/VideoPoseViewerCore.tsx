@@ -1145,7 +1145,7 @@ export function VideoPoseViewer({
           maxWidth: "100%",
           maxHeight: compactMode ? "100%" : videoMaxHeight,
           backgroundColor: "transparent",
-          borderRadius: compactMode ? 0 : (showControls && isExpanded ? "var(--radius-3) var(--radius-3) 0 0" : "var(--radius-3)"),
+          borderRadius: compactMode ? 0 : (showControls && (isExpanded || preprocessing.usePreprocessing) ? "var(--radius-3) var(--radius-3) 0 0" : "var(--radius-3)"),
           overflow: "hidden",
           margin: "0 auto",
           display: "inline-flex",
@@ -1334,11 +1334,11 @@ export function VideoPoseViewer({
           isMobile={isMobile}
         />
 
-        <BottomGradientMask showControls={showControls} isExpanded={isExpanded} />
+        <BottomGradientMask showControls={showControls} isExpanded={isExpanded || preprocessing.usePreprocessing} />
       </Box>
 
-      {/* Controls Panel */}
-      {showControls && isExpanded && (
+      {/* Controls Panel - Always visible when preprocessing is done */}
+      {showControls && (isExpanded || preprocessing.usePreprocessing) && (
         <Flex
           direction="column"
           gap="2"
@@ -1422,7 +1422,7 @@ export function VideoPoseViewer({
                     <Button
                       onClick={handleImageInsight}
                       disabled={isImageInsightLoading || !selectedPose}
-                      className={buttonStyles.actionButtonSquare}
+                      className={`${buttonStyles.actionButtonSquare} ${buttonStyles.actionButtonPulse}`}
                       size="2"
                       style={{ opacity: selectedPose ? 1 : 0.5 }}
                     >
@@ -2006,7 +2006,7 @@ export function VideoPoseViewer({
                     className={buttonStyles.actionButton}
                     onClick={() => {
                       const encodedUrl = encodeURIComponent(videoUrl);
-                      window.open(`/technique?video=${encodedUrl}`, "_blank");
+                      window.open(`/technique?video=${encodedUrl}&from=chat`, "_blank");
                     }}
                   >
                     <ExternalLinkIcon width={14} height={14} />

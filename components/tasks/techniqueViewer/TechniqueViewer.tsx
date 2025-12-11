@@ -46,6 +46,8 @@ import { extractS3KeyFromUrl } from "@/lib/s3";
 interface TechniqueViewerProps {
   videoUrl: string;
   onBack?: () => void;
+  /** Label for the back button tooltip (e.g., "Back to Library", "Back to Chat") */
+  backLabel?: string;
   /** Sport name (e.g., "Tennis", "Padel") */
   sport?: string;
   /** Task ID for server data persistence */
@@ -54,7 +56,7 @@ interface TechniqueViewerProps {
   developerMode?: boolean;
 }
 
-export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode = false }: TechniqueViewerProps) {
+export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, taskId, developerMode = false }: TechniqueViewerProps) {
   // Viewer configuration (externally controlled)
   const [config, setConfig] = useState<ViewerConfig>(DEFAULT_VIEWER_CONFIG);
 
@@ -1016,7 +1018,7 @@ export function TechniqueViewer({ videoUrl, onBack, sport, taskId, developerMode
           >
             <Flex align="center" gap="3">
               {onBack && (
-                <Tooltip content="Back to Library">
+                <Tooltip content={backLabel}>
                   <IconButton
                     size="2"
                     variant="ghost"
