@@ -827,8 +827,8 @@ export interface ViewerState {
     dominantHand: "left" | "right";
     confidence: number;
   } | null;
-  /** Current active tab inside the viewer (swings or data-analysis) */
-  activeTab: "swings" | "data-analysis";
+  /** Current active tab inside the viewer (swings, moments, or data-analysis) */
+  activeTab: "swings" | "moments" | "data-analysis";
   /** Error message if any */
   error: string | null;
 }
@@ -859,7 +859,55 @@ export interface ViewerCallbacks {
   /** Called when frame is captured (for analysis) */
   onFrameCapture?: (imageBlob: Blob, frame: number, poses: PoseDetectionResult[]) => void;
   /** Called when active tab changes inside the viewer */
-  onActiveTabChange?: (activeTab: "swings" | "data-analysis") => void;
+  onActiveTabChange?: (activeTab: "swings" | "moments" | "data-analysis") => void;
+}
+
+// ============================================================================
+// Moments Configuration (for Moments tab)
+// ============================================================================
+
+/** Custom user-created timeline event */
+export interface CustomEvent {
+  id: string;
+  name: string;
+  color: string;
+  time: number;
+  frame: number;
+  createdAt: number;
+}
+
+/** Video comment with position */
+export interface VideoComment {
+  id: string;
+  title: string;
+  description: string;
+  color: string;
+  x: number;
+  y: number;
+  time: number;
+  frame: number;
+  createdAt: number;
+}
+
+/** Configuration for the Moments tab */
+export interface MomentsConfig {
+  /** Custom user-created events */
+  customEvents: CustomEvent[];
+  /** Video comments */
+  videoComments: VideoComment[];
+  /** Protocol event position adjustments (event ID -> adjusted position) */
+  protocolAdjustments: Map<string, { time: number; frame: number }>;
+  /** Swing boundary adjustments */
+  swingBoundaryAdjustments: Map<string, {
+    startTime?: number;
+    startFrame?: number;
+    endTime?: number;
+    endFrame?: number;
+  }>;
+  /** Callback when user clicks View on a moment */
+  onViewMoment?: (time: number) => void;
+  /** Callback when user clicks Analyse on a moment */
+  onAnalyseMoment?: (moment: unknown) => void;
 }
 
 // ============================================================================
@@ -899,6 +947,8 @@ export interface ViewerActions {
   getPreprocessedPoses: () => Map<number, PoseDetectionResult[]>;
   /** Set preprocessed poses (for loading from server) */
   setPreprocessedPoses: (poses: Map<number, PoseDetectionResult[]>, fps: number) => void;
+  /** Get the video element (for frame capture in external components) */
+  getVideoElement: () => HTMLVideoElement | null;
 }
 
 // ============================================================================

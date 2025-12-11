@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { Tooltip } from "@radix-ui/themes";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
+import { videoLogger } from "@/lib/logger";
 
 interface ShowFloatingVideoProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
@@ -16,50 +17,77 @@ interface ShowFloatingVideoProps {
  * Only visible when there's a video in the chat.
  */
 export function ShowFloatingVideo({ scrollContainerRef }: ShowFloatingVideoProps) {
-  const [hasVideo, setHasVideo] = useState(false);
   const isMobile = useIsMobile();
-  const checkTimeoutRef = useRef<NodeJS.Timeout>();
   const floatingCtx = useFloatingVideoContextOptional();
 
-  // Check if there are any videos in the chat
+  // Determine visibility: registered videos OR DOM fallback
+  const [hasDomVideo, setHasDomVideo] = useState(false);
+  const hasRegisteredVideo = useMemo(() => {
+    return (floatingCtx?.registeredVideos?.size ?? 0) > 0;
+  }, [floatingCtx?.registeredVideos]);
+  const shouldShow = hasRegisteredVideo || hasDomVideo;
+
   useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const checkForVideos = () => {
-      // Clear any pending timeout
-      if (checkTimeoutRef.current) {
-        clearTimeout(checkTimeoutRef.current);
-      }
-
-      // Debounce the check
-      checkTimeoutRef.current = setTimeout(() => {
-        // Find all video containers in the chat
-        const videoContainers = scrollContainer.querySelectorAll('[data-video-container="true"]');
-        setHasVideo(videoContainers.length > 0);
-      }, 100);
+    const update = () => {
+      if (typeof document === "undefined") return;
+      const videoEl = document.querySelector("video");
+      setHasDomVideo(!!videoEl);
     };
+    update();
+    const observer = typeof MutationObserver !== "undefined"
+      ? new MutationObserver(update)
+      : null;
+    if (observer) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+    return () => observer?.disconnect();
+  }, []);
 
-    // Check on mount
-    checkForVideos();
-
-    // Use MutationObserver to detect when videos are added/removed
-    const observer = new MutationObserver(checkForVideos);
-    observer.observe(scrollContainer, {
-      childList: true,
-      subtree: true,
+  useEffect(() => {
+    videoLogger.debug("[ShowFloatingVideo] visibility state", {
+      hasRegisteredVideo,
+      registeredCount: floatingCtx?.registeredVideos?.size ?? 0,
+      hasDomVideo,
+      isFloating: floatingCtx?.isFloating,
+      isMinimized: floatingCtx?.isMinimized,
     });
-
-    return () => {
-      observer.disconnect();
-      if (checkTimeoutRef.current) {
-        clearTimeout(checkTimeoutRef.current);
-      }
-    };
-  }, [scrollContainerRef]);
+  }, [hasRegisteredVideo, hasDomVideo, floatingCtx?.registeredVideos?.size, floatingCtx?.isFloating, floatingCtx?.isMinimized]);
 
   const handleClick = () => {
     if (!floatingCtx) return;
+    
+    // If nothing registered yet, try to auto-register the most recent video in the DOM
+    if ((floatingCtx.registeredVideos?.size ?? 0) === 0) {
+      const videoEl = typeof document !== "undefined" ? document.querySelector('video') as HTMLVideoElement | null : null;
+      if (videoEl) {
+        const container = videoEl.closest('[data-video-container="true"]') as HTMLElement | null;
+        const refObj = { current: container || (videoEl as unknown as HTMLElement) } as React.RefObject<HTMLElement>;
+        const src = videoEl.currentSrc || videoEl.src || "dom-video";
+        const autoId = `dom-video-${Date.now()}`;
+        // Provide a proper renderContent that returns a video element (fallback will also work)
+        floatingCtx.registerVideo(autoId, refObj, src, () => (
+          <video
+            key={autoId}
+            src={src}
+            controls
+            autoPlay
+            playsInline
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              backgroundColor: "#000",
+            }}
+          />
+        ));
+        videoLogger.debug("[ShowFloatingVideo] Auto-registered DOM video", { autoId, src, hasContainer: !!container });
+      } else {
+        videoLogger.warn("[ShowFloatingVideo] No DOM video found to register");
+        return;
+      }
+    }
     
     // Use showFloatingVideoAtTime with 0 to bypass cooldown and show expanded
     // This will use the first registered video
@@ -67,7 +95,7 @@ export function ShowFloatingVideo({ scrollContainerRef }: ShowFloatingVideoProps
   };
 
   // Don't show if no videos or if floating video is already visible
-  if (!hasVideo) return null;
+  if (!shouldShow) return null;
   
   // Hide button when floating video is already showing (not minimized)
   const isFloatingExpanded = floatingCtx?.isFloating && !floatingCtx?.isMinimized;

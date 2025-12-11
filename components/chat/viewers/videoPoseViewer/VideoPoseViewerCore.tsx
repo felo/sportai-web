@@ -73,6 +73,7 @@ import type { ObjectDetectionResult, ProjectileDetectionResult } from "@/types/d
 
 // Pose data persistence
 import { loadPoseData, savePoseData, convertToPreprocessedPoses } from "@/lib/poseDataService";
+import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 
 interface VideoPoseViewerProps {
   videoUrl: string;
@@ -192,6 +193,12 @@ export function VideoPoseViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const confidenceStats = useRef<Map<number, { sum: number; count: number }>>(new Map());
+  const floatingCtx = useFloatingVideoContextOptional();
+  const floatingCtxRef = useRef(floatingCtx);
+  useEffect(() => {
+    floatingCtxRef.current = floatingCtx;
+  }, [floatingCtx]);
+  const registeredIdRef = useRef<string | null>(null);
 
   // Core state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -199,6 +206,53 @@ export function VideoPoseViewer({
   const [currentFrame, setCurrentFrame] = useState(0);
   const [currentPoses, setCurrentPoses] = useState<PoseDetectionResult[]>([]);
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+
+  // Register this video with floating context for popup playback (single registration per videoUrl)
+  useEffect(() => {
+    const ctx = floatingCtxRef.current;
+    const container = containerRef.current;
+    if (!ctx || !container || !videoUrl) return;
+
+    // Generate or reuse a stable id for this video
+    if (!registeredIdRef.current) {
+      registeredIdRef.current = `vpv-${videoUrl}`;
+    }
+    const id = registeredIdRef.current;
+
+    // Avoid re-registering if already registered
+    if (ctx.registeredVideos?.has(id)) {
+      return;
+    }
+
+    ctx.registerVideo(
+      id,
+      containerRef as React.RefObject<HTMLElement>,
+      videoUrl,
+      () => (
+        <video
+          key={id}
+          src={videoUrl}
+          controls
+          autoPlay
+          playsInline
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            backgroundColor: "#000",
+          }}
+        />
+      )
+    );
+
+    return () => {
+      ctx.unregisterVideo(id);
+    };
+    // Only re-run when the actual videoUrl changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoUrl]);
 
   // Pose enabled state (controlled/uncontrolled)
   const isControlled = controlledPoseEnabled !== undefined;
@@ -1138,6 +1192,7 @@ export function VideoPoseViewer({
       {/* Video Container */}
       <Box
         ref={containerRef}
+        data-video-container="true"
         style={{
           position: "relative",
           width: compactMode ? "100%" : "auto",

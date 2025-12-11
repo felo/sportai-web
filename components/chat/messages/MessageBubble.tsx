@@ -534,6 +534,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     messageId={message.id}
                     chatId={getCurrentChatId() || undefined}
                     content={message.content}
+                    videoUrl={message.videoUrl || message.video_url}
                     isStreaming={message.isStreaming}
                     isIncomplete={message.isIncomplete}
                     thinkingMessage={(() => {

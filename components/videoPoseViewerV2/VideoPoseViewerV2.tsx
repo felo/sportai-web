@@ -19,7 +19,8 @@ import React, {
   ReactNode,
 } from "react";
 import { Box, Flex, Text, Badge } from "@radix-ui/themes";
-import { PlayIcon, ActivityLogIcon } from "@radix-ui/react-icons";
+import { PlayIcon, ActivityLogIcon, BookmarkIcon } from "@radix-ui/react-icons";
+import { MomentsGalleryView } from "@/components/tasks/techniqueViewer/components";
 import { usePoseDetection } from "@/hooks/usePoseDetection";
 import type { PoseDetectionResult, SupportedModel } from "@/hooks/usePoseDetection";
 import { detectionLogger } from "@/lib/logger";
@@ -46,6 +47,7 @@ import type {
   ViewerActions,
   DEFAULT_VIEWER_CONFIG,
   ProtocolEvent,
+  MomentsConfig,
 } from "./types";
 import {
   CONFIDENCE_PRESETS,
@@ -181,6 +183,8 @@ interface VideoPoseViewerV2Props {
   confidenceThreshold?: number;
   /** Callback when confidence threshold changes */
   onConfidenceThresholdChange?: (threshold: number) => void;
+  /** Moments tab configuration (custom events, comments, adjustments) */
+  momentsConfig?: MomentsConfig;
 }
 
 // ============================================================================
@@ -210,7 +214,7 @@ function shouldUseCrossOrigin(url: string): boolean {
 
 export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
   function VideoPoseViewerV2(
-    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false, confidenceThreshold, onConfidenceThresholdChange },
+    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false, confidenceThreshold, onConfidenceThresholdChange, momentsConfig },
     ref
   ) {
     // Refs
@@ -259,7 +263,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
 
     // Tab state
-    const [activeTab, setActiveTab] = useState<"swings" | "data-analysis">("swings");
+    const [activeTab, setActiveTab] = useState<"swings" | "moments" | "data-analysis">("swings");
     
     // Data Analysis metric state (persists across tab switches)
     const [selectedMetric, setSelectedMetric] = useState<MetricType>("velocity");
@@ -274,11 +278,20 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       callbacksRef.current?.onActiveTabChange?.(activeTab);
     }, [activeTab]);
 
+    // Count moments for badge
+    const momentsCount = useMemo(() => {
+      const protocolCount = protocolEvents.length;
+      const customCount = momentsConfig?.customEvents?.length ?? 0;
+      const commentsCount = momentsConfig?.videoComments?.length ?? 0;
+      return protocolCount + customCount + commentsCount;
+    }, [protocolEvents, momentsConfig?.customEvents, momentsConfig?.videoComments]);
+
     // Tab definitions
     const tabs: TabDefinition[] = useMemo(() => [
       { id: "swings", label: "Swings", icon: <PlayIcon width={16} height={16} /> },
+      { id: "moments", label: "Moments", icon: <BookmarkIcon width={16} height={16} />, badge: momentsCount > 0 ? momentsCount : undefined },
       { id: "data-analysis", label: "Data Analysis", icon: <ActivityLogIcon width={16} height={16} /> },
-    ], []);
+    ], [momentsCount]);
 
     // Swing detection V1 hook
     const {
@@ -1557,6 +1570,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         // Notify parent that preprocessing is "complete" (loaded from server)
         callbacksRef.current?.onPreprocessComplete?.(poses.size, fps);
       },
+      getVideoElement: () => videoRef.current,
     }), [
       videoFPS,
       usingPreprocessedPoses,
@@ -1590,6 +1604,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     return (
       <Box
         ref={containerRef}
+        data-video-container="true"
         className={className}
         style={{
           position: "relative",
@@ -1606,7 +1621,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         <TabNavigation
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as "swings" | "data-analysis")}
+          onTabChange={(tabId) => setActiveTab(tabId as "swings" | "moments" | "data-analysis")}
         />
 
         {/* Swings Tab Content */}
@@ -1881,6 +1896,45 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           </Flex>
         )}
         </Box>
+
+        {/* Moments Tab Content */}
+        {activeTab === "moments" && momentsConfig && (
+          <MomentsGalleryView
+            protocolEvents={protocolEvents}
+            customEvents={momentsConfig.customEvents}
+            videoComments={momentsConfig.videoComments}
+            protocolAdjustments={momentsConfig.protocolAdjustments}
+            swingBoundaryAdjustments={momentsConfig.swingBoundaryAdjustments}
+            videoElement={videoRef.current}
+            onViewMoment={(time) => {
+              momentsConfig.onViewMoment?.(time);
+              // Also seek within this viewer
+              const video = videoRef.current;
+              if (video) {
+                video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+                setCurrentTime(time);
+              }
+              // Switch to swings tab to show the video
+              setActiveTab("swings");
+            }}
+            onAnalyseMoment={(moment) => {
+              momentsConfig.onAnalyseMoment?.(moment);
+            }}
+          />
+        )}
+
+        {/* Moments Tab Empty State (when no momentsConfig provided) */}
+        {activeTab === "moments" && !momentsConfig && (
+          <Flex
+            align="center"
+            justify="center"
+            style={{ flex: 1, padding: "48px" }}
+          >
+            <Text size="2" style={{ color: "rgba(255,255,255,0.4)" }}>
+              Moments configuration not provided
+            </Text>
+          </Flex>
+        )}
 
         {/* Data Analysis Tab Content */}
         {activeTab === "data-analysis" && (

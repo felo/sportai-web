@@ -32,6 +32,7 @@ import { getSportColor } from "@/components/tasks/viewer/utils";
 import { LoadingState } from "@/components/tasks/viewer/components/LoadingState";
 import { ServerDataDebugPanel } from "./ServerDataDebugPanel";
 import { CustomEventDialog, type CustomEvent, VideoCommentDialog, type VideoComment } from "./components";
+import type { Moment } from "./components";
 import { 
   loadPoseData, 
   savePoseData, 
@@ -312,7 +313,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
     }));
   }, []);
 
-  const handleActiveTabChange = useCallback((activeTab: "swings" | "data-analysis") => {
+  const handleActiveTabChange = useCallback((activeTab: "swings" | "moments" | "data-analysis") => {
     setViewerState((prev) => ({ ...prev, activeTab }));
   }, []);
 
@@ -845,6 +846,25 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
     return protocolEvents.filter(e => e.protocolId === "swing-detection-v3").length;
   }, [protocolEvents]);
 
+  // Handle analyse moment action
+  const handleAnalyseMoment = useCallback((moment: Moment) => {
+    // For now, seek to the moment and show an alert with info
+    // TODO: Integrate with AI chat for detailed analysis
+    viewerRef.current?.seekTo(moment.time);
+    setViewMode("player");
+    
+    // Log analysis request for now
+    console.log(`[TechniqueViewer] Analyse requested for moment:`, {
+      id: moment.id,
+      label: moment.label,
+      type: moment.type,
+      time: moment.time,
+      frame: moment.frame,
+      protocolId: moment.protocolId,
+      metadata: moment.metadata,
+    });
+  }, []);
+
   // Angle preset helpers
   const isAngleActive = useCallback((angle: [number, number, number]) => {
     return config.angles.measuredAngles.some(
@@ -1273,6 +1293,16 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
               callbacks={viewerCallbacks}
               confidenceThreshold={confidenceThreshold}
               onConfidenceThresholdChange={handleConfidenceThresholdChange}
+              momentsConfig={{
+                customEvents,
+                videoComments,
+                protocolAdjustments,
+                swingBoundaryAdjustments,
+                onViewMoment: (time) => {
+                  viewerRef.current?.seekTo(time);
+                },
+                onAnalyseMoment: handleAnalyseMoment,
+              }}
               style={{
                 position: "absolute",
                 top: 0,

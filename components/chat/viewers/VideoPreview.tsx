@@ -52,6 +52,7 @@ export function VideoPreview({
           />
         ) : (
           <video
+            data-video-container="true"
             src={videoPreview || undefined}
             style={{
               height: "80px",

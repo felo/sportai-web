@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Box, Text, Button } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
 import { useFloatingVideoContextOptional } from "../../viewers/FloatingVideoContext";
 import type { Message } from "@/types/chat";
+import { videoLogger } from "@/lib/logger";
 
 // Default aspect ratio fallback
 const DEFAULT_ASPECT_RATIO = 16 / 9;
@@ -134,33 +135,90 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     seekToRef.current?.(seconds);
   }, []);
 
-  // Register this video with the floating context (only once per videoSrc change)
-  useEffect(() => {
-    const ctx = floatingContextRef.current;
-    if (!ctx || !videoContainerRef.current || !videoSrc || isImage) return;
+  // Register this video with the floating context (single attempt; no retries)
+  useLayoutEffect(() => {
+    if (!videoSrc) {
+      videoLogger.warn("[UserMessage] Skipping registration: missing videoSrc", {
+        messageId: message.id,
+        videoSrcPresent: !!videoSrc,
+      });
+      return;
+    }
     
-    ctx.registerVideo(
-      message.id,
-      videoContainerRef as React.RefObject<HTMLElement>,
-      videoSrc,
-      () => null, // renderContent not used with portal approach
-      undefined, // aspectRatio - will be updated later
-      seekTo
-    );
-    
-    return () => {
-      ctx.unregisterVideo(message.id);
+    const registerNow = () => {
+      const container = videoContainerRef.current;
+      if (!container) {
+        videoLogger.warn("[UserMessage] Skipping registration: container not ready", {
+          messageId: message.id,
+          videoSrc,
+        });
+        return;
+      }
+      const ctx = floatingContextRef.current;
+      if (!ctx) {
+        videoLogger.warn("[UserMessage] Skipping registration: floating context not ready", {
+          messageId: message.id,
+          videoSrc,
+        });
+        return;
+      }
+      
+      ctx.registerVideo(
+        message.id,
+        videoContainerRef as React.RefObject<HTMLElement>,
+        videoSrc,
+      // Render a simple video fallback if no portal content is provided
+      () => (
+        <video
+          key={message.id}
+          src={videoSrc}
+          controls
+          autoPlay
+          playsInline
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            backgroundColor: "#000",
+          }}
+        />
+      ),
+        undefined, // aspectRatio - will be updated later
+        seekTo
+      );
+      videoLogger.debug("[UserMessage] Registered video", {
+        messageId: message.id,
+        videoSrc,
+        hasContainer: !!container,
+      });
+      
+      return () => {
+        videoLogger.debug("[UserMessage] Unregister video", { messageId: message.id });
+        ctx.unregisterVideo(message.id);
+      };
     };
+    
+    // If container is not yet mounted, defer to next frame once.
+    if (!videoContainerRef.current) {
+      const rafId = requestAnimationFrame(() => {
+        registerNow();
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+    
+    return registerNow();
     // Only depend on message.id and videoSrc, not the full context
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message.id, videoSrc, isImage, seekTo]);
+  }, [message.id, videoSrc, seekTo]);
   
   // Keep seekTo callback updated in the context
   useEffect(() => {
     const ctx = floatingContextRef.current;
-    if (!ctx || !videoSrc || isImage) return;
+    if (!ctx || !videoSrc) return;
     ctx.updateVideoSeekTo(message.id, seekTo);
-  }, [message.id, videoSrc, isImage, seekTo]);
+  }, [message.id, videoSrc, seekTo]);
   
   // Continuously track dimensions when NOT floating using ResizeObserver
   // This ensures we always have the correct pre-float dimensions ready

@@ -202,18 +202,57 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     }, 100);
   }, [scrollToVideo]);
 
-  // Show floating video at a specific timestamp
+  // Show floating video at a specific timestamp (single attempt; no retries)
   const showFloatingVideoAtTime = useCallback((seconds: number) => {
-    const videos = Array.from(registeredVideosRef.current.values());
+    const ensureDomVideoRegistered = () => {
+      if (typeof document === "undefined") return false;
+      const allVideos = document.querySelectorAll("video");
+      const videoEl = allVideos.length > 0 ? allVideos[allVideos.length - 1] : null;
+      if (!videoEl) {
+        videoLogger.warn("[FloatingVideoContext] No DOM video found to auto-register");
+        return false;
+      }
+      const container = (videoEl.closest('[data-video-container=\"true\"]') as HTMLElement | null) || (videoEl as unknown as HTMLElement | null);
+      const autoId = `dom-video-${Date.now()}`;
+      const src = (videoEl as HTMLVideoElement).currentSrc || (videoEl as HTMLVideoElement).src || "dom-video";
+      registeredVideosRef.current.set(autoId, {
+        id: autoId,
+        ref: { current: container } as React.RefObject<HTMLElement>,
+        videoUrl: src,
+        // renderContent returns null - FloatingVideoPortal will use videoUrl fallback
+        renderContent: () => null,
+        aspectRatio: undefined,
+        seekTo: (s: number) => {
+          (videoEl as HTMLVideoElement).currentTime = s;
+          (videoEl as HTMLVideoElement).play().catch(() => {});
+        },
+      });
+      setRegistrationVersion(v => v + 1);
+      videoLogger.debug("[FloatingVideoContext] Auto-registered DOM video", {
+        autoId,
+        src,
+        hasContainer: !!container,
+      });
+      return true;
+    };
+
+    let videos = Array.from(registeredVideosRef.current.values());
     videoLogger.debug("[FloatingVideoContext] showFloatingVideoAtTime called", {
       seconds,
       registeredVideoCount: videos.length,
       videoIds: videos.map(v => v.id),
+      isFloating,
+      isMinimized,
+      activeVideoId,
     });
     
     if (videos.length === 0) {
-      videoLogger.warn("[FloatingVideoContext] No registered videos to show");
-      return;
+      const ok = ensureDomVideoRegistered();
+      if (!ok) {
+        videoLogger.warn("[FloatingVideoContext] No registered videos to show");
+        return;
+      }
+      videos = Array.from(registeredVideosRef.current.values());
     }
     
     const video = videos[0]; // Use first registered video
@@ -303,6 +342,14 @@ export function FloatingVideoProvider({ children, scrollContainerRef }: Floating
     showFloatingVideoAtTime,
     registrationVersion, // Trigger re-render when registrations (including aspectRatio) change
   ]);
+
+  // Expose context on window for debugging/manual registration in DevTools
+  useEffect(() => {
+    (window as any).__floatingCtx = value;
+    return () => {
+      delete (window as any).__floatingCtx;
+    };
+  }, [value]);
 
   return (
     <FloatingVideoContext.Provider value={value}>

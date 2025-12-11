@@ -2,16 +2,19 @@
 
 import { Box } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
+import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 import { MarkdownWithSwings } from "@/components/markdown";
 import { StreamingIndicator } from "../../feedback/StreamingIndicator";
 import { FeedbackButtons } from "../../feedback/FeedbackButtons";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
+import { useEffect, useRef } from "react";
 
 interface AssistantMessageProps {
   messageId: string;
   chatId?: string;
   content: string;
+  videoUrl?: string;
   isStreaming?: boolean;
   isIncomplete?: boolean;
   thinkingMessage: string;
@@ -31,6 +34,7 @@ export function AssistantMessage({
   messageId,
   chatId,
   content,
+  videoUrl,
   isStreaming,
   isIncomplete,
   thinkingMessage,
@@ -42,6 +46,79 @@ export function AssistantMessage({
   onRetry,
   isRetrying,
 }: AssistantMessageProps) {
+  const floatingCtx = useFloatingVideoContextOptional();
+  const floatingCtxRef = useRef(floatingCtx);
+  useEffect(() => {
+    floatingCtxRef.current = floatingCtx;
+  }, [floatingCtx]);
+  
+  // Register any assistant-rendered videos via MarkdownWithSwings callbacks
+  // Note: MarkdownWithSwings already wires timestamp clicks; we add video registration here
+  const handleRegisterVideo = (id: string, videoRef: React.RefObject<HTMLElement>, videoSrc: string) => {
+    const ctx = floatingCtx;
+    if (!ctx) return;
+    ctx.registerVideo(
+      id,
+      videoRef,
+      videoSrc,
+      () => (
+        <video
+          key={id}
+          src={videoSrc}
+          controls
+          autoPlay
+          playsInline
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            backgroundColor: "#000",
+          }}
+        />
+      )
+    );
+  };
+
+  // Register directly from message videoUrl (DB source of truth), one-per-message
+  useEffect(() => {
+    const ctx = floatingCtxRef.current;
+    if (!ctx || !messageId) return;
+    if (!videoUrl) return;
+
+    const regId = `assistant-msg-${messageId}`;
+    if (ctx.registeredVideos?.has(regId)) return;
+
+    ctx.registerVideo(
+      regId,
+      { current: null },
+      videoUrl,
+      () => (
+        <video
+          key={regId}
+          src={videoUrl}
+          controls
+          autoPlay
+          playsInline
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            backgroundColor: "#000",
+          }}
+        />
+      )
+    );
+
+    return () => {
+      ctx.unregisterVideo(regId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId, videoUrl]);
+
   // Show recovery UI if message is incomplete and not currently streaming
   const showRecovery = isIncomplete && !isStreaming && onRetry;
   
@@ -53,6 +130,7 @@ export function AssistantMessage({
             messageId={messageId} 
             onAskForHelp={onAskForHelp}
             onTTSUsage={onTTSUsage}
+            onRegisterVideo={handleRegisterVideo}
             feedbackButtons={!isStreaming && !isIncomplete ? (
               <FeedbackButtons 
                 messageId={messageId}

@@ -548,7 +548,7 @@ export function FloatingVideoPortal() {
             />
           </Box>
 
-          {/* Container for the portaled VideoPoseViewer - fills entire space, drag zone overlays it */}
+          {/* Container for video content - fills entire space */}
           <Box
             ref={videoContainerRef}
             style={{
@@ -560,10 +560,39 @@ export function FloatingVideoPortal() {
               backgroundColor: "#000",
               overflow: "hidden",
               zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-          />
+          >
+            {/* Try renderContent first, fall back to default video if it returns null */}
+            {(() => {
+              const content = typeof registration.renderContent === "function" 
+                ? registration.renderContent() 
+                : null;
+              if (content) return content;
+              // Fallback: render a basic video element using the videoUrl
+              return (
+                <video
+                  key={registration.id}
+                  src={registration.videoUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    backgroundColor: "#000",
+                  }}
+                />
+              );
+            })()}
+          </Box>
           
           {/* Mid-left control buttons - appear on hover/tap */}
           {/* Positioned at vertical center to avoid corners where native device controls appear */}
