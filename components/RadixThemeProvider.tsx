@@ -4,16 +4,16 @@ import { Theme } from "@radix-ui/themes";
 import { useEffect, useState, useLayoutEffect } from "react";
 import { initTheatreModeResizeListener } from "@/utils/storage";
 
-// Custom appearance type that includes our green theme
-type CustomAppearance = "light" | "dark" | "green";
-// Radix only supports light/dark, so we map green to dark
+// Custom appearance type that includes our custom themes
+type CustomAppearance = "light" | "dark" | "green" | "sportai";
+// Radix only supports light/dark, so we map custom themes to dark
 type RadixAppearance = "light" | "dark";
 type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
 type GrayColor = "gray" | "mauve" | "slate" | "sage" | "olive" | "sand";
 
 // Helper to get Radix appearance from custom appearance
 const getRadixAppearance = (appearance: CustomAppearance): RadixAppearance => {
-  // Green theme uses dark as base
+  // Green and SportAI themes use dark as base
   return appearance === "light" ? "light" : "dark";
 };
 

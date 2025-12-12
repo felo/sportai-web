@@ -252,6 +252,114 @@ html[data-theme="green"] .radix-themes {
   --color-text-muted: var(--gray-11) !important;
 }
 
+/* SPORTAI DEFAULT THEME overrides */
+html[data-theme="sportai"] .radix-themes {
+  /* Custom mint/accent colors - Primary accent: #7ADB8F */
+  --mint-1: #001C0F !important;
+  --mint-2: #002B1A !important;
+  --mint-3: #025940 !important;
+  --mint-4: #037A55 !important;
+  --mint-5: #049B6A !important;
+  --mint-6: #5ECF85 !important;
+  --mint-7: #7ADB8F !important; /* Primary accent */
+  --mint-8: #8EE39D !important;
+  --mint-9: #7ADB8F !important; /* Solid backgrounds */
+  --mint-10: #8EE39D !important; /* Hover state */
+  --mint-11: #FFFFFF !important; /* Text primary */
+  --mint-12: #FFFFFF !important;
+
+  /* Alpha variants */
+  --mint-a1: rgba(122, 219, 143, 0.05) !important;
+  --mint-a2: rgba(122, 219, 143, 0.1) !important;
+  --mint-a3: rgba(122, 219, 143, 0.15) !important;
+  --mint-a4: rgba(122, 219, 143, 0.2) !important;
+  --mint-a5: rgba(122, 219, 143, 0.3) !important;
+  --mint-a6: rgba(122, 219, 143, 0.4) !important;
+  --mint-a7: rgba(122, 219, 143, 0.5) !important;
+  --mint-a8: rgba(122, 219, 143, 0.64) !important;
+  --mint-a9: rgba(122, 219, 143, 0.8) !important;
+  --mint-a10: rgba(122, 219, 143, 0.9) !important;
+  --mint-a11: rgba(255, 255, 255, 0.95) !important;
+  --mint-a12: rgba(255, 255, 255, 1) !important;
+
+  /* Override accent colors */
+  --accent-1: var(--mint-1) !important;
+  --accent-2: var(--mint-2) !important;
+  --accent-3: var(--mint-3) !important;
+  --accent-4: var(--mint-4) !important;
+  --accent-5: var(--mint-5) !important;
+  --accent-6: var(--mint-6) !important;
+  --accent-7: var(--mint-7) !important;
+  --accent-8: var(--mint-8) !important;
+  --accent-9: var(--mint-9) !important;
+  --accent-10: var(--mint-10) !important;
+  --accent-11: var(--mint-11) !important;
+  --accent-12: var(--mint-12) !important;
+  
+  --accent-a1: var(--mint-a1) !important;
+  --accent-a2: var(--mint-a2) !important;
+  --accent-a3: var(--mint-a3) !important;
+  --accent-a4: var(--mint-a4) !important;
+  --accent-a5: var(--mint-a5) !important;
+  --accent-a6: var(--mint-a6) !important;
+  --accent-a7: var(--mint-a7) !important;
+  --accent-a8: var(--mint-a8) !important;
+  --accent-a9: var(--mint-a9) !important;
+  --accent-a10: var(--mint-a10) !important;
+  --accent-a11: var(--mint-a11) !important;
+  --accent-a12: var(--mint-a12) !important;
+
+  /* Custom gray scale - green-tinted neutrals */
+  --gray-1: #054530 !important;  /* Main bg */
+  --gray-2: #043D2A !important;
+  --gray-3: #002B1A !important;  /* Surface */
+  --gray-4: #001C0F !important;  /* Elevated surface */
+  --gray-5: #025940 !important;  /* Border */
+  --gray-6: #037A55 !important;
+  --gray-7: #049B6A !important;
+  --gray-8: #05BC7F !important;
+  --gray-9: #06DD94 !important;
+  --gray-10: #07FEA9 !important;
+  --gray-11: #F7F9F8 !important; /* Text muted */
+  --gray-12: #FFFFFF !important; /* Text primary */
+  
+  --color-background: #054530 !important;
+  --color-surface: #002B1A !important;
+  --color-panel-solid: #001C0F !important;
+  --color-border: #025940 !important;
+  --color-accent: #7ADB8F !important;
+  --color-accent-hover: #8EE39D !important;
+  --color-text: #FFFFFF !important;
+  --color-text-muted: #F7F9F8 !important;
+  
+  /* On-accent color (text on accent buttons) */
+  --accent-contrast: #001C0F !important;
+}
+
+/* SportAI theme markdown bullet points */
+html[data-theme="sportai"] .markdown-ul .markdown-li::before {
+  color: #7ADB8F;
+}
+
+html[data-theme="sportai"] .markdown-ol .markdown-li::before {
+  color: #7ADB8F;
+}
+
+html[data-theme="sportai"] .markdown-divider-line {
+  background-color: rgba(122, 219, 143, 0.3);
+}
+
+html[data-theme="sportai"] .markdown-divider-dots {
+  color: #7ADB8F;
+}
+
+/* SportAI theme dropdown highlights */
+html[data-theme="sportai"] .radix-themes [data-radix-collection-item][data-highlighted],
+html[data-theme="sportai"] .radix-themes [data-radix-menu-content] [data-highlighted] {
+  background-color: rgba(122, 219, 143, 0.15) !important;
+  color: var(--gray-12) !important;
+}
+
 /* Hide scrollbars while maintaining scroll functionality */
 * {
   scrollbar-width: none; /* Firefox */
