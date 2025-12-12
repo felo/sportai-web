@@ -29,6 +29,7 @@ import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/sto
 import { updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId, setCurrentChatId, createNewChat } from "@/utils/storage-unified";
 import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
+import { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
 
 // Local imports
 import { 
@@ -263,6 +264,10 @@ export function AIChatForm() {
 
   const error = videoError || apiError;
 
+  // Check conversation limit
+  const userMessageCount = messages.filter(m => m.role === "user").length;
+  const hasReachedLimit = userMessageCount >= FREE_TIER_MESSAGE_LIMIT;
+
   // Handlers
   const handlePickleballCoachPrompt = useCallback(() => {
     setPrompt(PICKLEBALL_COACH_PROMPT);
@@ -384,31 +389,33 @@ export function AIChatForm() {
             scrollContainerRef={scrollContainerRef}
             messagesEndRef={messagesEndRef}
             inputArea={
-              <ChatInput
-                prompt={prompt}
-                videoFile={videoFile}
-                videoPreview={videoPreview}
-                error={null}
-                loading={loading}
-                progressStage={progressStage}
-                thinkingMode={thinkingMode}
-                mediaResolution={mediaResolution}
-                domainExpertise={domainExpertise}
-                onPromptChange={setPrompt}
-                onVideoRemove={clearVideo}
-                onVideoChange={handleVideoChange}
-                onSubmit={handleSubmit}
-                onStop={handleStop}
-                onPickleballCoachClick={handlePickleballCoachPrompt}
-                onThinkingModeChange={handleThinkingModeChange}
-                onMediaResolutionChange={handleMediaResolutionChange}
-                onDomainExpertiseChange={handleDomainExpertiseChange}
-                disableTooltips={hasJustDropped}
-                hideDisclaimer={showingVideoSizeError}
-                videoSportDetected={videoSportDetected}
-                onVideoUrlDetected={setDetectedVideoUrl}
-                videoPreAnalysis={videoPreAnalysis}
-              />
+              hasReachedLimit ? null : (
+                <ChatInput
+                  prompt={prompt}
+                  videoFile={videoFile}
+                  videoPreview={videoPreview}
+                  error={null}
+                  loading={loading}
+                  progressStage={progressStage}
+                  thinkingMode={thinkingMode}
+                  mediaResolution={mediaResolution}
+                  domainExpertise={domainExpertise}
+                  onPromptChange={setPrompt}
+                  onVideoRemove={clearVideo}
+                  onVideoChange={handleVideoChange}
+                  onSubmit={handleSubmit}
+                  onStop={handleStop}
+                  onPickleballCoachClick={handlePickleballCoachPrompt}
+                  onThinkingModeChange={handleThinkingModeChange}
+                  onMediaResolutionChange={handleMediaResolutionChange}
+                  onDomainExpertiseChange={handleDomainExpertiseChange}
+                  disableTooltips={hasJustDropped}
+                  hideDisclaimer={showingVideoSizeError}
+                  videoSportDetected={videoSportDetected}
+                  onVideoUrlDetected={setDetectedVideoUrl}
+                  videoPreAnalysis={videoPreAnalysis}
+                />
+              )
             }
           >
             {messages.length === 0 && !loading ? (
@@ -429,6 +436,7 @@ export function AIChatForm() {
                 onSelectQuickOnly={handleSelectQuickOnly}
                 onOpenTechniqueStudio={handleOpenTechniqueStudio}
                 loadedMessageIds={loadedMessageIds}
+                onStartNewChat={handleNewChat}
               />
             )}
           </ChatLayout>

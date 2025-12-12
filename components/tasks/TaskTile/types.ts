@@ -14,7 +14,7 @@ export interface VideoMetadata {
 export interface Task {
   id: string;
   task_type: string;
-  sport: "tennis" | "padel" | "pickleball";
+  sport: "tennis" | "padel" | "pickleball" | "all";
   sportai_task_id: string | null;
   video_url: string;
   video_s3_key: string | null;

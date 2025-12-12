@@ -36,7 +36,7 @@ const TASK_TYPES = [
 ];
 
 const SPORTS = [
-  { value: "all", label: "All Sports" },
+  { value: "all", label: "Other" },
   { value: "padel", label: "Padel" },
   { value: "tennis", label: "Tennis" },
   { value: "pickleball", label: "Pickleball" },
@@ -45,7 +45,7 @@ const SPORTS = [
 interface Task {
   id: string;
   task_type: string;
-  sport: "tennis" | "padel" | "pickleball";
+  sport: "tennis" | "padel" | "pickleball" | "all";
   sportai_task_id: string | null;
   video_url: string;
   video_s3_key: string | null;
@@ -82,7 +82,7 @@ export function TasksPage() {
   const [developerMode, setDeveloperMode] = useState(false);
   
   // Filter state
-  const [filterSport, setFilterSport] = useState<string>("all");
+  const [filterSport, setFilterSport] = useState<string>("show_all");
   const [filterTaskType, setFilterTaskType] = useState<string>("all");
   
   // Sort state
@@ -121,7 +121,7 @@ export function TasksPage() {
   const filteredTasks = useMemo(() => {
     // First filter
     let result = tasks.filter(task => {
-      if (filterSport !== "all" && task.sport !== filterSport) return false;
+      if (filterSport !== "show_all" && task.sport !== filterSport) return false;
       if (filterTaskType !== "all" && task.task_type !== filterTaskType) return false;
       return true;
     });
@@ -731,12 +731,15 @@ export function TasksPage() {
   };
   
   const getSportBadge = (sportValue: Task["sport"]) => {
-    const colors: Record<Task["sport"], "cyan" | "orange" | "green"> = {
+    // Don't show badge for "other" (all) sport
+    if (sportValue === "all") return null;
+    
+    const colors: Record<Exclude<Task["sport"], "all">, "cyan" | "orange" | "green"> = {
       padel: "cyan",
       tennis: "orange",
       pickleball: "green",
     };
-    const labels: Record<Task["sport"], string> = {
+    const labels: Record<Exclude<Task["sport"], "all">, string> = {
       padel: "Padel",
       tennis: "Tennis",
       pickleball: "Pickleball",
@@ -1051,7 +1054,7 @@ export function TasksPage() {
             <Select.Root value={filterSport} onValueChange={setFilterSport} size="1">
               <Select.Trigger placeholder="All Sports" style={{ minWidth: "110px" }} />
               <Select.Content>
-                <Select.Item value="all">All Sports</Select.Item>
+                <Select.Item value="show_all">All</Select.Item>
                 {SPORTS.map(s => (
                   <Select.Item key={s.value} value={s.value}>
                     {s.label}
@@ -1074,7 +1077,7 @@ export function TasksPage() {
             </Select.Root>
             
             {/* Show count of filtered results */}
-            {(filterSport !== "all" || filterTaskType !== "all") && (
+            {(filterSport !== "show_all" || filterTaskType !== "all") && (
               <Text size="1" color="gray">
                 {filteredTasks.length} of {tasks.length}
               </Text>

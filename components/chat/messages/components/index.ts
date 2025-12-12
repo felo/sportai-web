@@ -1,4 +1,6 @@
 export { ProUpsellBanner } from "./ProUpsellBanner";
+export { ConversationLimitBanner } from "./ConversationLimitBanner";
+export { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
 export { DeveloperInfo } from "./DeveloperInfo";
 export { ThinkingIndicator } from "./ThinkingIndicator";
 export { UserMessage } from "./UserMessage";

@@ -13,7 +13,7 @@ export const PRO_VIDEO_LIMIT_MB = 500;
 export function getVideoSizeErrorMessage(sizeMB: number): string {
   return `## Video Size Limit
 
-I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size (approx 10 min). Unfortunately, that's quite large for me to process on the free tier - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
+I can see you've uploaded a video that's **${sizeMB.toFixed(1)} MB** in size. Unfortunately, that's quite large for me to process on the free tier - I work best with videos under **${LARGE_VIDEO_LIMIT_MB} MB**.
 
 ---
 

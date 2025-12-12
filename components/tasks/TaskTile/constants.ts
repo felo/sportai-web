@@ -13,8 +13,8 @@ export const FORMAT_CODEC_MAP: Record<string, string> = {
   "OGV": "Theora",
 };
 
-// Sport badge colors
-export const SPORT_COLORS: Record<Task["sport"], "cyan" | "orange" | "green"> = {
+// Sport badge colors (excludes "all" since badge is hidden for that)
+export const SPORT_COLORS: Record<Exclude<Task["sport"], "all">, "cyan" | "orange" | "green"> = {
   padel: "cyan",
   tennis: "orange",
   pickleball: "green",
@@ -25,6 +25,7 @@ export const SPORT_ICONS: Record<Task["sport"], string> = {
   padel: "P",
   tennis: "T",
   pickleball: "PB",
+  all: "🎾",
 };
 
 // Background colors for no-thumbnail state
@@ -32,6 +33,7 @@ export const SPORT_BG_COLORS: Record<Task["sport"], string> = {
   padel: "var(--cyan-4)",
   tennis: "var(--orange-4)",
   pickleball: "var(--green-4)",
+  all: "var(--gray-4)",
 };
 
 // Task status configuration

@@ -5,6 +5,7 @@ import { Text } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
 import { MessageBubble } from "./MessageBubble";
 import { ScrollSpacer } from "./ScrollSpacer";
+import { ConversationLimitBanner, FREE_TIER_MESSAGE_LIMIT } from "./components";
 import { URLs } from "@/lib/config";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Message, ProgressStage } from "@/types/chat";
@@ -27,6 +28,8 @@ interface MessageListProps {
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Track which messages were loaded from storage (not created in this session)
   loadedMessageIds?: Set<string>;
+  // Start new chat handler for conversation limit
+  onStartNewChat?: () => void;
 }
 
 export function MessageList({
@@ -44,11 +47,18 @@ export function MessageList({
   onSelectQuickOnly,
   onOpenTechniqueStudio,
   loadedMessageIds,
+  onStartNewChat,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
+  // Count user messages for conversation limit
+  const userMessageCount = messages.filter(m => m.role === "user").length;
+  const hasReachedLimit = userMessageCount >= FREE_TIER_MESSAGE_LIMIT;
+  
   chatLogger.debug("[MessageList] Render:", {
     messagesCount: messages.length,
+    userMessageCount,
+    hasReachedLimit,
     loading,
     messageIds: messages.map(m => m.id),
   });
@@ -128,6 +138,12 @@ export function MessageList({
           isLoadedFromServer={loadedMessageIds?.has(message.id) ?? false}
         />
       ))}
+
+      {/* Conversation limit banner */}
+      <ConversationLimitBanner 
+        show={hasReachedLimit} 
+        onStartNewChat={onStartNewChat}
+      />
 
       {/* Ref for scrollToBottom functionality */}
       <div ref={messagesEndRef} aria-hidden="true" />

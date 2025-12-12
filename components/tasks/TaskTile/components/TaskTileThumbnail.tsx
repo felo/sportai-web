@@ -102,12 +102,14 @@ export function TaskTileThumbnail({
         />
       )}
 
-      {/* Sport Badge */}
-      <Box style={{ position: "absolute", top: "8px", left: "8px" }}>
-        <Badge color={SPORT_COLORS[task.sport]} variant="solid" size="1">
-          {task.sport.charAt(0).toUpperCase() + task.sport.slice(1)}
-        </Badge>
-      </Box>
+      {/* Sport Badge - hidden for "other" (all) sport */}
+      {task.sport !== "all" && (
+        <Box style={{ position: "absolute", top: "8px", left: "8px" }}>
+          <Badge color={SPORT_COLORS[task.sport]} variant="solid" size="1">
+            {task.sport.charAt(0).toUpperCase() + task.sport.slice(1)}
+          </Badge>
+        </Box>
+      )}
 
       {/* Menu Dropdown */}
       <Box
