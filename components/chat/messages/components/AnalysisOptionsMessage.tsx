@@ -106,19 +106,19 @@ const TECHNIQUE_PRO_FEATURES: FeatureInfo[] = [
 // Typewriter Hook
 // ============================================================================
 
-const TYPEWRITER_STORAGE_KEY = "analysis-options-intro-typed";
-
-function useTypewriter(text: string, speed: number = 30, enabled: boolean = true): string {
-  const [displayText, setDisplayText] = useState(() => (enabled ? "" : text));
-  const [currentIndex, setCurrentIndex] = useState(() => (enabled ? 0 : text.length));
+function useTypewriter(text: string, speed: number = 30, enabled: boolean): string {
+  const [displayText, setDisplayText] = useState(enabled ? "" : text);
+  const [currentIndex, setCurrentIndex] = useState(enabled ? 0 : text.length);
 
   useEffect(() => {
+    // Not enabled - show full text immediately
     if (!enabled) {
       setDisplayText(text);
       setCurrentIndex(text.length);
       return;
     }
 
+    // Continue typing
     if (currentIndex < text.length) {
       const timer = setTimeout(() => {
         setDisplayText(prev => prev + text[currentIndex]);
@@ -127,18 +127,6 @@ function useTypewriter(text: string, speed: number = 30, enabled: boolean = true
       return () => clearTimeout(timer);
     }
   }, [currentIndex, text, speed, enabled]);
-
-  useEffect(() => {
-    // Reset when text or enabled flag changes
-    if (enabled) {
-      setDisplayText("");
-      setCurrentIndex(0);
-      return;
-    }
-
-    setDisplayText(text);
-    setCurrentIndex(text.length);
-  }, [text, enabled]);
 
   return displayText;
 }
@@ -182,6 +170,7 @@ interface AnalysisOptionsMessageProps {
   onSelectQuickOnly: () => void;
   isLoading?: boolean;
   selectedOption?: "pro_plus_quick" | "quick_only" | null;
+  isLoadedFromServer?: boolean; // If true, skip typewriter animation
 }
 
 /**
@@ -194,10 +183,12 @@ export function AnalysisOptionsMessage({
   onSelectQuickOnly,
   isLoading = false,
   selectedOption = null,
+  isLoadedFromServer = false,
 }: AnalysisOptionsMessageProps) {
-  const [shouldTypewriterRun, setShouldTypewriterRun] = useState<boolean | null>(null);
-  const [showBoxes, setShowBoxes] = useState(false);
-  const [showButtons, setShowButtons] = useState(false);
+  // If loaded from server, skip animation. If new message, show typewriter.
+  const shouldAnimate = !isLoadedFromServer;
+  const [showBoxes, setShowBoxes] = useState(!shouldAnimate);
+  const [showButtons, setShowButtons] = useState(!shouldAnimate);
 
   const sportName = preAnalysis.sport 
     ? preAnalysis.sport.charAt(0).toUpperCase() + preAnalysis.sport.slice(1)
@@ -225,31 +216,13 @@ export function AnalysisOptionsMessage({
     return msg;
   }, [sportName, cameraLabel, analysisType]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const hasSeenIntro = localStorage.getItem(TYPEWRITER_STORAGE_KEY) === "true";
-    setShouldTypewriterRun(!hasSeenIntro);
-
-    if (!hasSeenIntro) {
-      localStorage.setItem(TYPEWRITER_STORAGE_KEY, "true");
-    }
-  }, []);
-
-  const typedIntro = useTypewriter(introMessage, 18, shouldTypewriterRun === true);
-  const introText = shouldTypewriterRun === null
-    ? ""
-    : shouldTypewriterRun
-      ? typedIntro
-      : introMessage;
+  const introText = useTypewriter(introMessage, 18, shouldAnimate);
 
   // Trigger animations after intro finishes
   useEffect(() => {
-    if (shouldTypewriterRun === null) return;
+    if (!shouldAnimate) return; // Already showing everything instantly
 
-    const introDelay = shouldTypewriterRun
-      ? introMessage.length * 18 + 300
-      : 300;
+    const introDelay = introMessage.length * 18 + 300;
     const boxesTimer = setTimeout(() => setShowBoxes(true), introDelay);
     const buttonsTimer = setTimeout(() => setShowButtons(true), introDelay + 600);
     
@@ -257,7 +230,7 @@ export function AnalysisOptionsMessage({
       clearTimeout(boxesTimer);
       clearTimeout(buttonsTimer);
     };
-  }, [introMessage, shouldTypewriterRun]);
+  }, [introMessage, shouldAnimate]);
 
   const isEligible = preAnalysis.isProEligible || preAnalysis.isTechniqueLiteEligible;
   const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;

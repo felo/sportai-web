@@ -49,9 +49,11 @@ export function TaskHeader({
           tooltip="Back to Tasks"
         />
         <Flex align="center" gap="3">
-          <Badge color={getSportColor(task.sport)} size="2">
-            {task.sport.charAt(0).toUpperCase() + task.sport.slice(1)}
-          </Badge>
+          {task.sport !== "all" && (
+            <Badge color={getSportColor(task.sport)} size="2">
+              {task.sport.charAt(0).toUpperCase() + task.sport.slice(1)}
+            </Badge>
+          )}
           <Badge variant="soft" size="2">
             {task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1)}
           </Badge>

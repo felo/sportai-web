@@ -593,8 +593,8 @@ CREATE TABLE IF NOT EXISTS sportai_tasks (
   -- Task type (statistics, activity_detection, etc.)
   task_type TEXT NOT NULL,
   
-  -- Sport type
-  sport TEXT NOT NULL DEFAULT 'padel' CHECK (sport IN ('tennis', 'padel', 'pickleball')),
+  -- Sport type ('all' is valid only for technique tasks)
+  sport TEXT NOT NULL DEFAULT 'padel' CHECK (sport IN ('tennis', 'padel', 'pickleball', 'all')),
   
   -- SportAI API fields
   sportai_task_id UUID, -- Task ID returned from SportAI API
@@ -658,4 +658,11 @@ CREATE TRIGGER update_sportai_tasks_updated_at
 -- =============================================
 -- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 -- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS thumbnail_s3_key TEXT;
+
+-- =============================================
+-- MIGRATION: Add 'all' as valid sport for technique tasks
+-- Run this if you already have the sportai_tasks table
+-- =============================================
+-- ALTER TABLE sportai_tasks DROP CONSTRAINT sportai_tasks_sport_check;
+-- ALTER TABLE sportai_tasks ADD CONSTRAINT sportai_tasks_sport_check CHECK (sport IN ('tennis', 'padel', 'pickleball', 'all'));
 

@@ -89,6 +89,7 @@ export function AIChatForm() {
     removeMessage,
     clearMessages,
     isHydrated,
+    loadedMessageIds,
   } = useAIChat();
 
   // AI API hook
@@ -427,6 +428,7 @@ export function AIChatForm() {
                 onSelectProPlusQuick={handleSelectProPlusQuick}
                 onSelectQuickOnly={handleSelectQuickOnly}
                 onOpenTechniqueStudio={handleOpenTechniqueStudio}
+                loadedMessageIds={loadedMessageIds}
               />
             )}
           </ChatLayout>

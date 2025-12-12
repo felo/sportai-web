@@ -39,13 +39,14 @@ export function formatDuration(seconds: number): string {
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
 
-export function getSportColor(sport: string): "cyan" | "orange" | "green" {
-  const colors: Record<string, "cyan" | "orange" | "green"> = {
+export function getSportColor(sport: string): "cyan" | "orange" | "green" | "gray" {
+  const colors: Record<string, "cyan" | "orange" | "green" | "gray"> = {
     padel: "cyan",
     tennis: "orange",
     pickleball: "green",
+    all: "gray",
   };
-  return colors[sport] || "cyan";
+  return colors[sport] || "gray";
 }
 
 import { PLAYER_CONFIG, getDynamicSwingsThreshold } from "./constants";

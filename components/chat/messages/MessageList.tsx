@@ -25,6 +25,8 @@ interface MessageListProps {
   onSelectQuickOnly?: (messageId: string) => void;
   // Technique Studio handler
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
+  // Track which messages were loaded from storage (not created in this session)
+  loadedMessageIds?: Set<string>;
 }
 
 export function MessageList({
@@ -41,6 +43,7 @@ export function MessageList({
   onSelectProPlusQuick,
   onSelectQuickOnly,
   onOpenTechniqueStudio,
+  loadedMessageIds,
 }: MessageListProps) {
   const isMobile = useIsMobile();
   
@@ -122,6 +125,7 @@ export function MessageList({
           // Pass progress info to the last message (the assistant message being generated)
           progressStage={index === messages.length - 1 ? progressStage : "idle"}
           uploadProgress={index === messages.length - 1 ? uploadProgress : 0}
+          isLoadedFromServer={loadedMessageIds?.has(message.id) ?? false}
         />
       ))}
 

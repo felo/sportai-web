@@ -73,6 +73,8 @@ export interface SwingCurveViewProps {
   confidenceThreshold?: number;
   /** Callback when confidence threshold changes */
   onConfidenceThresholdChange?: (threshold: number) => void;
+  /** Whether to show outer angles (180° - angle) instead of inner angles */
+  useComplementaryAngles?: boolean;
   /** Custom class name */
   className?: string;
   /** Custom style */
@@ -960,6 +962,7 @@ export function SwingCurveView({
   onOrientationTypeChange,
   confidenceThreshold: controlledConfidenceThreshold,
   onConfidenceThresholdChange,
+  useComplementaryAngles = true,
   className,
   style,
 }: SwingCurveViewProps) {
@@ -1324,6 +1327,12 @@ export function SwingCurveView({
               }
               break;
           }
+          // The stored values are already "outer angles" (where 0° = straight, higher = more bent)
+          // When useComplementaryAngles is true: show as-is (outer angle)
+          // When useComplementaryAngles is false: transform to inner angle (180° = straight)
+          if (value !== null && !useComplementaryAngles) {
+            value = 180 - value;
+          }
           break;
         case "score":
           value = fd.swingScore;
@@ -1337,7 +1346,7 @@ export function SwingCurveView({
         phase: fd.phase,
       };
     });
-  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart, orientationType]);
+  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart, orientationType, useComplementaryAngles]);
 
   // Raw data (before any processing) - for comparison (velocity and knee bend)
   const rawChartData = useMemo((): ChartDataPoint[] => {
@@ -1489,6 +1498,12 @@ export function SwingCurveView({
             }
             break;
         }
+        // The stored values are already "outer angles" (where 0° = straight, higher = more bent)
+        // When useComplementaryAngles is true: show as-is (outer angle)
+        // When useComplementaryAngles is false: transform to inner angle (180° = straight)
+        if (value !== null && !useComplementaryAngles) {
+          value = 180 - value;
+        }
       }
       
       return {
@@ -1498,7 +1513,7 @@ export function SwingCurveView({
         phase: fd.phase,
       };
     });
-  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart]);
+  }, [swingResult, selectedMetric, selectedWrist, selectedKnee, angleType, velocityBodyPart, useComplementaryAngles]);
 
   // Helper to get confidence for a body part
   const getConfidenceForBodyPart = useCallback((fd: SwingFrameDataV3, bodyPart: VelocityBodyPart, side: "left" | "right"): number | null => {

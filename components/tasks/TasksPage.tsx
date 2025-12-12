@@ -36,6 +36,7 @@ const TASK_TYPES = [
 ];
 
 const SPORTS = [
+  { value: "all", label: "All Sports" },
   { value: "padel", label: "Padel" },
   { value: "tennis", label: "Tennis" },
   { value: "pickleball", label: "Pickleball" },
@@ -44,7 +45,7 @@ const SPORTS = [
 interface Task {
   id: string;
   task_type: string;
-  sport: "tennis" | "padel" | "pickleball";
+  sport: "tennis" | "padel" | "pickleball" | "all";
   sportai_task_id: string | null;
   video_url: string;
   thumbnail_url: string | null;
@@ -71,8 +72,8 @@ export function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
-  const [taskType, setTaskType] = useState("statistics");
-  const [sport, setSport] = useState("padel");
+  const [taskType, setTaskType] = useState("technique");
+  const [sport, setSport] = useState("all");
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
@@ -98,6 +99,22 @@ export function TasksPage() {
       setSortDirection("desc");
     }
   };
+  
+  // Available task types based on sport selection
+  // "All Sports" only supports technique tasks (client-side processing)
+  const availableTaskTypes = useMemo(() => {
+    if (sport === "all") {
+      return TASK_TYPES.filter(t => t.value === "technique");
+    }
+    return TASK_TYPES;
+  }, [sport]);
+  
+  // Auto-switch to technique when sport changes to "all"
+  useEffect(() => {
+    if (sport === "all" && taskType !== "technique") {
+      setTaskType("technique");
+    }
+  }, [sport, taskType]);
   
   // Filtered and sorted tasks
   const filteredTasks = useMemo(() => {
@@ -713,15 +730,17 @@ export function TasksPage() {
   };
   
   const getSportBadge = (sportValue: Task["sport"]) => {
-    const colors: Record<Task["sport"], "cyan" | "orange" | "green"> = {
+    const colors: Record<Task["sport"], "cyan" | "orange" | "green" | "gray"> = {
       padel: "cyan",
       tennis: "orange",
       pickleball: "green",
+      all: "gray",
     };
     const labels: Record<Task["sport"], string> = {
       padel: "Padel",
       tennis: "Tennis",
       pickleball: "Pickleball",
+      all: "All Sports",
     };
     return <Badge color={colors[sportValue]}>{labels[sportValue]}</Badge>;
   };
@@ -902,7 +921,7 @@ export function TasksPage() {
                 <Select.Root value={taskType} onValueChange={setTaskType} disabled={submitting || uploadingVideo}>
                   <Select.Trigger style={{ width: "100%" }} />
                   <Select.Content>
-                    {TASK_TYPES.map(type => (
+                    {availableTaskTypes.map(type => (
                       <Select.Item key={type.value} value={type.value}>
                         {type.label}
                       </Select.Item>

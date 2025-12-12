@@ -16,7 +16,7 @@ interface CoachingTabProps {
   result: StatisticsResult | null;
   rankings: PlayerRankings;
   playerDisplayNames: Record<number, string>;
-  sport?: "tennis" | "padel" | "pickleball";
+  sport?: "tennis" | "padel" | "pickleball" | "all";
 }
 
 interface ChatMessage {

@@ -7,7 +7,7 @@ import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/stor
 import { calculatePricing } from "@/lib/token-utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -46,12 +46,16 @@ interface MessageBubbleProps {
   // Analysis options handlers
   onSelectProPlusQuick?: (messageId: string) => void;
   onSelectQuickOnly?: (messageId: string) => void;
+  // Technique Studio handler
+  onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Progress state for upload/processing/analyzing
   progressStage?: ProgressStage;
   uploadProgress?: number;
+  // Whether this message was loaded from storage (not created in this session)
+  isLoadedFromServer?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, progressStage = "idle", uploadProgress = 0 }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -515,6 +519,17 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                   onSelectProPlusQuick={() => onSelectProPlusQuick?.(message.id)}
                   onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
                   isLoading={message.isStreaming}
+                  isLoadedFromServer={isLoadedFromServer}
+                />
+              ) : message.messageType === "technique_studio_prompt" && message.techniqueStudioPrompt ? (
+                <TechniqueStudioPrompt
+                  videoUrl={message.techniqueStudioPrompt.videoUrl}
+                  taskId={message.techniqueStudioPrompt.taskId}
+                  onOpenStudio={() => onOpenTechniqueStudio?.(
+                    message.techniqueStudioPrompt!.videoUrl,
+                    message.techniqueStudioPrompt!.taskId
+                  )}
+                  onTTSUsage={handleTTSUsage}
                 />
               ) : (
                 <>
@@ -554,7 +569,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
               
               {/* Developer mode token information */}
               <DeveloperInfo
-                show={developerMode && (!!message.content || message.messageType === "analysis_options")}
+                show={developerMode && (!!message.content || message.messageType === "analysis_options" || message.messageType === "technique_studio_prompt")}
                 messageTokens={messageTokens}
                 cumulativeTokens={cumulativeTokens}
                 messagePricing={messagePricing}

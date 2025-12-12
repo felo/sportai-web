@@ -1998,6 +1998,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             onOrientationTypeChange={setSelectedOrientationType}
             confidenceThreshold={confidenceThreshold}
             onConfidenceThresholdChange={onConfidenceThresholdChange}
+            useComplementaryAngles={config.angles.useComplementaryAngles}
             onSeekToFrame={(frame) => {
               const video = videoRef.current;
               if (!video) return;

@@ -58,6 +58,8 @@ export function useAIChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isSwitchingChatRef = useRef(false);
   const activeChatIdRef = useRef<string | undefined>(undefined);
+  // Track message IDs that were loaded from storage (not created in this session)
+  const loadedMessageIdsRef = useRef<Set<string>>(new Set());
 
   // Load messages from localStorage after hydration (client-side only)
   useEffect(() => {
@@ -74,6 +76,8 @@ export function useAIChat() {
           if (chat) {
             // Mark any messages that were interrupted as incomplete
             messagesToLoad = markIncompleteMessages(chat.messages);
+            // Track these as loaded from storage
+            messagesToLoad.forEach(m => loadedMessageIdsRef.current.add(m.id));
           }
         }
         
@@ -88,6 +92,8 @@ export function useAIChat() {
           } else {
             // No current chat - try old storage for backward compatibility
             loadMessagesFromStorage().then((storedMessages) => {
+              // Track these as loaded from storage
+              storedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
               setMessages(storedMessages);
               setIsHydrated(true);
               
@@ -219,6 +225,8 @@ export function useAIChat() {
           } else {
             // Mark any messages that were interrupted as incomplete
             const markedMessages = markIncompleteMessages(chat.messages);
+            // Track these as loaded from storage
+            markedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
             // Load messages from the selected chat
             const refreshed = await refreshVideoUrls(markedMessages);
             setMessages(refreshed);
@@ -237,6 +245,8 @@ export function useAIChat() {
         chatLogger.debug("No current chat, loading from old storage");
         const storedMessages = await loadMessagesFromStorage();
         if (storedMessages.length > 0) {
+          // Track these as loaded from storage
+          storedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
           const refreshed = await refreshVideoUrls(storedMessages);
           setMessages(refreshed);
           saveMessagesToStorage(refreshed);
@@ -427,6 +437,7 @@ export function useAIChat() {
     uploadProgress,
     messagesEndRef,
     isHydrated,
+    loadedMessageIds: loadedMessageIdsRef.current,
     setLoading,
     setProgressStage,
     setUploadProgress,

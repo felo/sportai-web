@@ -117,10 +117,18 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const validSports = ["tennis", "padel", "pickleball"];
+    const validSports = ["tennis", "padel", "pickleball", "all"];
     if (!validSports.includes(sport)) {
       return NextResponse.json(
         { error: `Invalid sport: ${sport}. Must be one of: ${validSports.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    
+    // "all" sport is only valid for technique tasks (client-side processing)
+    if (sport === "all" && !CLIENT_SIDE_TASKS.includes(taskType)) {
+      return NextResponse.json(
+        { error: `Sport "all" is only valid for technique tasks, not ${taskType}` },
         { status: 400 }
       );
     }

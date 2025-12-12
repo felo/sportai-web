@@ -1347,7 +1347,7 @@ Keep the analysis focused and actionable.`;
                   </IconButton>
                 </Tooltip>
               )}
-              {sport && (
+              {sport && sport !== "all" && (
                 <Badge color={getSportColor(sport)} size="2">
                   {sport.charAt(0).toUpperCase() + sport.slice(1)}
                 </Badge>
