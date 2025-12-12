@@ -1735,7 +1735,7 @@ export function PoseConfigurationPanel({
             {/* Pose Stability Filter */}
             <Section title="Pose Stability Filter" icon={<TargetIcon />}>
               <Text size="1" color="gray" style={{ marginBottom: "12px" }}>
-                Detects and recovers from corrupted "banana" frames
+                Detects and recovers from corrupted &quot;banana&quot; frames
               </Text>
 
               <ControlRow label="Enable">

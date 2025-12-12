@@ -28,7 +28,7 @@ export type TTSVoiceGender = "male" | "female" | "neutral";
 /**
  * TTS language/accent type
  */
-export type TTSLanguage = "en-US" | "en-GB" | "en-AU" | "en-IN";
+export type TTSLanguage = "en-US" | "en-GB" | "en-AU" | "en-IN" | "fr-FR";
 
 /**
  * TTS settings interface

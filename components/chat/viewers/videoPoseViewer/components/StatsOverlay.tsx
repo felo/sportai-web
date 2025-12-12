@@ -3,6 +3,7 @@
 import { Box, Flex, Text, Button } from "@radix-ui/themes";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import type { PoseDetectionResult } from "@/hooks/usePoseDetection";
+import type { ProjectileDetectionResult, ObjectDetectionResult } from "@/types/detection";
 
 export interface StatsOverlayProps {
   currentFrame: number;
@@ -12,8 +13,8 @@ export interface StatsOverlayProps {
   isPoseEnabled: boolean;
   isObjectDetectionEnabled: boolean;
   isProjectileDetectionEnabled: boolean;
-  currentObjects: unknown[];
-  currentProjectile: unknown | null;
+  currentObjects: ObjectDetectionResult[];
+  currentProjectile: ProjectileDetectionResult | null;
   isPortraitVideo: boolean;
   isMobile: boolean;
   confidenceStats: React.RefObject<Map<number, { sum: number; count: number }>>;
@@ -52,7 +53,7 @@ export function StatsOverlay({
   if (!hasContent) return null;
 
   // Get average accuracy for selected player
-  const stats = confidenceStats.current.get(selectedPoseIndex);
+  const stats = confidenceStats.current?.get(selectedPoseIndex);
   const avgConfidence = stats && stats.count > 0 ? stats.sum / stats.count : 0;
 
   return (
@@ -157,7 +158,7 @@ export function StatsOverlay({
         {isProjectileDetectionEnabled && currentProjectile && (
           <Text size="1" style={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "10px" }}>
             Ball tracked •{" "}
-            {((currentProjectile as { confidence: number }).confidence * 100).toFixed(0)}%
+            {(currentProjectile.confidence * 100).toFixed(0)}%
             confidence
           </Text>
         )}

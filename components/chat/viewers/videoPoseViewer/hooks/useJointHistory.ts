@@ -488,5 +488,3 @@ export function useJointHistory({
   };
 }
 
-// Re-export types for consumers
-export type { SegmentDefinition, AngleDefinition };

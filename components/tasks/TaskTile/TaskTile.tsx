@@ -46,7 +46,7 @@ export function TaskTile({
 
   return (
     <Card
-      ref={containerRef}
+      ref={containerRef as React.RefObject<HTMLDivElement>}
       style={{
         cursor: canView && !isPreparing ? "pointer" : "default",
         transition: "all 0.2s ease",

@@ -45,7 +45,7 @@ const SPORTS = [
 interface Task {
   id: string;
   task_type: string;
-  sport: "tennis" | "padel" | "pickleball" | "all";
+  sport: "tennis" | "padel" | "pickleball";
   sportai_task_id: string | null;
   video_url: string;
   thumbnail_url: string | null;
@@ -730,17 +730,15 @@ export function TasksPage() {
   };
   
   const getSportBadge = (sportValue: Task["sport"]) => {
-    const colors: Record<Task["sport"], "cyan" | "orange" | "green" | "gray"> = {
+    const colors: Record<Task["sport"], "cyan" | "orange" | "green"> = {
       padel: "cyan",
       tennis: "orange",
       pickleball: "green",
-      all: "gray",
     };
     const labels: Record<Task["sport"], string> = {
       padel: "Padel",
       tennis: "Tennis",
       pickleball: "Pickleball",
-      all: "All Sports",
     };
     return <Badge color={colors[sportValue]}>{labels[sportValue]}</Badge>;
   };

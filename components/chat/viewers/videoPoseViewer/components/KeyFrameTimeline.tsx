@@ -10,7 +10,7 @@ import {
 } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
 import type { TrophyDetectionResult } from "../hooks/useTrophyDetection";
-import type { ContactPointResult } from "../hooks/useContactPointDetection";
+import type { ContactPointDetectionResult } from "../hooks/useContactPointDetection";
 import type { LandingDetectionResult } from "../hooks/useLandingDetection";
 import type { SwingDetectionResult } from "../hooks/useSwingDetection";
 import type { SwingDetectionResultV2 } from "../hooks/useSwingDetectionV2";
@@ -21,7 +21,7 @@ export interface KeyFrameTimelineProps {
   selectedProtocol: "serve" | "swings" | "swings-v2";
   // Results
   trophyResult: TrophyDetectionResult | null;
-  contactResult: ContactPointResult | null;
+  contactResult: ContactPointDetectionResult | null;
   landingResult: LandingDetectionResult | null;
   swingResult: SwingDetectionResult | null;
   swingV2Result: SwingDetectionResultV2 | null;

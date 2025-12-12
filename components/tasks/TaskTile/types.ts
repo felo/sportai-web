@@ -54,7 +54,7 @@ export interface TaskProgress {
 // Status configuration
 export interface StatusConfig {
   color: "orange" | "blue" | "green" | "red";
-  icon: React.ComponentType<{ width?: number; height?: number }>;
+  icon: React.ComponentType<{ width?: string | number; height?: string | number }>;
   label: string;
 }
 

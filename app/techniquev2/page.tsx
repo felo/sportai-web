@@ -114,6 +114,7 @@ export default function TechniqueV2Page() {
     preprocessedFrameCount: 0,
     protocolEvents: [],
     handednessResult: null,
+    activeTab: "swings",
     error: null,
   });
 
