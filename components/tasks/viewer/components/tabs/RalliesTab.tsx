@@ -10,6 +10,7 @@ import {
   RallyTimeline,
   MainTimeline,
   PadelCourt2D,
+  TennisCourt2D,
   VideoCourtLayout,
   TimelineFilter,
 } from "../index";
@@ -38,6 +39,7 @@ interface RalliesTabProps {
   enhancedBallBounces: BallBounce[];
   allSwings: SwingWithPlayer[];
   activeEventTooltip: ActiveEventTooltip | null;
+  onVideoError?: (message: string) => void;
 }
 
 export function RalliesTab({
@@ -64,6 +66,7 @@ export function RalliesTab({
   enhancedBallBounces,
   allSwings,
   activeEventTooltip,
+  onVideoError,
 }: RalliesTabProps) {
   // Video thumbnails for timeline preview (disabled - limited value, causes issues)
   // const { vttUrl: thumbnails } = useVideoThumbnails(task.video_url, {
@@ -81,7 +84,7 @@ export function RalliesTab({
             filters={timelineFilters}
             onFilterChange={onTimelineFiltersChange}
             hasRallies={result.rallies && result.rallies.length > 0}
-            showCourtOptions={task.sport === "padel"}
+            showCourtOptions={["padel", "tennis"].includes(task.sport)}
           />
         </Flex>
       )}
@@ -89,7 +92,7 @@ export function RalliesTab({
       {/* Video + Court Layout */}
       <VideoCourtLayout
         isFullWidth={isVideoFullWidth}
-        showCourt={task.sport === "padel"}
+        showCourt={["padel", "tennis"].includes(task.sport)}
         videoPlayer={
           <VidstackPlayer
             ref={videoRef as Ref<HTMLVideoElement>}
@@ -107,24 +110,38 @@ export function RalliesTab({
             inferAudioBounces={inferAudioBounces}
             onInferAudioBouncesChange={onInferAudioBouncesChange}
             playerDisplayNames={playerDisplayNames}
-            showCalibrationButton={task.sport === "padel"}
+            showCalibrationButton={false}
             isCalibrated={calibrationMatrix !== null}
             onCalibrationComplete={onCalibrationComplete}
             courtKeypoints={result?.debug_data?.court_keypoints}
+            onVideoError={onVideoError}
           />
         }
         courtComponent={
-          <PadelCourt2D
-            currentTime={currentTime}
-            ballBounces={enhancedBallBounces}
-            rallies={result?.rallies}
-            playerPositions={result?.player_positions}
-            swings={allSwings}
-            playerDisplayNames={playerDisplayNames}
-            showBounces={true}
-            showPlayers={true}
-            showTeamZoneSync={timelineFilters.showTeamZoneSync}
-          />
+          task.sport === "tennis" ? (
+            <TennisCourt2D
+              currentTime={currentTime}
+              ballBounces={enhancedBallBounces}
+              rallies={result?.rallies}
+              playerPositions={result?.player_positions}
+              swings={allSwings}
+              playerDisplayNames={playerDisplayNames}
+              showBounces={true}
+              showPlayers={true}
+            />
+          ) : (
+            <PadelCourt2D
+              currentTime={currentTime}
+              ballBounces={enhancedBallBounces}
+              rallies={result?.rallies}
+              playerPositions={result?.player_positions}
+              swings={allSwings}
+              playerDisplayNames={playerDisplayNames}
+              showBounces={true}
+              showPlayers={true}
+              showTeamZoneSync={timelineFilters.showTeamZoneSync}
+            />
+          )
         }
       />
 

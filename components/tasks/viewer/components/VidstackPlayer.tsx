@@ -84,6 +84,8 @@ interface VidstackPlayerProps {
   thumbnails?: string;
   // Court keypoints for debug overlay
   courtKeypoints?: ([number, number] | [null, null])[];
+  // Error callback for video loading failures
+  onVideoError?: (message: string) => void;
 }
 
 // Custom hook for frame stepping - Vidstack doesn't have built-in frame stepping
@@ -147,6 +149,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     onCalibrationComplete,
     thumbnails,
     courtKeypoints,
+    onVideoError,
   }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
     const [showBallTracker, setShowBallTracker] = useState(false);
@@ -263,6 +266,23 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
         player.removeEventListener("can-play", handleCanPlay);
       };
     }, []);
+    
+    // Handle video loading errors
+    useEffect(() => {
+      const player = playerRef.current;
+      if (!player) return;
+      
+      const handleError = () => {
+        const errorMessage = "Video could not be loaded. The URL may have expired or the video is unavailable.";
+        onVideoError?.(errorMessage);
+      };
+      
+      player.addEventListener("error", handleError);
+      
+      return () => {
+        player.removeEventListener("error", handleError);
+      };
+    }, [onVideoError]);
 
     return (
       <Box

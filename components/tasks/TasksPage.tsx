@@ -48,6 +48,7 @@ interface Task {
   sport: "tennis" | "padel" | "pickleball";
   sportai_task_id: string | null;
   video_url: string;
+  video_s3_key: string | null;
   thumbnail_url: string | null;
   thumbnail_s3_key: string | null;
   video_length: number | null;

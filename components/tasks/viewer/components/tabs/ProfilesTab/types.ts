@@ -6,6 +6,7 @@ export interface ProfilesTabProps {
   rankings: PlayerRankings;
   portraits?: Record<number, string>;
   playerDisplayNames?: Record<number, string>;
+  sport?: "tennis" | "padel" | "pickleball";
 }
 
 export interface ProfileColor {

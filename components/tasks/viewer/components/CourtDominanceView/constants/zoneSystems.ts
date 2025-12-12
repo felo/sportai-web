@@ -1,8 +1,12 @@
 import type { ZoneDefinition, ZoneSystem } from "../types";
-import { metersToGrid } from "./grid";
+import { metersToGrid, type Sport } from "./grid";
+
+// =============================================================================
+// PADEL ZONE SYSTEMS
+// =============================================================================
 
 // Traffic Light System (3 zones) - Classic coaching model for HALF COURT
-const TRAFFIC_LIGHT_ZONES: ZoneDefinition[] = [
+const PADEL_TRAFFIC_LIGHT_ZONES: ZoneDefinition[] = [
   {
     id: "green",
     name: "Net Zone",
@@ -47,7 +51,7 @@ const TRAFFIC_LIGHT_ZONES: ZoneDefinition[] = [
 ];
 
 // 6-Zone Tactical System - Split by depth AND side (HALF COURT)
-const SIX_ZONE_SYSTEM: ZoneDefinition[] = [
+const PADEL_SIX_ZONE_SYSTEM: ZoneDefinition[] = [
   // Net zones (7-10m from back wall)
   {
     id: "net-deuce",
@@ -136,7 +140,7 @@ const SIX_ZONE_SYSTEM: ZoneDefinition[] = [
 ];
 
 // 9-Zone Grid System - Detailed 3×3 analysis (HALF COURT)
-const NINE_ZONE_SYSTEM: ZoneDefinition[] = [
+const PADEL_NINE_ZONE_SYSTEM: ZoneDefinition[] = [
   // Row 1: Net (6.67-10m from back wall)
   {
     id: "net-left",
@@ -266,7 +270,7 @@ const NINE_ZONE_SYSTEM: ZoneDefinition[] = [
 ];
 
 // Functional Zone System (Advanced) - Based on shot types (HALF COURT)
-const FUNCTIONAL_ZONES: ZoneDefinition[] = [
+const PADEL_FUNCTIONAL_ZONES: ZoneDefinition[] = [
   {
     id: "volley",
     name: "Volley Zone",
@@ -337,13 +341,240 @@ const FUNCTIONAL_ZONES: ZoneDefinition[] = [
   },
 ];
 
-// All zone systems
-export const ZONE_SYSTEMS: ZoneSystem[] = [
+// =============================================================================
+// TENNIS ZONE SYSTEMS
+// =============================================================================
+// Tennis half-court: 11.885m from baseline to net, with 6m extended behind baseline
+// Y coordinates: 0 = baseline, 11.885 = net, -6 = behind baseline (for defense tracking)
+// Note: Tennis zones measured from BASELINE (y=0) toward NET (y=11.885)
+
+// Tennis Traffic Light System (4 zones including behind baseline)
+const TENNIS_TRAFFIC_LIGHT_ZONES: ZoneDefinition[] = [
+  {
+    id: "net",
+    name: "Net Zone",
+    emoji: "🟢",
+    color: "#10B981",
+    yMin: 8.5,
+    yMax: 17.885, // Extended to include full approach to net
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 8.5, 17.885, "tennis"),
+    description: "Attacking position at the net",
+    tacticalAdvice: "Finish points here with volleys and overheads",
+  },
+  {
+    id: "transition",
+    name: "No-Man's Land",
+    emoji: "🟠",
+    color: "#F59E0B",
+    yMin: 5.5,
+    yMax: 8.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 5.5, 8.5, "tennis"),
+    description: "Danger zone - pass through quickly!",
+    tacticalAdvice: "Never rally from here - approach the net or retreat to baseline",
+    isPressureZone: true,
+  },
+  {
+    id: "baseline",
+    name: "Baseline Zone",
+    emoji: "🔵",
+    color: "#3B82F6", // Blue - this is HOME in tennis
+    yMin: 2.5,
+    yMax: 5.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 2.5, 5.5, "tennis"),
+    description: "Rally position - your home base",
+    tacticalAdvice: "Build points here, wait for short ball to attack",
+  },
+  {
+    id: "deep-defense",
+    name: "Deep Defense",
+    emoji: "🔴",
+    color: "#EF4444",
+    yMin: 0,
+    yMax: 2.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 0, 2.5, "tennis"),
+    description: "Behind baseline - defensive position",
+    tacticalAdvice: "Neutralize with depth, work back to baseline position",
+    isPressureZone: true,
+  },
+];
+
+// Tennis 6-Zone Tactical System (Deuce/Ad + Depth)
+const TENNIS_SIX_ZONE_SYSTEM: ZoneDefinition[] = [
+  // Net zones
+  {
+    id: "net-deuce",
+    name: "Net Deuce",
+    emoji: "🎯",
+    color: "#10B981",
+    yMin: 8,
+    yMax: 17.885,
+    xMin: 0,
+    xMax: 5.485,
+    ...metersToGrid(0, 5.485, 8, 17.885, "tennis"),
+    description: "Net position on deuce side",
+    tacticalAdvice: "Cover the down-the-line, poach on crosses",
+  },
+  {
+    id: "net-ad",
+    name: "Net Ad",
+    emoji: "🎯",
+    color: "#059669",
+    yMin: 8,
+    yMax: 17.885,
+    xMin: 5.485,
+    xMax: 10.97,
+    ...metersToGrid(5.485, 10.97, 8, 17.885, "tennis"),
+    description: "Net position on advantage side",
+    tacticalAdvice: "Control the backhand side, attack weak returns",
+  },
+  // Transition zones (no-man's land)
+  {
+    id: "trans-deuce",
+    name: "Transition Deuce",
+    emoji: "⚡",
+    color: "#F59E0B",
+    yMin: 4,
+    yMax: 8,
+    xMin: 0,
+    xMax: 5.485,
+    ...metersToGrid(0, 5.485, 4, 8, "tennis"),
+    description: "Mid-court deuce side",
+    tacticalAdvice: "Move through quickly - vulnerable to passing shots",
+    isPressureZone: true,
+  },
+  {
+    id: "trans-ad",
+    name: "Transition Ad",
+    emoji: "⚡",
+    color: "#D97706",
+    yMin: 4,
+    yMax: 8,
+    xMin: 5.485,
+    xMax: 10.97,
+    ...metersToGrid(5.485, 10.97, 4, 8, "tennis"),
+    description: "Mid-court advantage side",
+    tacticalAdvice: "No-man's land - keep moving forward or back",
+    isPressureZone: true,
+  },
+  // Baseline zones
+  {
+    id: "baseline-deuce",
+    name: "Baseline Deuce",
+    emoji: "🏠",
+    color: "#3B82F6",
+    yMin: 0,
+    yMax: 4,
+    xMin: 0,
+    xMax: 5.485,
+    ...metersToGrid(0, 5.485, 0, 4, "tennis"),
+    description: "Baseline deuce corner",
+    tacticalAdvice: "Rally cross-court, look for inside-out opportunities",
+  },
+  {
+    id: "baseline-ad",
+    name: "Baseline Ad",
+    emoji: "🏠",
+    color: "#2563EB",
+    yMin: 0,
+    yMax: 4,
+    xMin: 5.485,
+    xMax: 10.97,
+    ...metersToGrid(5.485, 10.97, 0, 4, "tennis"),
+    description: "Baseline advantage corner",
+    tacticalAdvice: "Control the backhand diagonal, set up forehand attacks",
+  },
+];
+
+// Tennis Functional Zones (Based on shot types)
+const TENNIS_FUNCTIONAL_ZONES: ZoneDefinition[] = [
+  {
+    id: "volley",
+    name: "Volley Zone",
+    emoji: "🎯",
+    color: "#10B981",
+    yMin: 9.5,
+    yMax: 17.885,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 9.5, 17.885, "tennis"),
+    description: "Prime finishing area",
+    tacticalAdvice: "Take balls out of the air, put away with authority",
+  },
+  {
+    id: "approach",
+    name: "Approach Zone",
+    emoji: "🚀",
+    color: "#8B5CF6",
+    yMin: 6.5,
+    yMax: 9.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 6.5, 9.5, "tennis"),
+    description: "Approach shot territory",
+    tacticalAdvice: "Hit deep approach, close to net immediately",
+  },
+  {
+    id: "no-mans-land",
+    name: "No-Man's Land",
+    emoji: "⚠️",
+    color: "#F59E0B",
+    yMin: 4,
+    yMax: 6.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 4, 6.5, "tennis"),
+    description: "Danger zone - vulnerable to passing shots",
+    tacticalAdvice: "NEVER rally from here! Move through quickly",
+    isPressureZone: true,
+  },
+  {
+    id: "rally",
+    name: "Rally Zone",
+    emoji: "🎾",
+    color: "#3B82F6",
+    yMin: 1.5,
+    yMax: 4,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 1.5, 4, "tennis"),
+    description: "Baseline rally position",
+    tacticalAdvice: "Build points, move opponent, wait for short ball",
+  },
+  {
+    id: "defense",
+    name: "Defense Zone",
+    emoji: "🛡️",
+    color: "#EF4444",
+    yMin: 0,
+    yMax: 1.5,
+    xMin: 0,
+    xMax: 10.97,
+    ...metersToGrid(0, 10.97, 0, 1.5, "tennis"),
+    description: "Deep defensive position",
+    tacticalAdvice: "Neutralize with heavy topspin, buy time to recover",
+    isPressureZone: true,
+  },
+];
+
+// =============================================================================
+// ZONE SYSTEM EXPORTS
+// =============================================================================
+
+// Padel zone systems
+export const PADEL_ZONE_SYSTEMS: ZoneSystem[] = [
   {
     id: "traffic-light",
     name: "Traffic Light",
     description: "Simple 3-zone system (Green/Orange/Red)",
-    zones: TRAFFIC_LIGHT_ZONES,
+    zones: PADEL_TRAFFIC_LIGHT_ZONES,
     coachingTips:
       "Coaches use the Traffic Light system to teach court positioning basics. Green zone (net) is where you want to be to finish points. Orange zone (transition) should be crossed quickly—don't linger here. Red zone (defense) means you're under pressure; use lobs to reset and work your way forward.",
   },
@@ -351,7 +582,7 @@ export const ZONE_SYSTEMS: ZoneSystem[] = [
     id: "6-zone",
     name: "6-Zone Tactical",
     description: "Split by depth and court side",
-    zones: SIX_ZONE_SYSTEM,
+    zones: PADEL_SIX_ZONE_SYSTEM,
     coachingTips:
       "The 6-Zone system helps coaches analyze court side balance. Players should control their side while being ready to cover the middle. Watch for patterns: Are you spending too much time on one side? Good teams rotate smoothly between deuce and ad sides while maintaining net presence.",
   },
@@ -359,7 +590,7 @@ export const ZONE_SYSTEMS: ZoneSystem[] = [
     id: "9-zone",
     name: "9-Zone Grid",
     description: "Detailed 3×3 grid analysis",
-    zones: NINE_ZONE_SYSTEM,
+    zones: PADEL_NINE_ZONE_SYSTEM,
     coachingTips:
       "The 9-Zone grid provides granular positioning data. Coaches use this to identify specific weaknesses—like a player stuck in back corners or avoiding the center. Elite players dominate the net-center (the 'T') and minimize time in mid-court zones. Compare your heat map to pros to spot improvement areas.",
   },
@@ -367,11 +598,53 @@ export const ZONE_SYSTEMS: ZoneSystem[] = [
     id: "functional",
     name: "Functional",
     description: "Based on shot types and tactics",
-    zones: FUNCTIONAL_ZONES,
+    zones: PADEL_FUNCTIONAL_ZONES,
     coachingTips:
       "The Functional system maps zones to shot types. Volley zone is for finishing with power. Bandeja zone is where you control with overhead shots. No-man's land is dangerous—never stay here! Service box is for building points. Glass wall zone means you're defending; use the walls creatively to reset.",
   },
 ];
+
+// Tennis zone systems
+export const TENNIS_ZONE_SYSTEMS: ZoneSystem[] = [
+  {
+    id: "traffic-light",
+    name: "Traffic Light",
+    description: "4-zone system (Net/Transition/Baseline/Deep)",
+    zones: TENNIS_TRAFFIC_LIGHT_ZONES,
+    coachingTips:
+      "The Tennis Traffic Light system shows court positioning fundamentals. Green (net) is where you finish points. Orange (no-man's land) is DANGEROUS—you'll get passed if you stay here! Blue (baseline) is your rally home base. Red (deep defense) means you're retrieving; work your way back to the baseline.",
+  },
+  {
+    id: "6-zone",
+    name: "6-Zone Tactical",
+    description: "Split by depth and court side",
+    zones: TENNIS_SIX_ZONE_SYSTEM,
+    coachingTips:
+      "The 6-Zone system analyzes court side balance. In singles, recover to center after each shot. Watch for patterns: Are you being pushed to one side? Elite players control the baseline center and approach on short balls. Minimize time in transition zones—they're vulnerable to passing shots.",
+  },
+  {
+    id: "functional",
+    name: "Functional",
+    description: "Based on shot types and tactics",
+    zones: TENNIS_FUNCTIONAL_ZONES,
+    coachingTips:
+      "The Functional system maps zones to shot types. Volley zone is for finishing with authority. Approach zone is for hitting deep and closing. No-man's land is where you get PASSED—never rally here! Rally zone is your baseline home. Defense zone means you're stretched; neutralize with depth.",
+  },
+];
+
+// Helper to get zone systems for a specific sport
+export function getZoneSystemsForSport(sport: Sport): ZoneSystem[] {
+  switch (sport) {
+    case "tennis":
+      return TENNIS_ZONE_SYSTEMS;
+    case "padel":
+    default:
+      return PADEL_ZONE_SYSTEMS;
+  }
+}
+
+// Default export (backward compatible - uses Padel)
+export const ZONE_SYSTEMS = PADEL_ZONE_SYSTEMS;
 
 
 

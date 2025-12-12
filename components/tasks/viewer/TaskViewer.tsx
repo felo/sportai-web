@@ -2,7 +2,8 @@
 
 import { useState, use, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Card, Text } from "@radix-ui/themes";
+import { Box, Card, Text, Callout } from "@radix-ui/themes";
+import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import {
   PlayIcon,
   BarChartIcon,
@@ -86,6 +87,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("rallies");
   const [playerNames, setPlayerNames] = useState<Record<number, string>>({});
   const [calibrationMatrix, setCalibrationMatrix] = useState<number[][] | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
   
   // Bounce inference toggles
   const [inferSwingBounces, setInferSwingBounces] = useState(true);
@@ -240,6 +242,18 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
           </Card>
         </Box>
       )}
+      
+      {/* Video loading error - mild warning */}
+      {videoError && (
+        <Box style={{ padding: "var(--space-4)", paddingBottom: 0, maxWidth: "1400px", margin: "0 auto" }}>
+          <Callout.Root color="orange" size="1">
+            <Callout.Icon>
+              <ExclamationTriangleIcon />
+            </Callout.Icon>
+            <Callout.Text>{videoError}</Callout.Text>
+          </Callout.Root>
+        </Box>
+      )}
 
       {/* Tab Content */}
       <Box style={{ padding: "var(--space-4)", maxWidth: "1400px", margin: "0 auto", paddingBottom: "var(--space-6)" }}>
@@ -269,6 +283,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             enhancedBallBounces={enhancedBallBounces}
             allSwings={allSwings}
             activeEventTooltip={activeEventTooltip}
+            onVideoError={setVideoError}
           />
         </Box>
 
@@ -312,6 +327,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             enhancedBallBounces={enhancedBallBounces}
             playerDisplayNames={playerDisplayNames}
             portraits={portraits}
+            sport={task?.sport === "all" ? "padel" : task?.sport}
           />
         )}
 
@@ -321,6 +337,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             rankings={rankings}
             portraits={portraits}
             playerDisplayNames={playerDisplayNames}
+            sport={task?.sport === "all" ? "padel" : task?.sport}
           />
         )}
 

@@ -18,8 +18,9 @@ export function ProfilesTab({
   rankings,
   portraits = {},
   playerDisplayNames = {},
+  sport = "padel",
 }: ProfilesTabProps) {
-  const { profiles, isGenerating, error, generate } = usePlayerProfiles({ sport: "padel" });
+  const { profiles, isGenerating, error, generate } = usePlayerProfiles({ sport });
   const hasGeneratedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);

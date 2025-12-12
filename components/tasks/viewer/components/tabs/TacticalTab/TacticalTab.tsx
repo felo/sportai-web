@@ -19,13 +19,15 @@ interface TacticalTabProps {
   enhancedBallBounces: BallBounce[];
   playerDisplayNames?: Record<number, string>;
   portraits?: Record<number, string>;
+  sport?: "tennis" | "padel" | "pickleball";
 }
 
 export function TacticalTab({ 
   result, 
   enhancedBallBounces, 
   playerDisplayNames = {}, 
-  portraits = {} 
+  portraits = {},
+  sport = "padel",
 }: TacticalTabProps) {
   // State management
   const {
@@ -79,6 +81,7 @@ export function TacticalTab({
     allShotsAnalyzedRef,
     ballSequenceAnalyzedRef,
     nicknamesGeneratedRef,
+    sport,
   });
 
   // Early return for no result
@@ -104,6 +107,7 @@ export function TacticalTab({
           nicknamesLoading={nicknamesLoading}
           analysis={allShotsAnalysis}
           onBallSequenceClick={handleBallSequenceClick}
+          sport={sport}
         />
       )}
 
@@ -120,6 +124,7 @@ export function TacticalTab({
           analysis={ballSequenceAnalysis}
           onBallSequenceClick={handleBallSequenceClick}
           sectionRef={ballSequenceSectionRef}
+          sport={sport}
         />
       )}
 
@@ -128,6 +133,7 @@ export function TacticalTab({
           result={result}
           playerDisplayNames={playerDisplayNames}
           portraits={portraits}
+          sport={sport}
         />
       )}
     </Box>

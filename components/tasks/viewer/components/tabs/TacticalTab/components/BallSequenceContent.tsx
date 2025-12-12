@@ -11,6 +11,8 @@ import { SectionHeader } from "./SectionHeader";
 import { AnalysisDisplay } from "./AnalysisDisplay";
 import type { BallSequenceClickData } from "../types";
 
+type Sport = "tennis" | "padel" | "pickleball";
+
 interface BallSequenceContentProps {
   selectedBall: number;
   onBallChange: (ball: number) => void;
@@ -27,6 +29,7 @@ interface BallSequenceContentProps {
   };
   onBallSequenceClick: (data: BallSequenceClickData) => void;
   sectionRef: React.RefObject<HTMLDivElement>;
+  sport?: Sport;
 }
 
 export function BallSequenceContent({
@@ -41,6 +44,7 @@ export function BallSequenceContent({
   analysis,
   onBallSequenceClick,
   sectionRef,
+  sport = "padel",
 }: BallSequenceContentProps) {
   const currentBallData = ballDataMap[selectedBall] || [];
   const currentTab = BALL_TABS.find(t => t.id === selectedBall) || BALL_TABS[0];
@@ -107,7 +111,7 @@ export function BallSequenceContent({
               countLabel={currentTab.countLabel}
               emptyMessage={`No ${currentTab.name.toLowerCase()} data available`}
               ballType={currentTab.ballType}
-              sport="padel"
+              sport={sport}
               portraits={portraits}
               nicknames={nicknames}
               nicknamesLoading={nicknamesLoading}

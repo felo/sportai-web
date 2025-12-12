@@ -11,6 +11,8 @@ import { EmptyState } from "./EmptyState";
 import { AnalysisDisplay } from "./AnalysisDisplay";
 import type { BallSequenceClickData } from "../types";
 
+type Sport = "tennis" | "padel" | "pickleball";
+
 interface AllShotsContentProps {
   allShotsData: PlayerShotData[];
   hasAllShotsData: boolean;
@@ -25,6 +27,7 @@ interface AllShotsContentProps {
     error: string | null;
   };
   onBallSequenceClick: (data: BallSequenceClickData) => void;
+  sport?: Sport;
 }
 
 export function AllShotsContent({
@@ -37,6 +40,7 @@ export function AllShotsContent({
   nicknamesLoading,
   analysis,
   onBallSequenceClick,
+  sport = "padel",
 }: AllShotsContentProps) {
   const availableSwingTypes = useMemo(() => extractSwingTypes(allShotsData), [allShotsData]);
   const filteredData = useMemo(
@@ -79,7 +83,7 @@ export function AllShotsContent({
               countLabel="shot"
               emptyMessage="No shot data available"
               ballType="serve"
-              sport="padel"
+              sport={sport}
               portraits={portraits}
               nicknames={nicknames}
               nicknamesLoading={nicknamesLoading}
@@ -95,7 +99,7 @@ export function AllShotsContent({
 
       <Box mt="4">
         <AnalysisDisplay
-          title="🎯 Shot Placement Analysis"
+          title="Shot Placement Analysis"
           isAnalyzing={analysis.isAnalyzing}
           analysis={analysis.analysis}
           error={analysis.error}

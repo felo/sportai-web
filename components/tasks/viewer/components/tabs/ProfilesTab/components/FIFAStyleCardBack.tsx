@@ -138,13 +138,14 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
       style={{
         width: "100%",
         height: "100%",
-        background: `linear-gradient(145deg, ${tier.gradient[0]}22, ${tier.gradient[1]}44)`,
+        background: "var(--gray-2)",
         borderRadius: 12,
         overflow: "hidden",
         position: "relative",
+        border: `2px solid ${tier.gradient[0]}`,
       }}
     >
-      {/* Decorative diagonal stripe */}
+      {/* Decorative diagonal stripe - solid with subtle accent */}
       <Box
         style={{
           position: "absolute",
@@ -152,8 +153,20 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
           right: 0,
           width: "60%",
           height: "100%",
-          background: `linear-gradient(135deg, transparent 0%, ${tier.gradient[0]}15 50%, ${tier.gradient[1]}25 100%)`,
+          background: `linear-gradient(135deg, var(--gray-2) 0%, var(--gray-3) 50%, var(--gray-4) 100%)`,
           clipPath: "polygon(30% 0, 100% 0, 100% 100%, 0 100%)",
+        }}
+      />
+      {/* Accent corner glow */}
+      <Box
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: 0,
+          width: "50%",
+          height: "40%",
+          background: `radial-gradient(ellipse at bottom right, ${tier.gradient[0]}20, transparent 70%)`,
+          pointerEvents: "none",
         }}
       />
 
@@ -215,7 +228,8 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
                     width: 120,
                     height: 120,
                     borderRadius: 16,
-                    background: `linear-gradient(135deg, ${tier.gradient[0]}44, ${tier.gradient[1]}44)`,
+                    background: "var(--gray-4)",
+                    border: `2px solid ${tier.gradient[0]}`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -232,7 +246,7 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
         <Box
           style={{
             height: 2,
-            background: `linear-gradient(90deg, transparent, ${tier.gradient[0]}, transparent)`,
+            background: `linear-gradient(90deg, var(--gray-5), ${tier.gradient[0]}, var(--gray-5))`,
             margin: "0 24px",
           }}
         />
@@ -267,7 +281,7 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
         <Box
           style={{
             height: 1,
-            background: `linear-gradient(90deg, transparent, ${tier.gradient[0]}66, transparent)`,
+            background: `linear-gradient(90deg, var(--gray-5), ${tier.gradient[0]}, var(--gray-5))`,
             margin: "0 24px",
           }}
         />
@@ -290,7 +304,7 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
           <Box
             style={{
               width: 1,
-              background: `linear-gradient(180deg, transparent, ${tier.gradient[0]}44, transparent)`,
+              background: `linear-gradient(180deg, var(--gray-5), ${tier.gradient[0]}, var(--gray-5))`,
             }}
           />
 

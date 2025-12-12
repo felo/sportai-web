@@ -599,6 +599,7 @@ CREATE TABLE IF NOT EXISTS sportai_tasks (
   -- SportAI API fields
   sportai_task_id UUID, -- Task ID returned from SportAI API
   video_url TEXT NOT NULL,
+  video_s3_key TEXT,  -- S3 key for video (to refresh expired presigned URLs)
   thumbnail_url TEXT,  -- S3 URL for video thumbnail (first frame)
   thumbnail_s3_key TEXT,  -- S3 key for thumbnail
   video_length NUMERIC, -- Video length in seconds
@@ -665,4 +666,11 @@ CREATE TRIGGER update_sportai_tasks_updated_at
 -- =============================================
 -- ALTER TABLE sportai_tasks DROP CONSTRAINT sportai_tasks_sport_check;
 -- ALTER TABLE sportai_tasks ADD CONSTRAINT sportai_tasks_sport_check CHECK (sport IN ('tennis', 'padel', 'pickleball', 'all'));
+
+-- =============================================
+-- MIGRATION: Add video_s3_key column for URL refresh
+-- Run this if you already have the sportai_tasks table
+-- This allows refreshing expired presigned URLs
+-- =============================================
+-- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS video_s3_key TEXT;
 

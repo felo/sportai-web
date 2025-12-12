@@ -4,6 +4,7 @@ export interface Task {
   sport: "tennis" | "padel" | "pickleball" | "all";
   sportai_task_id: string | null;
   video_url: string;
+  video_s3_key: string | null;
   video_length: number | null;
   status: "pending" | "processing" | "completed" | "failed";
   estimated_compute_time: number | null;

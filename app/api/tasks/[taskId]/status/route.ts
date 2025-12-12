@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
+import { generatePresignedDownloadUrl } from "@/lib/s3";
 import type { Database } from "@/types/supabase";
 
 export const runtime = "nodejs";
@@ -23,6 +24,84 @@ function getSupabaseClient() {
   }
   
   return createClient<Database>(supabaseUrl, supabaseServiceKey);
+}
+
+/**
+ * Check if a presigned URL has expired or is about to expire
+ */
+function isUrlExpiredOrExpiring(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const expiresParam = urlObj.searchParams.get("X-Amz-Expires");
+    const dateParam = urlObj.searchParams.get("X-Amz-Date");
+    
+    if (!expiresParam || !dateParam) {
+      return true;
+    }
+    
+    const year = parseInt(dateParam.substring(0, 4));
+    const month = parseInt(dateParam.substring(4, 6)) - 1;
+    const day = parseInt(dateParam.substring(6, 8));
+    const hour = parseInt(dateParam.substring(9, 11));
+    const minute = parseInt(dateParam.substring(11, 13));
+    const second = parseInt(dateParam.substring(13, 15));
+    
+    const signedAt = new Date(Date.UTC(year, month, day, hour, minute, second));
+    const expiresInSeconds = parseInt(expiresParam);
+    const expiresAt = new Date(signedAt.getTime() + expiresInSeconds * 1000);
+    
+    // Refresh if expires within 1 hour
+    const refreshBuffer = 60 * 60 * 1000;
+    return Date.now() > expiresAt.getTime() - refreshBuffer;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Refresh video and thumbnail URLs if expired and update database
+ */
+async function refreshTaskUrls(
+  task: Database["public"]["Tables"]["sportai_tasks"]["Row"],
+  supabase: ReturnType<typeof getSupabaseClient>,
+  requestId: string
+): Promise<Database["public"]["Tables"]["sportai_tasks"]["Row"]> {
+  let updatedTask = { ...task };
+  const dbUpdates: { video_url?: string; thumbnail_url?: string } = {};
+  
+  // Refresh video URL if needed
+  if (task.video_s3_key && isUrlExpiredOrExpiring(task.video_url)) {
+    try {
+      const freshUrl = await generatePresignedDownloadUrl(task.video_s3_key, 7 * 24 * 3600);
+      logger.debug(`[${requestId}] Refreshed video URL for task ${task.id}`);
+      updatedTask.video_url = freshUrl;
+      dbUpdates.video_url = freshUrl;
+    } catch (refreshError) {
+      logger.warn(`[${requestId}] Failed to refresh video URL for task ${task.id}:`, refreshError);
+    }
+  }
+  
+  // Refresh thumbnail URL if needed
+  if (task.thumbnail_s3_key && task.thumbnail_url && isUrlExpiredOrExpiring(task.thumbnail_url)) {
+    try {
+      const freshUrl = await generatePresignedDownloadUrl(task.thumbnail_s3_key, 7 * 24 * 3600);
+      logger.debug(`[${requestId}] Refreshed thumbnail URL for task ${task.id}`);
+      updatedTask.thumbnail_url = freshUrl;
+      dbUpdates.thumbnail_url = freshUrl;
+    } catch (refreshError) {
+      logger.warn(`[${requestId}] Failed to refresh thumbnail URL for task ${task.id}:`, refreshError);
+    }
+  }
+  
+  // Update database if any URLs were refreshed
+  if (Object.keys(dbUpdates).length > 0) {
+    await supabase
+      .from("sportai_tasks")
+      .update(dbUpdates)
+      .eq("id", task.id);
+  }
+  
+  return updatedTask;
 }
 
 /**
@@ -70,15 +149,20 @@ export async function GET(
     }
     
     // If task is already completed or failed, return current status
+    // Also refresh video URL if needed
     if (task.status === "completed" || task.status === "failed") {
-      return NextResponse.json({ task });
+      const refreshedTask = await refreshTaskUrls(task, supabase, requestId);
+      return NextResponse.json({ task: refreshedTask });
     }
     
     // Get the appropriate status endpoint for this task type
     const baseEndpoint = STATUS_ENDPOINTS[task.task_type];
     if (!baseEndpoint) {
-      logger.error(`[${requestId}] Unknown task type: ${task.task_type}`);
-      return NextResponse.json({ task });
+      // Technique tasks and other client-side tasks don't have SportAI endpoints
+      // Just refresh video URL if needed and return
+      logger.debug(`[${requestId}] No status endpoint for task type: ${task.task_type}`);
+      const refreshedTask = await refreshTaskUrls(task, supabase, requestId);
+      return NextResponse.json({ task: refreshedTask });
     }
     
     // Poll SportAI API for status
@@ -143,10 +227,13 @@ export async function GET(
     
     if (updateError) {
       logger.error(`[${requestId}] Failed to update task:`, updateError);
-      return NextResponse.json({ task }); // Return original task on update failure
+      const refreshedTask = await refreshTaskUrls(task, supabase, requestId);
+      return NextResponse.json({ task: refreshedTask }); // Return original task on update failure
     }
     
-    return NextResponse.json({ task: updatedTask });
+    // Refresh video URL if needed before returning
+    const refreshedTask = await refreshTaskUrls(updatedTask, supabase, requestId);
+    return NextResponse.json({ task: refreshedTask });
   } catch (error) {
     logger.error(`[${requestId}] Unexpected error:`, error);
     return NextResponse.json(

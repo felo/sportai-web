@@ -22,6 +22,7 @@ export { RallyNetwork } from "./RallyNetwork";
 export { ConfidenceCard } from "./ConfidenceCard";
 export { TaskStatusCard } from "./TaskStatusCard";
 export { PadelCourt2D } from "./PadelCourt2D";
+export { TennisCourt2D } from "./TennisCourt2D";
 export { VideoCourtLayout } from "./VideoCourtLayout";
 export { TimelineFilter } from "./TimelineFilter";
 export type { TimelineFilterState } from "./TimelineFilter";

@@ -14,7 +14,7 @@ import {
 import { TargetIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult } from "../../types";
 import type { ZoneSystemId, ZoneStat, PlayerDominance } from "./types";
-import { ZONE_SYSTEMS } from "./constants";
+import { getZoneSystemsForSport, type Sport } from "./constants";
 import { formatDuration, calculateZoneDominance } from "./utils";
 import { CourtZoneGrid, PlayerDominanceCard } from "./components";
 
@@ -22,16 +22,21 @@ interface CourtDominanceViewProps {
   result: StatisticsResult | null;
   playerDisplayNames?: Record<number, string>;
   portraits?: Record<number, string>;
+  sport?: Sport;
 }
 
 export function CourtDominanceView({
   result,
   playerDisplayNames = {},
   portraits = {},
+  sport = "padel",
 }: CourtDominanceViewProps) {
   const [selectedSystem, setSelectedSystem] = useState<ZoneSystemId>("traffic-light");
   const [selectedPlayer, setSelectedPlayer] = useState<number | "all">("all");
   const [isVisible, setIsVisible] = useState(false);
+
+  // Get zone systems for this sport
+  const zoneSystems = useMemo(() => getZoneSystemsForSport(sport), [sport]);
 
   // Trigger entrance animation
   useEffect(() => {
@@ -39,7 +44,7 @@ export function CourtDominanceView({
     return () => clearTimeout(timer);
   }, []);
 
-  const currentSystem = ZONE_SYSTEMS.find((s) => s.id === selectedSystem) || ZONE_SYSTEMS[0];
+  const currentSystem = zoneSystems.find((s) => s.id === selectedSystem) || zoneSystems[0];
 
   // Get valid players (with enough swings)
   const validPlayers = useMemo(() => {
@@ -180,7 +185,7 @@ export function CourtDominanceView({
                   onValueChange={(v) => setSelectedSystem(v as ZoneSystemId)}
                   size="2"
                 >
-                  {ZONE_SYSTEMS.map((sys) => (
+                  {zoneSystems.map((sys) => (
                     <SegmentedControl.Item key={sys.id} value={sys.id}>
                       {sys.name}
                     </SegmentedControl.Item>
@@ -248,6 +253,7 @@ export function CourtDominanceView({
                 zones={currentSystem.zones}
                 zoneStats={aggregatedZones}
                 isVisible={isVisible}
+                sport={sport}
               />
             </Flex>
           </Card>

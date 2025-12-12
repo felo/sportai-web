@@ -3,25 +3,29 @@
 import { useMemo, useId } from "react";
 import { Box, Flex, Text } from "@radix-ui/themes";
 import type { ZoneDefinition, ZoneStat } from "../types";
-import { GRID_COLS, GRID_ROWS } from "../constants/grid";
+import { GRID_COLS, GRID_ROWS, EXTENDED_GRID_ROWS, getCourtConfig, type Sport } from "../constants/grid";
 
 interface CourtZoneGridProps {
   zones: ZoneDefinition[];
   zoneStats: ZoneStat[];
   isVisible: boolean;
+  sport?: Sport;
 }
 
 /**
  * Court grid visualization - matches ShotHeatmap style.
  * Renders a half-court view with zone overlays.
+ * Supports both Padel (with back wall) and Tennis (with baseline + extended area).
  */
-export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProps) {
+export function CourtZoneGrid({ zones, zoneStats, isVisible, sport = "padel" }: CourtZoneGridProps) {
+  const courtConfig = getCourtConfig(sport);
+  const gridRows = sport === "tennis" ? EXTENDED_GRID_ROWS : GRID_ROWS;
   const uniqueId = useId();
 
   // Create a grid of cells with zone assignments
   const cellZones = useMemo(() => {
     const grid: (ZoneDefinition | null)[][] = [];
-    for (let row = 0; row < GRID_ROWS; row++) {
+    for (let row = 0; row < gridRows; row++) {
       grid[row] = [];
       for (let col = 0; col < GRID_COLS; col++) {
         // Find which zone this cell belongs to
@@ -32,7 +36,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
       }
     }
     return grid;
-  }, [zones]);
+  }, [zones, gridRows]);
 
   return (
     <Box
@@ -47,7 +51,8 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
       <Box
         style={{
           position: "relative",
-          aspectRatio: "1 / 1", // Square for half court (10m × 10m)
+          // Tennis has taller aspect ratio to show behind-baseline area
+          aspectRatio: sport === "tennis" ? "1 / 1.5" : "1 / 1",
         }}
       >
         {/* Grid cells */}
@@ -57,7 +62,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
             inset: 0,
             display: "grid",
             gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-            gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
+            gridTemplateRows: `repeat(${gridRows}, 1fr)`,
             gap: "2px",
           }}
         >
@@ -97,7 +102,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
             const percentage = stat?.percentage || 0;
 
             // Calculate actual visual center based on rendered cells
-            let minRow = GRID_ROWS,
+            let minRow = gridRows,
               maxRow = -1,
               minCol = GRID_COLS,
               maxCol = -1;
@@ -117,7 +122,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
 
             // Calculate center: find the midpoint of the cell range
             const left = (((minCol + maxCol + 1) / 2) / GRID_COLS) * 100;
-            const top = (((minRow + maxRow + 1) / 2) / GRID_ROWS) * 100;
+            const top = (((minRow + maxRow + 1) / 2) / gridRows) * 100;
 
             return (
               <Flex
@@ -190,7 +195,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
           NET ↑
         </Text>
 
-        {/* Back wall indicator (at bottom) */}
+        {/* Back/Baseline indicator (at bottom) */}
         <Text
           size="4"
           weight="bold"
@@ -201,7 +206,7 @@ export function CourtZoneGrid({ zones, zoneStats, isVisible }: CourtZoneGridProp
             color: "var(--gray-12)",
           }}
         >
-          BACK WALL ↓
+          {courtConfig.backLabel} ↓
         </Text>
       </Box>
     </Box>

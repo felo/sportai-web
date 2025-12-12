@@ -7,6 +7,8 @@ import type { PlayerShotData } from "../../../ShotHeatmap";
 import { buildPlayerAnalysisData, buildBallSequenceData } from "../utils";
 import type { TacticalSubTab } from "../types";
 
+type Sport = "tennis" | "padel" | "pickleball";
+
 interface UseTacticalDataOptions {
   allShotsData: PlayerShotData[];
   serveData: PlayerShotData[];
@@ -18,6 +20,7 @@ interface UseTacticalDataOptions {
   allShotsAnalyzedRef: React.MutableRefObject<boolean>;
   ballSequenceAnalyzedRef: React.MutableRefObject<boolean>;
   nicknamesGeneratedRef: React.MutableRefObject<boolean>;
+  sport?: Sport;
 }
 
 export function useTacticalData({
@@ -31,6 +34,7 @@ export function useTacticalData({
   allShotsAnalyzedRef,
   ballSequenceAnalyzedRef,
   nicknamesGeneratedRef,
+  sport = "padel",
 }: UseTacticalDataOptions) {
   const hasAllShotsData = allShotsData.length > 0 && allShotsData.some(d => d.totalShots > 0);
 
@@ -39,11 +43,11 @@ export function useTacticalData({
     nicknames, 
     isGenerating: nicknamesLoading, 
     generate: generateNicknames 
-  } = usePlayerNicknames({ sport: "padel" });
+  } = usePlayerNicknames({ sport });
 
   // Separate tactical analysis hooks for each sub-tab
-  const allShotsAnalysis = useTacticalAnalysis({ sport: "padel" });
-  const ballSequenceAnalysis = useTacticalAnalysis({ sport: "padel" });
+  const allShotsAnalysis = useTacticalAnalysis({ sport });
+  const ballSequenceAnalysis = useTacticalAnalysis({ sport });
 
   // Build tactical data for nickname generation
   const tacticalDataForNicknames = useMemo((): PlayerTacticalData[] => {

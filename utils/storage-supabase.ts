@@ -395,6 +395,21 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
     // This is safer than delete + insert and handles race conditions
     if (chat.messages && chat.messages.length > 0) {
       supabaseLogger.debug("Upserting", chat.messages.length, "messages");
+      
+      // Re-validate session before messages upsert to catch any token refresh issues
+      // This is important because the RLS policy on messages checks auth.uid()
+      const { data: { session: currentSession }, error: revalidateError } = await supabase.auth.getSession();
+      
+      if (revalidateError || !currentSession) {
+        supabaseLogger.error("Session invalidated before messages upsert:", revalidateError);
+        return false;
+      }
+      
+      if (currentSession.user.id !== userId) {
+        supabaseLogger.error("Session user changed during save operation! Original:", userId, "Current:", currentSession.user.id);
+        return false;
+      }
+      
       const messageInserts = chat.messages.map((msg, index) => messageToDbInsert(msg, chat.id, index));
       
       const { error: messagesError } = await supabase
@@ -409,16 +424,28 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         
         // Check if it's an RLS violation
         if (messagesError.code === "42501") {
-          supabaseLogger.error("RLS violation on messages table. Possible causes:");
-          supabaseLogger.error("  1. Session token may have expired during the request");
-          supabaseLogger.error("  2. Chat ownership mismatch (chat.user_id != auth.uid())");
-          supabaseLogger.error("  3. Chat was not properly created before inserting messages");
-          supabaseLogger.error("Debug info:", {
-            chatId: chat.id,
-            userId,
-            messageCount: messageInserts.length,
-            sessionUserId: session?.user?.id,
-          });
+          // Gather diagnostic info to help debug the issue
+          const { data: chatCheck } = await supabase
+            .from("chats")
+            .select("id, user_id")
+            .eq("id", chat.id)
+            .maybeSingle();
+          
+          supabaseLogger.error("RLS violation on messages table. Diagnostic info:");
+          supabaseLogger.error("  Session user ID:", currentSession.user.id);
+          supabaseLogger.error("  Expected user ID:", userId);
+          supabaseLogger.error("  Chat ID:", chat.id);
+          supabaseLogger.error("  Chat exists in DB:", !!chatCheck);
+          supabaseLogger.error("  Chat owner in DB:", chatCheck?.user_id || "N/A");
+          supabaseLogger.error("  Chat owner matches session:", chatCheck?.user_id === currentSession.user.id);
+          supabaseLogger.error("  Message count:", messageInserts.length);
+          supabaseLogger.error("  Token expires at:", currentSession.expires_at ? new Date(currentSession.expires_at * 1000).toISOString() : "N/A");
+          
+          // If the chat doesn't exist in the DB after we just upserted it, something is very wrong
+          if (!chatCheck) {
+            supabaseLogger.error("CRITICAL: Chat was upserted but not found in subsequent query!");
+            supabaseLogger.error("This may indicate a transaction isolation issue or RLS policy preventing read.");
+          }
         }
         
         return false;

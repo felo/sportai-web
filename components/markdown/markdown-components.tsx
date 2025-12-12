@@ -22,6 +22,31 @@ import {
 import type { HighlightingPreferences } from "@/utils/storage";
 import type { CourtCoordinate, BallSequenceClick, BallSequenceType, CourtZone } from "./CourtCoordinateModal";
 import { COURT_ZONE_DEFINITIONS } from "./CourtCoordinateModal";
+import {
+  MagnifyingGlassIcon,
+  BarChartIcon,
+  TargetIcon,
+  LightningBoltIcon,
+  StarIcon,
+  StarFilledIcon,
+  CheckIcon,
+  CheckCircledIcon,
+  CrossCircledIcon,
+  ExclamationTriangleIcon,
+  RocketIcon,
+  ActivityLogIcon,
+  InfoCircledIcon,
+  GearIcon,
+  PersonIcon,
+  VideoIcon,
+  FileTextIcon,
+  ChatBubbleIcon,
+  StopwatchIcon,
+  TimerIcon,
+  DotFilledIcon,
+  CircleIcon,
+  ReaderIcon,
+} from "@radix-ui/react-icons";
 
 // Court grid constants for validation
 const GRID_COLS = 12;
@@ -361,18 +386,23 @@ function processTextWithTimestampsAndMetrics(
   const sortedCourtTerms = [...COURT_POSITION_TERMS].sort((a, b) => b.length - a.length);
   const courtPositionPattern = new RegExp(`\\b(${sortedCourtTerms.map(t => t.replace(/-/g, '[-\\s]?')).join('|')})\\b`, 'gi');
   
+  // Emoji pattern for detection - comprehensive pattern to catch all emoji variants
+  // Covers: Miscellaneous Symbols, Dingbats, Supplemental Symbols, Transport/Map Symbols, and all emoji planes
+  const emojiPattern = /(?:[\u2300-\u23FF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\u2B50-\u2B55]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])[\uFE0E\uFE0F]?(?:\u200D(?:[\u2300-\u23FF]|[\u2600-\u26FF]|[\u2700-\u27BF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])[\uFE0E\uFE0F]?)*/g;
+  
   // Collect all matches with their types
   const matches: Array<{ 
     index: number; 
     length: number; 
     text: string; 
-    type: 'timestamp' | 'metric' | 'swing' | 'coordinate' | 'ballSequence' | 'courtPosition';
+    type: 'timestamp' | 'metric' | 'swing' | 'coordinate' | 'ballSequence' | 'courtPosition' | 'emoji';
     value?: number;
     unit?: string;
     category?: 'swing' | 'terminology' | 'technique';
     coordinate?: CourtCoordinate;
     ballSequence?: BallSequenceClick;
     courtZone?: CourtZone;
+    iconComponent?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   }> = [];
   
   // Only process timestamps if enabled
@@ -534,6 +564,30 @@ function processTextWithTimestampsAndMetrics(
     }
   }
   
+  // Process emojis and replace with Radix icons where available
+  let emojiMatch: RegExpExecArray | null;
+  while ((emojiMatch = emojiPattern.exec(text)) !== null) {
+    const overlaps = matches.some(m => 
+      m.index <= emojiMatch!.index && emojiMatch!.index < m.index + m.length
+    );
+    if (!overlaps) {
+      const emoji = emojiMatch[0];
+      // Try exact match first, then try without variation selectors
+      const normalizedEmoji = emoji.replace(/[\uFE0E\uFE0F]/g, '');
+      const iconComponent = EMOJI_TO_ICON[emoji] || EMOJI_TO_ICON[normalizedEmoji];
+      // Only add if we have a mapped icon, otherwise leave emoji as-is
+      if (iconComponent) {
+        matches.push({
+          index: emojiMatch.index,
+          length: emoji.length,
+          text: emoji,
+          type: 'emoji',
+          iconComponent: iconComponent
+        });
+      }
+    }
+  }
+  
   // Sort matches by index
   matches.sort((a, b) => a.index - b.index);
   
@@ -663,6 +717,21 @@ function processTextWithTimestampsAndMetrics(
           </span>
         );
       }
+    } else if (matchItem.type === 'emoji' && matchItem.iconComponent) {
+      // Render Radix icon in place of emoji
+      const IconComponent = matchItem.iconComponent;
+      parts.push(
+        <IconComponent 
+          key={`emoji-${matchItem.index}`}
+          style={{ 
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            marginRight: '2px',
+            width: '16px',
+            height: '16px',
+          }}
+        />
+      );
     } else {
       // Metric with conversion support
       if (matchItem.value !== undefined && matchItem.unit && onMetricClick) {
@@ -732,6 +801,195 @@ const TextWithTimestamps: React.FC<{
   
   return <>{children}</>;
 };
+
+// ============================================================================
+// EMOJI TO RADIX ICON REPLACEMENT
+// ============================================================================
+
+// Emoji to Radix Icon mapping
+const EMOJI_TO_ICON: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  // Analysis & Search
+  '🔍': MagnifyingGlassIcon,
+  '🔎': MagnifyingGlassIcon,
+  
+  // Charts & Data
+  '📊': BarChartIcon,
+  '📈': RocketIcon,
+  '📉': BarChartIcon,
+  '🚀': RocketIcon,
+  
+  // Sports & Target
+  '🎾': TargetIcon,
+  '🏸': TargetIcon,
+  '🎯': TargetIcon,
+  '⚾': TargetIcon,
+  '🥎': TargetIcon,
+  
+  // Energy & Ideas
+  '💡': LightningBoltIcon,
+  '⚡': LightningBoltIcon,
+  '⚡️': LightningBoltIcon,  // with variation selector
+  '✨': StarIcon,
+  '🌟': StarFilledIcon,
+  '⭐': StarIcon,
+  '⭐️': StarIcon,  // with variation selector
+  
+  // Status & Feedback
+  '✅': CheckCircledIcon,
+  '✅️': CheckCircledIcon,  // with variation selector
+  '✓': CheckIcon,
+  '✓️': CheckIcon,  // with variation selector
+  '❌': CrossCircledIcon,
+  '❌️': CrossCircledIcon,  // with variation selector
+  '⚠️': ExclamationTriangleIcon,
+  '⚠': ExclamationTriangleIcon,  // without variation selector
+  '⛔': CrossCircledIcon,
+  '⛔️': CrossCircledIcon,  // with variation selector
+  
+  // Achievement
+  '🏆': StarFilledIcon,
+  '🥇': StarFilledIcon,
+  '🥈': StarIcon,
+  '🥉': StarIcon,
+  
+  // Activity & Training
+  '🏋️': ActivityLogIcon,
+  '🏋️‍♂️': ActivityLogIcon,
+  '🏋️‍♀️': ActivityLogIcon,
+  '💪': ActivityLogIcon,
+  '🏃': ActivityLogIcon,
+  '🏃‍♂️': ActivityLogIcon,
+  '🏃‍♀️': ActivityLogIcon,
+  
+  // Info & Settings
+  'ℹ️': InfoCircledIcon,
+  'ℹ': InfoCircledIcon,  // without variation selector
+  '⚙️': GearIcon,
+  '⚙': GearIcon,  // without variation selector
+  '🔧': GearIcon,
+  
+  // People
+  '👤': PersonIcon,
+  '👥': PersonIcon,
+  
+  // Media
+  '🎥': VideoIcon,
+  '🎥️': VideoIcon,  // with variation selector
+  '📹': VideoIcon,
+  '📹️': VideoIcon,  // with variation selector
+  '📝': FileTextIcon,
+  '📄': FileTextIcon,
+  
+  // Communication
+  '💬': ChatBubbleIcon,
+  '🗣️': ChatBubbleIcon,
+  
+  // Time & Timers
+  '⏱️': StopwatchIcon,
+  '⏱': StopwatchIcon,  // without variation selector
+  '⏲️': TimerIcon,
+  '⏲': TimerIcon,  // without variation selector
+  '⏰': StopwatchIcon,
+  '🕐': StopwatchIcon,
+  '🕑': StopwatchIcon,
+  '🕒': StopwatchIcon,
+  
+  // Circles & Indicators
+  '🔴': DotFilledIcon,
+  '🟢': DotFilledIcon,
+  '🟡': DotFilledIcon,
+  '🟠': DotFilledIcon,
+  '🔵': DotFilledIcon,
+  '⚪': CircleIcon,
+  '⚫': DotFilledIcon,
+  '🟣': DotFilledIcon,
+  '🟤': DotFilledIcon,
+  '⭕': CircleIcon,
+  
+  // Brain & Thinking
+  '🧠': ReaderIcon,
+  '💭': ChatBubbleIcon,
+  '🤔': ReaderIcon,
+  '💫': StarIcon,
+};
+
+/**
+ * Replace emojis in text with Radix icons
+ * Returns an array of React nodes (strings and icon components)
+ */
+function replaceEmojisWithIcons(text: string): React.ReactNode[] {
+  if (typeof text !== 'string') return [text];
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  
+  // Comprehensive emoji regex to catch all emoji variants
+  // Covers: Miscellaneous Symbols, Dingbats, Supplemental Symbols, Transport/Map Symbols, and all emoji planes
+  const emojiRegex = /(?:[\u2300-\u23FF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\u2B50-\u2B55]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])[\uFE0E\uFE0F]?(?:\u200D(?:[\u2300-\u23FF]|[\u2600-\u26FF]|[\u2700-\u27BF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])[\uFE0E\uFE0F]?)*/g;
+  
+  let match;
+  while ((match = emojiRegex.exec(text)) !== null) {
+    const emoji = match[0];
+    // Try exact match first, then try without variation selectors
+    const normalizedEmoji = emoji.replace(/[\uFE0E\uFE0F]/g, '');
+    const IconComponent = EMOJI_TO_ICON[emoji] || EMOJI_TO_ICON[normalizedEmoji];
+    
+    // Add text before the emoji
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // If we have a mapped icon, use it; otherwise keep the emoji
+    if (IconComponent) {
+      parts.push(
+        <IconComponent 
+          key={`icon-${match.index}`}
+          style={{ 
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            marginRight: '4px',
+            width: '16px',
+            height: '16px',
+          }}
+        />
+      );
+    } else {
+      // Keep emoji as-is if no mapping exists
+      parts.push(emoji);
+    }
+    
+    lastIndex = match.index + emoji.length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Process children to replace emojis with icons
+ */
+function processChildrenForEmojis(children: React.ReactNode): React.ReactNode {
+  if (typeof children === 'string') {
+    const processed = replaceEmojisWithIcons(children);
+    return processed.length === 1 ? processed[0] : <>{processed}</>;
+  }
+  
+  if (Array.isArray(children)) {
+    return children.map((child, index) => {
+      if (typeof child === 'string') {
+        const processed = replaceEmojisWithIcons(child);
+        return <React.Fragment key={index}>{processed}</React.Fragment>;
+      }
+      return child;
+    });
+  }
+  
+  return children;
+}
 
 // Factory function to create markdown components with swing, metric, coordinate, ball sequence, court zone, and timestamp click handlers
 export const createMarkdownComponents = (
@@ -910,11 +1168,13 @@ export const createMarkdownComponents = (
       {...props}
     />
   ),
-  summary: ({ node, ...props }: any) => (
+  summary: ({ node, children, ...props }: any) => (
     <summary
       className={styles.collapsibleSummary}
       {...props}
-    />
+    >
+      {processChildrenForEmojis(children)}
+    </summary>
   ),
 });
 
