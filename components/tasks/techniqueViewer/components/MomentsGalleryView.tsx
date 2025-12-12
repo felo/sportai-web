@@ -55,6 +55,8 @@ interface MomentsGalleryViewProps {
   onDeleteMoment?: (moment: Moment) => void;
   /** Callback when user resets a protocol event adjustment */
   onResetAdjustment?: (moment: Moment) => void;
+  /** Callback when user wants to edit a moment's name */
+  onEditMomentName?: (moment: Moment) => void;
 }
 
 // ============================================================================
@@ -90,6 +92,7 @@ export function MomentsGalleryView({
   poseData,
   onDeleteMoment,
   onResetAdjustment,
+  onEditMomentName,
 }: MomentsGalleryViewProps) {
   const [filter, setFilter] = useState<FilterOption>("all");
   const [sort, setSort] = useState<SortOption>("time");
@@ -112,6 +115,11 @@ export function MomentsGalleryView({
   const handleResetAdjustment = useCallback((moment: Moment) => {
     onResetAdjustment?.(moment);
   }, [onResetAdjustment]);
+
+  // Handle edit name
+  const handleEditName = useCallback((moment: Moment) => {
+    onEditMomentName?.(moment);
+  }, [onEditMomentName]);
 
   // Get effective time for a protocol event (with adjustment)
   const getEffectiveTime = useCallback((event: ProtocolEvent) => {
@@ -415,6 +423,7 @@ export function MomentsGalleryView({
               poseConfidence={getPoseConfidence(moment.frame)}
               onDelete={handleDelete}
               onResetAdjustment={handleResetAdjustment}
+              onEditName={handleEditName}
             />
           ))}
         </Flex>
@@ -432,12 +441,12 @@ export function MomentsGalleryView({
             />
             <Text size="2" style={{ color: "rgba(255,255,255,0.4)" }}>
               {filter === "all"
-                ? "No moments detected yet"
+                ? "No moments yet"
                 : "No moments match this filter"}
             </Text>
             <Text size="1" style={{ color: "rgba(255,255,255,0.3)" }}>
               {filter === "all"
-                ? "Enable protocols in settings and preprocess the video to detect moments"
+                ? "Add markers or comments on the timeline to create moments"
                 : "Try a different filter or add custom markers"}
             </Text>
           </Flex>

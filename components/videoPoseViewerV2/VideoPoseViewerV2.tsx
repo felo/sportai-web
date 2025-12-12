@@ -19,8 +19,8 @@ import React, {
   ReactNode,
 } from "react";
 import { Box, Flex, Text, Badge } from "@radix-ui/themes";
-import { PlayIcon, ActivityLogIcon, BookmarkIcon } from "@radix-ui/react-icons";
-import { MomentsGalleryView } from "@/components/tasks/techniqueViewer/components";
+import { PlayIcon, ActivityLogIcon, BookmarkIcon, FileTextIcon, BarChartIcon } from "@radix-ui/react-icons";
+import { MomentsGalleryView, ReportsView, PerformanceTab } from "@/components/tasks/techniqueViewer/components";
 import { usePoseDetection } from "@/hooks/usePoseDetection";
 import type { PoseDetectionResult, SupportedModel } from "@/hooks/usePoseDetection";
 import { detectionLogger } from "@/lib/logger";
@@ -263,7 +263,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
     const [protocolEvents, setProtocolEvents] = useState<ProtocolEvent[]>([]);
 
     // Tab state
-    const [activeTab, setActiveTab] = useState<"swings" | "moments" | "data-analysis">("swings");
+    const [activeTab, setActiveTab] = useState<"swings" | "moments" | "reports" | "data-analysis" | "performance">("swings");
     
     // Data Analysis metric state (persists across tab switches)
     const [selectedMetric, setSelectedMetric] = useState<MetricType>("velocity");
@@ -278,20 +278,15 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       callbacksRef.current?.onActiveTabChange?.(activeTab);
     }, [activeTab]);
 
-    // Count moments for badge
-    const momentsCount = useMemo(() => {
-      const protocolCount = protocolEvents.length;
-      const customCount = momentsConfig?.customEvents?.length ?? 0;
-      const commentsCount = momentsConfig?.videoComments?.length ?? 0;
-      return protocolCount + customCount + commentsCount;
-    }, [protocolEvents, momentsConfig?.customEvents, momentsConfig?.videoComments]);
-
     // Tab definitions
+    const reportsCount = momentsConfig?.reports?.length ?? 0;
     const tabs: TabDefinition[] = useMemo(() => [
       { id: "swings", label: "Swings", icon: <PlayIcon width={16} height={16} /> },
-      { id: "moments", label: "Moments", icon: <BookmarkIcon width={16} height={16} />, badge: momentsCount > 0 ? momentsCount : undefined },
+      { id: "performance", label: "Performance", icon: <BarChartIcon width={16} height={16} /> },
+      { id: "moments", label: "Moments", icon: <BookmarkIcon width={16} height={16} /> },
+      { id: "reports", label: "Reports", icon: <FileTextIcon width={16} height={16} />, badge: reportsCount > 0 ? reportsCount : undefined },
       { id: "data-analysis", label: "Data Analysis", icon: <ActivityLogIcon width={16} height={16} /> },
-    ], [momentsCount]);
+    ], [reportsCount]);
 
     // Swing detection V1 hook
     const {
@@ -804,6 +799,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           labelPositionState: labelPositionStateRef.current,
           isPlaying,
           useComplementaryAngles: config.angles.useComplementaryAngles,
+          anglePrecision: config.angles.anglePrecision,
         });
         labelPositionStateRef.current = newLabelState;
       }
@@ -1286,7 +1282,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               endFrame: swing.trophyFrame,
               startTime: swing.trophyTimestamp,
               endTime: swing.trophyTimestamp,
-              label: `Prep ${i + 1}`,
+              label: "Preparation",
               color: "#F59E0B", // Amber color for preparation
               metadata: {
                 swingType: swing.swingType,
@@ -1309,7 +1305,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               endFrame: swing.contactPointFrame,
               startTime: swing.contactPointTimestamp,
               endTime: swing.contactPointTimestamp,
-              label: `Contact ${i + 1}`,
+              label: "Contact",
               color: "#FFE66D", // Yellow/gold color for contact point
               metadata: {
                 swingType: swing.swingType,
@@ -1331,7 +1327,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               endFrame: swing.landingFrame,
               startTime: swing.landingTimestamp,
               endTime: swing.landingTimestamp,
-              label: `Follow ${i + 1}`,
+              label: "Follow-through",
               color: "#95E1D3", // Mint/teal color for follow-through
               metadata: {
                 swingType: swing.swingType,
@@ -1621,7 +1617,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
         <TabNavigation
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as "swings" | "moments" | "data-analysis")}
+          onTabChange={(tabId) => setActiveTab(tabId as "swings" | "moments" | "reports" | "data-analysis" | "performance")}
         />
 
         {/* Swings Tab Content */}
@@ -1920,12 +1916,17 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             }}
             onAnalyseMoment={(moment) => {
               momentsConfig.onAnalyseMoment?.(moment);
+              // Switch to reports tab when analysis is triggered
+              setActiveTab("reports");
             }}
             onDeleteMoment={(moment) => {
               momentsConfig.onDeleteMoment?.(moment);
             }}
             onResetAdjustment={(moment) => {
               momentsConfig.onResetAdjustment?.(moment);
+            }}
+            onEditMomentName={(moment) => {
+              momentsConfig.onEditMomentName?.(moment);
             }}
           />
         )}
@@ -1939,6 +1940,38 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           >
             <Text size="2" style={{ color: "rgba(255,255,255,0.4)" }}>
               Moments configuration not provided
+            </Text>
+          </Flex>
+        )}
+
+        {/* Reports Tab Content */}
+        {activeTab === "reports" && momentsConfig && (
+          <ReportsView
+            reports={momentsConfig.reports ?? []}
+            onDeleteReport={momentsConfig.onDeleteReport}
+            onViewMoment={(time) => {
+              momentsConfig.onViewMoment?.(time);
+              // Also seek within this viewer
+              const video = videoRef.current;
+              if (video) {
+                video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+                setCurrentTime(time);
+              }
+              // Switch to swings tab to show the video
+              setActiveTab("swings");
+            }}
+          />
+        )}
+
+        {/* Reports Tab Empty State (when no momentsConfig provided) */}
+        {activeTab === "reports" && !momentsConfig && (
+          <Flex
+            align="center"
+            justify="center"
+            style={{ flex: 1, padding: "48px" }}
+          >
+            <Text size="2" style={{ color: "rgba(255,255,255,0.4)" }}>
+              Reports configuration not provided
             </Text>
           </Flex>
         )}
@@ -1978,6 +2011,26 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             }}
             isAnalyzing={isSwingAnalyzingV3}
             style={{ flex: 1, minHeight: 0 }}
+          />
+        )}
+
+        {/* Performance Tab Content */}
+        {activeTab === "performance" && (
+          <PerformanceTab
+            protocolEvents={protocolEvents}
+            videoElement={videoRef.current}
+            videoFPS={usingPreprocessedPoses ? preprocessingFPS : videoFPS}
+            swingResult={swingResultV3}
+            onSeekTo={(time) => {
+              const video = videoRef.current;
+              if (!video) return;
+              video.currentTime = Math.max(0, Math.min(time, video.duration || 0));
+              setCurrentTime(time);
+              const frame = Math.round(time * (usingPreprocessedPoses ? preprocessingFPS : videoFPS));
+              if (usingPreprocessedPoses && preprocessedPoses.has(frame)) {
+                setCurrentPoses(preprocessedPoses.get(frame) || []);
+              }
+            }}
           />
         )}
       </Box>

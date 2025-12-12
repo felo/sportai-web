@@ -235,7 +235,7 @@ export const DEFAULT_ANGLE_CONFIG: AngleConfig = {
   arcColor: "rgba(168, 85, 247, 0.3)",
   textColor: "#FFFFFF",
   fontSize: 20,
-  useComplementaryAngles: false,
+  useComplementaryAngles: true,
 };
 
 // ============================================================================
@@ -827,8 +827,8 @@ export interface ViewerState {
     dominantHand: "left" | "right";
     confidence: number;
   } | null;
-  /** Current active tab inside the viewer (swings, moments, or data-analysis) */
-  activeTab: "swings" | "moments" | "data-analysis";
+  /** Current active tab inside the viewer (swings, moments, data-analysis, or performance) */
+  activeTab: "swings" | "moments" | "data-analysis" | "performance";
   /** Error message if any */
   error: string | null;
 }
@@ -859,7 +859,7 @@ export interface ViewerCallbacks {
   /** Called when frame is captured (for analysis) */
   onFrameCapture?: (imageBlob: Blob, frame: number, poses: PoseDetectionResult[]) => void;
   /** Called when active tab changes inside the viewer */
-  onActiveTabChange?: (activeTab: "swings" | "moments" | "data-analysis") => void;
+  onActiveTabChange?: (activeTab: "swings" | "moments" | "data-analysis" | "performance") => void;
 }
 
 // ============================================================================
@@ -890,6 +890,22 @@ export interface VideoComment {
 }
 
 /** Configuration for the Moments tab */
+/** A single analysis report for a moment */
+export interface MomentReport {
+  id: string;
+  momentId: string;
+  momentLabel: string;
+  momentType: "protocol" | "custom" | "comment";
+  protocolId?: string;
+  time: number;
+  frame: number;
+  previewUrl?: string;
+  content: string;
+  isStreaming: boolean;
+  createdAt: number;
+  sport?: string;
+}
+
 export interface MomentsConfig {
   /** Custom user-created events */
   customEvents: CustomEvent[];
@@ -904,14 +920,20 @@ export interface MomentsConfig {
     endTime?: number;
     endFrame?: number;
   }>;
+  /** Analysis reports for moments */
+  reports?: MomentReport[];
   /** Callback when user clicks View on a moment */
   onViewMoment?: (time: number) => void;
-  /** Callback when user clicks Analyse on a moment */
+  /** Callback when user clicks Analyse on a moment - adds report and switches to reports tab */
   onAnalyseMoment?: (moment: unknown) => void;
   /** Callback when user deletes a custom event or comment */
   onDeleteMoment?: (moment: unknown) => void;
   /** Callback when user resets a protocol event adjustment */
   onResetAdjustment?: (moment: unknown) => void;
+  /** Callback when user wants to edit a moment's name */
+  onEditMomentName?: (moment: unknown) => void;
+  /** Callback when user deletes a report */
+  onDeleteReport?: (reportId: string) => void;
 }
 
 // ============================================================================

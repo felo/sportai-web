@@ -3,7 +3,7 @@
 /**
  * CustomEventDialog
  *
- * A dialog for creating custom timeline events.
+ * A dialog for creating or editing custom timeline events.
  * Users can specify a name and color for their custom event marker.
  */
 
@@ -12,7 +12,7 @@ import { Dialog, Flex, Text, TextField, Button, Box } from "@radix-ui/themes";
 import buttonStyles from "@/styles/buttons.module.css";
 
 // Predefined color palette for custom events
-const EVENT_COLORS = [
+export const EVENT_COLORS = [
   { name: "Red", value: "#EF4444" },
   { name: "Orange", value: "#F97316" },
   { name: "Amber", value: "#F59E0B" },
@@ -48,17 +48,31 @@ export interface CustomEvent {
   createdAt: number;
 }
 
+/** Data for editing an existing event/moment */
+export interface EditingMoment {
+  id: string;
+  type: "custom" | "comment" | "protocol";
+  label: string;
+  color: string;
+  time: number;
+  frame: number;
+}
+
 interface CustomEventDialogProps {
   /** Whether the dialog is open */
   open: boolean;
   /** Callback when dialog open state changes */
   onOpenChange: (open: boolean) => void;
-  /** Time position where the event will be created (seconds) */
+  /** Time position where the event will be created (seconds) - used in create mode */
   eventTime: number;
-  /** Frame number where the event will be created */
+  /** Frame number where the event will be created - used in create mode */
   eventFrame: number;
-  /** Callback when event is created */
+  /** Callback when event is created (create mode) */
   onCreateEvent: (event: Omit<CustomEvent, "id" | "createdAt">) => void;
+  /** Optional: Event being edited (switches to edit mode when provided) */
+  editingMoment?: EditingMoment | null;
+  /** Callback when event is updated (edit mode) */
+  onUpdateEvent?: (id: string, updates: { name: string; color: string }) => void;
 }
 
 export function CustomEventDialog({
@@ -67,43 +81,70 @@ export function CustomEventDialog({
   eventTime,
   eventFrame,
   onCreateEvent,
+  editingMoment,
+  onUpdateEvent,
 }: CustomEventDialogProps) {
   const [name, setName] = useState("");
   const [selectedColor, setSelectedColor] = useState(EVENT_COLORS[10].value); // Default to blue
 
-  // Reset form when dialog opens
+  const isEditMode = !!editingMoment;
+
+  // Reset/populate form when dialog opens
   useEffect(() => {
     if (open) {
-      setName("");
-      setSelectedColor(EVENT_COLORS[10].value);
+      if (editingMoment) {
+        // Edit mode: populate with existing values
+        setName(editingMoment.label);
+        setSelectedColor(editingMoment.color);
+      } else {
+        // Create mode: reset to defaults
+        setName("");
+        setSelectedColor(EVENT_COLORS[10].value);
+      }
     }
-  }, [open]);
+  }, [open, editingMoment]);
 
-  const handleCreate = () => {
+  const handleSubmit = () => {
     if (!name.trim()) return;
 
-    onCreateEvent({
-      name: name.trim(),
-      color: selectedColor,
-      time: eventTime,
-      frame: eventFrame,
-    });
+    if (isEditMode && editingMoment && onUpdateEvent) {
+      // Edit mode
+      onUpdateEvent(editingMoment.id, {
+        name: name.trim(),
+        color: selectedColor,
+      });
+    } else {
+      // Create mode
+      onCreateEvent({
+        name: name.trim(),
+        color: selectedColor,
+        time: eventTime,
+        frame: eventFrame,
+      });
+    }
 
     onOpenChange(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && name.trim()) {
-      handleCreate();
+      handleSubmit();
     }
   };
+
+  // Get display time/frame (from editing moment in edit mode, or props in create mode)
+  const displayTime = isEditMode && editingMoment ? editingMoment.time : eventTime;
+  const displayFrame = isEditMode && editingMoment ? editingMoment.frame : eventFrame;
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content maxWidth="400px">
-        <Dialog.Title>Add Custom Marker</Dialog.Title>
+        <Dialog.Title>{isEditMode ? "Edit Marker" : "Add Custom Marker"}</Dialog.Title>
         <Dialog.Description size="2" color="gray" mb="4">
-          Create a marker at {eventTime.toFixed(2)}s (frame {eventFrame})
+          {isEditMode 
+            ? `Editing marker at ${displayTime.toFixed(2)}s (frame ${displayFrame})`
+            : `Create a marker at ${displayTime.toFixed(2)}s (frame ${displayFrame})`
+          }
         </Dialog.Description>
 
         <Flex direction="column" gap="4">
@@ -188,10 +229,10 @@ export function CustomEventDialog({
           </Dialog.Close>
           <Button
             className={buttonStyles.actionButtonSquare}
-            onClick={handleCreate}
+            onClick={handleSubmit}
             disabled={!name.trim()}
           >
-            Create Marker
+            {isEditMode ? "Save Changes" : "Create Marker"}
           </Button>
         </Flex>
       </Dialog.Content>

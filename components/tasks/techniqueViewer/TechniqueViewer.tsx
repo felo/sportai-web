@@ -27,6 +27,7 @@ import {
   type ViewerActions,
   type PoseDetectionResult,
   type ProtocolEvent,
+  type MomentReport,
   PROTOCOL_EVENT_COLORS,
   AVAILABLE_PROTOCOLS,
   ANGLE_PRESETS,
@@ -34,7 +35,7 @@ import {
 import { getSportColor } from "@/components/tasks/viewer/utils";
 import { LoadingState } from "@/components/tasks/viewer/components/LoadingState";
 import { ServerDataDebugPanel } from "./ServerDataDebugPanel";
-import { CustomEventDialog, type CustomEvent, VideoCommentDialog, type VideoComment } from "./components";
+import { CustomEventDialog, type CustomEvent, type EditingMoment, VideoCommentDialog, type VideoComment } from "./components";
 import type { Moment } from "./components";
 import { 
   loadPoseData, 
@@ -46,6 +47,7 @@ import {
   type StoredVideoComment,
 } from "@/lib/poseDataService";
 import { extractS3KeyFromUrl } from "@/lib/s3";
+import { calculateAngle } from "@/types/pose";
 
 interface TechniqueViewerProps {
   videoUrl: string;
@@ -94,6 +96,10 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
   const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
   const [customEventDialogOpen, setCustomEventDialogOpen] = useState(false);
   const [pendingCustomEventTime, setPendingCustomEventTime] = useState<{ time: number; frame: number } | null>(null);
+  const [editingMoment, setEditingMoment] = useState<EditingMoment | null>(null);
+
+  // Analysis reports for moments
+  const [reports, setReports] = useState<MomentReport[]>([]);
 
   // Drag state for timeline markers
   const [draggedMarker, setDraggedMarker] = useState<{
@@ -316,7 +322,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
     }));
   }, []);
 
-  const handleActiveTabChange = useCallback((activeTab: "swings" | "moments" | "data-analysis") => {
+  const handleActiveTabChange = useCallback((activeTab: "swings" | "moments" | "data-analysis" | "performance") => {
     setViewerState((prev) => ({ ...prev, activeTab }));
   }, []);
 
@@ -339,6 +345,33 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
     setPendingCustomEventTime(null);
     setDirtyFlags(prev => ({ ...prev, customEvents: true })); // Mark for unified save
   }, [customEvents]);
+
+  // Handle updating an existing event (for edit mode)
+  const handleUpdateEvent = useCallback((id: string, updates: { name: string; color: string }) => {
+    // Check if it's a custom event
+    const customEvent = customEvents.find((e) => e.id === id);
+    if (customEvent) {
+      setCustomEvents((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, name: updates.name, color: updates.color } : e))
+      );
+      setDirtyFlags((prev) => ({ ...prev, customEvents: true }));
+      setEditingMoment(null);
+      return;
+    }
+
+    // Check if it's a video comment
+    const videoComment = videoComments.find((c) => c.id === id);
+    if (videoComment) {
+      setVideoComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, label: updates.name, color: updates.color } : c))
+      );
+      setDirtyFlags((prev) => ({ ...prev, videoComments: true }));
+      setEditingMoment(null);
+      return;
+    }
+
+    setEditingMoment(null);
+  }, [customEvents, videoComments]);
 
   // Create a video comment
   const handleCreateVideoComment = useCallback(async (commentData: Omit<VideoComment, "id" | "createdAt">) => {
@@ -849,14 +882,54 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
     return protocolEvents.filter(e => e.protocolId === "swing-detection-v3").length;
   }, [protocolEvents]);
 
-  // Handle analyse moment action
-  const handleAnalyseMoment = useCallback((moment: Moment) => {
-    // For now, seek to the moment and show an alert with info
-    // TODO: Integrate with AI chat for detailed analysis
-    viewerRef.current?.seekTo(moment.time);
-    setViewMode("player");
+  // All angle presets for full annotation capture
+  const ALL_ANGLES: Array<[number, number, number]> = [
+    ANGLE_PRESETS.leftElbow,
+    ANGLE_PRESETS.rightElbow,
+    ANGLE_PRESETS.leftKnee,
+    ANGLE_PRESETS.rightKnee,
+    ANGLE_PRESETS.leftShoulder,
+    ANGLE_PRESETS.rightShoulder,
+    ANGLE_PRESETS.leftHip,
+    ANGLE_PRESETS.rightHip,
+    ANGLE_PRESETS.torsoTilt,
+  ];
+
+  // Helper to strip stream metadata from LLM response
+  const stripStreamMetadata = (text: string): string => {
+    const metaIndex = text.indexOf("__STREAM_META__");
+    if (metaIndex !== -1) {
+      return text.slice(0, metaIndex);
+    }
+    return text;
+  };
+
+  // Handle analyse moment action - creates report and streams AI analysis
+  const handleAnalyseMoment = useCallback(async (moment: Moment): Promise<void> => {
+    if (!viewerRef.current) {
+      console.error("[TechniqueViewer] No viewer ref available");
+      return;
+    }
+
+    // Create a new report immediately
+    const reportId = `report-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newReport: MomentReport = {
+      id: reportId,
+      momentId: moment.id,
+      momentLabel: moment.label,
+      momentType: moment.type,
+      protocolId: moment.protocolId,
+      time: moment.time,
+      frame: moment.frame,
+      content: "",
+      isStreaming: true,
+      createdAt: Date.now(),
+      sport,
+    };
     
-    // Log analysis request for now
+    // Add report to state (it will be streaming)
+    setReports(prev => [newReport, ...prev]);
+
     console.log(`[TechniqueViewer] Analyse requested for moment:`, {
       id: moment.id,
       label: moment.label,
@@ -864,7 +937,229 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
       time: moment.time,
       frame: moment.frame,
       protocolId: moment.protocolId,
-      metadata: moment.metadata,
+    });
+
+    // Save current angles
+    const previousAngles = [...config.angles.measuredAngles];
+    
+    // Enable all angles for comprehensive capture
+    setConfig(prev => ({
+      ...prev,
+      angles: {
+        ...prev.angles,
+        measuredAngles: ALL_ANGLES,
+      },
+    }));
+
+    // Seek to the moment's time
+    viewerRef.current.seekTo(moment.time);
+
+    // Wait for frame to render with all annotations
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Capture the annotated frame
+    const blob = await viewerRef.current.captureFrame();
+
+    // Restore previous angles
+    setConfig(prev => ({
+      ...prev,
+      angles: {
+        ...prev.angles,
+        measuredAngles: previousAngles,
+      },
+    }));
+
+    if (!blob) {
+      console.error("[TechniqueViewer] Failed to capture frame");
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { ...r, isStreaming: false, content: "Failed to capture frame for analysis." } : r
+      ));
+      return;
+    }
+
+    console.log(`[TechniqueViewer] Captured frame for moment: ${moment.label} (${(blob.size / 1024).toFixed(1)} KB)`);
+
+    // Create preview URL for the report
+    const previewUrl = URL.createObjectURL(blob);
+    setReports(prev => prev.map(r => 
+      r.id === reportId ? { ...r, previewUrl } : r
+    ));
+
+    // Upload to S3
+    try {
+      const timestamp = Date.now();
+      const imageFile = new File([blob], `moment_${timestamp}.jpg`, { type: "image/jpeg" });
+      
+      console.log("[TechniqueViewer] Uploading frame to S3...");
+      
+      const urlResponse = await fetch("/api/s3/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: imageFile.name,
+          contentType: imageFile.type,
+        }),
+      });
+
+      if (!urlResponse.ok) {
+        const errorData = await urlResponse.json();
+        throw new Error(errorData.error || "Failed to get upload URL");
+      }
+
+      const { url: presignedUrl, downloadUrl } = await urlResponse.json();
+
+      // Upload to S3
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.addEventListener("load", () => {
+          if (xhr.status === 200 || xhr.status === 204) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+        xhr.open("PUT", presignedUrl);
+        xhr.setRequestHeader("Content-Type", imageFile.type);
+        xhr.send(imageFile);
+      });
+
+      console.log("[TechniqueViewer] Frame uploaded to S3");
+
+      // Get pose data for this frame to calculate angles
+      const preprocessedPoses = viewerRef.current?.getPreprocessedPoses();
+      const framePoses = preprocessedPoses?.get(moment.frame);
+      const pose = framePoses?.[0]; // Use first detected pose
+
+      // Calculate all angles if pose data is available
+      let anglesMeasured = "";
+      if (pose && pose.keypoints) {
+        const kp = pose.keypoints;
+        const minConfidence = 0.3;
+        
+        // Helper to check if keypoint is valid
+        const isValid = (idx: number) => kp[idx] && (kp[idx].score ?? 0) >= minConfidence;
+        
+        // Helper to calculate angle with complementary (outer) option
+        const getAngle = (a: number, b: number, c: number): number | null => {
+          if (!isValid(a) || !isValid(b) || !isValid(c)) return null;
+          const rawAngle = calculateAngle(kp[a], kp[b], kp[c]);
+          // Use complementary angles (180 - angle) as that's our default display
+          return Math.round(180 - rawAngle);
+        };
+
+        const angles: { name: string; value: number | null }[] = [
+          { name: "Left Elbow", value: getAngle(5, 7, 9) },
+          { name: "Right Elbow", value: getAngle(6, 8, 10) },
+          { name: "Left Knee", value: getAngle(11, 13, 15) },
+          { name: "Right Knee", value: getAngle(12, 14, 16) },
+          { name: "Left Shoulder", value: getAngle(7, 5, 11) },
+          { name: "Right Shoulder", value: getAngle(8, 6, 12) },
+          { name: "Left Hip", value: getAngle(5, 11, 13) },
+          { name: "Right Hip", value: getAngle(6, 12, 14) },
+        ];
+
+        const validAngles = angles.filter(a => a.value !== null);
+        if (validAngles.length > 0) {
+          anglesMeasured = `\n\n**Measured Joint Angles (outer angles, where 180° = fully extended):**\n${validAngles.map(a => `- ${a.name}: ${a.value}°`).join("\n")}`;
+        }
+      }
+
+      // Build context-aware prompt
+      const momentType = moment.type === "protocol" ? "AI-detected" : "user-marked";
+      const momentContext = moment.protocolId 
+        ? `This is a "${moment.label}" moment detected by the ${moment.protocolId} protocol.`
+        : `This is a user-marked moment labeled "${moment.label}".`;
+      
+      const sportContext = sport 
+        ? `The sport is ${sport}.`
+        : "The sport has not been specified.";
+
+      const prompt = `Analyze this ${momentType} moment from a sports video in the Technique Studio.
+
+${momentContext}
+${sportContext}
+
+The image shows the player's body position with pose detection overlay and joint angle measurements at ${moment.time.toFixed(2)} seconds (frame ${moment.frame}).${anglesMeasured}
+
+Please provide detailed biomechanical feedback on:
+1. Body positioning and alignment at this moment
+2. The joint angles and what they indicate about the technique
+3. What's good about the technique shown
+4. Specific suggestions for improvement
+
+Keep the analysis focused and actionable.`;
+
+      // Send to LLM API with streaming
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("videoUrl", downloadUrl);
+      formData.append("promptType", "frame");
+      formData.append("thinkingMode", "deep");
+      formData.append("mediaResolution", "high");
+      formData.append("domainExpertise", sport || "all-sports");
+
+      console.log("[TechniqueViewer] Sending to LLM API...");
+
+      const response = await fetch("/api/llm", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "x-stream": "true",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API error ${response.status}: ${errorText}`);
+      }
+
+      // Stream the response
+      const reader = response.body?.getReader();
+      if (reader) {
+        let fullResponse = "";
+        const decoder = new TextDecoder();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          fullResponse += chunk;
+          
+          // Update report content as we stream
+          setReports(prev => prev.map(r => 
+            r.id === reportId ? { ...r, content: stripStreamMetadata(fullResponse) } : r
+          ));
+        }
+        
+        // Mark as complete
+        setReports(prev => prev.map(r => 
+          r.id === reportId ? { ...r, content: stripStreamMetadata(fullResponse), isStreaming: false } : r
+        ));
+        console.log("[TechniqueViewer] Analysis complete");
+      }
+
+    } catch (error) {
+      console.error("[TechniqueViewer] Analysis error:", error);
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { 
+          ...r, 
+          isStreaming: false, 
+          content: `Analysis failed: ${error instanceof Error ? error.message : "Unknown error"}` 
+        } : r
+      ));
+    }
+  }, [config.angles.measuredAngles, sport]);
+
+  // Handle delete report
+  const handleDeleteReport = useCallback((reportId: string) => {
+    setReports(prev => {
+      const report = prev.find(r => r.id === reportId);
+      if (report?.previewUrl) {
+        URL.revokeObjectURL(report.previewUrl);
+      }
+      return prev.filter(r => r.id !== reportId);
     });
   }, []);
 
@@ -1153,6 +1448,16 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                     >
                       Use Outer Angles (180°−)
                     </DropdownMenu.CheckboxItem>
+                    <DropdownMenu.CheckboxItem
+                      checked={config.angles.anglePrecision > 0}
+                      onCheckedChange={(checked) => setConfig(prev => ({
+                        ...prev,
+                        angles: { ...prev.angles, anglePrecision: checked ? 1 : 0 }
+                      }))}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Show Decimals
+                    </DropdownMenu.CheckboxItem>
                     
                     <DropdownMenu.Separator />
                     
@@ -1301,26 +1606,45 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                 videoComments,
                 protocolAdjustments,
                 swingBoundaryAdjustments,
+                reports,
                 onViewMoment: (time) => {
                   viewerRef.current?.seekTo(time);
                 },
-                onAnalyseMoment: handleAnalyseMoment,
-                onDeleteMoment: (moment: { id: string; type: string }) => {
-                  if (moment.type === "custom") {
-                    setCustomEvents((prev) => prev.filter((e) => e.id !== moment.id));
+                onAnalyseMoment: (moment) => handleAnalyseMoment(moment as Moment),
+                onDeleteReport: handleDeleteReport,
+                onDeleteMoment: (moment) => {
+                  const m = moment as { id: string; type: string };
+                  if (m.type === "custom") {
+                    setCustomEvents((prev) => prev.filter((e) => e.id !== m.id));
                     setDirtyFlags((prev) => ({ ...prev, customEvents: true }));
-                  } else if (moment.type === "comment") {
-                    setVideoComments((prev) => prev.filter((c) => c.id !== moment.id));
+                  } else if (m.type === "comment") {
+                    setVideoComments((prev) => prev.filter((c) => c.id !== m.id));
                     setDirtyFlags((prev) => ({ ...prev, videoComments: true }));
                   }
                 },
-                onResetAdjustment: (moment: { id: string }) => {
+                onResetAdjustment: (moment) => {
+                  const m = moment as { id: string };
                   setProtocolAdjustments((prev) => {
                     const next = new Map(prev);
-                    next.delete(moment.id);
+                    next.delete(m.id);
                     return next;
                   });
                   setDirtyFlags((prev) => ({ ...prev, protocolAdjustments: true }));
+                },
+                onEditMomentName: (moment) => {
+                  const m = moment as { id: string; type: string; label: string; color: string; time: number; frame: number };
+                  // Only allow editing custom events and comments
+                  if (m.type === "custom" || m.type === "comment") {
+                    setEditingMoment({
+                      id: m.id,
+                      type: m.type as "custom" | "comment",
+                      label: m.label,
+                      color: m.color,
+                      time: m.time,
+                      frame: m.frame,
+                    });
+                    setCustomEventDialogOpen(true);
+                  }
                 },
               }}
               style={{
@@ -2155,7 +2479,7 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
                       }}
                     >
                       <Text size="1" style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "10px" }}>
-                        + Click or right-click to add marker
+                        + Right-click to add marker
                       </Text>
                     </Flex>
                   )}
@@ -2316,10 +2640,15 @@ export function TechniqueViewer({ videoUrl, onBack, backLabel = "Back", sport, t
       {/* Custom Event Dialog */}
       <CustomEventDialog
         open={customEventDialogOpen}
-        onOpenChange={setCustomEventDialogOpen}
+        onOpenChange={(open) => {
+          setCustomEventDialogOpen(open);
+          if (!open) setEditingMoment(null);
+        }}
         eventTime={pendingCustomEventTime?.time ?? 0}
         eventFrame={pendingCustomEventTime?.frame ?? 0}
         onCreateEvent={handleCreateCustomEvent}
+        editingMoment={editingMoment}
+        onUpdateEvent={handleUpdateEvent}
       />
 
       {/* Video Comment Dialog */}

@@ -10,30 +10,56 @@
  */
 
 import { useEffect, useState } from "react";
-import { Box, Flex, Text, Badge, Card, DropdownMenu, Spinner } from "@radix-ui/themes";
+import { Box, Flex, Text, Badge, Card, DropdownMenu, Spinner, Button, Tooltip } from "@radix-ui/themes";
 import {
   RocketIcon,
   TargetIcon,
   CheckCircledIcon,
   ChatBubbleIcon,
   BookmarkIcon,
-  PlayIcon,
   MagicWandIcon,
   DragHandleDots2Icon,
   Pencil1Icon,
+  Pencil2Icon,
   DotsVerticalIcon,
   TrashIcon,
   ResetIcon,
+  PlayIcon,
 } from "@radix-ui/react-icons";
 import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
 import type { CustomEvent } from "./CustomEventDialog";
 import type { VideoComment } from "./VideoCommentDialog";
+import buttonStyles from "@/styles/buttons.module.css";
+
+// ============================================================================
+// Color Utilities
+// ============================================================================
+
+/**
+ * Determines if text should be dark or light based on background color brightness.
+ * Uses relative luminance calculation for accessibility (WCAG 2.0).
+ */
+export function getContrastTextColor(hexColor: string): string {
+  // Remove # if present
+  const hex = hexColor.replace("#", "");
+  
+  // Parse RGB values
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return dark text for light backgrounds, light text for dark backgrounds
+  return luminance > 0.5 ? "rgba(0, 0, 0, 0.9)" : "white";
+}
 
 // ============================================================================
 // Thumbnail Cache & Queue (module-level, persists across component instances)
 // ============================================================================
 
-const DEBUG = true;
+const DEBUG = false; // Set to true for thumbnail debugging
 function log(...args: unknown[]) {
   if (DEBUG) console.log("[Thumbnails]", ...args);
 }
@@ -302,6 +328,8 @@ interface MomentCardProps {
   onDelete?: (moment: Moment) => void;
   /** Callback when "Reset adjustment" is clicked (only for adjusted moments) */
   onResetAdjustment?: (moment: Moment) => void;
+  /** Callback when "Edit name" is clicked */
+  onEditName?: (moment: Moment) => void;
 }
 
 // ============================================================================
@@ -339,25 +367,6 @@ function getMomentIcon(moment: Moment): React.ReactNode {
   }
 }
 
-function getProtocolLabel(protocolId: string): string {
-  switch (protocolId) {
-    case "loading-position":
-      return "Loading Position";
-    case "serve-preparation":
-      return "Preparation";
-    case "tennis-contact-point":
-      return "Contact Point";
-    case "serve-follow-through":
-      return "Follow Through";
-    case "swing-detection-v3":
-    case "swing-detection-v2":
-    case "swing-detection-v1":
-      return "Swing";
-    default:
-      return protocolId;
-  }
-}
-
 // ============================================================================
 // Component
 // ============================================================================
@@ -371,11 +380,18 @@ export function MomentCard({
   poseConfidence,
   onDelete,
   onResetAdjustment,
+  onEditName,
 }: MomentCardProps) {
   // Initialize from cache if available
   const initialCached = videoElement ? getCachedThumbnail(videoElement.src, moment.frame) : null;
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initialCached);
   const [isCapturing, setIsCapturing] = useState(!initialCached);
+  
+  // Handle analyse click
+  const handleAnalyseClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onAnalyse(moment);
+  };
 
   // Request capture if not cached
   useEffect(() => {
@@ -429,13 +445,6 @@ export function MomentCard({
   // Use pose confidence if available, otherwise fall back to metadata confidence
   const confidence = poseConfidence ?? (moment.metadata?.confidence as number | undefined);
 
-  // Get label for display
-  const typeLabel = moment.protocolId
-    ? getProtocolLabel(moment.protocolId)
-    : moment.type === "comment"
-    ? "Comment"
-    : "Marker";
-
   return (
     <Card
       className="moment-card"
@@ -449,6 +458,8 @@ export function MomentCard({
           : "1px solid var(--gray-6)",
         overflow: "hidden",
         position: "relative",
+        display: "flex",
+        flexDirection: "column",
       }}
       onClick={() => onView(moment)}
     >
@@ -503,14 +514,14 @@ export function MomentCard({
           </Flex>
         )}
 
-        {/* Type Badge - top left (using marker color) */}
+        {/* Type Badge - top left (using marker color with contrast text) */}
         <Box
           style={{
             position: "absolute",
             top: "8px",
             left: "8px",
             backgroundColor: moment.color,
-            color: "white",
+            color: getContrastTextColor(moment.color),
             padding: "2px 8px",
             borderRadius: "4px",
             fontSize: "11px",
@@ -522,7 +533,7 @@ export function MomentCard({
           }}
         >
           {getMomentIcon(moment)}
-          <span>{typeLabel}</span>
+          <span>{moment.label}</span>
         </Box>
 
         {/* Menu Dropdown - top right (like TaskTile) */}
@@ -558,8 +569,15 @@ export function MomentCard({
               </DropdownMenu.Item>
               <DropdownMenu.Item onSelect={() => onAnalyse(moment)}>
                 <MagicWandIcon width={14} height={14} />
-                <Text ml="2">Analyse moment</Text>
+                <Text ml="2">Analyse</Text>
               </DropdownMenu.Item>
+              {/* Edit name - only for user-created markers (custom events and comments) */}
+              {onEditName && (moment.type === "custom" || moment.type === "comment") && (
+                <DropdownMenu.Item onSelect={() => onEditName(moment)}>
+                  <Pencil2Icon width={14} height={14} />
+                  <Text ml="2">Edit name</Text>
+                </DropdownMenu.Item>
+              )}
               {/* Reset adjustment - only for adjusted protocol events */}
               {moment.isAdjusted && onResetAdjustment && (
                 <>
@@ -584,22 +602,37 @@ export function MomentCard({
           </DropdownMenu.Root>
         </Box>
 
-        {/* Confidence Badge - bottom left */}
+        {/* Confidence Badge - bottom left with tooltip */}
         {confidence != null && (
-          <Box
-            style={{
-              position: "absolute",
-              bottom: "8px",
-              left: "8px",
-              backgroundColor: confidence >= 0.7 ? "rgba(34, 197, 94, 0.9)" : "rgba(100, 100, 100, 0.9)",
-              padding: "2px 6px",
-              borderRadius: "4px",
-            }}
+          <Tooltip
+            content={
+              <Text size="1" style={{ display: "block", maxWidth: "240px" }}>
+                Pose detection confidence for this moment.
+                <br /><br />
+                • 70%+ Excellent — highly accurate tracking
+                <br />
+                • 50-70% Good — reliable for most analysis
+                <br />
+                • Below 50% — detection may be less reliable
+              </Text>
+            }
           >
-            <Text size="1" style={{ color: "white", fontWeight: 500 }}>
-              {(confidence * 100).toFixed(0)}%
-            </Text>
-          </Box>
+            <Box
+              style={{
+                position: "absolute",
+                bottom: "8px",
+                left: "8px",
+                backgroundColor: confidence >= 0.7 ? "rgba(34, 197, 94, 0.9)" : confidence >= 0.5 ? "rgba(234, 179, 8, 0.9)" : "rgba(100, 100, 100, 0.9)",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                cursor: "help",
+              }}
+            >
+              <Text size="1" style={{ color: "white", fontWeight: 500 }}>
+                {(confidence * 100).toFixed(0)}%
+              </Text>
+            </Box>
+          </Tooltip>
         )}
 
         {/* Duration/Time Badge - bottom right (like TaskTile) */}
@@ -618,68 +651,36 @@ export function MomentCard({
           </Text>
         </Box>
 
-        {/* Play Overlay - appears on hover (like TaskTile) */}
-        <Flex
-          align="center"
-          justify="center"
-          className="play-overlay"
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.3)",
-            opacity: 0,
-            transition: "opacity 0.2s ease",
-          }}
-        >
-          <Box
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              backgroundColor: "var(--mint-9)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-            }}
-          >
-            <PlayIcon width={24} height={24} color="white" />
-          </Box>
-        </Flex>
       </Box>
 
       {/* Content Area - structured like TaskTile */}
-      <Flex direction="column" gap="2" p="3">
+      <Flex direction="column" gap="2" p="3" style={{ flex: 1 }}>
         {/* Status row with badges */}
-        <Flex justify="between" align="center">
-          <Flex align="center" gap="2">
-            {/* Adjusted indicator */}
-            {moment.isAdjusted && (
-              <Badge color="amber" variant="soft" size="1">
-                Adjusted
-              </Badge>
-            )}
-            {/* Parent swing context */}
-            {moment.parentSwingLabel && (
-              <Badge color="blue" variant="soft" size="1">
-                {moment.parentSwingLabel}
-              </Badge>
-            )}
-          </Flex>
+        <Flex align="center" gap="2" wrap="wrap">
+          {/* Adjusted indicator */}
+          {moment.isAdjusted && (
+            <Badge color="amber" variant="soft" size="1">
+              Adjusted
+            </Badge>
+          )}
+          {/* Parent swing context */}
+          {moment.parentSwingLabel && (
+            <Badge color="blue" variant="soft" size="1">
+              {moment.parentSwingLabel}
+            </Badge>
+          )}
         </Flex>
 
-        {/* Title - moment label */}
-        <Text
+        {/* Analyse Moment button - anchored to bottom */}
+        <Button
           size="2"
-          weight="medium"
-          style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
+          className={buttonStyles.actionButtonSquare}
+          onClick={handleAnalyseClick}
+          style={{ marginTop: "auto" }}
         >
-          {moment.label}
-        </Text>
+          <MagicWandIcon width={14} height={14} />
+          Analyse
+        </Button>
       </Flex>
 
       {/* Hover styles - matching TaskTile */}
@@ -688,10 +689,6 @@ export function MomentCard({
           transform: translateY(-2px);
           box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
           border-color: var(--mint-9) !important;
-        }
-
-        :global(.moment-card:hover .play-overlay) {
-          opacity: 1 !important;
         }
       `}</style>
     </Card>

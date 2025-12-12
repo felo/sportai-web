@@ -502,6 +502,11 @@ html[data-theme="green"] .markdown-ol .markdown-li::before {
   color: #248559;
 }
 
+/* Ensure nested ordered lists reset their counter (fixes AI-generated lists with wrong numbering) */
+.markdown-ol .markdown-ol {
+  counter-reset: markdown-counter;
+}
+
 /* Lists inside collapsible sections need extra left margin to account for section padding */
 details .markdown-ul,
 details .markdown-ol {

@@ -74,7 +74,7 @@ const FORMATTING_GUIDELINES = `
 
 - **Structured Breakdown**: Organize your analysis in a clear, digestible format. Consider using:
   - Bullet points for specific observations
-  - Numbered lists for exercises or drills
+  - Numbered lists for exercises or drills (IMPORTANT: when nesting numbered lists, always restart numbering at 1 for each nested level)
   - Clear visual separation between different topics
   
   **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections:**
