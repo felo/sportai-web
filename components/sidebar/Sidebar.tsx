@@ -223,10 +223,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         >
           {!isCollapsed && (
             <Image
-              src="https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg"
+              src="https://res.cloudinary.com/djtxhrly7/image/upload/v1765579947/SportAI_Open_Horizontal_light_ajy8ld.svg"
               alt="SportAI"
-              width={120}
-              height={38}
+              width={120*1.5}
+              height={38*1.5}
               priority
               style={{ objectFit: "contain", height: "auto", display: "block" }}
             />

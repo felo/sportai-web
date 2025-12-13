@@ -6,6 +6,13 @@
  */
 
 // ============================================
+// Feature Flags
+// ============================================
+
+/** Show "Want more accuracy and deeper insights?" PRO upsell banner */
+export const SHOW_PRO_UPSELL_BANNER = false;
+
+// ============================================
 // Conversation Limits
 // ============================================
 

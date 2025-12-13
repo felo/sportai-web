@@ -639,7 +639,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                             <path d="M14 8h4v4" />
                           </svg>
                           <Text size="2" color="gray" align="center">
-                            Video is floating
+                            Video Analysis
                           </Text>
                           <Button
                             size="1"
@@ -648,7 +648,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                               floatingContext?.closeFloating();
                             }}
                           >
-                            Return to video
+                            Show Video
                           </Button>
                         </Box>
                       )}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Task, StatisticsResult } from "../types";
 import type { LoadingPhase } from "../components/LoadingState";
+import { isSampleTask, getSampleTask } from "@/components/tasks/sampleTasks";
 
 interface UseTaskFetchingResult {
   task: Task | null;
@@ -75,7 +76,10 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
       return;
     }
     
-    if (!user) {
+    // Sample tasks don't require authentication
+    const isSample = isSampleTask(taskId);
+    
+    if (!user && !isSample) {
       setLoading(false);
       return;
     }
@@ -94,15 +98,84 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
       };
       
       try {
+        // Handle sample tasks differently - load from static data + S3
+        if (isSample) {
+          const sampleTask = getSampleTask(taskId);
+          if (!sampleTask) {
+            await ensureMinLoadingTime();
+            throw new Error("Sample task not found");
+          }
+          
+          // Refresh video URL if S3 key exists
+          let refreshedVideoUrl = sampleTask.video_url;
+          if (sampleTask.video_s3_key) {
+            try {
+              const urlResponse = await fetch("/api/s3/download-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  key: sampleTask.video_s3_key,
+                  expiresIn: 7 * 24 * 3600,
+                }),
+              });
+              if (urlResponse.ok) {
+                const { downloadUrl } = await urlResponse.json();
+                if (downloadUrl) refreshedVideoUrl = downloadUrl;
+              }
+            } catch {
+              // Use original URL on error
+            }
+          }
+          
+          // Set task with refreshed video URL
+          setTask({
+            ...sampleTask,
+            video_url: refreshedVideoUrl,
+          } as Task);
+          
+          // Fetch result if result_s3_key exists
+          if (sampleTask.result_s3_key) {
+            setLoadingPhase("result");
+            try {
+              const resultUrlResponse = await fetch("/api/s3/download-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  key: sampleTask.result_s3_key,
+                  expiresIn: 3600, // 1 hour for result
+                }),
+              });
+              
+              if (resultUrlResponse.ok) {
+                const { downloadUrl } = await resultUrlResponse.json();
+                if (downloadUrl) {
+                  const resultResponse = await fetch(downloadUrl);
+                  if (resultResponse.ok) {
+                    const statisticsResult = await resultResponse.json();
+                    setResult(statisticsResult);
+                  }
+                }
+              }
+            } catch {
+              // Result fetch failed - continue without result
+            }
+          }
+          
+          setLoadingPhase("done");
+          await ensureMinLoadingTime();
+          return;
+        }
+        
+        // Regular tasks - fetch from API
         // Fetch task details using the status endpoint (single task, not all)
         // AND start fetching result in parallel
         const [taskResponse, resultResponse] = await Promise.all([
           fetch(`/api/tasks/${taskId}/status`, {
-            headers: { Authorization: `Bearer ${user.id}` },
+            headers: { Authorization: `Bearer ${user!.id}` },
           }),
           fetch(`/api/tasks/${taskId}/result`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${user.id}` },
+            headers: { Authorization: `Bearer ${user!.id}` },
           }),
         ]);
         

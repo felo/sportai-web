@@ -3,6 +3,7 @@
 import { Flex, Text, Grid } from "@radix-ui/themes";
 import { TaskTile, type Task } from "./TaskTile";
 import { EmptyState } from "@/components/ui";
+import { useRefreshedSampleTasks } from "./sampleTasks";
 
 interface TaskGridViewProps {
   tasks: Task[];
@@ -15,10 +16,15 @@ interface TaskGridViewProps {
   onDownloadVideo?: (task: Task) => void;
   onExportData?: (taskId: string) => void;
   isTaskNew?: (taskId: string) => boolean;
+  showSamples?: boolean;
 }
 
-export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew }: TaskGridViewProps) {
-  if (tasks.length === 0) {
+export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew, showSamples = true }: TaskGridViewProps) {
+  const sampleTasks = useRefreshedSampleTasks();
+  const hasTasks = tasks.length > 0;
+  const hasSamples = showSamples && sampleTasks.length > 0;
+  
+  if (!hasTasks && !hasSamples) {
     return (
       <Flex align="center" justify="center" py="8">
         <EmptyState message="No videos match the current filters." />
@@ -31,7 +37,7 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
   const completedTasks = tasks.filter(t => t.status === "completed");
   const failedTasks = tasks.filter(t => t.status === "failed");
   
-  const renderTaskSection = (sectionTasks: Task[], title: string, subtitle?: string) => {
+  const renderTaskSection = (sectionTasks: Task[], title: string, subtitle?: string, isSampleSection?: boolean) => {
     if (sectionTasks.length === 0) return null;
     
     return (
@@ -61,14 +67,14 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
               key={task.id}
               task={task}
               onClick={() => onTaskClick(task.id)}
-              onFetchResult={() => onFetchResult(task.id)}
+              onFetchResult={isSampleSection ? undefined : () => onFetchResult(task.id)}
               isFetching={fetchingResult === task.id}
-              onDelete={onDeleteTask ? () => onDeleteTask(task.id) : undefined}
+              onDelete={isSampleSection ? undefined : (onDeleteTask ? () => onDeleteTask(task.id) : undefined)}
               isDeleting={deletingTask === task.id}
               isPreparing={preparingTask === task.id}
-              onDownloadVideo={onDownloadVideo ? () => onDownloadVideo(task) : undefined}
-              onExportData={onExportData ? () => onExportData(task.id) : undefined}
-              isNew={isTaskNew?.(task.id)}
+              onDownloadVideo={isSampleSection ? undefined : (onDownloadVideo ? () => onDownloadVideo(task) : undefined)}
+              onExportData={isSampleSection ? undefined : (onExportData ? () => onExportData(task.id) : undefined)}
+              isNew={isSampleSection ? false : isTaskNew?.(task.id)}
             />
           ))}
         </Grid>
@@ -97,6 +103,14 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
         failedTasks, 
         "Failed", 
         `${failedTasks.length} ${failedTasks.length === 1 ? "analysis" : "analyses"}`
+      )}
+      
+      {/* Sample videos section */}
+      {hasSamples && renderTaskSection(
+        sampleTasks,
+        "Sample Videos",
+        "Try these demo analyses",
+        true
       )}
     </Flex>
   );

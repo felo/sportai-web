@@ -15,7 +15,7 @@ export interface LogoNewChatButtonProps {
   directTapAction?: boolean;
 }
 
-const LOGO_URL = "https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/sai-logo-green-horizontal_grc5v1.svg";
+const LOGO_URL = "https://res.cloudinary.com/djtxhrly7/image/upload/v1765579947/SportAI_Open_Horizontal_light_ajy8ld.svg";
 
 /**
  * A logo component that morphs into a "New chat" button on hover (desktop).
@@ -23,8 +23,8 @@ const LOGO_URL = "https://res.cloudinary.com/djtxhrly7/image/upload/v1763680466/
  */
 export function LogoNewChatButton({
   onNewChat,
-  width = 120,
-  height = 38,
+  width = 120*1.5,
+  height = 38*1.5,
   directTapAction = false,
 }: LogoNewChatButtonProps) {
   const [isHovered, setIsHovered] = useState(false);

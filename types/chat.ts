@@ -1,3 +1,17 @@
+/**
+ * Candidate option for interactive response selection
+ */
+export type CandidateOption = {
+  id: string;
+  text: string; // The text shown as user's message when selected
+  description?: string; // Optional subtitle
+  icon?: string; // emoji
+  premadeResponse: string; // The AI's response when this option is selected
+  followUpOptions?: CandidateOption[]; // Optional follow-up options to show after this response
+  demoVideoUrl?: string; // If set, triggers video analysis with this URL (no upload needed)
+  demoVideoS3Key?: string; // If set, fetches presigned URL from this S3 key before analysis
+};
+
 export type ProgressStage =
   | "idle"
   | "uploading"
@@ -10,7 +24,12 @@ export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  messageType?: "standard" | "analysis_options" | "technique_studio_prompt"; // Type of message (default is standard)
+  messageType?: "standard" | "analysis_options" | "technique_studio_prompt" | "candidate_responses"; // Type of message (default is standard)
+  // Candidate responses (for messageType === "candidate_responses")
+  candidateResponses?: {
+    options: CandidateOption[];
+    selectedIndex?: number; // undefined until user picks one
+  };
   videoFile?: File | null;
   videoPreview?: string | null;
   videoUrl?: string | null; // S3 URL for video playback
@@ -26,6 +45,7 @@ export type Message = {
   isVideoSizeLimitError?: boolean; // Flag to indicate this is a video size limitation message
   isStreaming?: boolean; // Flag to indicate the message is currently streaming
   isIncomplete?: boolean; // Flag to indicate the response was interrupted or failed
+  isGreeting?: boolean; // Flag to indicate this is the initial greeting message
   // Analysis options (for messageType === "analysis_options")
   analysisOptions?: {
     preAnalysis: VideoPreAnalysis;

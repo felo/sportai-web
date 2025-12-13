@@ -94,24 +94,54 @@ export async function POST(request: NextRequest) {
 
     let videoData: { data: Buffer; mimeType: string } | null = null;
     
-    // Priority: videoUrl (S3) > videoFile (direct upload)
+    // Priority: videoUrl (S3 or external) > videoFile (direct upload)
     if (videoUrl) {
-      // Download from S3 using AWS SDK (efficient server-side download)
-      logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
-      logger.info(`📥 Downloading from S3 (server-side): ${videoUrl}`);
-      logger.time(`[${requestId}] S3 download`);
+      // Check if this is an S3 URL or external URL (like Cloudinary)
+      const isS3Url = videoUrl.includes('.s3.') && videoUrl.includes('amazonaws.com');
       
-      try {
-        videoData = await downloadFromS3(videoUrl);
-        logger.timeEnd(`[${requestId}] S3 download`);
-        logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
-        logger.debug(`[${requestId}] Video URL: ${videoUrl}, MIME type: ${videoData.mimeType}`);
-      } catch (error) {
-        logger.error(`[${requestId}] Failed to download from S3:`, error);
-        return NextResponse.json(
-          { error: `Failed to download media from S3: ${error instanceof Error ? error.message : "Unknown error"}` },
-          { status: 500 }
-        );
+      if (isS3Url) {
+        // Download from S3 using AWS SDK (efficient server-side download)
+        logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
+        logger.info(`📥 Downloading from S3 (server-side): ${videoUrl}`);
+        logger.time(`[${requestId}] S3 download`);
+        
+        try {
+          videoData = await downloadFromS3(videoUrl);
+          logger.timeEnd(`[${requestId}] S3 download`);
+          logger.debug(`[${requestId}] Media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+          logger.debug(`[${requestId}] Video URL: ${videoUrl}, MIME type: ${videoData.mimeType}`);
+        } catch (error) {
+          logger.error(`[${requestId}] Failed to download from S3:`, error);
+          return NextResponse.json(
+            { error: `Failed to download media from S3: ${error instanceof Error ? error.message : "Unknown error"}` },
+            { status: 500 }
+          );
+        }
+      } else {
+        // External URL (Cloudinary, etc.) - download via HTTP fetch
+        logger.info(`[${requestId}] Downloading media from external URL: ${videoUrl}`);
+        logger.time(`[${requestId}] External download`);
+        
+        try {
+          const response = await fetch(videoUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const contentType = response.headers.get('content-type') || 'video/mp4';
+          videoData = {
+            data: Buffer.from(arrayBuffer),
+            mimeType: contentType,
+          };
+          logger.timeEnd(`[${requestId}] External download`);
+          logger.debug(`[${requestId}] External media buffer size: ${(videoData.data.length / (1024 * 1024)).toFixed(2)} MB`);
+        } catch (error) {
+          logger.error(`[${requestId}] Failed to download from external URL:`, error);
+          return NextResponse.json(
+            { error: `Failed to download media: ${error instanceof Error ? error.message : "Unknown error"}` },
+            { status: 500 }
+          );
+        }
       }
     } else if (videoFile) {
       const fileType = videoFile.type.startsWith("video/") ? "video" : "image";

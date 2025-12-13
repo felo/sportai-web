@@ -1,14 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import { Text } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
 import { MessageBubble } from "./MessageBubble";
 import { ScrollSpacer } from "./ScrollSpacer";
 import { ConversationLimitBanner, FREE_TIER_MESSAGE_LIMIT } from "./components";
-import { URLs } from "@/lib/config";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import type { Message, ProgressStage } from "@/types/chat";
+import type { Message, ProgressStage, CandidateOption } from "@/types/chat";
 
 interface MessageListProps {
   messages: Message[];
@@ -26,6 +23,8 @@ interface MessageListProps {
   onSelectQuickOnly?: (messageId: string) => void;
   // Technique Studio handler
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
+  // Candidate responses handler
+  onSelectCandidateResponse?: (messageId: string, index: number, option: CandidateOption) => void;
   // Track which messages were loaded from storage (not created in this session)
   loadedMessageIds?: Set<string>;
   // Start new chat handler for conversation limit
@@ -46,6 +45,7 @@ export function MessageList({
   onSelectProPlusQuick,
   onSelectQuickOnly,
   onOpenTechniqueStudio,
+  onSelectCandidateResponse,
   loadedMessageIds,
   onStartNewChat,
 }: MessageListProps) {
@@ -74,49 +74,6 @@ export function MessageList({
       role="log" 
       aria-label="Chat messages"
     >
-      {messages.length === 0 && (
-        <div 
-          className="flex flex-col items-center justify-start pt-12" 
-          role="status"
-          style={{
-            width: "100%",
-          }}
-        >
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: "min(600px, 80vw)",
-              height: "auto",
-              marginBottom: "var(--space-4)",
-            }}
-          >
-            <Image
-              src={URLs.logo}
-              alt="SportAI"
-              width={600}
-              height={190}
-              style={{
-                width: "100%",
-                height: "auto",
-                objectFit: "contain",
-                objectPosition: "center top",
-              }}
-              priority
-            />
-          </div>
-          <Text
-            size="5"
-            align="center"
-            color="gray"
-            style={{
-              margin: 0,
-            }}
-          >
-            AI-powered technique & tactical analysis
-          </Text>
-        </div>
-      )}
 
       {messages.map((message, index) => (
         <MessageBubble 
@@ -132,6 +89,7 @@ export function MessageList({
           onSelectProPlusQuick={onSelectProPlusQuick}
           onSelectQuickOnly={onSelectQuickOnly}
           onOpenTechniqueStudio={onOpenTechniqueStudio}
+          onSelectCandidateResponse={onSelectCandidateResponse}
           // Pass progress info to the last message (the assistant message being generated)
           progressStage={index === messages.length - 1 ? progressStage : "idle"}
           uploadProgress={index === messages.length - 1 ? uploadProgress : 0}

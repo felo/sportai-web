@@ -17,6 +17,7 @@ interface AssistantMessageProps {
   videoUrl?: string;
   isStreaming?: boolean;
   isIncomplete?: boolean;
+  isGreeting?: boolean; // Hide feedback buttons for greeting/premade responses
   thinkingMessage: string;
   showProgressBar?: boolean;
   uploadProgress?: number; // Actual upload progress (0-100) when uploading
@@ -37,6 +38,7 @@ export function AssistantMessage({
   videoUrl,
   isStreaming,
   isIncomplete,
+  isGreeting,
   thinkingMessage,
   showProgressBar = false,
   uploadProgress,
@@ -130,7 +132,7 @@ export function AssistantMessage({
             messageId={messageId} 
             onAskForHelp={onAskForHelp}
             onTTSUsage={onTTSUsage}
-            feedbackButtons={!isStreaming && !isIncomplete ? (
+            feedbackButtons={!isStreaming && !isIncomplete && !isGreeting ? (
               <FeedbackButtons 
                 messageId={messageId}
                 chatId={chatId}

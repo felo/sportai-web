@@ -21,10 +21,17 @@ import {
  * - It's an assistant message AND
  * - It has isStreaming=true (was interrupted during generation) OR
  * - It has no content and no isStreaming flag (failed before any content was generated)
+ * 
+ * Excludes greeting messages and candidate_responses (these are meant to have empty content).
  */
 function markIncompleteMessages(messages: Message[]): Message[] {
   return messages.map((msg, index) => {
     if (msg.role === "assistant") {
+      // Skip greeting messages and candidate_responses - these are meant to have empty content
+      if (msg.isGreeting || msg.messageType === "candidate_responses") {
+        return msg;
+      }
+      
       // Already marked as incomplete - keep it
       if (msg.isIncomplete) {
         return msg;

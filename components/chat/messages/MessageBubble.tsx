@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Avatar, Box, Flex, Text } from "@radix-ui/themes";
-import type { Message, ProgressStage } from "@/types/chat";
+import type { Message, ProgressStage, CandidateOption } from "@/types/chat";
 import { getDeveloperMode, getTheatreMode, getCurrentChatId } from "@/utils/storage";
 import { calculatePricing } from "@/lib/token-utils";
+import { SHOW_PRO_UPSELL_BANNER } from "@/lib/limitations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -48,6 +49,8 @@ interface MessageBubbleProps {
   onSelectQuickOnly?: (messageId: string) => void;
   // Technique Studio handler
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
+  // Candidate responses handler
+  onSelectCandidateResponse?: (messageId: string, index: number, option: CandidateOption) => void;
   // Progress state for upload/processing/analyzing
   progressStage?: ProgressStage;
   uploadProgress?: number;
@@ -55,7 +58,7 @@ interface MessageBubbleProps {
   isLoadedFromServer?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, onSelectCandidateResponse, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -316,11 +319,24 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
 
   // Show PRO upsell after message is complete with a natural delay (only once per chat)
   useEffect(() => {
+    // Master toggle for PRO upsell banner
+    if (!SHOW_PRO_UPSELL_BANNER) {
+      setShowProUpsell(false);
+      return;
+    }
+    
     if (message.role === "assistant" && message.content) {
       const chatId = getCurrentChatId();
       
-      // Don't show PRO upsell for video size limit errors
-      if (message.isVideoSizeLimitError) {
+      // Don't show PRO upsell for video size limit errors or greeting messages
+      if (message.isVideoSizeLimitError || message.isGreeting) {
+        setShowProUpsell(false);
+        return;
+      }
+      
+      // Don't show PRO upsell until there have been at least 7 assistant messages
+      const assistantMessageCount = allMessages.filter(m => m.role === "assistant").length;
+      if (assistantMessageCount < 7) {
         setShowProUpsell(false);
         return;
       }
@@ -375,6 +391,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     });
   }, [hasVideo, message.videoFile, message.videoUrl]);
 
+  // Don't render candidate_responses messages that:
+  // 1. Have been selected (options are hidden)
+  // 2. Have missing/broken candidateResponses data
+  // This prevents empty message bubbles or "on it..." from appearing after refresh
+  if (message.messageType === "candidate_responses") {
+    // Selected - don't render at all
+    if (message.candidateResponses?.selectedIndex !== undefined) {
+      return null;
+    }
+    // Missing or empty options - don't render (broken data)
+    if (!message.candidateResponses?.options?.length) {
+      return null;
+    }
+  }
+
   return (
     <>
       {/* Inject keyframes for avatar poke animation */}
@@ -382,12 +413,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       
       <Flex
         gap={isMobile && message.role === "assistant" ? "0" : "4"}
-        justify={message.role === "user" ? "end" : "start"}
+        justify={
+          // Follow-up options (candidate_responses without intro text) should be right-aligned like user messages
+          message.role === "user" || (message.messageType === "candidate_responses" && !message.content?.trim())
+            ? "end" 
+            : "start"
+        }
         role="article"
         aria-label={`Message from ${message.role === "user" ? "user" : "assistant"}`}
         data-message-id={message.id}
       >
-        {message.role === "assistant" && !isMobile && (
+        {/* Hide avatar for follow-up options (candidate_responses without intro text) */}
+        {message.role === "assistant" && !isMobile && !(message.messageType === "candidate_responses" && !message.content?.trim()) && (
           <Box style={{ position: "relative", flexShrink: 0 }}>
             <Box
               onClick={handleAvatarPoke}
@@ -472,7 +509,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
 
         <Box
           style={{
-            maxWidth: isMobile 
+            // Candidate responses without intro text (follow-up options) should span full width
+            maxWidth: (message.messageType === "candidate_responses" && !message.content?.trim())
+              ? "100%"
+              : isMobile 
               ? "100%"
               : theatreMode && hasVideo && !isImageOnly
               ? "100%"
@@ -511,8 +551,17 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
 
           {message.role === "assistant" && (
             <Box style={{ maxWidth: "none" }}>
-              {/* Analysis Options Message (PRO eligibility choice) */}
-              {message.messageType === "analysis_options" && message.analysisOptions ? (
+              {/* Candidate Responses Message (interactive options) */}
+              {message.messageType === "candidate_responses" && message.candidateResponses ? (
+                <CandidateResponsesMessage
+                  introText={message.content}
+                  options={message.candidateResponses.options}
+                  selectedIndex={message.candidateResponses.selectedIndex}
+                  onSelect={(index, option) => onSelectCandidateResponse?.(message.id, index, option)}
+                  isLoadedFromServer={isLoadedFromServer}
+                />
+              ) : /* Analysis Options Message (PRO eligibility choice) */
+              message.messageType === "analysis_options" && message.analysisOptions ? (
                 <AnalysisOptionsMessage
                   preAnalysis={message.analysisOptions.preAnalysis}
                   selectedOption={message.analysisOptions.selectedOption}
@@ -539,6 +588,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     content={message.content}
                     isStreaming={message.isStreaming}
                     isIncomplete={message.isIncomplete}
+                    isGreeting={message.isGreeting}
                     thinkingMessage={(() => {
                       // Show upload progress during uploading
                       if (progressStage === "uploading") {

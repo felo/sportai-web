@@ -23,13 +23,12 @@ import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoCo
 import { FloatingVideoPortal } from "@/components/chat/viewers/FloatingVideoPortal";
 import { Sidebar } from "@/components/sidebar";
 import { useLibraryTasks } from "@/components/sidebar/LibraryTasksContext";
-import { StarterPrompts } from "@/components/StarterPrompts";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
-import { updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId, setCurrentChatId, createNewChat } from "@/utils/storage-unified";
-import { getMediaType, downloadVideoFromUrl } from "@/utils/video-utils";
+import { getMediaType } from "@/utils/video-utils";
 import { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
+import type { CandidateOption } from "@/types/chat";
 
 // Local imports
 import { 
@@ -41,10 +40,11 @@ import {
   useAutoScroll,
   useMessageRetry,
   useChatSubmission,
+  useGreetingMessage,
 } from "./hooks";
 import { generateHelpQuestion } from "./utils";
 import { ChatLayout, NavigationDialog } from "./components";
-import type { StarterPromptSettings, ProgressStage } from "./types";
+import type { ProgressStage } from "./types";
 
 export function AIChatForm() {
   // Refs
@@ -245,6 +245,15 @@ export function AIChatForm() {
   // Chat title hook
   useChatTitle({ messages, loading, isHydrated });
 
+  // Greeting message hook - adds initial AI greeting when chat is empty
+  useGreetingMessage({
+    messages,
+    isHydrated,
+    loading,
+    addMessage,
+    updateMessage,
+  });
+
   // Preload pose detection when video is added
   useEffect(() => {
     if (videoFile) {
@@ -272,55 +281,6 @@ export function AIChatForm() {
   const handlePickleballCoachPrompt = useCallback(() => {
     setPrompt(PICKLEBALL_COACH_PROMPT);
   }, []);
-
-  const handleStarterPromptSelect = useCallback(async (
-    promptText: string, 
-    videoUrl: string,
-    settings?: StarterPromptSettings
-  ) => {
-    try {
-      setVideoError(null);
-      
-      if (settings) {
-        const currentChatId = getCurrentChatId();
-        const chatSettingsToUpdate: Partial<{
-          thinkingMode: ThinkingMode;
-          mediaResolution: MediaResolution;
-          domainExpertise: DomainExpertise;
-        }> = {};
-
-        if (settings.thinkingMode) {
-          setThinkingMode(settings.thinkingMode);
-          chatSettingsToUpdate.thinkingMode = settings.thinkingMode;
-        }
-        if (settings.mediaResolution) {
-          setMediaResolution(settings.mediaResolution);
-          chatSettingsToUpdate.mediaResolution = settings.mediaResolution;
-        }
-        if (settings.domainExpertise) {
-          setDomainExpertise(settings.domainExpertise);
-          chatSettingsToUpdate.domainExpertise = settings.domainExpertise;
-        }
-        if (settings.playbackSpeed !== undefined) {
-          setVideoPlaybackSpeed(settings.playbackSpeed);
-        }
-        setPoseData(settings.poseSettings);
-
-        if (currentChatId && Object.keys(chatSettingsToUpdate).length > 0) {
-          updateChatSettings(currentChatId, chatSettingsToUpdate);
-        }
-      }
-      
-      const file = await downloadVideoFromUrl(videoUrl);
-      processVideoFile(file);
-      setPrompt(promptText);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load demo video";
-      setVideoError(errorMessage);
-      setPrompt(promptText);
-      throw err;
-    }
-  }, [processVideoFile, setVideoError, setThinkingMode, setMediaResolution, setDomainExpertise]);
 
   const handleClearConversation = useCallback(() => {
     clearMessages();
@@ -363,6 +323,110 @@ export function AIChatForm() {
     setMediaResolution(newChat.mediaResolution ?? "medium");
     setDomainExpertise(newChat.domainExpertise ?? "all-sports");
   }, [confirmNavigation, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise]);
+
+  // Handle candidate response selection (e.g., greeting options)
+  const handleSelectCandidateResponse = useCallback(async (messageId: string, index: number, option: CandidateOption) => {
+    // 1. Update the greeting message with the selected index
+    updateMessage(messageId, {
+      candidateResponses: {
+        options: messages.find(m => m.id === messageId)?.candidateResponses?.options || [],
+        selectedIndex: index,
+      },
+    });
+
+    // 2. Check if this is a demo video option - trigger actual analysis
+    // If S3 key is provided, fetch a fresh presigned URL first
+    if (option.demoVideoUrl || option.demoVideoS3Key) {
+      let videoUrl = option.demoVideoUrl;
+      
+      // Fetch presigned URL from S3 key if provided
+      if (option.demoVideoS3Key) {
+        try {
+          const response = await fetch("/api/s3/download-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              key: option.demoVideoS3Key,
+              expiresIn: 7 * 24 * 3600, // 7 days
+            }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.downloadUrl) {
+              videoUrl = data.downloadUrl;
+            }
+          }
+        } catch {
+          // Fall back to demoVideoUrl if refresh fails
+        }
+      }
+      
+      if (videoUrl) {
+        // Pass prompt and video URL directly to handleSubmit (no state timing issues)
+        const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
+        handleSubmit(fakeEvent, option.text, videoUrl);
+        return;
+      }
+    }
+
+    // 3. Add the user's "message" (their selection) - only for non-demo options
+    const userMessageId = crypto.randomUUID();
+    addMessage({
+      id: userMessageId,
+      role: "user",
+      content: option.text,
+    });
+
+    // 4. Auto-scroll to show the new messages
+    scrollToBottom();
+
+    // 5. Add the premade assistant response with typewriter effect
+    const assistantMessageId = crypto.randomUUID();
+    const fullResponse = option.premadeResponse || "";
+    const hasFollowUp = option.followUpOptions && option.followUpOptions.length > 0;
+    
+    // Start with first character to avoid ThinkingIndicator
+    addMessage({
+      id: assistantMessageId,
+      role: "assistant",
+      content: fullResponse.charAt(0),
+      isStreaming: true,
+    });
+
+    // Typewriter effect
+    let charIndex = 1;
+    const typingSpeed = 15; // ms per character
+    
+    const typeNextChar = () => {
+      if (charIndex < fullResponse.length) {
+        updateMessage(assistantMessageId, {
+          content: fullResponse.substring(0, charIndex + 1),
+          isStreaming: charIndex + 1 < fullResponse.length,
+        });
+        charIndex++;
+        setTimeout(typeNextChar, typingSpeed);
+      } else if (hasFollowUp) {
+        // After typing completes, add follow-up options
+        setTimeout(() => {
+          const followUpMessageId = crypto.randomUUID();
+          addMessage({
+            id: followUpMessageId,
+            role: "assistant",
+            content: "",
+            messageType: "candidate_responses",
+            candidateResponses: {
+              options: option.followUpOptions!,
+              selectedIndex: undefined,
+            },
+          });
+          // Scroll to show the follow-up options
+          scrollToBottom();
+        }, 300); // Small delay after typing completes
+      }
+    };
+    
+    setTimeout(typeNextChar, typingSpeed);
+  }, [updateMessage, addMessage, messages, scrollToBottom, handleSubmit]);
 
   return (
     <AudioPlayerProvider>
@@ -418,27 +482,24 @@ export function AIChatForm() {
               )
             }
           >
-            {messages.length === 0 && !loading ? (
-              <StarterPrompts onPromptSelect={handleStarterPromptSelect} />
-            ) : (
-              <MessageList
-                messages={messages}
-                loading={loading}
-                progressStage={progressStage}
-                uploadProgress={uploadProgress}
-                messagesEndRef={messagesEndRef}
-                scrollContainerRef={scrollContainerRef}
-                onAskForHelp={handleAskForHelp}
-                onUpdateMessage={updateMessage}
-                onRetryMessage={handleRetryMessage}
-                retryingMessageId={retryingMessageId}
-                onSelectProPlusQuick={handleSelectProPlusQuick}
-                onSelectQuickOnly={handleSelectQuickOnly}
-                onOpenTechniqueStudio={handleOpenTechniqueStudio}
-                loadedMessageIds={loadedMessageIds}
-                onStartNewChat={handleNewChat}
-              />
-            )}
+            <MessageList
+              messages={messages}
+              loading={loading}
+              progressStage={progressStage}
+              uploadProgress={uploadProgress}
+              messagesEndRef={messagesEndRef}
+              scrollContainerRef={scrollContainerRef}
+              onAskForHelp={handleAskForHelp}
+              onUpdateMessage={updateMessage}
+              onRetryMessage={handleRetryMessage}
+              retryingMessageId={retryingMessageId}
+              onSelectProPlusQuick={handleSelectProPlusQuick}
+              onSelectQuickOnly={handleSelectQuickOnly}
+              onOpenTechniqueStudio={handleOpenTechniqueStudio}
+              onSelectCandidateResponse={handleSelectCandidateResponse}
+              loadedMessageIds={loadedMessageIds}
+              onStartNewChat={handleNewChat}
+            />
           </ChatLayout>
 
           <ErrorToast error={error} />

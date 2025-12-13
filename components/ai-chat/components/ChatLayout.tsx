@@ -30,7 +30,7 @@ export const ChatLayout = forwardRef<HTMLDivElement, ChatLayoutProps>(function C
     <div className={`content-wrapper ${!isSidebarCollapsed ? 'sidebar-expanded' : ''} ${isSidebarInitialLoad ? 'no-transition' : ''}`}>
       <div
         ref={containerRef}
-        className={`flex flex-col max-w-4xl w-full h-full transition-all ${isDragging ? "bg-blue-50 dark:bg-blue-900/10" : ""}`}
+        className="flex flex-col max-w-4xl w-full h-full"
         style={{ position: "relative", overflow: "hidden" }}
         {...dragHandlers}
       >

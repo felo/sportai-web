@@ -6,4 +6,5 @@ export { useChatTitle } from "./useChatTitle";
 export { useAutoScroll } from "./useAutoScroll";
 export { useMessageRetry } from "./useMessageRetry";
 export { useChatSubmission } from "./useChatSubmission";
+export { useGreetingMessage } from "./useGreetingMessage";
 

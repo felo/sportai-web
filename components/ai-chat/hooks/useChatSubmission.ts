@@ -77,10 +77,10 @@
    ) => Promise<void>;
  }
 
- interface UseChatSubmissionReturn {
-   handleSubmit: (e: React.FormEvent, overridePrompt?: string) => Promise<void>;
-   submitAbortRef: React.MutableRefObject<AbortController | null>;
- }
+interface UseChatSubmissionReturn {
+  handleSubmit: (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string) => Promise<void>;
+  submitAbortRef: React.MutableRefObject<AbortController | null>;
+}
 
  export function useChatSubmission({
    prompt,
@@ -118,14 +118,15 @@
  }: UseChatSubmissionOptions): UseChatSubmissionReturn {
    const submitAbortRef = useRef<AbortController | null>(null);
 
-   const handleSubmit = useCallback(async (e: React.FormEvent, overridePrompt?: string) => {
-     e.preventDefault();
-     
-     const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
-     const hasValidInput = effectivePrompt.trim() || videoFile || detectedVideoUrl;
-     if (!hasValidInput || loading) return;
+  const handleSubmit = useCallback(async (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string) => {
+    e.preventDefault();
+    
+    const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
+    const effectiveVideoUrl = overrideVideoUrl !== undefined ? overrideVideoUrl : detectedVideoUrl;
+    const hasValidInput = effectivePrompt.trim() || videoFile || effectiveVideoUrl;
+    if (!hasValidInput || loading) return;
 
-     const currentVideoUrl = detectedVideoUrl;
+    const currentVideoUrl = effectiveVideoUrl;
      let currentPrompt = effectivePrompt.trim();
      if (!currentPrompt && (videoFile || currentVideoUrl)) {
        currentPrompt = "Please analyse this video for me.";
@@ -173,50 +174,63 @@
      let videoMessageId: string | null = null;
      let lastUserMessageId: string | null = null;
      
-     // Create user messages
-     if ((currentVideoFile || currentVideoUrl) && currentPrompt.trim()) {
-       videoMessageId = generateMessageId();
-       const videoTokens = calculateUserMessageTokens("", currentVideoFile);
-       const videoMessage: Message = {
-         id: videoMessageId,
-         role: "user",
-         content: "",
-         videoFile: currentVideoFile || null,
-         videoPreview: currentVideoPreview,
-         videoUrl: currentVideoUrl || undefined,
-         thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
-         thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
-         videoPlaybackSpeed,
-         inputTokens: videoTokens,
-         poseData,
-         isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
-       };
-       addMessage(videoMessage);
-       
-       const textMessageId = generateMessageId();
-       lastUserMessageId = textMessageId;
-       const textMessage: Message = {
-         id: textMessageId,
-         role: "user",
-         content: currentPrompt,
-         inputTokens: calculateUserMessageTokens(currentPrompt, null),
-       };
-       addMessage(textMessage);
-     } else if (currentVideoUrl && !currentVideoFile) {
-       videoMessageId = generateMessageId();
-       lastUserMessageId = videoMessageId;
-       const userMessage: Message = {
-         id: videoMessageId,
-         role: "user",
-         content: currentPrompt,
-         videoUrl: currentVideoUrl,
-         thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
-         thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
-         inputTokens: calculateUserMessageTokens(currentPrompt, null),
-         isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
-       };
-       addMessage(userMessage);
-     } else {
+    // Create user messages
+    if ((currentVideoFile || currentVideoUrl) && currentPrompt.trim()) {
+      // Text message first (user's request)
+      const textMessageId = generateMessageId();
+      const textMessage: Message = {
+        id: textMessageId,
+        role: "user",
+        content: currentPrompt,
+        inputTokens: calculateUserMessageTokens(currentPrompt, null),
+      };
+      addMessage(textMessage);
+      
+      // Video message below
+      videoMessageId = generateMessageId();
+      lastUserMessageId = videoMessageId;
+      const videoTokens = calculateUserMessageTokens("", currentVideoFile);
+      const videoMessage: Message = {
+        id: videoMessageId,
+        role: "user",
+        content: "",
+        videoFile: currentVideoFile || null,
+        videoPreview: currentVideoPreview,
+        videoUrl: currentVideoUrl || undefined,
+        thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
+        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
+        videoPlaybackSpeed,
+        inputTokens: videoTokens,
+        poseData,
+        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
+      };
+      addMessage(videoMessage);
+    } else if (currentVideoUrl && !currentVideoFile) {
+      // Text message first
+      const textMessageId = generateMessageId();
+      const textMessage: Message = {
+        id: textMessageId,
+        role: "user",
+        content: currentPrompt,
+        inputTokens: calculateUserMessageTokens(currentPrompt, null),
+      };
+      addMessage(textMessage);
+      
+      // Video message below (empty content, just the video)
+      videoMessageId = generateMessageId();
+      lastUserMessageId = videoMessageId;
+      const videoMessage: Message = {
+        id: videoMessageId,
+        role: "user",
+        content: "",
+        videoUrl: currentVideoUrl,
+        thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
+        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
+        inputTokens: 0,
+        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
+      };
+      addMessage(videoMessage);
+    } else {
        const userMessageId = generateMessageId();
        lastUserMessageId = userMessageId;
        if (currentVideoFile) videoMessageId = userMessageId;
@@ -389,14 +403,34 @@
            });
          }
        }
-       const chatId = getCurrentChatId();
-       if (chatId === requestChatId) {
-         updateMessage(assistantMessageId, { isStreaming: false });
-       }
-     }
-   };
+      const chatId = getCurrentChatId();
+      if (chatId === requestChatId) {
+        updateMessage(assistantMessageId, { isStreaming: false });
+        
+        // Add Technique Studio prompt after analysis completes
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check if this is the demo video - link to sample task in library
+        const DEMO_VIDEO_URL = "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4";
+        const isDemoVideo = currentVideoUrl === DEMO_VIDEO_URL;
+        
+        const studioPromptId = generateMessageId();
+        const studioPromptMessage: Message = {
+          id: studioPromptId,
+          role: "assistant",
+          content: "",
+          messageType: "technique_studio_prompt",
+          techniqueStudioPrompt: {
+            videoUrl: currentVideoUrl,
+            taskId: isDemoVideo ? "sample-tennis-serve" : undefined,
+          },
+        };
+        addMessage(studioPromptMessage);
+      }
+    }
+  };
 
-   // Helper: Handle video file upload
+  // Helper: Handle video file upload
    const handleVideoFileUpload = async (
      currentPrompt: string,
      currentVideoFile: File,

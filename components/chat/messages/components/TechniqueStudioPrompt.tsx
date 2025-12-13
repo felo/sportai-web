@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Button, Flex } from "@radix-ui/themes";
+import { useState } from "react";
+import { Box, Button, Flex, Spinner } from "@radix-ui/themes";
 import { VideoIcon } from "@radix-ui/react-icons";
 import { MarkdownWithSwings } from "@/components/markdown";
 import buttonStyles from "@/styles/buttons.module.css";
@@ -23,6 +24,13 @@ export function TechniqueStudioPrompt({
   onOpenStudio,
   onTTSUsage,
 }: TechniqueStudioPromptProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleClick = () => {
+    setIsLoading(true);
+    onOpenStudio();
+  };
+
   return (
     <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
       <MarkdownWithSwings 
@@ -36,10 +44,15 @@ export function TechniqueStudioPrompt({
         <Button
           size="3"
           className={`${buttonStyles.actionButtonSquare} ${buttonStyles.actionButtonPulse}`}
-          onClick={onOpenStudio}
+          onClick={handleClick}
+          disabled={isLoading}
         >
-          <VideoIcon width={18} height={18} />
-          Technique Studio
+          {isLoading ? (
+            <Spinner size="2" />
+          ) : (
+            <VideoIcon width={18} height={18} />
+          )}
+          {isLoading ? "Opening..." : "Technique Studio"}
         </Button>
       </Flex>
     </Box>

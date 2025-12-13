@@ -25,6 +25,7 @@ import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
+import { isSampleTask } from "./sampleTasks";
 import { extractFirstFrameFromUrl, extractFirstFrameWithDuration, uploadThumbnailToS3, validateVideoFile } from "@/utils/video-utils";
 import { uploadToS3 } from "@/lib/s3";
 
@@ -387,6 +388,12 @@ export function TasksPage() {
   
   // Handle task click - fetch JSON if needed, then navigate
   const handleTaskClick = async (taskId: string) => {
+    // Sample tasks - navigate directly without any API calls
+    if (isSampleTask(taskId)) {
+      router.push(`/library/${taskId}`);
+      return;
+    }
+    
     if (!user) return;
     
     const task = tasks.find(t => t.id === taskId);
