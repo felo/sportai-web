@@ -112,6 +112,7 @@ export {
   generateGuestTaskId,
   createGuestTechniqueTask,
   getGuestTaskCount,
+  migrateGuestTasks,
 } from "./guest-tasks";
 
 

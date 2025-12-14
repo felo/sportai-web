@@ -156,3 +156,60 @@ export function createGuestTechniqueTask(params: {
 export function getGuestTaskCount(): number {
   return getGuestTasks().length;
 }
+
+/**
+ * Migrate guest tasks to a user's account
+ * Creates server-side task records and clears local storage
+ * @param userId - The authenticated user's ID
+ * @returns Object with success status and migration stats
+ */
+export async function migrateGuestTasks(userId: string): Promise<{
+  success: boolean;
+  migrated: number;
+  error?: string;
+}> {
+  const guestTasks = getGuestTasks();
+  
+  if (guestTasks.length === 0) {
+    return { success: true, migrated: 0 };
+  }
+  
+  try {
+    // Batch insert all guest tasks in one API call
+    const response = await fetch("/api/tasks/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userId}`,
+      },
+      body: JSON.stringify({
+        tasks: guestTasks.map(task => ({
+          taskType: task.task_type,
+          sport: task.sport,
+          videoUrl: task.video_url,
+          thumbnailUrl: task.thumbnail_url,
+          thumbnailS3Key: task.thumbnail_s3_key,
+          videoLength: task.video_length,
+        })),
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Migration failed: ${response.status}`);
+    }
+    
+    const { count } = await response.json();
+    
+    // Clear guest tasks from localStorage after successful migration
+    clearGuestTasks();
+    
+    return { success: true, migrated: count };
+  } catch (error) {
+    return {
+      success: false,
+      migrated: 0,
+      error: error instanceof Error ? error.message : "Migration failed",
+    };
+  }
+}

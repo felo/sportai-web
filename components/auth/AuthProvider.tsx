@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { User, Session } from "@supabase/supabase-js";
 import { createLogger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { clearUserDataFromStorage } from "@/utils/storage";
+import { clearUserDataFromStorage, migrateGuestTasks } from "@/utils/storage";
 import { migrateChatIds } from "@/utils/chat-id-migration";
 
 const authLogger = createLogger("Auth");
@@ -297,6 +297,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           authLogger.error("Chat ID migration failed:", error);
           // Continue anyway - this won't block sign-in
         }
+        
+        // Migrate guest tasks to user's account (non-blocking)
+        authLogger.debug("Checking for guest task migration...");
+        migrateGuestTasks(session.user.id).then(result => {
+          if (result.migrated > 0) {
+            authLogger.info(`Migrated ${result.migrated} guest task(s) to account`);
+          }
+          if (!result.success) {
+            authLogger.error("Guest task migration failed:", result.error);
+          }
+        }).catch(error => {
+          authLogger.error("Guest task migration error:", error);
+          // Continue anyway - guest tasks still work locally
+        });
         
         // Dispatch event immediately so UI updates
         window.dispatchEvent(new CustomEvent("auth-state-change", { detail: { event: _event } }));
