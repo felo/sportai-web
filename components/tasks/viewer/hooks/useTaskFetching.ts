@@ -3,6 +3,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Task, StatisticsResult } from "../types";
 import type { LoadingPhase } from "../components/LoadingState";
 import { isSampleTask, getSampleTask } from "@/components/tasks/sampleTasks";
+import { isGuestTask, getGuestTask } from "@/utils/storage";
 
 interface UseTaskFetchingResult {
   task: Task | null;
@@ -76,10 +77,11 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
       return;
     }
     
-    // Sample tasks don't require authentication
+    // Sample and guest tasks don't require authentication
     const isSample = isSampleTask(taskId);
+    const isGuest = isGuestTask(taskId);
     
-    if (!user && !isSample) {
+    if (!user && !isSample && !isGuest) {
       setLoading(false);
       return;
     }
@@ -161,6 +163,21 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
             }
           }
           
+          setLoadingPhase("done");
+          await ensureMinLoadingTime();
+          return;
+        }
+        
+        // Handle guest tasks - load from localStorage
+        if (isGuest) {
+          const guestTask = getGuestTask(taskId);
+          if (!guestTask) {
+            await ensureMinLoadingTime();
+            throw new Error("Guest task not found");
+          }
+          
+          // Guest tasks are technique tasks - no result to fetch
+          setTask(guestTask as Task);
           setLoadingPhase("done");
           await ensureMinLoadingTime();
           return;

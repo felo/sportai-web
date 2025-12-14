@@ -23,7 +23,7 @@ import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
-import { getDeveloperMode } from "@/utils/storage";
+import { getDeveloperMode, getGuestTasks, deleteGuestTask, isGuestTask } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
 import { isSampleTask, useRefreshedSampleTasks } from "./sampleTasks";
 import { extractFirstFrameFromUrl, extractFirstFrameWithDuration, uploadThumbnailToS3, validateVideoFile } from "@/utils/video-utils";
@@ -70,6 +70,7 @@ export function TasksPage() {
   const isMobile = useIsMobile();
   const { markTaskAsSeen, isTaskNew } = useLibraryTasks();
   const sampleTasks = useRefreshedSampleTasks();
+  const [guestTasks, setGuestTasks] = useState<Task[]>([]);
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,11 +120,40 @@ export function TasksPage() {
     }
   }, [sport, taskType]);
   
-  // Combine user tasks with sample tasks for display
+  // Load guest tasks from localStorage
+  useEffect(() => {
+    const loadGuestTasks = () => {
+      const storedGuestTasks = getGuestTasks() as Task[];
+      setGuestTasks(storedGuestTasks);
+    };
+    
+    loadGuestTasks();
+    
+    // Listen for storage changes (in case another tab modifies guest tasks)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sportai_guest_tasks") {
+        loadGuestTasks();
+      }
+    };
+    
+    // Listen for guest task changes from same tab
+    const handleGuestTasksChanged = () => {
+      loadGuestTasks();
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("guest-tasks-changed", handleGuestTasksChanged);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("guest-tasks-changed", handleGuestTasksChanged);
+    };
+  }, []);
+  
+  // Combine user tasks, guest tasks, and sample tasks for display
   const allTasks = useMemo(() => {
-    // Combine user tasks with sample tasks (samples at the end)
-    return [...tasks, ...sampleTasks];
-  }, [tasks, sampleTasks]);
+    // Combine user tasks with guest tasks and sample tasks (samples at the end)
+    return [...tasks, ...guestTasks, ...sampleTasks];
+  }, [tasks, guestTasks, sampleTasks]);
   
   // Filtered and sorted tasks
   const filteredTasks = useMemo(() => {
@@ -286,14 +316,22 @@ export function TasksPage() {
     }
   };
   
-  // Delete a task from the database
+  // Delete a task from the database or localStorage
   const deleteTask = async (taskId: string) => {
-    if (!user) return;
-    
     setDeletingTask(taskId);
     setError(null);
     
     try {
+      // Handle guest tasks (delete from localStorage)
+      if (isGuestTask(taskId)) {
+        deleteGuestTask(taskId);
+        setGuestTasks(prev => prev.filter(t => t.id !== taskId));
+        return;
+      }
+      
+      // Server tasks require authentication
+      if (!user) return;
+      
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${user.id}` },
@@ -397,6 +435,12 @@ export function TasksPage() {
   const handleTaskClick = async (taskId: string) => {
     // Sample tasks - navigate directly without any API calls
     if (isSampleTask(taskId)) {
+      router.push(`/library/${taskId}`);
+      return;
+    }
+    
+    // Guest tasks - navigate directly (stored in localStorage)
+    if (isGuestTask(taskId)) {
       router.push(`/library/${taskId}`);
       return;
     }

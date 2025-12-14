@@ -28,6 +28,7 @@ const TeamIcon = ({ width = 16, height = 16 }: { width?: number; height?: number
 );
 import { useAuth } from "@/components/auth/AuthProvider";
 import { isSampleTask } from "@/components/tasks/sampleTasks";
+import { isGuestTask } from "@/utils/storage";
 import { useVideoPlayback, useEventTooltip } from "./hooks";
 import {
   useTaskFetching,
@@ -181,8 +182,8 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     return <LoadingState phase={loadingPhase} />;
   }
 
-  // Auth redirect (except for sample tasks)
-  if (!user && !isSampleTask(params.taskId)) {
+  // Auth redirect (except for sample and guest tasks)
+  if (!user && !isSampleTask(params.taskId) && !isGuestTask(params.taskId)) {
     router.push("/");
     return null;
   }

@@ -8,6 +8,7 @@ import { useCallback, useRef } from "react";
 import { analysisLogger } from "@/lib/logger";
 import type { Message, VideoPreAnalysis } from "@/types/chat";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import { createGuestTechniqueTask } from "@/utils/storage";
 import type { User } from "@supabase/supabase-js";
 import { estimateProAnalysisTime } from "@/utils/video-utils";
 import { generateMessageId, stripStreamMetadata } from "../utils";
@@ -272,8 +273,25 @@ export function useAnalysisOptions({
       } catch (err) {
         analysisLogger.error(`Error creating PRO ${taskType} task:`, err);
       }
+    } else if (isTechniqueAnalysis) {
+      // Create guest task for technique analysis (stored in localStorage)
+      try {
+        analysisLogger.info(`Creating guest technique task for URL:`, videoUrl);
+        const guestTask = createGuestTechniqueTask({
+          videoUrl,
+          sport: preAnalysis.sport as "tennis" | "padel" | "pickleball" | "all",
+          thumbnailUrl: preAnalysis.thumbnailUrl,
+          videoLength: preAnalysis.durationSeconds,
+        });
+        taskCreated = true;
+        createdTaskId = guestTask.id;
+        refreshLibraryTasks();
+        analysisLogger.info(`Guest technique task created:`, guestTask.id);
+      } catch (err) {
+        analysisLogger.error("Error creating guest technique task:", err);
+      }
     } else {
-      analysisLogger.warn("User not authenticated, skipping PRO task creation");
+      analysisLogger.warn("User not authenticated, skipping PRO task creation (non-technique tasks require authentication)");
     }
     
     // Add library notification message with gradual typing effect

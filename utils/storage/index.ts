@@ -98,6 +98,22 @@ export {
 // ============================================
 export { clearUserDataFromStorage } from "./user-data";
 
+// ============================================
+// Guest Tasks
+// ============================================
+export {
+  getGuestTasks,
+  getGuestTask,
+  saveGuestTask,
+  updateGuestTask,
+  deleteGuestTask,
+  clearGuestTasks,
+  isGuestTask,
+  generateGuestTaskId,
+  createGuestTechniqueTask,
+  getGuestTaskCount,
+} from "./guest-tasks";
+
 
 
 

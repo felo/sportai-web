@@ -8,6 +8,7 @@ import { TechniqueViewer } from "@/components/tasks/techniqueViewer";
 import { LoadingState } from "@/components/tasks/viewer/components/LoadingState";
 import { useSidebarSettings } from "@/hooks/sidebar";
 import { isSampleTask, getSampleTask } from "@/components/tasks/sampleTasks";
+import { isGuestTask, getGuestTask } from "@/utils/storage";
 
 export default function TaskViewerPage({
   params,
@@ -68,6 +69,18 @@ export default function TaskViewerPage({
       return;
     }
     
+    // Handle guest tasks - load from localStorage
+    if (isGuestTask(taskId)) {
+      const guestTask = getGuestTask(taskId);
+      if (guestTask) {
+        setTaskType(guestTask.task_type);
+        setVideoUrl(guestTask.video_url);
+        setSport(guestTask.sport);
+      }
+      setLoading(false);
+      return;
+    }
+    
     async function fetchTaskType() {
       if (!user) return;
       
@@ -96,18 +109,25 @@ export default function TaskViewerPage({
     }
   }, [taskId, user, authLoading]);
 
+  // For sample and guest tasks, allow viewing without authentication
+  const isSample = isSampleTask(taskId);
+  const isGuest = isGuestTask(taskId);
+  
+  // Redirect if not authenticated (except for sample and guest tasks)
+  useEffect(() => {
+    if (!authLoading && !loading && !user && !isSample && !isGuest) {
+      router.push("/");
+    }
+  }, [authLoading, loading, user, isSample, isGuest, router]);
+
   // Loading state - show bouncing ball animation
   if (authLoading || loading) {
     return <LoadingState message="Loading video" />;
   }
 
-  // For sample tasks, allow viewing without authentication
-  const isSample = isSampleTask(taskId);
-  
-  // Redirect if not authenticated (except for sample tasks)
-  if (!user && !isSample) {
-    router.push("/");
-    return null;
+  // Redirect state - show loading while redirecting
+  if (!user && !isSample && !isGuest) {
+    return <LoadingState message="Redirecting..." />;
   }
 
   // Technique tasks use TechniqueViewer
