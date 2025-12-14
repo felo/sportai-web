@@ -1,12 +1,12 @@
 "use client";
 
-import { Flex, Text, Grid } from "@radix-ui/themes";
-import { TaskTile, type Task } from "./TaskTile";
+import { Flex, Text, Grid, Skeleton } from "@radix-ui/themes";
+import { TaskTile, TaskTileSkeleton, type Task } from "./TaskTile";
 import { EmptyState } from "@/components/ui";
-import { useRefreshedSampleTasks } from "./sampleTasks";
 
 interface TaskGridViewProps {
   tasks: Task[];
+  sampleTasks?: Task[];
   onTaskClick: (taskId: string) => void;
   onFetchResult: (taskId: string) => void;
   fetchingResult: string | null;
@@ -17,12 +17,38 @@ interface TaskGridViewProps {
   onExportData?: (taskId: string) => void;
   isTaskNew?: (taskId: string) => boolean;
   showSamples?: boolean;
+  /** Show loading skeletons instead of tasks */
+  loading?: boolean;
 }
 
-export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew, showSamples = true }: TaskGridViewProps) {
-  const sampleTasks = useRefreshedSampleTasks();
+export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew, showSamples = true, loading = false }: TaskGridViewProps) {
   const hasTasks = tasks.length > 0;
   const hasSamples = showSamples && sampleTasks.length > 0;
+  
+  // Show loading skeletons
+  if (loading) {
+    return (
+      <Flex direction="column" gap="6">
+        <Flex direction="column" gap="3">
+          <Skeleton width="120px" height="24px" />
+          <Grid
+            columns={{
+              initial: "1",
+              xs: "2",
+              sm: "2",
+              md: "3",
+              lg: "4",
+            }}
+            gap="4"
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <TaskTileSkeleton key={i} />
+            ))}
+          </Grid>
+        </Flex>
+      </Flex>
+    );
+  }
   
   if (!hasTasks && !hasSamples) {
     return (
@@ -105,8 +131,8 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
         `${failedTasks.length} ${failedTasks.length === 1 ? "analysis" : "analyses"}`
       )}
       
-      {/* Sample videos section */}
-      {hasSamples && renderTaskSection(
+      {/* Sample videos section - only show if we have sample tasks passed in */}
+      {hasSamples && sampleTasks.length > 0 && renderTaskSection(
         sampleTasks,
         "Sample Videos",
         "Try these demo analyses",

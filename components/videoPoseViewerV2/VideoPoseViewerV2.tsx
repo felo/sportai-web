@@ -1687,7 +1687,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               pointerEvents: "none", // Allow clicks through to video controls
             }}
           >
-            <Flex direction="column" align="center" gap="3">
+            <Flex direction="column" align="center" gap="3" style={{ width: "100%" }}>
               {/* Bouncing Tennis Ball */}
               <Box style={{ position: "relative", width: "80px", height: "80px" }}>
                 <Box
@@ -1757,7 +1757,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
                   }}
                 />
               </Box>
-              <Text size="2" color="gray" style={{ textAlign: "center" }}>
+              <Text size="2" color="gray" style={{ textAlign: "center", width: "100%" }}>
                 {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
               </Text>
             </Flex>
