@@ -10,7 +10,7 @@ import { CHART_THEME, ATTRIBUTE_CONFIG } from "../constants";
 import { toRadarData } from "../utils";
 import { ScrollableBox } from "./ScrollableBox";
 import { SportAIRatingBadge } from "./SportAIRatingBadge";
-import { FlipCard } from "./FlipCard";
+import { FlipCard } from "@/components/ui/animations";
 import { FIFAStyleCardBack } from "./FIFAStyleCardBack";
 import { calculateSportAIRating } from "../utils/calculateRating";
 import { getPlayerCardPortrait, CSS_ENHANCEMENT_STYLES } from "@/utils/portrait-enhance";

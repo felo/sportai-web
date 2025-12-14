@@ -53,3 +53,6 @@ export { FeedbackToast } from "./FeedbackToast";
 export { LogoNewChatButton } from "./brand/LogoNewChatButton";
 export type { LogoNewChatButtonProps } from "./brand/LogoNewChatButton";
 
+// Animations
+export { FlipCard } from "./animations/FlipCard";
+export type { FlipCardProps } from "./animations/FlipCard";
