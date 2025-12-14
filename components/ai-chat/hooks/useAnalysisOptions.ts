@@ -314,7 +314,7 @@ export function useAnalysisOptions({
     }
     
     await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, storedUserPrompt, {
-      showTechniqueStudioPrompt: isTechniqueAnalysis && taskCreated,
+      showTechniqueStudioPrompt: isTechniqueAnalysis,
       taskId: createdTaskId,
     });
   }, [messages, user, addMessage, updateMessage, scrollToBottom, startQuickAnalysis, refreshLibraryTasks]);

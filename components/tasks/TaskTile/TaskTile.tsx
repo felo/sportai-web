@@ -8,6 +8,7 @@ import { IconButton } from "@/components/ui";
 import type { TaskTileProps } from "./types";
 import { STATUS_CONFIG } from "./constants";
 import { formatTimeAgo } from "./utils";
+import { isSampleTask } from "../sampleTasks";
 import { useThumbnail, useTaskProgress } from "./hooks";
 import {
   TaskTileThumbnail,
@@ -74,17 +75,25 @@ export function TaskTile({
         {/* Status and actions row */}
         <Flex justify="between" align="center">
           <Flex align="center" gap="2">
-            <Badge color={statusConfig.color} variant="soft">
-              <StatusIcon width={12} height={12} />
-              <Text size="1" ml="1">
-                {statusConfig.label}
-              </Text>
-            </Badge>
-
-            {isNew && task.status === "completed" && (
-              <Badge color="blue" variant="solid" size="1">
-                New
+            {isSampleTask(task.id) ? (
+              <Badge color="gray" variant="soft">
+                <Text size="1">Sample</Text>
               </Badge>
+            ) : (
+              <>
+                <Badge color={statusConfig.color} variant="soft">
+                  <StatusIcon width={12} height={12} />
+                  <Text size="1" ml="1">
+                    {statusConfig.label}
+                  </Text>
+                </Badge>
+
+                {isNew && task.status === "completed" && (
+                  <Badge color="blue" variant="solid" size="1">
+                    New
+                  </Badge>
+                )}
+              </>
             )}
           </Flex>
 
@@ -108,10 +117,12 @@ export function TaskTile({
           {task.task_type.replace(/_/g, " ")}
         </Text>
 
-        {/* Time info */}
-        <Text size="1" color="gray">
-          {formatTimeAgo(task.created_at)}
-        </Text>
+        {/* Time info - hide for sample tasks */}
+        {!isSampleTask(task.id) && (
+          <Text size="1" color="gray">
+            {formatTimeAgo(task.created_at)}
+          </Text>
+        )}
 
         {/* Error message for failed tasks */}
         {task.status === "failed" && task.error_message && (

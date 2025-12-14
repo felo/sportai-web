@@ -14,6 +14,7 @@ import { useAIChat } from "@/hooks/useAIChat";
 import { useAIApi } from "@/hooks/useAIApi";
 import { useNavigationWarning } from "@/hooks/useNavigationWarning";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { MessageList } from "@/components/chat/messages/MessageList";
 import { ChatInput } from "@/components/chat/input/ChatInput";
 import { ChatHeader } from "@/components/chat/header/ChatHeader";
@@ -60,6 +61,7 @@ export function AIChatForm() {
   const [prompt, setPrompt] = useState("");
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Video upload hook
   const {
@@ -326,6 +328,12 @@ export function AIChatForm() {
 
   // Handle candidate response selection (e.g., greeting options)
   const handleSelectCandidateResponse = useCallback(async (messageId: string, index: number, option: CandidateOption) => {
+    // Handle special actions (like sign-in) without updating message state
+    if (option.action === "sign_in") {
+      setAuthModalOpen(true);
+      return;
+    }
+
     // 1. Update the greeting message with the selected index
     updateMessage(messageId, {
       candidateResponses: {
@@ -508,6 +516,11 @@ export function AIChatForm() {
             open={dialogOpen} 
             onConfirm={handleConfirm} 
             onCancel={handleCancel} 
+          />
+
+          <AuthModal 
+            open={authModalOpen} 
+            onOpenChange={setAuthModalOpen} 
           />
 
           <FloatingVideoPortal />

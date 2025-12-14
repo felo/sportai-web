@@ -12,7 +12,7 @@ const MESSAGES = {
   showExamples: "I have a few demo analyses ready for you to explore. Pick one to see what SportAI can do:",
   howItWorks: "Upload a tennis, padel, or pickleball video and I'll break it down frame by frame.\n\nI use the SportAI AI Platform to track players and the ball, then provide specific feedback on what you're doing well and what to improve.\n\nReady to try it? Don't be shy. Drop a video below, or check out the examples.",
   uploadVideo: "Perfect! Drag and drop your video here or click the **+** button below.\n\nFor best results, use a video where the player or the full court is clearly visible (see examples). I'll analyze technique, movement, and tactics automatically.\n\nI'm best with racket sports like Tennis, Padel and Pickleball, but able to analyze other sports as well.",
-  greeting: "Greetings! Upload a sports video and get instant AI analysis.",
+  greeting: "Greetings! Upload a sports video and get instant AI analysis, and remember to create a free account to store videos, access advanced features, and tailor the AI to you.",
 } as const;
 
 // =============================================================================
@@ -54,6 +54,13 @@ const createUploadVideoOption = (
   followUpOptions,
 });
 
+const createSignInOption = (id: string): CandidateOption => ({
+  id,
+  text: "Sign In",
+  premadeResponse: "", // Not used - action will trigger auth modal
+  action: "sign_in",
+});
+
 const createShowExamplesOption = (id: string): CandidateOption => ({
   id,
   text: "Show me some examples",
@@ -78,15 +85,13 @@ const createHowItWorksOption = (
 // Terminal follow-up options (no further nesting to avoid circular references)
 // After 2 levels of follow-up, users can type or use the main input
 const TERMINAL_FOLLOW_UP_OPTIONS: CandidateOption[] = [
-  createUploadVideoOption("upload-video-terminal"),
+  createSignInOption("sign-in-terminal"),
   createShowExamplesOption("show-examples-terminal"),
 ];
 
 // Follow-up options shown after "How does it work?"
 const HOW_IT_WORKS_FOLLOW_UP_OPTIONS: CandidateOption[] = [
-  createUploadVideoOption("upload-video-followup", [
-    createShowExamplesOption("show-examples-followup-3"),
-  ]),
+  createSignInOption("sign-in-followup-1"),
   createShowExamplesOption("show-examples-followup-2"),
 ];
 

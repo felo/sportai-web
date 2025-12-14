@@ -25,7 +25,7 @@ import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode } from "@/utils/storage";
 import { TaskGridView } from "./TaskGridView";
-import { isSampleTask } from "./sampleTasks";
+import { isSampleTask, useRefreshedSampleTasks } from "./sampleTasks";
 import { extractFirstFrameFromUrl, extractFirstFrameWithDuration, uploadThumbnailToS3, validateVideoFile } from "@/utils/video-utils";
 import { uploadToS3 } from "@/lib/s3";
 
@@ -69,6 +69,7 @@ export function TasksPage() {
   const { isCollapsed, isInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
   const { markTaskAsSeen, isTaskNew } = useLibraryTasks();
+  const sampleTasks = useRefreshedSampleTasks();
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +119,16 @@ export function TasksPage() {
     }
   }, [sport, taskType]);
   
+  // Combine user tasks with sample tasks for display
+  const allTasks = useMemo(() => {
+    // Combine user tasks with sample tasks (samples at the end)
+    return [...tasks, ...sampleTasks];
+  }, [tasks, sampleTasks]);
+  
   // Filtered and sorted tasks
   const filteredTasks = useMemo(() => {
     // First filter
-    let result = tasks.filter(task => {
+    let result = allTasks.filter(task => {
       if (filterSport !== "show_all" && task.sport !== filterSport) return false;
       if (filterTaskType !== "all" && task.task_type !== filterTaskType) return false;
       return true;
@@ -187,7 +194,7 @@ export function TasksPage() {
     });
     
     return result;
-  }, [tasks, filterSport, filterTaskType, sortColumn, sortDirection]);
+  }, [allTasks, filterSport, filterTaskType, sortColumn, sortDirection]);
   
   // Load developer mode and listen for changes
   useEffect(() => {
@@ -449,16 +456,15 @@ export function TasksPage() {
     }
   };
   
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/");
-    }
-  }, [authLoading, user, router]);
+  // No redirect for unauthenticated users - they can view sample tasks
   
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      // No user - just show sample tasks, no need to fetch
+      setLoading(false);
+      return;
+    }
     
     try {
       const response = await fetch("/api/tasks", {
@@ -851,7 +857,8 @@ export function TasksPage() {
     router.push("/");
   }, [router]);
   
-  if (authLoading || loading) {
+  // Show loading state only while auth is loading, or while fetching tasks for authenticated users
+  if (authLoading || (user && loading)) {
     return (
       <>
         <Sidebar />
@@ -872,8 +879,6 @@ export function TasksPage() {
       </>
     );
   }
-  
-  if (!user) return null;
 
   return (
     <>
@@ -1086,7 +1091,7 @@ export function TasksPage() {
             {/* Show count of filtered results */}
             {(filterSport !== "show_all" || filterTaskType !== "all") && (
               <Text size="1" color="gray">
-                {filteredTasks.length} of {tasks.length}
+                {filteredTasks.length} of {allTasks.length}
               </Text>
             )}
           </Flex>
@@ -1111,10 +1116,10 @@ export function TasksPage() {
           </SegmentedControl.Root>
         </Flex>
         
-        {/* Grid View */}
+        {/* Grid View - exclude samples since TaskGridView handles them separately */}
         {viewMode === "grid" && (
           <TaskGridView
-            tasks={filteredTasks}
+            tasks={filteredTasks.filter(t => !isSampleTask(t.id))}
             onTaskClick={handleTaskClick}
             onFetchResult={fetchResult}
             fetchingResult={fetchingResult}
@@ -1133,8 +1138,10 @@ export function TasksPage() {
           {filteredTasks.length === 0 ? (
             <Flex align="center" justify="center" py="8">
               <Text color="gray">
-                {tasks.length === 0 
-                  ? "Your PRO video analyses will appear here in the Library."
+                {allTasks.length === 0 
+                  ? user 
+                    ? "Your PRO video analyses will appear here in the Library."
+                    : "Sign in to upload and analyze your own videos."
                   : "No tasks match the selected filters."}
               </Text>
             </Flex>
@@ -1208,10 +1215,16 @@ export function TasksPage() {
                     <Table.Cell>{getTypeBadge(task.task_type)}</Table.Cell>
                     <Table.Cell>
                       <Flex align="center" gap="2">
-                        {getStatusBadge(task.status)}
-                        {/* New badge for completed tasks that haven't been viewed */}
-                        {isTaskNew(task.id) && task.status === "completed" && (
-                          <Badge color="blue" variant="solid" size="1">New</Badge>
+                        {isSampleTask(task.id) ? (
+                          <Badge color="gray" variant="soft">sample</Badge>
+                        ) : (
+                          <>
+                            {getStatusBadge(task.status)}
+                            {/* New badge for completed tasks that haven't been viewed */}
+                            {isTaskNew(task.id) && task.status === "completed" && (
+                              <Badge color="blue" variant="solid" size="1">New</Badge>
+                            )}
+                          </>
                         )}
                       </Flex>
                     </Table.Cell>
@@ -1254,10 +1267,12 @@ export function TasksPage() {
                         {task.video_length ? formatDuration(Math.round(task.video_length)) : "-"}
                       </Table.Cell>
                     )}
-                    <Table.Cell>{formatDate(task.created_at)}</Table.Cell>
+                    <Table.Cell>{isSampleTask(task.id) ? "-" : formatDate(task.created_at)}</Table.Cell>
                     {developerMode && <Table.Cell>{formatElapsed(task)}</Table.Cell>}
                     <Table.Cell>
-                      {task.status === "completed" ? (
+                      {isSampleTask(task.id) ? (
+                        "-"
+                      ) : task.status === "completed" ? (
                         <Text color="green" size="2">Done</Text>
                       ) : task.status === "failed" ? (
                         <Text color="red" size="2">Failed</Text>

@@ -10,6 +10,7 @@ export type CandidateOption = {
   followUpOptions?: CandidateOption[]; // Optional follow-up options to show after this response
   demoVideoUrl?: string; // If set, triggers video analysis with this URL (no upload needed)
   demoVideoS3Key?: string; // If set, fetches presigned URL from this S3 key before analysis
+  action?: "sign_in"; // If set, triggers a special action instead of showing premadeResponse
 };
 
 export type ProgressStage =

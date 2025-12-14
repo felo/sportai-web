@@ -36,6 +36,20 @@ export function useThumbnail({
     setRegenerateKey((k) => k + 1);
   }, []);
 
+  // Track previous video URL to detect changes
+  const prevVideoUrlRef = useRef(videoUrl);
+  
+  // Reset error state when video URL changes (e.g., when presigned URL is refreshed)
+  // Only reset if we had an error AND don't already have a thumbnail
+  useEffect(() => {
+    const videoUrlChanged = prevVideoUrlRef.current !== videoUrl;
+    prevVideoUrlRef.current = videoUrl;
+    
+    if (videoUrlChanged && hasError && !thumbnail) {
+      setHasError(false);
+    }
+  }, [videoUrl, hasError, thumbnail]);
+
   // Intersection Observer for lazy loading
   useEffect(() => {
     // If we already have a stored thumbnail, no need to observe
@@ -74,6 +88,15 @@ export function useThumbnail({
 
     // Wait until in view before generating thumbnail
     if (!isInView) return;
+    
+    // Skip thumbnail generation for S3 URLs that aren't presigned (they won't work)
+    // Presigned URLs contain query parameters like X-Amz-Signature
+    const isS3Url = videoUrl.includes('.s3.') && videoUrl.includes('amazonaws.com');
+    const isPresigned = videoUrl.includes('X-Amz-');
+    if (isS3Url && !isPresigned) {
+      // Don't try to generate - wait for URL to be refreshed
+      return;
+    }
 
     setIsGenerating(true);
 

@@ -190,9 +190,10 @@ export function AnalysisOptionsMessage({
   const [showBoxes, setShowBoxes] = useState(!shouldAnimate);
   const [showButtons, setShowButtons] = useState(!shouldAnimate);
 
-  const sportName = preAnalysis.sport 
-    ? preAnalysis.sport.charAt(0).toUpperCase() + preAnalysis.sport.slice(1)
-    : "your video";
+  const isRacketSport = preAnalysis.sport && ["tennis", "pickleball", "padel"].includes(preAnalysis.sport);
+  const sportName = isRacketSport
+    ? preAnalysis.sport!.charAt(0).toUpperCase() + preAnalysis.sport!.slice(1)
+    : null;
   
   // Get camera angle label
   const cameraAngle = preAnalysis.cameraAngle;
@@ -208,12 +209,17 @@ export function AnalysisOptionsMessage({
   
   // Build intro message
   const introMessage = useMemo(() => {
-    let msg = `I see you have a ${sportName.toLowerCase()} video`;
-    if (cameraLabel) {
-      msg += ` with a ${cameraLabel.toLowerCase()} angle`;
+    // For racket sports, mention sport name and camera angle
+    if (sportName) {
+      let msg = `I see you have a ${sportName.toLowerCase()} video`;
+      if (cameraLabel) {
+        msg += ` with a ${cameraLabel.toLowerCase()} angle`;
+      }
+      msg += `. This qualifies for a PRO ${analysisType} Analysis!`;
+      return msg;
     }
-    msg += `. This qualifies for a PRO ${analysisType} Analysis!`;
-    return msg;
+    // For other sports, use simpler message
+    return `I see you have a video that qualifies for a PRO ${analysisType} Analysis!`;
   }, [sportName, cameraLabel, analysisType]);
 
   const introText = useTypewriter(introMessage, 18, shouldAnimate);

@@ -27,7 +27,7 @@ export function TaskGridView({ tasks, onTaskClick, onFetchResult, fetchingResult
   if (!hasTasks && !hasSamples) {
     return (
       <Flex align="center" justify="center" py="8">
-        <EmptyState message="No videos match the current filters." />
+        <EmptyState message="No videos available. Try adjusting the filters." />
       </Flex>
     );
   }
