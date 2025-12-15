@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Box, Flex, Heading, Text, Card, Separator } from "@radix-ui/themes";
 import { Player } from "../types";
 import { PlayerCharts } from "./PlayerCharts";
@@ -50,12 +51,12 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
             }}
           >
             {portrait ? (
-              <img
+              <Image
                 src={portrait}
                 alt={displayName}
+                fill
+                sizes="72px"
                 style={{ 
-                  width: "100%", 
-                  height: "100%", 
                   objectFit: "cover",
                   objectPosition: "top",
                 }}

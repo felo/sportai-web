@@ -1,6 +1,7 @@
 "use client";
 
 import { RefObject, useMemo, useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { StarIcon, PlayIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult, SwingWithPlayer, BallBounce } from "../../types";
@@ -482,12 +483,12 @@ function AchievementCard({
           <>
             {/* Collapsed: Show thumbnail */}
             {thumbnail ? (
-              <img
+              <Image
                 src={thumbnail}
                 alt={achievement.title}
+                fill
+                sizes="(max-width: 768px) 100vw, 400px"
                 style={{
-                  width: "100%",
-                  height: "100%",
                   objectFit: "cover",
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
                   transition: "transform 0.4s ease",
@@ -617,12 +618,12 @@ function AchievementCard({
                   }}
                 >
                   {portraits[playerId] ? (
-                    <img
+                    <Image
                       src={portraits[playerId]}
                       alt={playerDisplayNames[playerId] || `Player ${playerId}`}
+                      fill
+                      sizes="60px"
                       style={{
-                        width: "100%",
-                        height: "100%",
                         objectFit: "cover",
                         objectPosition: "top",
                       }}

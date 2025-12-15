@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, Badge, Progress, DropdownMenu, Spinner } from "@radix-ui/themes";
 import {
   PlayIcon,
@@ -93,13 +94,13 @@ export function TaskTileThumbnail({
           </Text>
         </Flex>
       ) : (
-        <img
+        <Image
           key={retryKey} // Force re-mount on retry
           src={thumbnail!}
           alt={`Video thumbnail for ${task.sport}`}
-          loading="lazy"
-          decoding="async"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          fill
+          sizes="(max-width: 640px) 100vw, 300px"
+          style={{ objectFit: "cover" }}
           onError={handleImageError}
         />
       )}

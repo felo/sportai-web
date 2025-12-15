@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Box, Flex, Text, Badge, Button, Tooltip } from "@radix-ui/themes";
 import {
   ChevronDownIcon,
@@ -144,14 +145,15 @@ export function ReportCard({
                 aspectRatio: "16/9",
                 backgroundColor: "black",
                 overflow: "hidden",
+                position: "relative",
               }}
             >
-              <img
+              <Image
                 src={report.previewUrl}
                 alt={`Analysis preview for ${report.momentLabel}`}
+                fill
+                sizes="(max-width: 768px) 100vw, 600px"
                 style={{
-                  width: "100%",
-                  height: "100%",
                   objectFit: "contain",
                 }}
               />

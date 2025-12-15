@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, Heading, Card, Tooltip } from "@radix-ui/themes";
 import { ResponsiveRadar } from "@nivo/radar";
 import type { PlayerProfile } from "@/types/player-profile";
@@ -126,12 +127,12 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
                       }}
                     >
                       {portraits[profile.playerId] ? (
-                        <img
+                        <Image
                           src={portraits[profile.playerId]}
                           alt={profile.playerName}
+                          fill
+                          sizes="32px"
                           style={{
-                            width: "100%",
-                            height: "100%",
                             objectFit: "cover",
                             objectPosition: "top",
                             filter: isActive ? "none" : "grayscale(100%)",

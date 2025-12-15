@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Dialog, Flex, Text, Badge, Box, Spinner, Button } from "@radix-ui/themes";
 import { Cross2Icon, CopyIcon, CheckIcon, ReloadIcon } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
@@ -103,10 +104,12 @@ export function VideoInfoDialog({
             </Flex>
           ) : thumbnail ? (
             <>
-              <img
+              <Image
                 src={thumbnail}
                 alt="Video thumbnail"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                fill
+                sizes="420px"
+                style={{ objectFit: "cover" }}
               />
               {onRegenerateThumbnail && (
                 <Box

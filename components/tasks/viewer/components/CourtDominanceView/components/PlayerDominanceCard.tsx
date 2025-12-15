@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Box, Flex, Text, Card, Tooltip, Badge } from "@radix-ui/themes";
 import { PersonIcon, StopwatchIcon, ExclamationTriangleIcon, CheckIcon } from "@radix-ui/react-icons";
 import type { ZoneDefinition, PlayerDominance } from "../types";
@@ -58,12 +59,12 @@ export function PlayerDominanceCard({
             }}
           >
             {portrait ? (
-              <img
+              <Image
                 src={portrait}
                 alt={player.playerName}
+                fill
+                sizes="52px"
                 style={{
-                  width: "100%",
-                  height: "100%",
                   objectFit: "cover",
                   objectPosition: "top",
                 }}

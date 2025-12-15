@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { Box, Flex, Grid, Text, Card, Heading, Separator, Tooltip } from "@radix-ui/themes";
 import { PersonIcon, ChevronLeftIcon, ChevronRightIcon, DoubleArrowRightIcon, RocketIcon, TimerIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult, TeamSession, Player, Swing } from "../../types";
@@ -605,12 +606,12 @@ function TeamCard({
                 }}
               >
                 {portraits[playerId] ? (
-                  <img
+                  <Image
                     src={portraits[playerId]}
                     alt={playerDisplayNames[playerId] || `Player ${playerId}`}
+                    fill
+                    sizes="72px"
                     style={{
-                      width: "100%",
-                      height: "100%",
                       objectFit: "cover",
                       objectPosition: "top",
                     }}

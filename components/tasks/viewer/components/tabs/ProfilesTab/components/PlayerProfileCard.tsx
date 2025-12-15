@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, Heading, Card, Separator } from "@radix-ui/themes";
 import { PersonIcon } from "@radix-ui/react-icons";
 import { ResponsiveRadar } from "@nivo/radar";
@@ -83,12 +84,12 @@ export function PlayerProfileCard({
             }}
           >
             {enhancedPortrait ? (
-              <img
+              <Image
                 src={enhancedPortrait}
                 alt={profile.playerName}
+                fill
+                sizes="64px"
                 style={{
-                  width: "100%",
-                  height: "100%",
                   objectFit: "cover",
                   objectPosition: "top",
                   ...(needsCssEnhancement ? CSS_ENHANCEMENT_STYLES : {}),

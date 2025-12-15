@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, HoverCard } from "@radix-ui/themes";
 import { PersonIcon } from "@radix-ui/react-icons";
 import type { PlayerProfile, PlayerProfileAttributes } from "@/types/player-profile";
@@ -205,12 +206,12 @@ export function FIFAStyleCardBack({ profile, portrait, rating }: FIFAStyleCardBa
                     position: "relative",
                   }}
                 >
-                  <img
+                  <Image
                     src={enhancedPortrait}
                     alt={profile.playerName}
+                    fill
+                    sizes="200px"
                     style={{
-                      width: "100%",
-                      height: "100%",
                       objectFit: "cover",
                       objectPosition: "top",
                       maskImage: "linear-gradient(to bottom, black 60%, transparent 100%), linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",

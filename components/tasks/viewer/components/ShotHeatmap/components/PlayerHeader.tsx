@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Box, Flex, Text, Heading, Badge } from "@radix-ui/themes";
 import { PersonIcon } from "@radix-ui/react-icons";
 import { NICKNAME_SHIMMER_KEYFRAMES } from "../constants";
@@ -56,12 +57,12 @@ export function PlayerHeader({
             }}
           >
             {portrait ? (
-              <img
+              <Image
                 src={portrait}
                 alt={displayName}
+                fill
+                sizes="52px"
                 style={{
-                  width: "100%",
-                  height: "100%",
                   objectFit: "cover",
                   objectPosition: "top",
                 }}

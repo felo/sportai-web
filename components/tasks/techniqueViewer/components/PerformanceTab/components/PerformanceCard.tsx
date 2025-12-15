@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, Card, Separator } from "@radix-ui/themes";
 import { PersonIcon } from "@radix-ui/react-icons";
 import { ResponsiveRadar } from "@nivo/radar";
@@ -309,12 +310,12 @@ function ThumbnailCircle({ thumbnailUrl, index, borderColor }: ThumbnailCirclePr
       }}
     >
       {thumbnailUrl ? (
-        <img
+        <Image
           src={thumbnailUrl}
           alt={`Swing ${index}`}
+          fill
+          sizes="64px"
           style={{
-            width: "100%",
-            height: "100%",
             objectFit: "cover",
             objectPosition: "center",
           }}
@@ -346,12 +347,12 @@ function LargePortrait({ thumbnailUrl, index, accentColor }: LargePortraitProps)
     >
       {thumbnailUrl ? (
         <Box style={{ width: "100%", height: "100%", position: "relative" }}>
-          <img
+          <Image
             src={thumbnailUrl}
             alt={`Swing ${index}`}
+            fill
+            sizes="200px"
             style={{
-              width: "100%",
-              height: "100%",
               objectFit: "cover",
               objectPosition: "center",
               maskImage: "linear-gradient(to bottom, black 60%, transparent 100%), linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%)",

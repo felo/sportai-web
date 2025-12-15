@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Box, Flex, Text, Badge, Card, DropdownMenu, Spinner, Button, Tooltip } from "@radix-ui/themes";
 import {
   MagicWandIcon,
@@ -210,12 +211,12 @@ function ThumbnailArea({
     >
       {/* Thumbnail Image */}
       {thumbnailUrl ? (
-        <img
+        <Image
           src={thumbnailUrl}
           alt={moment.label}
+          fill
+          sizes="(max-width: 640px) 100vw, 300px"
           style={{
-            width: "100%",
-            height: "100%",
             objectFit: "cover",
           }}
         />
