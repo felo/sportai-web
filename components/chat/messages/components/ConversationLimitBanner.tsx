@@ -36,7 +36,7 @@ export function ConversationLimitBanner({ show, onStartNewChat }: ConversationLi
       <Flex direction="column" gap="3" mt="4">
         <Flex direction="column" gap="2">
           <Text size="3" weight="medium">
-            You've hit the conversation limit of this BETA
+            You&apos;ve hit the conversation limit of this BETA
           </Text>
           <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
             This chat has reached a limit of {FREE_TIER_MESSAGE_LIMIT} messages. Start a new chat to continue.

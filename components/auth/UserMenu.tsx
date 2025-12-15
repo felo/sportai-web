@@ -31,6 +31,7 @@ interface UserMenuProps {
   onClearChat?: () => void;
   onOpenStorageDebug?: () => void;
   onOpenContextDebug?: () => void;
+  onResetOnboardingTips?: () => void;
   onSetAlertOpen?: (open: boolean) => void;
 }
 
@@ -53,6 +54,7 @@ export function UserMenu({
   onClearChat,
   onOpenStorageDebug,
   onOpenContextDebug,
+  onResetOnboardingTips,
   onSetAlertOpen,
 }: UserMenuProps = {}) {
   const router = useRouter();
@@ -298,6 +300,9 @@ export function UserMenu({
                           </DropdownMenu.Item>
                           <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
                             <Text>Storage</Text>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => onResetOnboardingTips?.()}>
+                            <Text>Reset Onboarding Tips</Text>
                           </DropdownMenu.Item>
                         </DropdownMenu.SubContent>
                       </DropdownMenu.Sub>

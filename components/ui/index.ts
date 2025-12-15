@@ -56,3 +56,7 @@ export type { LogoNewChatButtonProps } from "./brand/LogoNewChatButton";
 // Animations
 export { FlipCard } from "./animations/FlipCard";
 export type { FlipCardProps } from "./animations/FlipCard";
+
+// Onboarding
+export { OnboardingTooltip } from "./onboarding/OnboardingTooltip";
+export type { OnboardingTooltipProps, TooltipPosition } from "./onboarding/OnboardingTooltip";

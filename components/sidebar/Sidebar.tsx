@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "@/hooks/sidebar";
 import { updateExistingChat } from "@/utils/storage-unified";
+import { resetAllOnboardingTooltips } from "@/utils/storage/settings/onboarding-tooltips";
 import { SidebarContent } from "./SidebarContent";
 import { SidebarDialogs } from "./SidebarDialogs";
 import type { SidebarProps } from "./types";
@@ -160,6 +161,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 onOpenContextDebug={() => {
                   dialogsState.setDropdownOpen(false);
                   dialogsState.setContextDebugOpen(true);
+                }}
+                onResetOnboardingTips={() => {
+                  resetAllOnboardingTooltips();
+                  dialogsState.setDropdownOpen(false);
+                  // Force page reload to see the tooltips again
+                  window.location.reload();
                 }}
                 onSetAlertOpen={dialogsState.setAlertOpen}
               />
@@ -328,6 +335,12 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           onOpenContextDebug={() => {
             dialogsState.setDropdownOpen(false);
             dialogsState.setContextDebugOpen(true);
+          }}
+          onResetOnboardingTips={() => {
+            resetAllOnboardingTooltips();
+            dialogsState.setDropdownOpen(false);
+            // Force page reload to see the tooltips again
+            window.location.reload();
           }}
           onSetAlertOpen={dialogsState.setAlertOpen}
         />

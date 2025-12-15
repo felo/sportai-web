@@ -187,9 +187,6 @@ export function FollowUpSuggestions({
   sport = "other",
   maxSuggestions = 3,
 }: FollowUpSuggestionsProps) {
-  // TEMPORARILY DISABLED - remove this line to re-enable
-  return null;
-  
   const [isVisible, setIsVisible] = useState(false);
 
   // Get sport-specific questions, randomize, and limit
@@ -204,6 +201,11 @@ export function FollowUpSuggestions({
     const timer = setTimeout(() => setIsVisible(true), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // TEMPORARILY DISABLED - remove this block to re-enable
+  if (true) {
+    return null;
+  }
 
   return (
     <Box style={{ marginTop: "var(--space-3)", width: "100%", paddingRight: "var(--space-4)" }}>
@@ -272,3 +274,4 @@ export {
   GENERIC_TECHNIQUE_QUESTIONS,
   GENERIC_TACTICS_QUESTIONS,
 };
+

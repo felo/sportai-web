@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { ArrowDownIcon, ArrowUpIcon, VideoIcon } from "@radix-ui/react-icons";
 import { Tooltip } from "@radix-ui/themes";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 import { videoLogger } from "@/lib/logger";
+import { OnboardingTooltip } from "@/components/ui";
 
 interface ChatNavigationButtonsProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
@@ -35,6 +36,11 @@ export function ChatNavigationButtons({
   
   const checkScrollTimeoutRef = useRef<NodeJS.Timeout>();
   const checkVideoTimeoutRef = useRef<NodeJS.Timeout>();
+  const videoButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Track if this is the first time the video button appeared
+  const [showVideoTooltip, setShowVideoTooltip] = useState(false);
+  const videoButtonWasVisible = useRef(false);
 
   // Check if there are registered videos
   const hasRegisteredVideo = useMemo(() => {
@@ -47,6 +53,23 @@ export function ChatNavigationButtons({
     const isFloatingExpanded = floatingCtx?.isFloating && !floatingCtx?.isMinimized;
     return hasVideo && !isFloatingExpanded;
   }, [hasRegisteredVideo, hasDomVideo, floatingCtx?.isFloating, floatingCtx?.isMinimized]);
+
+  // Show onboarding tooltip when video button first appears
+  useEffect(() => {
+    if (showVideoButton && !videoButtonWasVisible.current) {
+      // Video button just appeared - show the tooltip after a short delay
+      const timer = setTimeout(() => {
+        setShowVideoTooltip(true);
+      }, 500);
+      videoButtonWasVisible.current = true;
+      return () => clearTimeout(timer);
+    }
+  }, [showVideoButton]);
+
+  // Dismiss tooltip when video button is clicked
+  const handleVideoTooltipDismiss = useCallback(() => {
+    setShowVideoTooltip(false);
+  }, []);
 
   // Monitor DOM for video elements
   useEffect(() => {
@@ -171,8 +194,11 @@ export function ChatNavigationButtons({
     }
   };
 
-  const handleShowFloatingVideo = () => {
+  const handleShowFloatingVideo = useCallback(() => {
     if (!floatingCtx) return;
+    
+    // Dismiss onboarding tooltip when clicked
+    setShowVideoTooltip(false);
     
     // If nothing registered yet, try to auto-register the most recent video in the DOM
     if ((floatingCtx.registeredVideos?.size ?? 0) === 0) {
@@ -207,7 +233,7 @@ export function ChatNavigationButtons({
     }
     
     floatingCtx.showFloatingVideoAtTime(0);
-  };
+  }, [floatingCtx]);
 
   // Build list of visible buttons (in order from bottom to top)
   const visibleButtons: Array<{
@@ -257,51 +283,71 @@ export function ChatNavigationButtons({
   const RIGHT_POSITION = isMobile ? "calc(16px + var(--space-3))" : "calc(16px + var(--space-3))";
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: BASE_BOTTOM,
-        right: RIGHT_POSITION,
-        display: "flex",
-        flexDirection: "column-reverse", // Stack from bottom to top
-        gap: `${BUTTON_GAP}px`,
-        zIndex: 1001,
-      }}
-    >
-      {visibleButtons.map((button) => (
-        <Tooltip key={button.id} content={button.tooltip}>
-          <button
-            onClick={button.onClick}
-            aria-label={button.ariaLabel}
-            style={{
-              width: `${BUTTON_SIZE}px`,
-              height: `${BUTTON_SIZE}px`,
-              borderRadius: "9999px",
-              backgroundColor: "#7ADB8F",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.3s ease-out",
-              border: "2px solid white",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
-              animation: "fadeInUp 0.3s ease-out",
-            }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.backgroundColor = "#95E5A6";
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.backgroundColor = "#7ADB8F";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
-            }}
-          >
-            {button.icon}
-          </button>
-        </Tooltip>
-      ))}
-    </div>
+    <>
+      <div
+        style={{
+          position: "absolute",
+          bottom: BASE_BOTTOM,
+          right: RIGHT_POSITION,
+          display: "flex",
+          flexDirection: "column-reverse", // Stack from bottom to top
+          gap: `${BUTTON_GAP}px`,
+          zIndex: 1001,
+        }}
+      >
+        {visibleButtons.map((button) => {
+          const isVideoButton = button.id === "show-video";
+          return (
+            <Tooltip key={button.id} content={button.tooltip}>
+              <button
+                ref={isVideoButton ? videoButtonRef : undefined}
+                onClick={button.onClick}
+                aria-label={button.ariaLabel}
+                style={{
+                  width: `${BUTTON_SIZE}px`,
+                  height: `${BUTTON_SIZE}px`,
+                  borderRadius: "9999px",
+                  backgroundColor: "#7ADB8F",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease-out",
+                  border: "2px solid white",
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
+                  animation: "fadeInUp 0.3s ease-out",
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.backgroundColor = "#95E5A6";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.backgroundColor = "#7ADB8F";
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
+                }}
+              >
+                {button.icon}
+              </button>
+            </Tooltip>
+          );
+        })}
+      </div>
+
+      {/* Onboarding tooltip for floating video button */}
+      {showVideoButton && (
+        <OnboardingTooltip
+          tooltipId="floating-video-button"
+          targetRef={videoButtonRef}
+          message="Enable this to view your video while reading."
+          position="left"
+          offset={12}
+          show={showVideoTooltip}
+          onDismiss={handleVideoTooltipDismiss}
+          autoDismissMs={12000}
+        />
+      )}
+    </>
   );
 }
