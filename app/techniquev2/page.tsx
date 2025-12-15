@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
   Box,
@@ -725,15 +726,12 @@ export default function TechniqueV2Page() {
                           >
                             {/* Thumbnail image */}
                             {swingThumbnails.get(event.id) ? (
-                              <img
-                                src={swingThumbnails.get(event.id)}
+                              <Image
+                                src={swingThumbnails.get(event.id) || ""}
                                 alt={`Swing ${index + 1}`}
+                                fill
+                                sizes="300px"
                                 style={{
-                                  position: "absolute",
-                                  top: 0,
-                                  left: 0,
-                                  width: "100%",
-                                  height: "100%",
                                   objectFit: "cover",
                                 }}
                               />
