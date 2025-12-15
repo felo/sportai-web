@@ -278,12 +278,14 @@ export function useTaskManagement({
         }
 
         // Create a clean export object with pose data and annotations
+        // Include keypointOrder for optimized format compatibility
         const exportData = {
           version: result.data.version,
           exportedAt: new Date().toISOString(),
           videoFPS: result.data.videoFPS,
           totalFrames: result.data.totalFrames,
           modelUsed: result.data.modelUsed,
+          keypointOrder: result.data.keypointOrder, // For optimized format
           poses: result.data.poses,
           metadata: result.data.metadata,
           annotations: {
@@ -296,8 +298,8 @@ export function useTaskManagement({
           userPreferences: result.data.userPreferences,
         };
 
-        // Create blob and download
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        // Create blob and download - use minified JSON for smaller file size
+        const blob = new Blob([JSON.stringify(exportData)], {
           type: "application/json",
         });
         const url = URL.createObjectURL(blob);

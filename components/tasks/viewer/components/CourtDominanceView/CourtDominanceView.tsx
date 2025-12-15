@@ -61,7 +61,7 @@ export function CourtDominanceView({
     return validPlayers
       .map((player, idx) => {
         const positions = result.player_positions?.[String(player.player_id)] || [];
-        const zones = calculateZoneDominance(positions, currentSystem.zones, rallies);
+        const zones = calculateZoneDominance(positions, currentSystem.zones, rallies, sport);
 
         const totalTime = zones.reduce((sum, z) => sum + z.timeSpent, 0);
         const dominantZoneStat = zones.reduce(

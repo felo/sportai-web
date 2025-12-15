@@ -29,7 +29,7 @@ import { extractS3KeyFromUrl } from "@/lib/s3";
 // Types and constants
 import type { TechniqueViewerProps, ViewMode, ContextMenuTarget, ContextMenuPosition, DirtyFlags } from "./types";
 import { DEFAULT_DIRTY_FLAGS, INITIAL_VIEWER_STATE } from "./constants";
-import type { SwingBoundaryAdjustment, ProtocolAdjustment } from "./utils";
+import { getEnabledProtocolsForSport, type SwingBoundaryAdjustment, type ProtocolAdjustment } from "./utils";
 
 // Custom hooks
 import {
@@ -55,7 +55,16 @@ export function TechniqueViewer({
   // Core State
   // ============================================================================
   
-  const [config, setConfig] = useState<ViewerConfig>(DEFAULT_VIEWER_CONFIG);
+  // Create sport-specific config by merging with defaults
+  const initialConfig = useMemo<ViewerConfig>(() => ({
+    ...DEFAULT_VIEWER_CONFIG,
+    protocols: {
+      ...DEFAULT_VIEWER_CONFIG.protocols,
+      enabledProtocols: getEnabledProtocolsForSport(sport),
+    },
+  }), [sport]);
+  
+  const [config, setConfig] = useState<ViewerConfig>(initialConfig);
   const hasVideoS3Key = !!extractS3KeyFromUrl(videoUrl);
   const [poseEnabled, setPoseEnabled] = useState(!hasVideoS3Key);
   const [showPanel, setShowPanel] = useState(false);

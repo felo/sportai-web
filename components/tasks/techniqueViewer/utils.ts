@@ -1,5 +1,54 @@
-import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
+import type { ProtocolEvent, ProtocolId } from "@/components/videoPoseViewerV2";
 import { MIN_SWING_DURATION } from "./constants";
+
+// ============================================================================
+// Sport-Specific Protocol Configuration
+// ============================================================================
+
+/**
+ * Get enabled protocols based on sport type.
+ * 
+ * Rules:
+ * - Tennis: swing detection + serve protocols
+ * - Padel: swing detection only
+ * - Pickleball: swing detection only
+ * - Other sports: no protocols
+ */
+export function getEnabledProtocolsForSport(sport?: string): ProtocolId[] {
+  const normalizedSport = sport?.toLowerCase();
+  
+  switch (normalizedSport) {
+    case "tennis":
+      return [
+        "swing-detection-v3",
+        "loading-position",
+        "serve-preparation",
+        "tennis-contact-point",
+        "serve-follow-through",
+        "handedness-detection",
+      ];
+    
+    case "padel":
+    case "pickleball":
+      return [
+        "swing-detection-v3",
+        "loading-position",
+        "handedness-detection",
+      ];
+    
+    default:
+      // Other sports: no protocols
+      return [];
+  }
+}
+
+/**
+ * Check if a sport should have pose/protocol analysis enabled
+ */
+export function shouldEnableProtocolsForSport(sport?: string): boolean {
+  const normalizedSport = sport?.toLowerCase();
+  return ["tennis", "padel", "pickleball"].includes(normalizedSport ?? "");
+}
 
 // ============================================================================
 // LLM Response Helpers
