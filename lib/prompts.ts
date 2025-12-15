@@ -1,4 +1,4 @@
-import type { DomainExpertise } from "@/utils/storage";
+import type { DomainExpertise, InsightLevel } from "@/utils/storage";
 
 /**
  * SERVER-SIDE ONLY PROMPTS
@@ -74,8 +74,30 @@ const FORMATTING_GUIDELINES = `
 
 - **Structured Breakdown**: Organize your analysis in a clear, digestible format. Consider using:
   - Bullet points for specific observations
-  - Numbered lists for exercises or drills (IMPORTANT: when nesting numbered lists, always restart numbering at 1 for each nested level)
+  - Numbered lists for exercises or drills
   - Clear visual separation between different topics
+  
+  **CRITICAL - List Formatting Rules:**
+  - When a numbered item has sub-points, use BULLET POINTS (-, •) for the sub-items, NOT more numbers
+  - NEVER continue numbering across different sections or drills
+  - Each new drill or exercise starts fresh at 1
+  
+  CORRECT example:
+  1. **The Sock Drill**:
+     - Put two tennis balls inside a long sock
+     - Practice your service motion swinging the sock
+     - Goal: Hit yourself in the middle of the back
+  
+  2. **Relax the Grip**:
+     - Hold the racket with grip pressure of about 3/10
+     - A looser grip allows better racket head drop
+  
+  WRONG example (do NOT do this):
+  1. The Sock Drill:
+  2. Put two tennis balls...
+  3. Practice your motion...
+  4. Relax the Grip:
+  5. Hold the racket...
   
   **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections:**
   - Every major section of your response MUST use this format:
@@ -475,4 +497,154 @@ Apply padel-specific tactical knowledge:
 export function getTacticalPromptWithDomain(domainExpertise: DomainExpertise): string {
   const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS_TACTICAL[domainExpertise] || "";
   return `${SYSTEM_PROMPT_TACTICAL}${domainEnhancement}`;
+}
+
+// ============================================================================
+// INSIGHT LEVEL PROMPTS - Controls complexity and depth of AI responses
+// ============================================================================
+
+/**
+ * Insight level communication style adjustments
+ * These are appended to the system prompt based on user's selected insight level
+ */
+export const INSIGHT_LEVEL_PROMPTS: Record<InsightLevel, string> = {
+  beginner: `
+
+**OVERRIDE - BEGINNER LEVEL COMMUNICATION**
+
+IMPORTANT: IGNORE all previous formatting guidelines about collapsible sections, structured breakdowns, context analysis sections, and comprehensive audits. For this beginner user, follow ONLY these simplified rules:
+
+**RESPONSE FORMAT FOR BEGINNERS:**
+1. Start with a brief encouraging comment (1 sentence)
+2. Give ONE simple tip to focus on (1-2 sentences)
+3. Optionally suggest ONE easy drill (2-3 sentences max)
+4. End with encouragement
+
+**STRICT RULES:**
+- NO \`<details>\` or \`<summary>\` tags - everything stays visible
+- NO "Context & Environment Analysis" section
+- NO technical jargon (no "pronation", "kinetic chain", "biomechanics")
+- NO angle measurements or numbers
+- NO bullet point lists with more than 3 items
+- NO multiple drills - just ONE simple exercise if any
+- Total response: 4-8 sentences MAXIMUM
+
+**TONE:** Like a friendly coach talking to a beginner. Warm, simple, encouraging.
+
+**EXAMPLE RESPONSE:**
+"Great effort on that serve! I can see you're getting good power from your legs.
+
+The one thing to focus on: try tossing the ball a bit higher. This gives you more time to swing up and through the ball.
+
+A simple practice: Stand at the baseline and toss 10 balls, trying to make each one land in the same spot in front of you. Once you can do that consistently, your serve will feel much smoother.
+
+Keep at it - you're doing great!"`,
+
+  developing: `
+
+**Communication Adaptation: DEVELOPING LEVEL**
+
+This user has some experience and wants to improve. Balance technical insight with accessibility:
+
+- **Moderate detail**: Focus on 2-3 key improvement areas, not a comprehensive audit
+- **Introduce terminology**: Use technical terms but briefly explain them when first mentioned (e.g., "pronation - the rotation of your forearm")
+- **Practical focus**: Prioritize actionable tips over theory
+- **Include some metrics**: Mention angles or timing when directly relevant
+- **Use collapsible sections**: But keep them focused - 2-3 sections maximum
+- **Progressive drills**: Suggest 2-3 drills that build on each other
+- **Proper list formatting**: Numbered items for drills with bullet sub-steps`,
+
+  advanced: `
+
+**Communication Adaptation: ADVANCED LEVEL**
+
+Provide comprehensive, technical analysis:
+
+- **Full technical vocabulary**: Use proper terminology without excessive explanation
+- **Comprehensive breakdown**: Cover multiple aspects of technique, tactics, and biomechanics
+- **Include all metrics**: Joint angles, speeds, timing analysis, and precise timestamps
+- **Detailed structure**: Use all collapsible sections for organized deep-dives
+- **Proper list formatting**: Numbered items for drills/exercises, bullet sub-points for steps within each
+- **Advanced drills**: Include progressive training programs and specific exercises
+- **Comparative analysis**: Reference professional technique standards when relevant`,
+};
+
+// ============================================================================
+// USER CONTEXT - Personalization based on user info
+// ============================================================================
+
+export interface UserContext {
+  firstName?: string;
+  // Future: skill level, preferred hand, goals, etc.
+}
+
+/**
+ * Generate user context section for the prompt
+ * @param userContext - User information for personalization
+ * @returns User context string to append to prompt
+ */
+function getUserContextPrompt(userContext?: UserContext): string {
+  if (!userContext?.firstName) {
+    return "";
+  }
+  
+  return `
+
+**User Context:**
+- The user's name is ${userContext.firstName}. You may occasionally use their name naturally in responses (e.g., "Great work, ${userContext.firstName}!" or "${userContext.firstName}, focus on..."), but don't overdo it - use it sparingly, maybe once or twice per response at most.
+- Remember: The user is the person asking questions, not necessarily the player being analyzed in the video. Only use their name when addressing them directly, not when describing what "they" are doing in the video unless they've indicated they are the player.`;
+}
+
+/**
+ * Get the complete system prompt with domain AND insight level enhancement for VIDEO analysis
+ * @param domainExpertise - Selected domain expertise
+ * @param insightLevel - Selected insight level (beginner/developing/advanced)
+ * @param userContext - Optional user context for personalization
+ * @returns Complete system prompt with all enhancements
+ */
+export function getSystemPromptWithDomainAndInsight(
+  domainExpertise: DomainExpertise,
+  insightLevel: InsightLevel,
+  userContext?: UserContext
+): string {
+  const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS[domainExpertise] || "";
+  const insightEnhancement = INSIGHT_LEVEL_PROMPTS[insightLevel] || "";
+  const userContextPrompt = getUserContextPrompt(userContext);
+  return `${SYSTEM_PROMPT}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
+}
+
+/**
+ * Get the system prompt for FRAME analysis with domain AND insight level enhancement
+ * @param domainExpertise - Selected domain expertise
+ * @param insightLevel - Selected insight level
+ * @param userContext - Optional user context for personalization
+ * @returns System prompt for frame analysis with all enhancements
+ */
+export function getFramePromptWithDomainAndInsight(
+  domainExpertise: DomainExpertise,
+  insightLevel: InsightLevel,
+  userContext?: UserContext
+): string {
+  const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS_FRAME[domainExpertise] || "";
+  const insightEnhancement = INSIGHT_LEVEL_PROMPTS[insightLevel] || "";
+  const userContextPrompt = getUserContextPrompt(userContext);
+  return `${SYSTEM_PROMPT_FRAME}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
+}
+
+/**
+ * Get the system prompt for TACTICAL analysis with domain AND insight level enhancement
+ * @param domainExpertise - Selected domain expertise
+ * @param insightLevel - Selected insight level
+ * @param userContext - Optional user context for personalization
+ * @returns System prompt for tactical analysis with all enhancements
+ */
+export function getTacticalPromptWithDomainAndInsight(
+  domainExpertise: DomainExpertise,
+  insightLevel: InsightLevel,
+  userContext?: UserContext
+): string {
+  const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS_TACTICAL[domainExpertise] || "";
+  const insightEnhancement = INSIGHT_LEVEL_PROMPTS[insightLevel] || "";
+  const userContextPrompt = getUserContextPrompt(userContext);
+  return `${SYSTEM_PROMPT_TACTICAL}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
 }

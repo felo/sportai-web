@@ -107,6 +107,12 @@ export async function syncChatsFromSupabase(): Promise<Chat[]> {
     // Update localStorage with merged chats
     saveChatsToLocal(allChats);
     
+    // Dispatch event so components can refresh their data from localStorage
+    // This ensures useAIChat reloads if the current chat's messages changed
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("chat-storage-change"));
+    }
+    
     storageLogger.info("syncChatsFromSupabase complete:", {
       supabase: supabaseChats.length,
       localOnly: localOnlyChats.length,

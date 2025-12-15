@@ -22,13 +22,28 @@ import {
  * - It has isStreaming=true (was interrupted during generation) OR
  * - It has no content and no isStreaming flag (failed before any content was generated)
  * 
- * Excludes greeting messages and candidate_responses (these are meant to have empty content).
+ * Also cleans up greeting messages that were interrupted during typewriter effect.
  */
 function markIncompleteMessages(messages: Message[]): Message[] {
   return messages.map((msg, index) => {
     if (msg.role === "assistant") {
-      // Skip greeting messages and candidate_responses - these are meant to have empty content
-      if (msg.isGreeting || msg.messageType === "candidate_responses") {
+      // Handle greeting messages - clean up isStreaming if set (typewriter was interrupted)
+      // But don't mark as incomplete since they're still valid greetings
+      if (msg.isGreeting) {
+        if (msg.isStreaming) {
+          chatLogger.debug("Cleaning up interrupted greeting message:", msg.id);
+          return { ...msg, isStreaming: false };
+        }
+        return msg;
+      }
+      
+      // Handle candidate_responses - these are meant to have empty content
+      // If candidateResponses data is missing/broken, filter them out later in MessageBubble
+      if (msg.messageType === "candidate_responses") {
+        // Clean up isStreaming if somehow set
+        if (msg.isStreaming) {
+          return { ...msg, isStreaming: false };
+        }
         return msg;
       }
       
@@ -167,12 +182,37 @@ export function useAIChat() {
         loading: isLoading,
       });
       
-      // If this is the same chat we're already on, don't reload
+      // If this is the same chat we're already on, check if storage has different messages
+      // (could happen after Supabase sync brings in updates from other devices)
       if (!isSwitchingToDifferentChat && currentChatId) {
-        chatLogger.debug("Same chat, skipping reload", {
+        const chat = await loadChat(currentChatId);
+        const storageMessages = chat?.messages ?? [];
+        
+        // Quick check: compare message count and last message ID
+        const messagesMatch = 
+          currentMessages.length === storageMessages.length &&
+          currentMessages[currentMessages.length - 1]?.id === storageMessages[storageMessages.length - 1]?.id;
+        
+        if (messagesMatch) {
+          chatLogger.debug("Same chat, messages unchanged, skipping reload", {
+            chatId: currentChatId,
+            messageCount: currentMessages.length,
+          });
+          return;
+        }
+        
+        // Messages changed (e.g., from Supabase sync), reload them
+        chatLogger.debug("Same chat but messages changed, reloading", {
           chatId: currentChatId,
-          messageCount: currentMessages.length,
+          stateCount: currentMessages.length,
+          storageCount: storageMessages.length,
         });
+        
+        const markedMessages = markIncompleteMessages(storageMessages);
+        markedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
+        const refreshed = await refreshVideoUrls(markedMessages);
+        setMessages(refreshed);
+        updateExistingChat(currentChatId, { messages: refreshed }, true);
         return;
       }
       

@@ -175,6 +175,11 @@ export async function migrateGuestTasks(userId: string): Promise<{
   }
   
   try {
+    // Valid sports for API - map any invalid values to "all"
+    const validSports = ["tennis", "padel", "pickleball", "all"];
+    const normalizeSport = (sport: string) => 
+      validSports.includes(sport) ? sport : "all";
+    
     // Batch insert all guest tasks in one API call
     const response = await fetch("/api/tasks/batch", {
       method: "POST",
@@ -185,7 +190,7 @@ export async function migrateGuestTasks(userId: string): Promise<{
       body: JSON.stringify({
         tasks: guestTasks.map(task => ({
           taskType: task.task_type,
-          sport: task.sport,
+          sport: normalizeSport(task.sport),
           videoUrl: task.video_url,
           thumbnailUrl: task.thumbnail_url,
           thumbnailS3Key: task.thumbnail_s3_key,

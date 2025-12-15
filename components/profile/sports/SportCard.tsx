@@ -27,6 +27,7 @@ import {
   getGoalOptions,
   fieldHelperText,
 } from "@/lib/profile-options";
+import { SkillLevelSelect } from "./SkillLevelSelect";
 import {
   isRacketSport,
   type RacketSport,
@@ -149,19 +150,10 @@ export function SportCard({ sport, defaultExpanded = false }: SportCardProps) {
                 label="Skill Level"
                 helperText={fieldHelperText.skillLevel}
               >
-                <Select.Root
+                <SkillLevelSelect
                   value={sport.skill_level}
-                  onValueChange={(v) => handleFieldChange("skill_level", v as SkillLevel)}
-                >
-                  <Select.Trigger style={{ width: "100%" }} />
-                  <Select.Content>
-                    {skillLevelOptions.map((s) => (
-                      <Select.Item key={s.value} value={s.value}>
-                        {s.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
+                  onChange={(v) => handleFieldChange("skill_level", v as SkillLevel)}
+                />
               </FormField>
             </Box>
             

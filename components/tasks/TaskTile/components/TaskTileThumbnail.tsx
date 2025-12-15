@@ -26,6 +26,7 @@ interface TaskTileThumbnailProps {
   onShowDelete?: () => void;
   onDownloadVideo?: () => void;
   onExportData?: () => void;
+  onExportPoseData?: () => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export function TaskTileThumbnail({
   onShowDelete,
   onDownloadVideo,
   onExportData,
+  onExportPoseData,
 }: TaskTileThumbnailProps) {
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -152,6 +154,12 @@ export function TaskTileThumbnail({
               <DropdownMenu.Item onSelect={onExportData}>
                 <FileIcon width={14} height={14} />
                 <Text ml="2">Export data</Text>
+              </DropdownMenu.Item>
+            )}
+            {onExportPoseData && task.task_type === "technique" && task.status === "completed" && (
+              <DropdownMenu.Item onSelect={onExportPoseData}>
+                <FileIcon width={14} height={14} />
+                <Text ml="2">Export Data</Text>
               </DropdownMenu.Item>
             )}
             {onShowDelete && (

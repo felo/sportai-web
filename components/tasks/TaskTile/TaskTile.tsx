@@ -29,6 +29,7 @@ export function TaskTile({
   isPreparing,
   onDownloadVideo,
   onExportData,
+  onExportPoseData,
   isNew,
 }: TaskTileProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -68,6 +69,7 @@ export function TaskTile({
         onShowDelete={onDelete ? () => setShowDeleteDialog(true) : undefined}
         onDownloadVideo={onDownloadVideo}
         onExportData={onExportData}
+        onExportPoseData={onExportPoseData}
       />
 
       {/* Card content */}

@@ -1,8 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
-import { Box, Flex, Text, Separator } from "@radix-ui/themes";
-import { RocketIcon, ArrowUpIcon, TargetIcon } from "@radix-ui/react-icons";
+import { Flex, Text, Separator } from "@radix-ui/themes";
 import { useCountingAnimation } from "../hooks";
 
 interface ServesVolleysDisplayProps {
@@ -45,7 +43,6 @@ export function ServesVolleysDisplay({
     <Flex direction="column" gap="4" style={{ paddingTop: 8 }}>
       {/* Serves */}
       <ShotTypeRow
-        icon={<RocketIcon width={20} height={20} />}
         label="Serves"
         count={displayServes}
         percentage={servePercentage}
@@ -59,7 +56,6 @@ export function ServesVolleysDisplay({
 
       {/* Volleys */}
       <ShotTypeRow
-        icon={<ArrowUpIcon width={20} height={20} />}
         label="Volleys"
         count={displayVolleys}
         percentage={volleyPercentage}
@@ -73,7 +69,6 @@ export function ServesVolleysDisplay({
 
       {/* Ground Strokes */}
       <ShotTypeRow
-        icon={<TargetIcon width={20} height={20} />}
         label="Ground Strokes"
         count={Math.round(groundStrokeCount * animationProgress)}
         percentage={groundStrokePercentage}
@@ -87,7 +82,6 @@ export function ServesVolleysDisplay({
 }
 
 function ShotTypeRow({
-  icon,
   label,
   count,
   percentage,
@@ -96,7 +90,6 @@ function ShotTypeRow({
   animationProgress,
   color,
 }: {
-  icon: ReactNode;
   label: string;
   count: number;
   percentage: number;
@@ -108,10 +101,7 @@ function ShotTypeRow({
   return (
     <Flex direction="column" gap="2">
       <Flex justify="between" align="center">
-        <Flex align="center" gap="2">
-          <Box style={{ color }}>{icon}</Box>
-          <Text size="2" weight="medium">{label}</Text>
-        </Flex>
+        <Text size="2" weight="medium">{label}</Text>
         <Text size="4" weight="bold" style={{ color, fontVariantNumeric: "tabular-nums" }}>
           {count}
         </Text>

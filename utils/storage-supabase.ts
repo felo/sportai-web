@@ -36,10 +36,22 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
   const messageType = poseData?.messageType;
   const analysisOptions = poseData?.analysisOptions;
   const techniqueStudioPrompt = poseData?.techniqueStudioPrompt;
+  const isGreeting = poseData?.isGreeting;
+  const candidateResponses = poseData?.candidateResponses;
+  const isIncomplete = poseData?.isIncomplete;
   
   // Remove special fields from poseData to keep it clean
   const cleanPoseData = poseData ? (() => {
-    const { isTechniqueLiteEligible: _, messageType: __, analysisOptions: ___, techniqueStudioPrompt: ____, ...rest } = poseData;
+    const { 
+      isTechniqueLiteEligible: _, 
+      messageType: __, 
+      analysisOptions: ___, 
+      techniqueStudioPrompt: ____, 
+      isGreeting: _____,
+      candidateResponses: ______,
+      isIncomplete: _______,
+      ...rest 
+    } = poseData;
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
   
@@ -65,6 +77,9 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
     messageType: messageType || undefined,
     analysisOptions: analysisOptions || undefined,
     techniqueStudioPrompt: techniqueStudioPrompt || undefined,
+    candidateResponses: candidateResponses || undefined,
+    isGreeting: isGreeting ?? undefined,
+    isIncomplete: isIncomplete ?? undefined,
     videoUrl: dbMsg.video_url || undefined,
     videoS3Key: dbMsg.video_s3_key || undefined,
     thumbnailUrl: dbMsg.thumbnail_url || undefined,
@@ -119,7 +134,10 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     message.isTechniqueLiteEligible !== undefined ||
     message.messageType ||
     message.analysisOptions ||
-    message.techniqueStudioPrompt;
+    message.techniqueStudioPrompt ||
+    message.isGreeting !== undefined ||
+    message.candidateResponses ||
+    message.isIncomplete !== undefined;
     
   const poseDataWithExtras = hasSpecialFields
     ? {
@@ -128,6 +146,9 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
         ...(message.messageType ? { messageType: message.messageType } : {}),
         ...(message.analysisOptions ? { analysisOptions: message.analysisOptions } : {}),
         ...(message.techniqueStudioPrompt ? { techniqueStudioPrompt: message.techniqueStudioPrompt } : {}),
+        ...(message.isGreeting !== undefined ? { isGreeting: message.isGreeting } : {}),
+        ...(message.candidateResponses ? { candidateResponses: message.candidateResponses } : {}),
+        ...(message.isIncomplete !== undefined ? { isIncomplete: message.isIncomplete } : {}),
       }
     : null;
   

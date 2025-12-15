@@ -277,9 +277,11 @@ export function useAnalysisOptions({
       // Create guest task for technique analysis (stored in localStorage)
       try {
         analysisLogger.info(`Creating guest technique task for URL:`, videoUrl);
+        // Map "other" sport to "all" for task storage (valid sports: tennis, padel, pickleball, all)
+        const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
         const guestTask = createGuestTechniqueTask({
           videoUrl,
-          sport: preAnalysis.sport as "tennis" | "padel" | "pickleball" | "all",
+          sport: taskSport,
           thumbnailUrl: preAnalysis.thumbnailUrl,
           videoLength: preAnalysis.durationSeconds,
         });

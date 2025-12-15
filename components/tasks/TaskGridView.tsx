@@ -15,13 +15,14 @@ interface TaskGridViewProps {
   preparingTask?: string | null;
   onDownloadVideo?: (task: Task) => void;
   onExportData?: (taskId: string) => void;
+  onExportPoseData?: (task: Task) => void;
   isTaskNew?: (taskId: string) => boolean;
   showSamples?: boolean;
   /** Show loading skeletons instead of tasks */
   loading?: boolean;
 }
 
-export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, isTaskNew, showSamples = true, loading = false }: TaskGridViewProps) {
+export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResult, fetchingResult, onDeleteTask, deletingTask, preparingTask, onDownloadVideo, onExportData, onExportPoseData, isTaskNew, showSamples = true, loading = false }: TaskGridViewProps) {
   const hasTasks = tasks.length > 0;
   const hasSamples = showSamples && sampleTasks.length > 0;
   
@@ -100,6 +101,7 @@ export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResu
               isPreparing={preparingTask === task.id}
               onDownloadVideo={isSampleSection ? undefined : (onDownloadVideo ? () => onDownloadVideo(task) : undefined)}
               onExportData={isSampleSection ? undefined : (onExportData ? () => onExportData(task.id) : undefined)}
+              onExportPoseData={isSampleSection ? undefined : (onExportPoseData ? () => onExportPoseData(task) : undefined)}
               isNew={isSampleSection ? false : isTaskNew?.(task.id)}
             />
           ))}

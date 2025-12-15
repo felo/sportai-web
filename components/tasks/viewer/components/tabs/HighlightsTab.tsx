@@ -5,7 +5,6 @@ import { Box, Flex, Text } from "@radix-ui/themes";
 import { StarIcon, PlayIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult, SwingWithPlayer, BallBounce } from "../../types";
 import { formatDuration } from "../../utils";
-import { Confetti } from "../shared";
 import { useHighlightThumbnails } from "../../hooks/useHighlightThumbnails";
 import { BallTrackerOverlay } from "../BallTrackerOverlay";
 
@@ -29,7 +28,6 @@ type AchievementType = "fastest_shot" | "fastest_sprint" | "longest_rally";
 interface Achievement {
   type: AchievementType;
   title: string;
-  emoji: string;
   value: string;
   unit: string;
   subtitle: string;
@@ -50,26 +48,22 @@ const ACHIEVEMENT_STYLES: Record<
     gradient: readonly [string, string, string];
     accentColor: string;
     glowColor: string;
-    emoji: string;
   }
 > = {
   fastest_shot: {
     gradient: ["#FF6B35", "#F7931E", "#FFD93D"] as const,
     accentColor: "#FF6B35",
     glowColor: "rgba(255, 107, 53, 0.5)",
-    emoji: "💥",
   },
   fastest_sprint: {
     gradient: ["#00D4AA", "#00B894", "#55EFC4"] as const,
     accentColor: "#00D4AA",
     glowColor: "rgba(0, 212, 170, 0.5)",
-    emoji: "⚡",
   },
   longest_rally: {
     gradient: ["#667EEA", "#764BA2", "#A855F7"] as const,
     accentColor: "#667EEA",
     glowColor: "rgba(102, 126, 234, 0.5)",
-    emoji: "🎾",
   },
 };
 
@@ -86,7 +80,6 @@ export function HighlightsTab({
   portraits,
   playerDisplayNames,
 }: HighlightsTabProps) {
-  const [showConfetti, setShowConfetti] = useState(false);
   const [expandedType, setExpandedType] = useState<AchievementType | null>(null);
 
   // Compute all swings from result (same as useAllSwings hook)
@@ -133,7 +126,6 @@ export function HighlightsTab({
       achievements.push({
         type: "fastest_shot",
         title: "Fastest Shot",
-        emoji: style.emoji,
         value: `${Math.round(fastestShot.speed)}`,
         unit: "km/h",
         subtitle:
@@ -164,7 +156,6 @@ export function HighlightsTab({
       achievements.push({
         type: "fastest_sprint",
         title: "Fastest Sprint",
-        emoji: style.emoji,
         value: `${fastestSprint.speed.toFixed(1)}`,
         unit: "km/h",
         subtitle:
@@ -206,7 +197,6 @@ export function HighlightsTab({
       achievements.push({
         type: "longest_rally",
         title: "Longest Rally",
-        emoji: style.emoji,
         value: formatDuration(longestRally.duration),
         unit: "",
         subtitle: `${shotsInRally} shots`,
@@ -233,14 +223,6 @@ export function HighlightsTab({
   // Extract video thumbnails (memory-efficient, single hidden video)
   const { thumbnails } = useHighlightThumbnails(videoUrl, timestamps);
 
-  // Trigger celebration confetti after cards animate in
-  useEffect(() => {
-    if (achievements.length > 0) {
-      const timer = setTimeout(() => setShowConfetti(true), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [achievements.length]);
-
   if (!result || achievements.length === 0) {
     return (
       <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
@@ -265,11 +247,6 @@ export function HighlightsTab({
 
   return (
     <Box style={{ position: "relative" }}>
-      {/* Background celebration confetti */}
-      <Box style={{ position: "fixed", top: 0, left: "50%", zIndex: 100, pointerEvents: "none" }}>
-        <Confetti trigger={showConfetti} />
-      </Box>
-
       <Flex direction="column" gap="6">
         {/* Achievement Cards Grid */}
         <Flex gap="5" wrap="wrap" justify="center">
@@ -522,13 +499,8 @@ function AchievementCard({
                   width: "100%",
                   height: "100%",
                   background: `linear-gradient(135deg, ${achievement.gradient[0]} 0%, ${achievement.gradient[1]} 50%, ${achievement.gradient[2]} 100%)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
                 }}
-              >
-                <Text style={{ fontSize: 64, opacity: 0.8 }}>{achievement.emoji}</Text>
-              </Box>
+              />
             )}
 
             {/* Gradient overlay */}
@@ -610,12 +582,9 @@ function AchievementCard({
                 boxShadow: `0 4px 12px ${achievement.glowColor}`,
               }}
             >
-              <Flex align="center" gap="1">
-                <Text style={{ fontSize: 14 }}>{achievement.emoji}</Text>
-                <Text size="1" weight="bold" style={{ color: "white", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {achievement.title}
-                </Text>
-              </Flex>
+              <Text size="1" weight="bold" style={{ color: "white", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {achievement.title}
+              </Text>
             </Box>
           </>
         )}

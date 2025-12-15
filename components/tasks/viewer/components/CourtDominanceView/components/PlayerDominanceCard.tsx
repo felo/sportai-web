@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Flex, Text, Card, Tooltip, Badge } from "@radix-ui/themes";
-import { PersonIcon } from "@radix-ui/react-icons";
+import { PersonIcon, StopwatchIcon, ExclamationTriangleIcon, CheckIcon } from "@radix-ui/react-icons";
 import type { ZoneDefinition, PlayerDominance } from "../types";
 import { formatDuration } from "../utils/formatters";
 
@@ -77,7 +77,15 @@ export function PlayerDominanceCard({
               {player.playerName}
             </Text>
             <Flex align="center" gap="1">
-              <Text style={{ fontSize: 12 }}>{dominantZoneDef?.emoji || "📍"}</Text>
+              <Box
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  backgroundColor: dominantZoneDef?.color || "var(--accent-9)",
+                  flexShrink: 0,
+                }}
+              />
               <Text size="2" color="gray">
                 {player.dominantZone}
               </Text>
@@ -89,7 +97,10 @@ export function PlayerDominanceCard({
         <Flex gap="2" wrap="wrap">
           <Tooltip content="Total tracked time during rallies">
             <Badge color="gray" variant="soft" size="2" style={{ cursor: "help" }}>
-              ⏱️ {formatDuration(player.totalTime)} tracked
+              <Flex align="center" gap="1">
+                <StopwatchIcon width={12} height={12} />
+                <span>{formatDuration(player.totalTime)} tracked</span>
+              </Flex>
             </Badge>
           </Tooltip>
           <Tooltip content="Time spent in defensive or transition zones">
@@ -105,8 +116,14 @@ export function PlayerDominanceCard({
               size="2"
               style={{ cursor: "help" }}
             >
-              {player.pressurePercentage > 50 ? "⚠️" : "✓"}{" "}
-              {player.pressurePercentage.toFixed(0)}% pressure
+              <Flex align="center" gap="1">
+                {player.pressurePercentage > 50 ? (
+                  <ExclamationTriangleIcon width={12} height={12} />
+                ) : (
+                  <CheckIcon width={12} height={12} />
+                )}
+                <span>{player.pressurePercentage.toFixed(0)}% pressure</span>
+              </Flex>
             </Badge>
           </Tooltip>
         </Flex>

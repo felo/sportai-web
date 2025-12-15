@@ -16,7 +16,7 @@ import {
   ActivityLogIcon, 
   MixerHorizontalIcon,
 } from "@radix-ui/react-icons";
-import type { SwingDetectionResultV3, SwingFrameDataV3, SwingPhase } from "./hooks/useSwingDetectionV3";
+import type { SwingDetectionResultV3, SwingFrameDataV3, SwingPhase } from "./hooks";
 
 // ============================================================================
 // Types

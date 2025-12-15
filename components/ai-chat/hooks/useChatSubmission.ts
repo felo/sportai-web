@@ -7,29 +7,31 @@
  import { useCallback, useRef } from "react";
  import { chatLogger } from "@/lib/logger";
  import type { Message, VideoPreAnalysis } from "@/types/chat";
- import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+ import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
  import { getCurrentChatId, loadChat } from "@/utils/storage-unified";
  import { uploadToS3 } from "@/lib/s3";
  import { generateMessageId, stripStreamMetadata, calculateUserMessageTokens } from "../utils";
  import type { ProgressStage } from "../types";
  import type { StarterPromptConfig } from "@/utils/prompts";
 
- interface UseChatSubmissionOptions {
-   // State
-   prompt: string;
-   videoFile: File | null;
-   videoPreview: string | null;
-   detectedVideoUrl: string | null;
-   messages: Message[];
-   videoPreAnalysis: VideoPreAnalysis | null;
-   loading: boolean;
-   // Settings
-   thinkingMode: ThinkingMode;
-   mediaResolution: MediaResolution;
-   domainExpertise: DomainExpertise;
-   videoPlaybackSpeed: number;
-   poseData: StarterPromptConfig["poseSettings"] | undefined;
-   needsServerConversion: boolean;
+interface UseChatSubmissionOptions {
+  // State
+  prompt: string;
+  videoFile: File | null;
+  videoPreview: string | null;
+  detectedVideoUrl: string | null;
+  messages: Message[];
+  videoPreAnalysis: VideoPreAnalysis | null;
+  loading: boolean;
+  // Settings
+  thinkingMode: ThinkingMode;
+  mediaResolution: MediaResolution;
+  domainExpertise: DomainExpertise;
+  insightLevel: InsightLevel;
+  userFirstName?: string; // User's first name for personalization
+  videoPlaybackSpeed: number;
+  poseData: StarterPromptConfig["poseSettings"] | undefined;
+  needsServerConversion: boolean;
    // Setters
    setPrompt: (prompt: string) => void;
    setLoading: (loading: boolean) => void;
@@ -49,55 +51,61 @@
    clearVideo: (keepBlobUrl?: boolean) => void;
    resetAnalysis: () => void;
    scrollMessageToTop: (messageId: string) => void;
-   // API
-   sendTextOnlyQuery: (
-     prompt: string,
-     messageId: string,
-     onUpdate: (id: string, updates: Partial<Message>) => void,
-     history: Message[],
-     abortController: AbortController,
-     thinkingMode: ThinkingMode,
-     mediaResolution: MediaResolution,
-     domainExpertise: DomainExpertise
-   ) => Promise<void>;
-   sendVideoQuery: (
-     prompt: string,
-     videoFile: File,
-     messageId: string,
-     onUpdate: (id: string, updates: Partial<Message>) => void,
-     setUploadProgress: (progress: number) => void,
-     setProgressStage: (stage: string) => void,
-     history: Message[],
-     onS3Upload: (url: string, key: string) => void,
-     abortController: AbortController,
-     thinkingMode: ThinkingMode,
-     mediaResolution: MediaResolution,
-     domainExpertise: DomainExpertise,
-     needsServerConversion: boolean
-   ) => Promise<void>;
- }
+  // API
+  sendTextOnlyQuery: (
+    prompt: string,
+    messageId: string,
+    onUpdate: (id: string, updates: Partial<Message>) => void,
+    history: Message[],
+    abortController: AbortController,
+    thinkingMode: ThinkingMode,
+    mediaResolution: MediaResolution,
+    domainExpertise: DomainExpertise,
+    insightLevel?: string,
+    userFirstName?: string
+  ) => Promise<void>;
+  sendVideoQuery: (
+    prompt: string,
+    videoFile: File,
+    messageId: string,
+    onUpdate: (id: string, updates: Partial<Message>) => void,
+    setUploadProgress: (progress: number) => void,
+    setProgressStage: (stage: string) => void,
+    history: Message[],
+    onS3Upload: (url: string, key: string) => void,
+    abortController: AbortController,
+    thinkingMode: ThinkingMode,
+    mediaResolution: MediaResolution,
+    domainExpertise: DomainExpertise,
+    needsServerConversion: boolean,
+    insightLevel?: string,
+    userFirstName?: string
+  ) => Promise<void>;
+}
 
 interface UseChatSubmissionReturn {
   handleSubmit: (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string) => Promise<void>;
   submitAbortRef: React.MutableRefObject<AbortController | null>;
 }
 
- export function useChatSubmission({
-   prompt,
-   videoFile,
-   videoPreview,
-   detectedVideoUrl,
-   messages,
-   videoPreAnalysis,
-   loading,
-   thinkingMode,
-   mediaResolution,
-   domainExpertise,
-   videoPlaybackSpeed,
-   poseData,
-   needsServerConversion,
-   setPrompt,
-   setLoading,
+export function useChatSubmission({
+  prompt,
+  videoFile,
+  videoPreview,
+  detectedVideoUrl,
+  messages,
+  videoPreAnalysis,
+  loading,
+  thinkingMode,
+  mediaResolution,
+  domainExpertise,
+  insightLevel,
+  userFirstName,
+  videoPlaybackSpeed,
+  poseData,
+  needsServerConversion,
+  setPrompt,
+  setLoading,
    setProgressStage,
    setUploadProgress,
    setShowingVideoSizeError,
@@ -142,23 +150,15 @@ interface UseChatSubmissionReturn {
        return;
      }
 
-     // Get conversation history
+     // Get conversation history from storage (source of truth for current chat)
+     // IMPORTANT: Always use storage messages, NOT React state messages!
+     // React state can contain stale messages from previous chats during rapid switching.
      const currentChat = await loadChat(requestChatId);
      const storageMessages = currentChat?.messages ?? [];
-     const stateMessages = messages;
      
-     let conversationHistory: Message[] = [];
-     if (storageMessages.length > 0 && stateMessages.length === 0) {
-       conversationHistory = [];
-     } else if (stateMessages.length > storageMessages.length) {
-       const storageIds = storageMessages.map(m => m.id).join(',');
-       const statePrefix = stateMessages.slice(0, storageMessages.length).map(m => m.id).join(',');
-       conversationHistory = (storageMessages.length === 0 || storageIds === statePrefix) 
-         ? stateMessages 
-         : storageMessages;
-     } else if (storageMessages.length > 0) {
-       conversationHistory = storageMessages;
-     }
+     // Use storage messages as the conversation history
+     // This prevents context from previous chats leaking into new chats
+     const conversationHistory: Message[] = storageMessages;
 
      setLoading(true);
      setUploadProgress(0);
@@ -311,22 +311,24 @@ interface UseChatSubmissionReturn {
            currentPrompt, currentVideoUrl, assistantMessageId, 
            conversationHistory, abortController, requestChatId
          );
-       } else if (!currentVideoFile) {
-         // Text-only
-         await sendTextOnlyQuery(
-           currentPrompt,
-           assistantMessageId,
-           (id, updates) => {
-             const chatId = getCurrentChatId();
-             if (chatId === requestChatId) updateMessage(id, updates);
-           },
-           conversationHistory,
-           abortController,
-           thinkingMode,
-           mediaResolution,
-           domainExpertise
-         );
-       } else {
+      } else if (!currentVideoFile) {
+        // Text-only
+        await sendTextOnlyQuery(
+          currentPrompt,
+          assistantMessageId,
+          (id, updates) => {
+            const chatId = getCurrentChatId();
+            if (chatId === requestChatId) updateMessage(id, updates);
+          },
+          conversationHistory,
+          abortController,
+          thinkingMode,
+          mediaResolution,
+          domainExpertise,
+          insightLevel,
+          userFirstName
+        );
+      } else {
          // Video file upload
          await handleVideoFileUpload(
            currentPrompt, currentVideoFile, assistantMessageId, videoMessageId,
@@ -346,7 +348,7 @@ interface UseChatSubmissionReturn {
      }
    }, [
      prompt, videoFile, videoPreview, detectedVideoUrl, loading, messages, videoPreAnalysis,
-     thinkingMode, mediaResolution, domainExpertise, videoPlaybackSpeed, poseData, needsServerConversion,
+     thinkingMode, mediaResolution, domainExpertise, insightLevel, videoPlaybackSpeed, poseData, needsServerConversion,
      addMessage, updateMessage, removeMessage, clearVideo, setVideoError, setApiError,
      setLoading, setProgressStage, setUploadProgress, setShowingVideoSizeError, setShouldAutoScroll,
      scrollMessageToTop, setDetectedVideoUrl, setVideoPreAnalysis, resetAnalysis, sendTextOnlyQuery, sendVideoQuery,
@@ -362,16 +364,18 @@ interface UseChatSubmissionReturn {
      abortController: AbortController,
      requestChatId: string
    ) => {
-     setProgressStage("analyzing");
-     
-     const formData = new FormData();
-     formData.append("prompt", currentPrompt);
-     formData.append("videoUrl", currentVideoUrl);
-     formData.append("thinkingMode", thinkingMode);
-     formData.append("mediaResolution", mediaResolution);
-     formData.append("domainExpertise", domainExpertise);
-     
-     if (conversationHistory.length > 0) {
+    setProgressStage("analyzing");
+    
+    const formData = new FormData();
+    formData.append("prompt", currentPrompt);
+    formData.append("videoUrl", currentVideoUrl);
+    formData.append("thinkingMode", thinkingMode);
+    formData.append("mediaResolution", mediaResolution);
+    formData.append("domainExpertise", domainExpertise);
+    formData.append("insightLevel", insightLevel);
+    if (userFirstName) formData.append("userFirstName", userFirstName);
+    
+    if (conversationHistory.length > 0) {
        const { getConversationContext } = await import("@/utils/context-utils");
        const context = getConversationContext(conversationHistory);
        if (context.length > 0) formData.append("history", JSON.stringify(context));
@@ -520,31 +524,33 @@ interface UseChatSubmissionReturn {
        }
      }
 
-     // Standard video upload
-     await sendVideoQuery(
-       currentPrompt,
-       currentVideoFile,
-       assistantMessageId,
-       (id, updates) => {
-         const chatId = getCurrentChatId();
-         if (chatId === requestChatId) updateMessage(id, updates);
-       },
-       setUploadProgress,
-       setProgressStage,
-       conversationHistory,
-       (s3Url, s3Key) => {
-         const chatId = getCurrentChatId();
-         if (chatId === requestChatId && videoMessageId) {
-           updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key, videoPreview: null });
-         }
-       },
-       abortController,
-       thinkingMode,
-       mediaResolution,
-       domainExpertise,
-       needsServerConversion
-     );
-   };
+    // Standard video upload
+    await sendVideoQuery(
+      currentPrompt,
+      currentVideoFile,
+      assistantMessageId,
+      (id, updates) => {
+        const chatId = getCurrentChatId();
+        if (chatId === requestChatId) updateMessage(id, updates);
+      },
+      setUploadProgress,
+      setProgressStage,
+      conversationHistory,
+      (s3Url, s3Key) => {
+        const chatId = getCurrentChatId();
+        if (chatId === requestChatId && videoMessageId) {
+          updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key, videoPreview: null });
+        }
+      },
+      abortController,
+      thinkingMode,
+      mediaResolution,
+      domainExpertise,
+      needsServerConversion,
+      insightLevel,
+      userFirstName
+    );
+  };
 
    // Helper: Handle submission error
    const handleSubmissionError = (

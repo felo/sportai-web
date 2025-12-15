@@ -13,7 +13,8 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import buttonStyles from "@/styles/buttons.module.css";
 import { useProfileContext } from "../ProfileContext";
 import { FormField } from "../shared/FormField";
-import { racketSportOptions, skillLevelOptions } from "@/lib/profile-options";
+import { SkillLevelSelect } from "./SkillLevelSelect";
+import { racketSportOptions } from "@/lib/profile-options";
 import type { RacketSport, SkillLevel } from "@/types/profile";
 
 interface SportFormProps {
@@ -94,24 +95,11 @@ export function SportForm({ existingSports, onClose, onAdded }: SportFormProps) 
           
           <Box style={{ flex: "1 1 200px" }}>
             <FormField label="Skill Level" required>
-              <Select.Root
+              <SkillLevelSelect
                 value={skillLevel}
-                onValueChange={(v) => setSkillLevel(v as SkillLevel)}
-              >
-                <Select.Trigger placeholder="Select level" style={{ width: "100%" }} />
-                <Select.Content>
-                  {skillLevelOptions.map((s) => (
-                    <Select.Item key={s.value} value={s.value} style={{ padding: "8px 12px" }}>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium">{s.label}</Text>
-                        {s.description && (
-                          <Text size="1" color="gray">{s.description}</Text>
-                        )}
-                      </Flex>
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
+                onChange={(v) => setSkillLevel(v)}
+                placeholder="Select level"
+              />
             </FormField>
           </Box>
         </Flex>

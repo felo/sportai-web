@@ -13,7 +13,7 @@ export {
   type SwingDetectionConfigV3,
   type SwingType,
   type SwingPhase,
-} from "./useSwingDetectionV3";
+} from "./useSwingDetectionV3/index";
 
 export {
   useHandednessDetection,

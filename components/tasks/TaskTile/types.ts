@@ -42,6 +42,7 @@ export interface TaskTileProps {
   isPreparing?: boolean;
   onDownloadVideo?: () => void;
   onExportData?: () => void;
+  onExportPoseData?: () => void;
   isNew?: boolean;
 }
 

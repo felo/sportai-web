@@ -6,6 +6,7 @@ import { PersonIcon, DoubleArrowRightIcon, CircleIcon, GearIcon } from "@radix-u
 import { ProgressRing } from "../../../shared";
 import type { ProgressRingGradient } from "../../../shared";
 import type { Confidences } from "../types";
+import { getDeveloperMode } from "@/utils/storage";
 
 const CONFIDENCE_GRADIENT: ProgressRingGradient = {
   stops: [
@@ -31,10 +32,24 @@ interface ConfidenceDisplayProps {
 
 /**
  * Display AI detection confidence scores with progress rings.
+ * In Developer Mode: shows all four circles (Pose, Swing, Ball, Overall)
+ * In normal mode: shows only one circle with the Overall confidence labeled "AI confidence"
  */
 export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDeveloperMode(getDeveloperMode());
+    
+    const handleDeveloperModeChange = () => {
+      setDeveloperMode(getDeveloperMode());
+    };
+    
+    window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+    return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -58,56 +73,73 @@ export function ConfidenceDisplay({ confidences }: ConfidenceDisplayProps) {
     <Card ref={containerRef} style={{ border: "1px solid var(--gray-5)" }}>
       <Flex direction="column" gap="3" p="4">
         <Heading size="3" weight="medium">AI Detection Confidence</Heading>
-        <Grid columns="2" gap="2" style={{ justifyItems: "center" }}>
-          <ProgressRing
-            value={Math.round(confidences.pose * 100)}
-            maxValue={100}
-            isVisible={isVisible}
-            playerId={1}
-            gradient={CONFIDENCE_GRADIENT}
-            icon={<PersonIcon width={14} height={14} />}
-            unit="Pose"
-            size={100}
-            strokeWidth={8}
-            hideMedalDisplay
-          />
-          <ProgressRing
-            value={Math.round(confidences.swing * 100)}
-            maxValue={100}
-            isVisible={isVisible}
-            playerId={2}
-            gradient={CONFIDENCE_GRADIENT}
-            icon={<DoubleArrowRightIcon width={14} height={14} />}
-            unit="Swing"
-            size={100}
-            strokeWidth={8}
-            hideMedalDisplay
-          />
-          <ProgressRing
-            value={Math.round(confidences.ball * 100)}
-            maxValue={100}
-            isVisible={isVisible}
-            playerId={3}
-            gradient={CONFIDENCE_GRADIENT}
-            icon={<CircleIcon width={14} height={14} />}
-            unit="Ball"
-            size={100}
-            strokeWidth={8}
-            hideMedalDisplay
-          />
-          <ProgressRing
-            value={Math.round(confidences.final * 100)}
-            maxValue={100}
-            isVisible={isVisible}
-            playerId={4}
-            gradient={CONFIDENCE_GRADIENT}
-            icon={<GearIcon width={14} height={14} />}
-            unit="Overall"
-            size={100}
-            strokeWidth={8}
-            hideMedalDisplay
-          />
-        </Grid>
+        {developerMode ? (
+          <Grid columns="2" gap="2" style={{ justifyItems: "center" }}>
+            <ProgressRing
+              value={Math.round(confidences.pose * 100)}
+              maxValue={100}
+              isVisible={isVisible}
+              playerId={1}
+              gradient={CONFIDENCE_GRADIENT}
+              icon={<PersonIcon width={14} height={14} />}
+              unit="Pose"
+              size={100}
+              strokeWidth={8}
+              hideMedalDisplay
+            />
+            <ProgressRing
+              value={Math.round(confidences.swing * 100)}
+              maxValue={100}
+              isVisible={isVisible}
+              playerId={2}
+              gradient={CONFIDENCE_GRADIENT}
+              icon={<DoubleArrowRightIcon width={14} height={14} />}
+              unit="Swing"
+              size={100}
+              strokeWidth={8}
+              hideMedalDisplay
+            />
+            <ProgressRing
+              value={Math.round(confidences.ball * 100)}
+              maxValue={100}
+              isVisible={isVisible}
+              playerId={3}
+              gradient={CONFIDENCE_GRADIENT}
+              icon={<CircleIcon width={14} height={14} />}
+              unit="Ball"
+              size={100}
+              strokeWidth={8}
+              hideMedalDisplay
+            />
+            <ProgressRing
+              value={Math.round(confidences.final * 100)}
+              maxValue={100}
+              isVisible={isVisible}
+              playerId={4}
+              gradient={CONFIDENCE_GRADIENT}
+              icon={<GearIcon width={14} height={14} />}
+              unit="Overall"
+              size={100}
+              strokeWidth={8}
+              hideMedalDisplay
+            />
+          </Grid>
+        ) : (
+          <Flex direction="column" align="center" justify="center" py="4">
+            <ProgressRing
+              value={Math.round(confidences.final * 100)}
+              maxValue={100}
+              isVisible={isVisible}
+              playerId={1}
+              gradient={CONFIDENCE_GRADIENT}
+              icon={<GearIcon width={14} height={14} />}
+              unit=""
+              size={140}
+              strokeWidth={12}
+              hideMedalDisplay
+            />
+          </Flex>
+        )}
         <AIImprovementMessage />
       </Flex>
     </Card>

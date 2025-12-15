@@ -8,7 +8,7 @@ import { ExitIcon, PersonIcon, SunIcon, TrashIcon, GearIcon } from "@radix-ui/re
 import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { AuthModal } from "./AuthModal";
-import type { HighlightingPreferences, TTSSettings } from "@/utils/storage";
+import type { HighlightingPreferences, TTSSettings, InsightLevel } from "@/utils/storage";
 
 const authLogger = createLogger("Auth");
 
@@ -18,6 +18,7 @@ interface UserMenuProps {
   developerMode?: boolean;
   highlightingPrefs?: HighlightingPreferences;
   ttsSettings?: TTSSettings;
+  insightLevel?: InsightLevel;
   messageCount?: number;
   isMobile?: boolean;
   collapsed?: boolean;
@@ -26,8 +27,10 @@ interface UserMenuProps {
   onDeveloperModeToggle?: (enabled: boolean) => void;
   onHighlightingToggle?: (key: keyof HighlightingPreferences, checked: boolean) => void;
   onTTSSettingChange?: <K extends keyof TTSSettings>(key: K, value: TTSSettings[K]) => void;
+  onInsightLevelChange?: (level: InsightLevel) => void;
   onClearChat?: () => void;
   onOpenStorageDebug?: () => void;
+  onOpenContextDebug?: () => void;
   onSetAlertOpen?: (open: boolean) => void;
 }
 
@@ -37,6 +40,7 @@ export function UserMenu({
   developerMode = false,
   highlightingPrefs = { terminology: true, technique: true, timestamps: true, swings: true },
   ttsSettings = { enabled: false, quality: "studio", gender: "male", language: "en-GB", speakingRate: 0.75, pitch: 0.0 },
+  insightLevel = "beginner",
   messageCount = 0,
   isMobile = false,
   collapsed = false,
@@ -45,8 +49,10 @@ export function UserMenu({
   onDeveloperModeToggle,
   onHighlightingToggle,
   onTTSSettingChange,
+  onInsightLevelChange,
   onClearChat,
   onOpenStorageDebug,
+  onOpenContextDebug,
   onSetAlertOpen,
 }: UserMenuProps = {}) {
   const router = useRouter();
@@ -282,9 +288,19 @@ export function UserMenu({
                   {developerMode && (
                     <>
                       <DropdownMenu.Separator />
-                      <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
-                        <Text>Storage Debug</Text>
-                      </DropdownMenu.Item>
+                      <DropdownMenu.Sub>
+                        <DropdownMenu.SubTrigger>
+                          <Text>Debug</Text>
+                        </DropdownMenu.SubTrigger>
+                        <DropdownMenu.SubContent>
+                          <DropdownMenu.Item onSelect={() => onOpenContextDebug?.()}>
+                            <Text>Context</Text>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
+                            <Text>Storage</Text>
+                          </DropdownMenu.Item>
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Sub>
                     </>
                   )}
                 </DropdownMenu.SubContent>
@@ -511,19 +527,53 @@ export function UserMenu({
 
               <DropdownMenu.Separator />
 
-              <DropdownMenu.Item 
-                color="red"
-                disabled={messageCount === 0 || !onClearChat}
-                onSelect={(e) => {
-                  if (messageCount > 0 && onClearChat) {
-                    e.preventDefault();
-                    onSetAlertOpen?.(true);
-                  }
-                }}
-              >
-                <TrashIcon width="16" height="16" />
-                <Text ml="2">Clear chat history</Text>
-              </DropdownMenu.Item>
+              {/* AI Insight Level */}
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger>
+                  <Text>AI Insight Level</Text>
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent>
+                  <DropdownMenu.Item onSelect={() => onInsightLevelChange?.("beginner")}>
+                    <Text>Beginner</Text>
+                    {insightLevel === "beginner" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => onInsightLevelChange?.("developing")}>
+                    <Text>Developing</Text>
+                    {insightLevel === "developing" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item onSelect={() => onInsightLevelChange?.("advanced")}>
+                    <Text>Advanced</Text>
+                    {insightLevel === "advanced" && (
+                      <Text ml="auto" size="1" color="gray">✓</Text>
+                    )}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+
+              {/* Clear chat history - Developer Mode Only */}
+              {developerMode && (
+                <>
+                  <DropdownMenu.Separator />
+
+                  <DropdownMenu.Item 
+                    color="red"
+                    disabled={messageCount === 0 || !onClearChat}
+                    onSelect={(e) => {
+                      if (messageCount > 0 && onClearChat) {
+                        e.preventDefault();
+                        onSetAlertOpen?.(true);
+                      }
+                    }}
+                  >
+                    <TrashIcon width="16" height="16" />
+                    <Text ml="2">Clear chat history</Text>
+                  </DropdownMenu.Item>
+                </>
+              )}
             </DropdownMenu.SubContent>
           </DropdownMenu.Sub>
 

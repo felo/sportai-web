@@ -32,6 +32,12 @@ export const HIGHLIGHTING_PREFERENCES_KEY = "highlighting-preferences";
 /** TTS settings storage key */
 export const TTS_SETTINGS_KEY = "tts-settings";
 
+/** AI Insight Level storage key */
+export const INSIGHT_LEVEL_KEY = "insight-level";
+
+/** Insight level onboarding completed storage key */
+export const INSIGHT_ONBOARDING_KEY = "insight-onboarding-completed";
+
 // ============================================
 // Config Constants
 // ============================================

@@ -1,5 +1,5 @@
 import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
-import type { SwingDetectionResultV3 } from "@/components/videoPoseViewerV2/hooks/useSwingDetectionV3";
+import type { SwingDetectionResultV3 } from "@/components/videoPoseViewerV2/hooks";
 
 // ============================================================================
 // Component Props

@@ -11,7 +11,7 @@ import {
   Badge,
   Heading,
 } from "@radix-ui/themes";
-import { TargetIcon } from "@radix-ui/react-icons";
+import { TargetIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import type { StatisticsResult } from "../../types";
 import type { ZoneSystemId, ZoneStat, PlayerDominance } from "./types";
 import { getZoneSystemsForSport, type Sport } from "./constants";
@@ -372,7 +372,9 @@ export function CourtDominanceView({
                 }}
               >
                 <Flex align="start" gap="2">
-                  <Text style={{ fontSize: 16, flexShrink: 0 }}>💡</Text>
+                  <Box style={{ flexShrink: 0, color: "var(--accent-11)", marginTop: 2 }}>
+                    <LightningBoltIcon width={16} height={16} />
+                  </Box>
                   <Text size="1" color="gray" style={{ lineHeight: 1.5 }}>
                     {currentSystem.coachingTips}
                   </Text>

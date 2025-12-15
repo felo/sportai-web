@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactNode } from "react";
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { MarkdownWithSwings } from "@/components/markdown";
 import { CollapsibleSection } from "@/components/ui";
@@ -7,7 +8,7 @@ import { StreamingIndicator } from "@/components/chat";
 import type { BallSequenceClickData } from "../types";
 
 interface AnalysisDisplayProps {
-  title: string;
+  title: ReactNode;
   isAnalyzing: boolean;
   analysis: string | null;
   error: string | null;

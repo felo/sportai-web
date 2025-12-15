@@ -16,6 +16,11 @@ export type MediaResolution = "low" | "medium" | "high";
 export type DomainExpertise = "all-sports" | "tennis" | "pickleball" | "padel";
 
 /**
+ * AI Insight Level type - controls complexity of AI responses
+ */
+export type InsightLevel = "beginner" | "developing" | "advanced";
+
+/**
  * TTS voice quality type
  */
 export type TTSVoiceQuality = "standard" | "wavenet" | "neural2" | "studio";

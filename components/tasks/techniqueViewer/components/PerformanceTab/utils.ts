@@ -1,5 +1,5 @@
 import type { SwingMetrics, RatingTier, RadarDataPoint } from "./types";
-import type { SwingFrameDataV3 } from "@/components/videoPoseViewerV2/hooks/useSwingDetectionV3";
+import type { SwingFrameDataV3 } from "@/components/videoPoseViewerV2/hooks";
 import { ATTRIBUTE_CONFIG, RATING_TIERS } from "./constants";
 
 // ============================================================================

@@ -25,6 +25,8 @@ interface MessageListProps {
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Candidate responses handler
   onSelectCandidateResponse?: (messageId: string, index: number, option: CandidateOption) => void;
+  // Follow-up suggestion handler
+  onSelectFollowUp?: (question: string) => void;
   // Track which messages were loaded from storage (not created in this session)
   loadedMessageIds?: Set<string>;
   // Start new chat handler for conversation limit
@@ -46,6 +48,7 @@ export function MessageList({
   onSelectQuickOnly,
   onOpenTechniqueStudio,
   onSelectCandidateResponse,
+  onSelectFollowUp,
   loadedMessageIds,
   onStartNewChat,
 }: MessageListProps) {
@@ -90,6 +93,7 @@ export function MessageList({
           onSelectQuickOnly={onSelectQuickOnly}
           onOpenTechniqueStudio={onOpenTechniqueStudio}
           onSelectCandidateResponse={onSelectCandidateResponse}
+          onSelectFollowUp={onSelectFollowUp}
           // Pass progress info to the last message (the assistant message being generated)
           progressStage={index === messages.length - 1 ? progressStage : "idle"}
           uploadProgress={index === messages.length - 1 ? uploadProgress : 0}

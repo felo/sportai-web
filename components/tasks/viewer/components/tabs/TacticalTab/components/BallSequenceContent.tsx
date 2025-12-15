@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Box, Flex, Text, Heading } from "@radix-ui/themes";
+import { TargetIcon } from "@radix-ui/react-icons";
 import { ShotHeatmap, PlayerShotData } from "../../../ShotHeatmap";
 import { formatSwingType } from "../../../../utils";
 import { extractSwingTypes, filterBySwingType } from "../utils";
@@ -121,7 +122,12 @@ export function BallSequenceContent({
 
         <Box mt="4">
           <AnalysisDisplay
-            title="🎯 Ball Sequence Analysis"
+            title={
+              <Flex align="center" gap="2">
+                <TargetIcon width={16} height={16} />
+                <span>Ball Sequence Analysis</span>
+              </Flex>
+            }
             isAnalyzing={analysis.isAnalyzing}
             analysis={analysis.analysis}
             error={analysis.error}

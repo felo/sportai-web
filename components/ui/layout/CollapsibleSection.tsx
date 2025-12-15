@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import styles from "@/styles/markdown.module.css";
 
 interface CollapsibleSectionProps {
   /** The title shown in the summary */
-  title: string;
+  title: ReactNode;
   /** Content to show when expanded */
   children: React.ReactNode;
   /** Whether the section is open by default */
@@ -19,7 +19,7 @@ interface CollapsibleSectionProps {
  * 
  * @example
  * ```tsx
- * <CollapsibleSection title="🎯 Complete Tactical Analysis" defaultOpen>
+ * <CollapsibleSection title="Complete Tactical Analysis" defaultOpen>
  *   <MarkdownWithSwings>{analysis}</MarkdownWithSwings>
  * </CollapsibleSection>
  * ```

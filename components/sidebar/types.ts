@@ -1,5 +1,5 @@
 import type { Chat } from "@/types/chat";
-import type { HighlightingPreferences, TTSSettings } from "@/utils/storage";
+import type { HighlightingPreferences, TTSSettings, InsightLevel } from "@/utils/storage";
 
 export type Appearance = "light" | "dark" | "green";
 
@@ -31,11 +31,13 @@ export interface SidebarSettingsState {
   theatreMode: boolean;
   highlightingPrefs: HighlightingPreferences;
   ttsSettings: TTSSettings;
+  insightLevel: InsightLevel;
   handleThemeSelect: (theme: Appearance) => void;
   handleDeveloperModeToggle: (enabled: boolean) => void;
   handleTheatreModeToggle: (enabled: boolean) => void;
   handleHighlightingToggle: (key: keyof HighlightingPreferences, checked: boolean) => void;
   handleTTSSettingChange: <K extends keyof TTSSettings>(key: K, value: TTSSettings[K]) => void;
+  handleInsightLevelChange: (level: InsightLevel) => void;
 }
 
 // Dialog state and handlers
@@ -52,6 +54,8 @@ export interface SidebarDialogsState {
   setEditTitle: (title: string) => void;
   storageDebugOpen: boolean;
   setStorageDebugOpen: (open: boolean) => void;
+  contextDebugOpen: boolean;
+  setContextDebugOpen: (open: boolean) => void;
 }
 
 // Chat list item props
@@ -112,6 +116,8 @@ export interface SidebarDialogsProps {
   setEditTitle: (title: string) => void;
   storageDebugOpen: boolean;
   setStorageDebugOpen: (open: boolean) => void;
+  contextDebugOpen: boolean;
+  setContextDebugOpen: (open: boolean) => void;
   developerMode: boolean;
   messageCount: number;
   onClearChat?: () => void;

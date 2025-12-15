@@ -17,6 +17,7 @@ export type {
   ThinkingMode,
   MediaResolution,
   DomainExpertise,
+  InsightLevel,
   TTSSettings,
   TTSVoiceQuality,
   TTSVoiceGender,
@@ -91,6 +92,13 @@ export {
   getTTSSettings,
   setTTSSettings,
   updateTTSSetting,
+  // AI Insight Level
+  getInsightLevel,
+  setInsightLevel,
+  // Insight Level Onboarding
+  hasCompletedInsightOnboarding,
+  setInsightOnboardingCompleted,
+  resetInsightOnboarding,
 } from "./settings";
 
 // ============================================

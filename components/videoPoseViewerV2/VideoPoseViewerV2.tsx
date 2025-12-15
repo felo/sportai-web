@@ -36,7 +36,7 @@ import {
 } from "@/components/chat/viewers/videoPoseViewer/utils";
 
 import { useSwingDetection } from "@/components/chat/viewers/videoPoseViewer/hooks/useSwingDetection";
-import { useSwingDetectionV3, type SwingDetectionResultV3 } from "./hooks/useSwingDetectionV3";
+import { useSwingDetectionV3, type SwingDetectionResultV3 } from "./hooks";
 import { useHandednessDetection, type HandednessResult } from "./hooks/useHandednessDetection";
 import { SwingCurveView, type MetricType, type WristType, type KneeType, type AngleType, type VelocityBodyPart, type OrientationType } from "./SwingCurveView";
 
@@ -1687,8 +1687,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
               pointerEvents: "none", // Allow clicks through to video controls
             }}
           >
-            <Flex direction="column" align="center" gap="3" style={{ width: "100%" }}>
-              {/* Bouncing Tennis Ball */}
+            {/* Bouncing Tennis Ball */}
               <Box style={{ position: "relative", width: "80px", height: "80px" }}>
                 <Box
                   style={{
@@ -1757,10 +1756,6 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
                   }}
                 />
               </Box>
-              <Text size="2" color="gray" style={{ textAlign: "center", width: "100%" }}>
-                {isModelLoading ? "Loading pose model..." : "Detecting video framerate..."}
-              </Text>
-            </Flex>
           </Flex>
         )}
 

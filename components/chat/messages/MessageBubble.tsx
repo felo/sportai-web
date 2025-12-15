@@ -8,7 +8,7 @@ import { calculatePricing } from "@/lib/token-utils";
 import { SHOW_PRO_UPSELL_BANNER } from "@/lib/limitations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -51,6 +51,8 @@ interface MessageBubbleProps {
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Candidate responses handler
   onSelectCandidateResponse?: (messageId: string, index: number, option: CandidateOption) => void;
+  // Follow-up suggestion handler
+  onSelectFollowUp?: (question: string) => void;
   // Progress state for upload/processing/analyzing
   progressStage?: ProgressStage;
   uploadProgress?: number;
@@ -58,7 +60,7 @@ interface MessageBubbleProps {
   isLoadedFromServer?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, onSelectCandidateResponse, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, onSelectCandidateResponse, onSelectFollowUp, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -161,19 +163,25 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     (message.videoFile?.type.startsWith("image/"))
   );
   
-  // Check if this is a recent video analysis (for showing video-style thinking messages)
-  // Only shows video messages if <= 2 user messages since the last video
-  const userSentVideo = (() => {
-    if (message.role !== "assistant" || messageIndex === 0) return false;
+  // Check if this conversation involves a video (for showing video-style thinking messages & follow-ups)
+  // Also extracts the detected sport for follow-up suggestions
+  const { isVideoConversation, isRecentVideoAnalysis, detectedSport } = (() => {
+    if (message.role !== "assistant" || messageIndex === 0) {
+      return { isVideoConversation: false, isRecentVideoAnalysis: false, detectedSport: "other" as const };
+    }
     
     // Find the most recent video or analysis_options message
     let lastVideoIndex = -1;
+    let sport: "tennis" | "pickleball" | "padel" | "other" = "other";
+    
     for (let i = messageIndex - 1; i >= 0; i--) {
       const prevMessage = allMessages[i];
       
       // If there's an analysis_options message, this is a video conversation
+      // and we can get the detected sport from preAnalysis
       if (prevMessage.messageType === "analysis_options") {
         lastVideoIndex = i;
+        sport = prevMessage.analysisOptions?.preAnalysis?.sport || "other";
         break;
       }
       
@@ -187,15 +195,22 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       }
     }
     
-    if (lastVideoIndex === -1) return false;
+    if (lastVideoIndex === -1) {
+      return { isVideoConversation: false, isRecentVideoAnalysis: false, detectedSport: "other" as const };
+    }
     
     // Count user messages after the video
     const userMessagesAfterVideo = allMessages
       .slice(lastVideoIndex + 1, messageIndex)
       .filter(m => m.role === "user").length;
     
-    // Only show video thinking messages if <= 1 user message since video
-    return userMessagesAfterVideo <= 1;
+    return { 
+      // True if there's a video anywhere in this conversation
+      isVideoConversation: true,
+      // True if this is within the first couple responses after video (for thinking messages)
+      isRecentVideoAnalysis: userMessagesAfterVideo <= 1,
+      detectedSport: sport,
+    };
   })();
   
   // Check if this is the first assistant message in the conversation
@@ -289,15 +304,15 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     if (!message.content && message.role === "assistant") {
       // Only video or complex queries get deep thinking treatment
       // First message without video → quick response expected
-      const useDeepThinking = userSentVideo || isComplexQuery;
+      const useDeepThinking = isRecentVideoAnalysis || isComplexQuery;
       
       // Determine message set length based on context
-      const messageCount = userSentVideo 
+      const messageCount = isRecentVideoAnalysis 
         ? THINKING_MESSAGES_VIDEO.length 
         : isComplexQuery ? 7 : 3; // DEEP vs QUICK counts
       
       // Rotate faster for simple queries (2s), slower for video/complex (3-4s)
-      const rotationSpeed = userSentVideo ? 3000 : isComplexQuery ? 4000 : 2000;
+      const rotationSpeed = isRecentVideoAnalysis ? 3000 : isComplexQuery ? 4000 : 2000;
       
       const interval = setInterval(() => {
         setThinkingMessageIndex((prev) => (prev + 1) % messageCount);
@@ -305,7 +320,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       
       return () => clearInterval(interval);
     }
-  }, [message.content, message.role, userSentVideo, isComplexQuery]);
+  }, [message.content, message.role, isRecentVideoAnalysis, isComplexQuery]);
 
   // Intelligent preloading: Load pose detection components when video is present
   useEffect(() => {
@@ -562,24 +577,28 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                 />
               ) : /* Analysis Options Message (PRO eligibility choice) */
               message.messageType === "analysis_options" && message.analysisOptions ? (
-                <AnalysisOptionsMessage
-                  preAnalysis={message.analysisOptions.preAnalysis}
-                  selectedOption={message.analysisOptions.selectedOption}
-                  onSelectProPlusQuick={() => onSelectProPlusQuick?.(message.id)}
-                  onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
-                  isLoading={message.isStreaming}
-                  isLoadedFromServer={isLoadedFromServer}
-                />
+                <>
+                  <AnalysisOptionsMessage
+                    preAnalysis={message.analysisOptions.preAnalysis}
+                    selectedOption={message.analysisOptions.selectedOption}
+                    onSelectProPlusQuick={() => onSelectProPlusQuick?.(message.id)}
+                    onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
+                    isLoading={message.isStreaming}
+                    isLoadedFromServer={isLoadedFromServer}
+                  />
+                </>
               ) : message.messageType === "technique_studio_prompt" && message.techniqueStudioPrompt ? (
-                <TechniqueStudioPrompt
-                  videoUrl={message.techniqueStudioPrompt.videoUrl}
-                  taskId={message.techniqueStudioPrompt.taskId}
-                  onOpenStudio={() => onOpenTechniqueStudio?.(
-                    message.techniqueStudioPrompt!.videoUrl,
-                    message.techniqueStudioPrompt!.taskId
-                  )}
-                  onTTSUsage={handleTTSUsage}
-                />
+                <>
+                  <TechniqueStudioPrompt
+                    videoUrl={message.techniqueStudioPrompt.videoUrl}
+                    taskId={message.techniqueStudioPrompt.taskId}
+                    onOpenStudio={() => onOpenTechniqueStudio?.(
+                      message.techniqueStudioPrompt!.videoUrl,
+                      message.techniqueStudioPrompt!.taskId
+                    )}
+                    onTTSUsage={handleTTSUsage}
+                  />
+                </>
               ) : (
                 <>
                   <AssistantMessage
@@ -598,12 +617,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                       // Note: During actual video CONVERSION, useAIApi sets message.content to 
                       // "Converting video format for analysis..." which will be shown instead of thinkingMessage
                       return getThinkingMessage(thinkingMessageIndex, {
-                        hasVideo: userSentVideo,
+                        hasVideo: isRecentVideoAnalysis,
                         isFirstMessage: false, // First message without video → treat as quick
                         isComplexQuery: isComplexQuery,
                       });
                     })()}
-                    showProgressBar={userSentVideo && !message.content}
+                    showProgressBar={isRecentVideoAnalysis && !message.content}
                     uploadProgress={progressStage === "uploading" ? uploadProgress : undefined}
                     onAskForHelp={onAskForHelp}
                     onTTSUsage={handleTTSUsage}
@@ -645,6 +664,22 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
           onOpenChange={setShowFeedbackToast}
         />
       </Flex>
+
+      {/* Follow-up suggestions - rendered outside main Flex for full width alignment */}
+      {message.role === "assistant" &&
+       messageIndex === allMessages.length - 1 &&
+       onSelectFollowUp &&
+       !message.isStreaming &&
+       !message.isIncomplete &&
+       !message.isGreeting &&
+       (isVideoConversation || 
+        message.messageType === "analysis_options" && message.analysisOptions?.selectedOption ||
+        message.messageType === "technique_studio_prompt") && (
+        <FollowUpSuggestions 
+          onSelect={onSelectFollowUp} 
+          sport={detectedSport}
+        />
+      )}
     </>
   );
 }

@@ -25,7 +25,8 @@ import { FloatingVideoPortal } from "@/components/chat/viewers/FloatingVideoPort
 import { Sidebar } from "@/components/sidebar";
 import { useLibraryTasks } from "@/components/sidebar/LibraryTasksContext";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
-import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
+import { getInsightLevel, setInsightLevel as saveInsightLevel, setInsightOnboardingCompleted } from "@/utils/storage";
 import { getCurrentChatId, setCurrentChatId, createNewChat } from "@/utils/storage-unified";
 import { getMediaType } from "@/utils/video-utils";
 import { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
@@ -53,7 +54,10 @@ export function AIChatForm() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Context & external hooks
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  
+  // Extract first name from profile for personalization
+  const userFirstName = profile?.full_name?.split(" ")[0];
   const { refresh: refreshLibraryTasks } = useLibraryTasks();
   const router = useRouter();
 
@@ -62,6 +66,21 @@ export function AIChatForm() {
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [insightLevel, setInsightLevel] = useState<InsightLevel>("beginner");
+
+  // Load and listen for insight level changes
+  useEffect(() => {
+    setInsightLevel(getInsightLevel());
+    
+    const handleInsightLevelChange = () => {
+      setInsightLevel(getInsightLevel());
+    };
+    
+    window.addEventListener("insight-level-change", handleInsightLevelChange);
+    return () => {
+      window.removeEventListener("insight-level-change", handleInsightLevelChange);
+    };
+  }, []);
 
   // Video upload hook
   const {
@@ -209,6 +228,8 @@ export function AIChatForm() {
     thinkingMode,
     mediaResolution,
     domainExpertise,
+    insightLevel,
+    userFirstName,
     videoPlaybackSpeed,
     poseData,
     needsServerConversion,
@@ -307,7 +328,17 @@ export function AIChatForm() {
   const handleAskForHelp = useCallback((termName: string) => {
     const question = generateHelpQuestion(termName);
     setPrompt(question);
-    
+
+    setTimeout(() => {
+      const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
+      handleSubmit(fakeEvent, question);
+    }, 100);
+  }, [handleSubmit]);
+
+  // Handle follow-up suggestion selection (after video analysis)
+  const handleSelectFollowUp = useCallback((question: string) => {
+    setPrompt(question);
+
     setTimeout(() => {
       const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
       handleSubmit(fakeEvent, question);
@@ -332,6 +363,14 @@ export function AIChatForm() {
     if (option.action === "sign_in") {
       setAuthModalOpen(true);
       return;
+    }
+
+    // Handle insight level actions (onboarding flow)
+    if (option.action?.startsWith("set_insight_")) {
+      const level = option.action.replace("set_insight_", "") as InsightLevel;
+      saveInsightLevel(level);
+      setInsightOnboardingCompleted();
+      // Continue with showing the response and follow-up options below
     }
 
     // 1. Update the greeting message with the selected index
@@ -505,6 +544,7 @@ export function AIChatForm() {
               onSelectQuickOnly={handleSelectQuickOnly}
               onOpenTechniqueStudio={handleOpenTechniqueStudio}
               onSelectCandidateResponse={handleSelectCandidateResponse}
+              onSelectFollowUp={handleSelectFollowUp}
               loadedMessageIds={loadedMessageIds}
               onStartNewChat={handleNewChat}
             />

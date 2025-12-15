@@ -7,7 +7,8 @@
 import { useState, useCallback, useRef } from "react";
 import { chatLogger } from "@/lib/logger";
 import type { Message } from "@/types/chat";
-import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
+import { getInsightLevel } from "@/utils/storage";
 import { getCurrentChatId, loadChat } from "@/utils/storage-unified";
 import { stripStreamMetadata } from "../utils";
 import type { ProgressStage } from "../types";
@@ -30,7 +31,8 @@ interface UseMessageRetryOptions {
     abortController: AbortController,
     thinkingMode: ThinkingMode,
     mediaResolution: MediaResolution,
-    domainExpertise: DomainExpertise
+    domainExpertise: DomainExpertise,
+    insightLevel: InsightLevel
   ) => Promise<void>;
 }
 
@@ -110,6 +112,9 @@ export function useMessageRetry({
     retryAbortRef.current = abortController;
     
     try {
+      // Get current insight level
+      const insightLevel = getInsightLevel();
+      
       if (!userVideoUrl) {
         // Text-only retry
         setProgressStage("generating");
@@ -124,7 +129,8 @@ export function useMessageRetry({
           abortController,
           thinkingMode,
           mediaResolution,
-          domainExpertise
+          domainExpertise,
+          insightLevel
         );
       } else {
         // Video retry
@@ -136,6 +142,7 @@ export function useMessageRetry({
         formData.append("thinkingMode", thinkingMode);
         formData.append("mediaResolution", mediaResolution);
         formData.append("domainExpertise", domainExpertise);
+        formData.append("insightLevel", insightLevel);
         
         if (conversationHistory.length > 0) {
           const { getConversationContext } = await import("@/utils/context-utils");

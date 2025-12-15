@@ -10,8 +10,10 @@ import {
   extractFirstFrameWithDuration,
   uploadThumbnailToS3,
 } from "@/utils/video-utils";
+import { extractS3KeyFromUrl } from "@/lib/s3";
 import { deleteGuestTask, isGuestTask } from "@/utils/storage";
 import { isSampleTask } from "../../sampleTasks";
+import { loadPoseData } from "@/lib/poseDataService";
 
 interface UseTaskManagementOptions {
   user: { id: string } | null;
@@ -38,6 +40,7 @@ interface UseTaskManagementReturn {
   deleteTask: (taskId: string, guestTasks: Task[], setGuestTasks: React.Dispatch<React.SetStateAction<Task[]>>) => Promise<void>;
   fetchResult: (taskId: string) => Promise<void>;
   downloadResult: (taskId: string) => Promise<void>;
+  downloadPoseData: (task: Task) => Promise<void>;
   handleTaskClick: (taskId: string) => Promise<void>;
 }
 
@@ -256,6 +259,63 @@ export function useTaskManagement({
     [user]
   );
 
+  // Download pose data (for technique videos)
+  const downloadPoseData = useCallback(
+    async (task: Task) => {
+      try {
+        // Extract S3 key from video URL
+        const videoS3Key = task.video_s3_key || extractS3KeyFromUrl(task.video_url);
+        
+        if (!videoS3Key) {
+          throw new Error("No video S3 key available for this task");
+        }
+
+        // Load pose data from S3
+        const result = await loadPoseData(videoS3Key);
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || "No pose data found for this video");
+        }
+
+        // Create a clean export object with pose data and annotations
+        const exportData = {
+          version: result.data.version,
+          exportedAt: new Date().toISOString(),
+          videoFPS: result.data.videoFPS,
+          totalFrames: result.data.totalFrames,
+          modelUsed: result.data.modelUsed,
+          poses: result.data.poses,
+          metadata: result.data.metadata,
+          annotations: {
+            customEvents: result.data.customEvents || [],
+            videoComments: result.data.videoComments || [],
+            protocolAdjustments: result.data.protocolAdjustments || [],
+            swingBoundaryAdjustments: result.data.swingBoundaryAdjustments || [],
+          },
+          thumbnails: result.data.thumbnails,
+          userPreferences: result.data.userPreferences,
+        };
+
+        // Create blob and download
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `technique-analysis-${task.id}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to export pose data");
+      }
+    },
+    []
+  );
+
   // Handle task click
   const handleTaskClick = useCallback(
     async (taskId: string) => {
@@ -373,6 +433,8 @@ export function useTaskManagement({
     deleteTask,
     fetchResult,
     downloadResult,
+    downloadPoseData,
     handleTaskClick,
   };
 }
+

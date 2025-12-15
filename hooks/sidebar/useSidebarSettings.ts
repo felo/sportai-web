@@ -10,8 +10,11 @@ import {
   updateHighlightingPreference,
   getTTSSettings,
   updateTTSSetting,
+  getInsightLevel,
+  setInsightLevel as saveInsightLevel,
   type HighlightingPreferences,
   type TTSSettings,
+  type InsightLevel,
 } from "@/utils/storage";
 import type { Appearance, SidebarSettingsState } from "@/components/sidebar/types";
 
@@ -33,6 +36,7 @@ export function useSidebarSettings(): SidebarSettingsState {
     speakingRate: 0.75,
     pitch: 0.0,
   });
+  const [insightLevel, setInsightLevel] = useState<InsightLevel>("beginner");
 
   // Initial load and event listeners
   useEffect(() => {
@@ -59,6 +63,9 @@ export function useSidebarSettings(): SidebarSettingsState {
     // Load TTS settings
     setTTSSettings(getTTSSettings());
 
+    // Load insight level
+    setInsightLevel(getInsightLevel());
+
     // Listen for theme changes
     const handleThemeChange = () => {
       const stored = localStorage.getItem("radix-theme");
@@ -82,14 +89,21 @@ export function useSidebarSettings(): SidebarSettingsState {
       setTTSSettings(getTTSSettings());
     };
 
+    // Listen for insight level changes
+    const handleInsightLevelChange = () => {
+      setInsightLevel(getInsightLevel());
+    };
+
     window.addEventListener("theme-change", handleThemeChange);
     window.addEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
     window.addEventListener("tts-settings-change", handleTTSSettingsChange);
+    window.addEventListener("insight-level-change", handleInsightLevelChange);
 
     return () => {
       window.removeEventListener("theme-change", handleThemeChange);
       window.removeEventListener("highlighting-preferences-change", handleHighlightingPreferencesChange);
       window.removeEventListener("tts-settings-change", handleTTSSettingsChange);
+      window.removeEventListener("insight-level-change", handleInsightLevelChange);
     };
   }, []);
 
@@ -140,17 +154,24 @@ export function useSidebarSettings(): SidebarSettingsState {
     []
   );
 
+  const handleInsightLevelChange = useCallback((level: InsightLevel) => {
+    saveInsightLevel(level);
+    // State will be updated via event handler
+  }, []);
+
   return {
     appearance,
     developerMode,
     theatreMode,
     highlightingPrefs,
     ttsSettings,
+    insightLevel,
     handleThemeSelect,
     handleDeveloperModeToggle,
     handleTheatreModeToggle,
     handleHighlightingToggle,
     handleTTSSettingChange,
+    handleInsightLevelChange,
   };
 }
 

@@ -143,6 +143,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 developerMode={settingsState.developerMode}
                 highlightingPrefs={settingsState.highlightingPrefs}
                 ttsSettings={settingsState.ttsSettings}
+                insightLevel={settingsState.insightLevel}
                 messageCount={messageCount}
                 isMobile={isMobile}
                 onThemeSelect={settingsState.handleThemeSelect}
@@ -150,10 +151,15 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                 onDeveloperModeToggle={settingsState.handleDeveloperModeToggle}
                 onHighlightingToggle={settingsState.handleHighlightingToggle}
                 onTTSSettingChange={settingsState.handleTTSSettingChange}
+                onInsightLevelChange={settingsState.handleInsightLevelChange}
                 onClearChat={onClearChat}
                 onOpenStorageDebug={() => {
                   dialogsState.setDropdownOpen(false);
                   dialogsState.setStorageDebugOpen(true);
+                }}
+                onOpenContextDebug={() => {
+                  dialogsState.setDropdownOpen(false);
+                  dialogsState.setContextDebugOpen(true);
                 }}
                 onSetAlertOpen={dialogsState.setAlertOpen}
               />
@@ -173,6 +179,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           setEditTitle={dialogsState.setEditTitle}
           storageDebugOpen={dialogsState.storageDebugOpen}
           setStorageDebugOpen={dialogsState.setStorageDebugOpen}
+          contextDebugOpen={dialogsState.contextDebugOpen}
+          setContextDebugOpen={dialogsState.setContextDebugOpen}
           developerMode={settingsState.developerMode}
           messageCount={messageCount}
           onClearChat={onClearChat}
@@ -302,6 +310,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           developerMode={settingsState.developerMode}
           highlightingPrefs={settingsState.highlightingPrefs}
           ttsSettings={settingsState.ttsSettings}
+          insightLevel={settingsState.insightLevel}
           messageCount={messageCount}
           isMobile={isMobile}
           collapsed={isCollapsed}
@@ -310,10 +319,15 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           onDeveloperModeToggle={settingsState.handleDeveloperModeToggle}
           onHighlightingToggle={settingsState.handleHighlightingToggle}
           onTTSSettingChange={settingsState.handleTTSSettingChange}
+          onInsightLevelChange={settingsState.handleInsightLevelChange}
           onClearChat={onClearChat}
           onOpenStorageDebug={() => {
             dialogsState.setDropdownOpen(false);
             dialogsState.setStorageDebugOpen(true);
+          }}
+          onOpenContextDebug={() => {
+            dialogsState.setDropdownOpen(false);
+            dialogsState.setContextDebugOpen(true);
           }}
           onSetAlertOpen={dialogsState.setAlertOpen}
         />
@@ -331,6 +345,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         setEditTitle={dialogsState.setEditTitle}
         storageDebugOpen={dialogsState.storageDebugOpen}
         setStorageDebugOpen={dialogsState.setStorageDebugOpen}
+        contextDebugOpen={dialogsState.contextDebugOpen}
+        setContextDebugOpen={dialogsState.setContextDebugOpen}
         developerMode={settingsState.developerMode}
         messageCount={messageCount}
         onClearChat={onClearChat}

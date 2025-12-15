@@ -11,6 +11,7 @@ export function useSidebarDialogs(): SidebarDialogsState {
   const [editingChat, setEditingChat] = useState<Chat | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [storageDebugOpen, setStorageDebugOpen] = useState(false);
+  const [contextDebugOpen, setContextDebugOpen] = useState(false);
 
   return {
     alertOpen,
@@ -25,6 +26,8 @@ export function useSidebarDialogs(): SidebarDialogsState {
     setEditTitle,
     storageDebugOpen,
     setStorageDebugOpen,
+    contextDebugOpen,
+    setContextDebugOpen,
   };
 }
 

@@ -67,6 +67,7 @@ export function TasksPage() {
     deleteTask,
     fetchResult,
     downloadResult,
+    downloadPoseData,
     handleTaskClick,
   } = taskManagement;
 
@@ -268,6 +269,7 @@ export function TasksPage() {
               preparingTask={preparingTask}
               onDownloadVideo={downloadVideo}
               onExportData={downloadResult}
+              onExportPoseData={downloadPoseData}
               isTaskNew={isTaskNew}
               loading={isLoadingTasks}
             />
@@ -494,3 +496,4 @@ export function TasksPage() {
 }
 
 export default TasksPage;
+

@@ -3,7 +3,7 @@ import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
-import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
 import type { PromptType } from "@/lib/prompts";
 
 // Ensure this route uses Node.js runtime (required for file uploads and Buffer)
@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
     const queryComplexity = (formData.get("queryComplexity") as "simple" | "complex") || "complex";
     // Existing cache name for reuse (e.g., on retry)
     const existingCacheName = formData.get("cacheName") as string | null;
+    // AI Insight Level - controls complexity and depth of responses
+    const insightLevel = (formData.get("insightLevel") as InsightLevel) || "beginner";
+    // User context for personalization
+    const userFirstName = formData.get("userFirstName") as string | null;
 
     logger.debug(`[${requestId}] Prompt received: ${prompt ? `${prompt.length} characters` : "missing"}`);
     logger.debug(`[${requestId}] Media file: ${videoFile ? `${videoFile.name} (${videoFile.type}, ${(videoFile.size / (1024 * 1024)).toFixed(2)} MB)` : "none"}`);
@@ -71,6 +75,11 @@ export async function POST(request: NextRequest) {
     logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
     logger.debug(`[${requestId}] Domain expertise: ${domainExpertise}`);
     logger.debug(`[${requestId}] Query complexity: ${queryComplexity}`);
+    logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
+    logger.debug(`[${requestId}] User: ${userFirstName || "anonymous"}`);
+    
+    // Build user context for personalization
+    const userContext = userFirstName ? { firstName: userFirstName } : undefined;
 
     if (!prompt || typeof prompt !== "string") {
       logger.error(`[${requestId}] Validation failed: Prompt is required`);
@@ -242,7 +251,9 @@ export async function POST(request: NextRequest) {
               domainExpertise, 
               promptType, 
               queryComplexity,
-              existingCacheName || undefined
+              existingCacheName || undefined,
+              insightLevel,
+              userContext
             );
             
             // Log cache status
@@ -339,7 +350,9 @@ export async function POST(request: NextRequest) {
       domainExpertise, 
       promptType, 
       queryComplexity,
-      existingCacheName || undefined
+      existingCacheName || undefined,
+      insightLevel,
+      userContext
     );
     
     const duration = Date.now() - startTime;

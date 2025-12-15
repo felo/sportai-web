@@ -69,7 +69,9 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       abortController?: AbortController,
       thinkingMode: ThinkingMode = "fast",
       mediaResolution: MediaResolution = "medium",
-      domainExpertise: DomainExpertise = "all-sports"
+      domainExpertise: DomainExpertise = "all-sports",
+      insightLevel?: string,
+      userFirstName?: string
     ): Promise<void> => {
       optionsRef.current.onProgressUpdate?.("generating", 0);
 
@@ -93,6 +95,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       formData.append("thinkingMode", thinkingMode);
       formData.append("mediaResolution", mediaResolution);
       formData.append("domainExpertise", domainExpertise);
+      if (insightLevel) formData.append("insightLevel", insightLevel);
+      if (userFirstName) formData.append("userFirstName", userFirstName);
 
       // Detect if this is a simple follow-up for optimized handling
       let isSimpleQuery = false;
@@ -304,7 +308,9 @@ export function useAIApi(options: UseAIApiOptions = {}) {
       thinkingMode: ThinkingMode = "fast",
       mediaResolution: MediaResolution = "medium",
       domainExpertise: DomainExpertise = "all-sports",
-      needsServerConversion: boolean = false
+      needsServerConversion: boolean = false,
+      insightLevel?: string,
+      userFirstName?: string
     ): Promise<void> => {
       const requestStartTime = Date.now();
       
@@ -518,6 +524,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         formData.append("thinkingMode", thinkingMode);
         formData.append("mediaResolution", mediaResolution);
         formData.append("domainExpertise", domainExpertise);
+        if (insightLevel) formData.append("insightLevel", insightLevel);
+        if (userFirstName) formData.append("userFirstName", userFirstName);
 
         // Track context usage for developer mode display
         let contextUsageInfo: {
@@ -750,6 +758,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         formData.append("thinkingMode", thinkingMode);
         formData.append("mediaResolution", mediaResolution);
         formData.append("domainExpertise", domainExpertise);
+        if (insightLevel) formData.append("insightLevel", insightLevel);
+        if (userFirstName) formData.append("userFirstName", userFirstName);
 
         // Track context usage for developer mode display (fallback path)
         let fallbackContextUsageInfo: {

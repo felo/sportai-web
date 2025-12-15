@@ -7,8 +7,8 @@ import {
   calculatePricing,
   formatCost,
 } from "./token-utils";
-import { getSystemPromptWithDomain, getFramePromptWithDomain, type PromptType } from "./prompts";
-import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import { getSystemPromptWithDomainAndInsight, getFramePromptWithDomainAndInsight, type PromptType, type UserContext } from "./prompts";
+import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
 
 // Model selection: Pro for video/complex, Flash for simple text follow-ups
 const MODEL_NAME_PRO = "gemini-3-pro-preview";
@@ -122,15 +122,16 @@ export async function queryLLM(
   domainExpertise: DomainExpertise = "all-sports",
   promptType: PromptType = "video",
   queryComplexity: "simple" | "complex" = "complex",
-  existingCacheName?: string // Existing cache to use for this video
+  existingCacheName?: string,
+  insightLevel: InsightLevel = "beginner",
+  userContext?: UserContext
 ): Promise<LLMResponse> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Get system prompt with domain-specific enhancement based on prompt type
-  // Use systemInstruction parameter instead of prepending to prompt
+  // Get system prompt with domain-specific, insight level, AND user context enhancement
   const systemPrompt = promptType === "frame" 
-    ? getFramePromptWithDomain(domainExpertise)
-    : getSystemPromptWithDomain(domainExpertise);
+    ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
+    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext);
   
   // Select model based on query characteristics
   const hasVideo = !!videoData;
@@ -139,6 +140,9 @@ export async function queryLLM(
   
   logger.info(`[${requestId}] Starting LLM query`);
   logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
+  logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
+  logger.debug(`[${requestId}] Domain: ${domainExpertise}`);
+  logger.debug(`[${requestId}] User: ${userContext?.firstName || "anonymous"}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
@@ -517,14 +521,16 @@ export async function streamLLM(
   domainExpertise: DomainExpertise = "all-sports",
   promptType: PromptType = "video",
   queryComplexity: "simple" | "complex" = "complex",
-  existingCacheName?: string
+  existingCacheName?: string,
+  insightLevel: InsightLevel = "beginner",
+  userContext?: UserContext
 ): Promise<StreamLLMResult> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Get system prompt with domain-specific enhancement based on prompt type
+  // Get system prompt with domain-specific, insight level, AND user context enhancement
   const systemPrompt = promptType === "frame" 
-    ? getFramePromptWithDomain(domainExpertise)
-    : getSystemPromptWithDomain(domainExpertise);
+    ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
+    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext);
   
   // Select model based on query characteristics
   const hasVideo = !!videoData;
@@ -533,6 +539,9 @@ export async function streamLLM(
   
   logger.info(`[${requestId}] Starting LLM stream`);
   logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
+  logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
+  logger.debug(`[${requestId}] Domain: ${domainExpertise}`);
+  logger.debug(`[${requestId}] User: ${userContext?.firstName || "anonymous"}`);
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
