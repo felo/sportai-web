@@ -827,8 +827,8 @@ export interface ViewerState {
     dominantHand: "left" | "right";
     confidence: number;
   } | null;
-  /** Current active tab inside the viewer (swings, moments, data-analysis, or performance) */
-  activeTab: "swings" | "moments" | "data-analysis" | "performance";
+  /** Current active tab inside the viewer (swings, moments, reports, data-analysis, or performance) */
+  activeTab: "swings" | "moments" | "reports" | "data-analysis" | "performance";
   /** Error message if any */
   error: string | null;
 }
@@ -859,7 +859,7 @@ export interface ViewerCallbacks {
   /** Called when frame is captured (for analysis) */
   onFrameCapture?: (imageBlob: Blob, frame: number, poses: PoseDetectionResult[]) => void;
   /** Called when active tab changes inside the viewer */
-  onActiveTabChange?: (activeTab: "swings" | "moments" | "data-analysis" | "performance") => void;
+  onActiveTabChange?: (activeTab: "swings" | "moments" | "reports" | "data-analysis" | "performance") => void;
 }
 
 // ============================================================================

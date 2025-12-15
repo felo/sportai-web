@@ -36,36 +36,42 @@ export interface TechniqueRatingTier {
 export const TECHNIQUE_COLORS = {
   mint: {
     primary: "#7ADB8F",
+    secondary: "#10B981",
     gradient: ["#7ADB8F", "#10B981"],
     fill: "rgba(122, 219, 143, 0.25)",
     glow: "rgba(122, 219, 143, 0.5)",
   },
   blue: {
     primary: "#60A5FA",
+    secondary: "#3B82F6",
     gradient: ["#60A5FA", "#3B82F6"],
     fill: "rgba(96, 165, 250, 0.25)",
     glow: "rgba(96, 165, 250, 0.5)",
   },
   amber: {
     primary: "#F59E0B",
+    secondary: "#D97706",
     gradient: ["#FBBF24", "#F59E0B"],
     fill: "rgba(245, 158, 11, 0.25)",
     glow: "rgba(245, 158, 11, 0.5)",
   },
   purple: {
     primary: "#A78BFA",
+    secondary: "#8B5CF6",
     gradient: ["#A78BFA", "#8B5CF6"],
     fill: "rgba(167, 139, 250, 0.25)",
     glow: "rgba(167, 139, 250, 0.5)",
   },
   rose: {
     primary: "#FB7185",
+    secondary: "#F43F5E",
     gradient: ["#FDA4AF", "#F43F5E"],
     fill: "rgba(251, 113, 133, 0.25)",
     glow: "rgba(251, 113, 133, 0.5)",
   },
   cyan: {
     primary: "#22D3EE",
+    secondary: "#06B6D4",
     gradient: ["#67E8F9", "#06B6D4"],
     fill: "rgba(34, 211, 238, 0.25)",
     glow: "rgba(34, 211, 238, 0.5)",

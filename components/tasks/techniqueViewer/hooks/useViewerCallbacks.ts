@@ -124,7 +124,7 @@ export function useViewerCallbacks({
   );
 
   const handleActiveTabChange = useCallback(
-    (activeTab: "swings" | "moments" | "data-analysis" | "performance") => {
+    (activeTab: "swings" | "moments" | "reports" | "data-analysis" | "performance") => {
       setViewerState((prev) => ({ ...prev, activeTab }));
     },
     [setViewerState]

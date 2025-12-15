@@ -1,5 +1,5 @@
-import type { StatisticsResult } from "../../../types";
-import type { PlayerRankings } from "../../../hooks/usePlayerRankings";
+import type { StatisticsResult, Swing } from "../../../../types";
+import type { PlayerRankings, ValidPlayer } from "../../../../hooks/usePlayerRankings";
 import type { PlayerProfileData } from "@/types/player-profile";
 
 /**
@@ -12,16 +12,16 @@ export function buildProfileData(
 ): PlayerProfileData[] {
   const { validPlayers } = rankings;
 
-  return validPlayers.map((player) => {
-    const swings = player.swings || [];
-    const speeds = swings.map((s) => s.ball_speed).filter((s) => s > 0);
+  return validPlayers.map((player: ValidPlayer) => {
+    const swings: Swing[] = player.swings || [];
+    const speeds: number[] = swings.map((s: Swing) => s.ball_speed).filter((s: number) => s > 0);
 
     // Build shot breakdown
     const shotBreakdown: Record<string, { count: number; percentage: number; avgSpeed: number }> =
       {};
     const typeCounts: Record<string, { count: number; speeds: number[] }> = {};
 
-    swings.forEach((swing) => {
+    swings.forEach((swing: Swing) => {
       const type = swing.serve ? "serve" : swing.swing_type || "unknown";
       if (!typeCounts[type]) typeCounts[type] = { count: 0, speeds: [] };
       typeCounts[type].count++;
@@ -34,7 +34,7 @@ export function buildProfileData(
         percentage: swings.length > 0 ? (data.count / swings.length) * 100 : 0,
         avgSpeed:
           data.speeds.length > 0
-            ? data.speeds.reduce((a, b) => a + b, 0) / data.speeds.length
+            ? data.speeds.reduce((a: number, b: number) => a + b, 0) / data.speeds.length
             : 0,
       };
     });
@@ -45,7 +45,7 @@ export function buildProfileData(
       stats: {
         totalSwings: swings.length,
         avgBallSpeed:
-          speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0,
+          speeds.length > 0 ? speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length : 0,
         maxBallSpeed: speeds.length > 0 ? Math.max(...speeds) : 0,
         distanceCovered: player.covered_distance || 0,
         fastestSprint: player.fastest_sprint || 0,

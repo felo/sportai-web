@@ -199,9 +199,12 @@ export function useFFmpegClip(): UseFFmpegClipReturn {
         await ffmpeg.deleteFile(inputName);
         await ffmpeg.deleteFile(outputName);
 
-        // Create blob
+        // Create blob - handle both Uint8Array and string from FFmpeg
         const mimeType = format === "mp4" ? "video/mp4" : "video/webm";
-        const blob = new Blob([outputData], { type: mimeType });
+        const blobPart = outputData instanceof Uint8Array 
+          ? new Uint8Array(outputData) // Create a copy to ensure ArrayBuffer compatibility
+          : outputData;
+        const blob = new Blob([blobPart], { type: mimeType });
 
         console.log(`[FFmpegClip] Clip extracted: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
         setProgress(100);

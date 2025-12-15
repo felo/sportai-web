@@ -13,11 +13,12 @@ export const FORMAT_CODEC_MAP: Record<string, string> = {
   "OGV": "Theora",
 };
 
-// Sport badge colors (excludes "all" since badge is hidden for that)
-export const SPORT_COLORS: Record<Exclude<Task["sport"], "all">, "cyan" | "orange" | "green"> = {
+// Sport badge colors
+export const SPORT_COLORS: Record<Task["sport"], "cyan" | "orange" | "green" | "gray"> = {
   padel: "cyan",
   tennis: "orange",
   pickleball: "green",
+  all: "gray",
 };
 
 // Sport placeholder text (shown when no thumbnail)

@@ -9,11 +9,12 @@ import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { AuthModal } from "./AuthModal";
 import type { HighlightingPreferences, TTSSettings, InsightLevel } from "@/utils/storage";
+import type { Appearance } from "@/components/sidebar/types";
 
 const authLogger = createLogger("Auth");
 
 interface UserMenuProps {
-  appearance?: "light" | "dark" | "green" | "sportai";
+  appearance?: Appearance;
   theatreMode?: boolean;
   developerMode?: boolean;
   highlightingPrefs?: HighlightingPreferences;
@@ -22,7 +23,7 @@ interface UserMenuProps {
   messageCount?: number;
   isMobile?: boolean;
   collapsed?: boolean;
-  onThemeSelect?: (theme: "light" | "dark" | "green" | "sportai") => void;
+  onThemeSelect?: (theme: Appearance) => void;
   onTheatreModeToggle?: (enabled: boolean) => void;
   onDeveloperModeToggle?: (enabled: boolean) => void;
   onHighlightingToggle?: (key: keyof HighlightingPreferences, checked: boolean) => void;

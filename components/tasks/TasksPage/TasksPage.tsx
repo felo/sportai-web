@@ -271,7 +271,7 @@ export function TasksPage() {
               onExportData={downloadResult}
               onExportPoseData={downloadPoseData}
               isTaskNew={isTaskNew}
-              loading={isLoadingTasks}
+              loading={isLoadingTasks ?? undefined}
             />
           )}
 

@@ -18,7 +18,8 @@ export interface ProfileColor {
 }
 
 export interface AttributeConfig {
-  icon: React.ComponentType<{ width?: number; height?: number; style?: React.CSSProperties }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: React.ComponentType<any>;
   label: string;
   description: string;
 }
