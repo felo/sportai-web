@@ -161,12 +161,12 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const tabs: TabDefinition[] = useMemo(() => [
     { id: "rallies", label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
     { id: "summary", label: "Match Summary", icon: <BarChartIcon width={16} height={16} /> },
+    { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
     { id: "players", label: "Player Stats", icon: <PersonIcon width={16} height={16} /> },
     { id: "teams", label: "Team Stats", icon: <TeamIcon width={16} height={16} /> },
     { id: "highlights", label: "Highlights", icon: <StarIcon width={16} height={16} /> },
     { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
-    { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
-    { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} /> },
+    { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} />, disabled: true },
     { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
   ], []);
 

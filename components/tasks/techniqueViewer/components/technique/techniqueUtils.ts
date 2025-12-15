@@ -218,14 +218,28 @@ export function calculateConsistencyScore(swings: TechniqueMetrics[]): number {
 
 /**
  * Get swing type display info
+ * Supports both padel format (forehand, backhand) and tennis format (fh, bh, 1h_bh, 2h_bh)
  */
 export function getSwingTypeInfo(swingType?: string): { label: string; color: string; icon: string } {
   const types: Record<string, { label: string; color: string; icon: string }> = {
+    // Standard / Padel format
     forehand: { label: "Forehand", color: TECHNIQUE_COLORS.mint.primary, icon: "🎾" },
     backhand: { label: "Backhand", color: TECHNIQUE_COLORS.blue.primary, icon: "🎾" },
+    backhand_one_hand: { label: "Backhand (1H)", color: TECHNIQUE_COLORS.blue.primary, icon: "🎾" },
+    backhand_two_hand: { label: "Backhand (2H)", color: TECHNIQUE_COLORS.blue.secondary, icon: "🎾" },
     serve: { label: "Serve", color: TECHNIQUE_COLORS.amber.primary, icon: "🚀" },
     volley: { label: "Volley", color: TECHNIQUE_COLORS.purple.primary, icon: "⚡" },
     smash: { label: "Smash", color: TECHNIQUE_COLORS.rose.primary, icon: "💥" },
+    overhead: { label: "Overhead", color: TECHNIQUE_COLORS.rose.primary, icon: "💥" },
+    // Tennis format (abbreviated) - from ML model
+    fh: { label: "Forehand", color: TECHNIQUE_COLORS.mint.primary, icon: "🎾" },
+    bh: { label: "Backhand", color: TECHNIQUE_COLORS.blue.primary, icon: "🎾" },
+    "1h_bh": { label: "Backhand (1H)", color: TECHNIQUE_COLORS.blue.primary, icon: "🎾" },
+    "2h_bh": { label: "Backhand (2H)", color: TECHNIQUE_COLORS.blue.secondary, icon: "🎾" },
+    fh_overhead: { label: "Serve / Overhead", color: TECHNIQUE_COLORS.amber.primary, icon: "🚀" },
+    bh_overhead: { label: "Backhand Overhead", color: TECHNIQUE_COLORS.rose.secondary, icon: "💥" },
+    fh_volley: { label: "Forehand Volley", color: TECHNIQUE_COLORS.purple.primary, icon: "⚡" },
+    bh_volley: { label: "Backhand Volley", color: TECHNIQUE_COLORS.purple.secondary, icon: "⚡" },
     unknown: { label: "Swing", color: TECHNIQUE_COLORS.cyan.primary, icon: "🏸" },
   };
   

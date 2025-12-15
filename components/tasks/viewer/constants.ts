@@ -8,8 +8,10 @@ export const FEATURE_FLAGS = {
 
 // ===========================================
 // SWING TYPE COLORS - Consistent across all charts
+// Supports both padel format (forehand, backhand) and tennis format (fh, bh, 1h_bh, 2h_bh)
 // ===========================================
 export const SWING_TYPE_COLORS: Record<string, string> = {
+  // Padel / Standard format
   forehand: "#10B981",        // Emerald
   backhand: "#06B6D4",        // Cyan
   backhand_one_hand: "#06B6D4",
@@ -28,6 +30,19 @@ export const SWING_TYPE_COLORS: Record<string, string> = {
   topspin: "#14B8A6",
   other: "#6B7280",           // Gray
   unknown: "#9CA3AF",         // Light gray
+  // Tennis format (abbreviated) - from ML model
+  fh: "#10B981",              // Emerald (same as forehand)
+  bh: "#06B6D4",              // Cyan (same as backhand)
+  "1h_bh": "#06B6D4",         // Cyan (same as backhand_one_hand)
+  "2h_bh": "#0EA5E9",         // Sky (same as backhand_two_hand)
+  fh_overhead: "#8B5CF6",     // Purple (same as serve)
+  bh_overhead: "#22C55E",     // Green (variant of overhead)
+  fh_volley: "#F59E0B",       // Amber (same as volley)
+  bh_volley: "#FBBF24",       // Yellow (variant of volley)
+  fh_slice: "#14B8A6",        // Teal (same as slice)
+  bh_slice: "#2DD4BF",        // Teal variant
+  fh_drop: "#EC4899",         // Pink (same as drop)
+  bh_drop: "#F472B6",         // Pink variant
 };
 
 // Fallback colors for unrecognized swing types

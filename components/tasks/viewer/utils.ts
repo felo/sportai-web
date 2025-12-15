@@ -1,5 +1,7 @@
 // Pretty names for swing types
+// Supports both padel format (forehand, backhand) and tennis format (fh, bh, 1h_bh, 2h_bh)
 const SWING_TYPE_NAMES: Record<string, string> = {
+  // Padel / Standard format
   forehand: "Forehand",
   backhand: "Backhand",
   backhand_one_hand: "Backhand (1H)",
@@ -17,6 +19,19 @@ const SWING_TYPE_NAMES: Record<string, string> = {
   kick: "Kick Serve",
   other: "Other",
   unknown: "Unknown",
+  // Tennis format (abbreviated) - from ML model
+  fh: "Forehand",
+  bh: "Backhand",
+  "1h_bh": "Backhand (1H)",
+  "2h_bh": "Backhand (2H)",
+  fh_overhead: "Serve / Overhead",
+  bh_overhead: "Backhand Overhead",
+  fh_volley: "Forehand Volley",
+  bh_volley: "Backhand Volley",
+  fh_slice: "Forehand Slice",
+  bh_slice: "Backhand Slice",
+  fh_drop: "Forehand Drop",
+  bh_drop: "Backhand Drop",
 };
 
 export function formatSwingType(swingType: string): string {

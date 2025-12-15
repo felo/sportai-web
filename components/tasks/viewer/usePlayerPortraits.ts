@@ -38,7 +38,7 @@ export function usePlayerPortraits(
 ) {
   const { 
     cropSize = 3,  // Use head+chest crop (more pixels on face = better quality)
-    enhance = true,  // Default to enhancing portraits
+    enhance = false,  // Portrait enhancement disabled for now
     enhancePreset = "premium",  // Use premium for best quality
     enhanceSize = 400,  // 400px is sufficient
   } = options;

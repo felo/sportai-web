@@ -114,6 +114,7 @@ export function RalliesTab({
             isCalibrated={calibrationMatrix !== null}
             onCalibrationComplete={onCalibrationComplete}
             courtKeypoints={result?.debug_data?.court_keypoints}
+            sport={task.sport}
             onVideoError={onVideoError}
           />
         }

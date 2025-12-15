@@ -2,20 +2,25 @@
 
 import { useEffect, useRef, RefObject } from "react";
 
+type Sport = "padel" | "tennis" | "pickleball" | "all";
+
 interface CourtOverlayProps {
   courtKeypoints: ([number, number] | [null, null])[];
   videoRef: RefObject<HTMLVideoElement | null>;
   isFullscreen?: boolean;
   isVideoReady?: boolean;
+  sport?: Sport;
 }
 
-// Court keypoint indices for a padel court (14 points)
+// =============================================================================
+// PADEL COURT CONFIGURATION (14 points)
+// =============================================================================
 // Based on actual keypoint positions from the detection:
 // 0: back-left corner        1: back-right corner
 // 2: service line left       3: service line center      4: service line right
 // 5: left sideline mid       6: left sideline upper      7: right sideline upper      8: right sideline mid
 // 9: front-left corner       10: front center            11: front-right corner
-const COURT_LINES: [number, number][] = [
+const PADEL_COURT_LINES: [number, number][] = [
   // Back baseline (far from camera)
   [0, 1],
   // Front baseline (close to camera)
@@ -40,8 +45,7 @@ const COURT_LINES: [number, number][] = [
   [6, 7],
 ];
 
-// Colors for keypoints by region
-const KEYPOINT_COLORS: Record<number, string> = {
+const PADEL_KEYPOINT_COLORS: Record<number, string> = {
   0: "#FF6B6B",  // Top left - red
   1: "#FF6B6B",  // Top right - red
   2: "#4ECDC4",  // Upper service left - teal
@@ -58,11 +62,108 @@ const KEYPOINT_COLORS: Record<number, string> = {
   13: "#DDA0DD", // Extra point 2 - plum
 };
 
+// =============================================================================
+// TENNIS COURT CONFIGURATION (18 points)
+// =============================================================================
+// Tennis court keypoint layout:
+// 0: Far left net post (red)           1: Far right net post (red)
+// 2: Near baseline left corner (cyan)  3: Near baseline right corner (cyan)
+// 4: Far baseline left corner (teal)   5: Near left singles line (light blue)
+// 6: Far baseline center (pink)        7: Near right singles line (light blue)
+// 8: Left net area (light blue)        9: Far baseline right corner (pink)
+// 10: Near service line left (green)   11: Near service line right (green)
+// 12: Net center (pink)                13: Center T (pink)
+// 14: Far left net level (yellow)      15: Far service line left (yellow)
+// 16: Far right net level (yellow)     17: Far service line right (yellow)
+const TENNIS_COURT_LINES: [number, number][] = [
+  // === HORIZONTAL LINES ===
+  // Near baseline (bottom): 2 -- 5 -- 7 -- 3
+  [2, 5],
+  [5, 7],
+  [7, 3],
+  
+  // Near service line: 10 -- 13 -- 11
+  [10, 13],
+  [13, 11],
+  
+  // Far service line: 15 -- 17
+  [15, 17],
+  
+  // Far baseline: 4 -- 6 -- 9
+  [4, 6],
+  [6, 9],
+  
+  // Net line: 8 -- 12 (and post connections)
+  [8, 12],
+  [0, 4],   // Left net post to far baseline corner
+  [1, 9],   // Right net post to far baseline corner
+  
+  // === VERTICAL/SIDELINES ===
+  // Left doubles sideline: 2 -> 10 -> 8 -> 14 -> 15 -> 4
+  [2, 10],
+  [10, 8],
+  [8, 14],
+  [14, 15],
+  [15, 4],
+  
+  // Right doubles sideline: 3 -> 11 -> 16 -> 17 -> 9
+  [3, 11],
+  [11, 16],
+  [16, 17],
+  [17, 9],
+  
+  // Left singles line: 5 -> 10
+  [5, 10],
+  
+  // Right singles line: 7 -> 11
+  [7, 11],
+  
+  // Center service line: 13 -> 12
+  [13, 12],
+];
+
+const TENNIS_KEYPOINT_COLORS: Record<number, string> = {
+  0: "#FF6B6B",  // Far left net post - red
+  1: "#FF6B6B",  // Far right net post - red
+  2: "#4ECDC4",  // Near baseline left - cyan
+  3: "#4ECDC4",  // Near baseline right - cyan
+  4: "#4ECDC4",  // Far baseline left - teal
+  5: "#45B7D1",  // Near left singles - light blue
+  6: "#DDA0DD",  // Far baseline center - pink
+  7: "#45B7D1",  // Near right singles - light blue
+  8: "#45B7D1",  // Left net area - light blue
+  9: "#DDA0DD",  // Far baseline right - pink
+  10: "#96CEB4", // Near service left - green
+  11: "#96CEB4", // Near service right - green
+  12: "#DDA0DD", // Net center - pink
+  13: "#DDA0DD", // Center T - pink
+  14: "#FFD93D", // Far left net level - yellow
+  15: "#FFD93D", // Far service left - yellow
+  16: "#FFD93D", // Far right net level - yellow
+  17: "#FFD93D", // Far service right - yellow
+};
+
+// Helper to get court config based on sport
+function getCourtConfig(sport: Sport) {
+  if (sport === "tennis") {
+    return {
+      lines: TENNIS_COURT_LINES,
+      colors: TENNIS_KEYPOINT_COLORS,
+    };
+  }
+  // Default to padel for padel, pickleball, and "all"
+  return {
+    lines: PADEL_COURT_LINES,
+    colors: PADEL_KEYPOINT_COLORS,
+  };
+}
+
 export function CourtOverlay({
   courtKeypoints,
   videoRef,
   isFullscreen = false,
   isVideoReady = false,
+  sport = "padel",
 }: CourtOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>(0);
@@ -74,6 +175,9 @@ export function CourtOverlay({
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // Get sport-specific configuration
+    const { lines: courtLines, colors: keypointColors } = getCourtConfig(sport);
 
     const draw = () => {
       // Get the actual video element dimensions
@@ -118,7 +222,7 @@ export function CourtOverlay({
       ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
       ctx.setLineDash([5, 5]);
 
-      for (const [startIdx, endIdx] of COURT_LINES) {
+      for (const [startIdx, endIdx] of courtLines) {
         const start = courtKeypoints[startIdx];
         const end = courtKeypoints[endIdx];
         
@@ -146,7 +250,7 @@ export function CourtOverlay({
 
         const x = offsetX + point[0] * displayWidth;
         const y = offsetY + point[1] * displayHeight;
-        const color = KEYPOINT_COLORS[index] || "#FFD93D";
+        const color = keypointColors[index] || "#FFD93D";
 
         // Draw outer glow
         ctx.beginPath();
@@ -209,7 +313,7 @@ export function CourtOverlay({
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [courtKeypoints, videoRef, isFullscreen, isVideoReady]);
+  }, [courtKeypoints, videoRef, isFullscreen, isVideoReady, sport]);
 
   return (
     <canvas

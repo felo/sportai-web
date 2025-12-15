@@ -2,7 +2,8 @@
 
 import { useState, forwardRef, useRef, useCallback, useEffect, useMemo } from "react";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { GearIcon, GridIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { GearIcon, GridIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon } from "@radix-ui/react-icons";
+import { getDeveloperMode } from "@/utils/storage";
 import {
   MediaPlayer,
   MediaProvider,
@@ -84,6 +85,8 @@ interface VidstackPlayerProps {
   thumbnails?: string;
   // Court keypoints for debug overlay
   courtKeypoints?: ([number, number] | [null, null])[];
+  // Sport type for court overlay configuration
+  sport?: "padel" | "tennis" | "pickleball" | "all";
   // Error callback for video loading failures
   onVideoError?: (message: string) => void;
 }
@@ -149,10 +152,11 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     onCalibrationComplete,
     thumbnails,
     courtKeypoints,
+    sport = "padel",
     onVideoError,
   }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
-    const [showBallTracker, setShowBallTracker] = useState(false);
+    const [showBallTracker, setShowBallTracker] = useState(true); // Default ON
     const [usePerspective, setUsePerspective] = useState(true);
     const [showTrail, setShowTrail] = useState(true);
     const [useSmoothing, setUseSmoothing] = useState(true);
@@ -166,6 +170,8 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     const [videoDuration, setVideoDuration] = useState<number | undefined>();
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isVideoReady, setIsVideoReady] = useState(false);
+    const [developerMode, setDeveloperMode] = useState(false);
+    const [showAllOverlays, setShowAllOverlays] = useState(true); // Default ON
     
     // Vidstack player ref
     const playerRef = useRef<MediaPlayerInstance>(null);
@@ -183,6 +189,40 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     
     // Show buttons when hovered or when settings panel is open
     const showButtons = isHovered || showVideoSettings;
+    
+    // Load developer mode on mount and listen for changes
+    useEffect(() => {
+      setDeveloperMode(getDeveloperMode());
+      
+      const handleDeveloperModeChange = () => {
+        setDeveloperMode(getDeveloperMode());
+      };
+      
+      window.addEventListener("developer-mode-change", handleDeveloperModeChange);
+      return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
+    }, []);
+    
+    // Toggle all visual overlays
+    // ON = restore defaults (ball tracker on, others off)
+    // OFF = hide everything for clean video view
+    const toggleAllOverlays = useCallback(() => {
+      const newState = !showAllOverlays;
+      setShowAllOverlays(newState);
+      
+      if (newState) {
+        // Turning ON: restore default overlays
+        setShowBallTracker(true);
+        setShowPlayerBoxes(false);
+        setShowPose(false);
+        setShowCourtKeypoints(false);
+      } else {
+        // Turning OFF: hide all overlays
+        setShowBallTracker(false);
+        setShowPlayerBoxes(false);
+        setShowPose(false);
+        setShowCourtKeypoints(false);
+      }
+    }, [showAllOverlays]);
     
     // Sync internal video ref with Vidstack's video element
     useEffect(() => {
@@ -353,6 +393,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
                 videoRef={internalVideoRef}
                 isFullscreen={isFullscreen}
                 isVideoReady={isVideoReady}
+                sport={sport}
               />
             </div>
           )}
@@ -440,7 +481,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
         </Box>
         )}
 
-        {/* Settings Button - Top Right (only show when video is ready) */}
+        {/* Top Right Button Group - Overlays toggle & Settings (only show when video is ready) */}
         {isVideoReady && (
         <Box 
           style={{ 
@@ -448,15 +489,18 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             top: "12px", 
             right: "12px", 
             zIndex: 100,
+            display: "flex",
+            gap: "6px",
           }}
         >
-          <Tooltip content="Video overlay settings">
+          {/* Magic Wand - Toggle All Overlays */}
+          <Tooltip content={showAllOverlays ? "Hide overlays (view clean video)" : "Show overlays"}>
             <IconButton
               size="1"
               variant="solid"
               style={{
-                backgroundColor: showVideoSettings ? "#7ADB8F" : "rgba(0, 0, 0, 0.6)",
-                color: showVideoSettings ? "#1C1C1C" : "white",
+                backgroundColor: showAllOverlays ? "#7ADB8F" : "rgba(0, 0, 0, 0.6)",
+                color: showAllOverlays ? "#1C1C1C" : "white",
                 border: "2px solid white",
                 borderRadius: "var(--radius-3)",
                 width: 28,
@@ -464,11 +508,34 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
                 backdropFilter: "blur(4px)",
                 transition: "background-color 0.2s ease-in-out",
               }}
-              onClick={() => setShowVideoSettings(!showVideoSettings)}
+              onClick={toggleAllOverlays}
             >
-              <GearIcon width={14} height={14} />
+              <MagicWandIcon width={14} height={14} />
             </IconButton>
           </Tooltip>
+          
+          {/* Settings Button - Developer Mode Only */}
+          {developerMode && (
+            <Tooltip content="Video overlay settings">
+              <IconButton
+                size="1"
+                variant="solid"
+                style={{
+                  backgroundColor: showVideoSettings ? "#7ADB8F" : "rgba(0, 0, 0, 0.6)",
+                  color: showVideoSettings ? "#1C1C1C" : "white",
+                  border: "2px solid white",
+                  borderRadius: "var(--radius-3)",
+                  width: 28,
+                  height: 28,
+                  backdropFilter: "blur(4px)",
+                  transition: "background-color 0.2s ease-in-out",
+                }}
+                onClick={() => setShowVideoSettings(!showVideoSettings)}
+              >
+                <GearIcon width={14} height={14} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
         )}
 

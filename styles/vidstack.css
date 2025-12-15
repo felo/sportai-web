@@ -3,85 +3,12 @@
 /* Base styles are imported directly in the component */
 
 /* ============================================
-   LIGHT MODE (Default)
+   GLOBAL DARK THEME (Default for video player)
+   Video players look best with dark UI regardless of app theme
    ============================================ */
 
 [data-media-player] {
-  /* Primary brand color - dark green in light mode */
-  --media-brand: #025940;
-  --media-focus: #025940;
-  
-  /* Slider/progress track colors */
-  --media-slider-track-fill-bg: #025940;
-  --media-slider-value-bg: #025940;
-  --media-slider-preview-bg: rgba(2, 89, 64, 0.1);
-  
-  /* Time slider specific */
-  --media-time-slider-track-fill-bg: #025940;
-  
-  /* Chapter markers */
-  --media-slider-chapter-title-color: #025940;
-  
-  /* Tooltip styling */
-  --media-tooltip-bg: #1C1C1C;
-  --media-tooltip-color: #FFFFFF;
-  
-  /* Menu styling */
-  --media-menu-bg: rgba(255, 255, 255, 0.95);
-  --media-menu-border: 1px solid rgba(0, 0, 0, 0.1);
-  --media-menu-item-hover-bg: rgba(2, 89, 64, 0.1);
-  
-  /* Focus rings */
-  --media-focus-ring: 0 0 0 2px rgba(2, 89, 64, 0.5);
-  
-  /* Border radius to match Radix UI */
-  --media-border-radius: var(--radius-3, 8px);
-  
-  /* Font family to match your app */
-  font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-/* Buffering progress color */
-[data-media-player] .vds-time-slider .vds-slider-progress {
-  background-color: rgba(2, 89, 64, 0.3);
-}
-
-/* Play button accent */
-[data-media-player] .vds-play-button:hover {
-  background-color: rgba(2, 89, 64, 0.1);
-}
-
-/* Active/selected states */
-[data-media-player] [data-active] {
-  color: #025940;
-}
-
-[data-media-player] .vds-menu-item[aria-checked="true"]::before {
-  background-color: #025940;
-}
-
-/* Chapter markers on timeline */
-[data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
-  background-color: #025940;
-}
-
-/* PiP button styling */
-[data-media-player] .vds-pip-button:hover {
-  background-color: rgba(2, 89, 64, 0.1);
-}
-
-/* Fullscreen button styling */
-[data-media-player] .vds-fullscreen-button:hover {
-  background-color: rgba(2, 89, 64, 0.1);
-}
-
-/* ============================================
-   DARK MODE
-   ============================================ */
-
-html[data-theme="dark"] [data-media-player],
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] {
-  /* Primary brand color - light green in dark mode */
+  /* Primary brand color - light green for contrast on dark */
   --media-brand: #7ADB8F;
   --media-focus: #7ADB8F;
   
@@ -97,52 +24,277 @@ html[data-theme="dark"] [data-media-player],
   --media-slider-chapter-title-color: #7ADB8F;
   
   /* Tooltip styling */
-  --media-tooltip-bg: #2E2E2E;
+  --media-tooltip-bg: #1C1C1C;
   --media-tooltip-color: #EEEEEE;
   
-  /* Menu styling */
-  --media-menu-bg: rgba(46, 46, 46, 0.98);
-  --media-menu-border: 1px solid rgba(255, 255, 255, 0.1);
-  --media-menu-item-hover-bg: rgba(122, 219, 143, 0.15);
+  /* Menu styling - dark theme */
+  --media-menu-bg: #1C1C1C;
+  --media-menu-border: 1px solid #383838;
+  --media-menu-item-hover-bg: rgba(122, 219, 143, 0.12);
   
   /* Focus rings */
   --media-focus-ring: 0 0 0 2px rgba(122, 219, 143, 0.5);
   
+  /* Border radius to match Radix UI */
+  --media-border-radius: var(--radius-3, 8px);
+  
   /* Control bar background */
-  --media-controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  --media-controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+  
+  /* Font family to match your app */
+  font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Dark mode buffering progress color */
-html[data-theme="dark"] [data-media-player] .vds-time-slider .vds-slider-progress,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-time-slider .vds-slider-progress {
+/* ============================================
+   SETTINGS MENU COMPREHENSIVE STYLING
+   ============================================ */
+
+/* Main menu container */
+[data-media-player] .vds-menu-items,
+[data-media-player] [data-media-menu-items] {
+  background-color: #1C1C1C !important;
+  border: 1px solid #383838 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(12px) !important;
+  padding: 6px !important;
+  min-width: 220px !important;
+}
+
+/* Menu item base styling */
+[data-media-player] .vds-menu-item,
+[data-media-player] [data-media-menu-item] {
+  color: #EEEEEE !important;
+  background: transparent !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  margin: 2px 0 !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+/* Menu item text */
+[data-media-player] .vds-menu-item span,
+[data-media-player] .vds-menu-item-label {
+  color: #EEEEEE !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* Menu item icons */
+[data-media-player] .vds-menu-item svg,
+[data-media-player] .vds-menu-item [class*="icon"] {
+  color: #ABABAB !important;
+  opacity: 0.85 !important;
+}
+
+/* Menu item hover state */
+[data-media-player] .vds-menu-item:hover,
+[data-media-player] .vds-menu-item[data-hocus],
+[data-media-player] .vds-menu-item[data-focus] {
+  background-color: rgba(122, 219, 143, 0.12) !important;
+  color: #FFFFFF !important;
+}
+
+[data-media-player] .vds-menu-item:hover svg,
+[data-media-player] .vds-menu-item[data-hocus] svg {
+  color: #7ADB8F !important;
+  opacity: 1 !important;
+}
+
+/* Submenu arrows/chevrons */
+[data-media-player] .vds-menu-item [class*="arrow"],
+[data-media-player] .vds-menu-item [class*="chevron"],
+[data-media-player] .vds-menu-chevron {
+  color: #686868 !important;
+}
+
+[data-media-player] .vds-menu-item:hover [class*="arrow"],
+[data-media-player] .vds-menu-item:hover [class*="chevron"],
+[data-media-player] .vds-menu-item:hover .vds-menu-chevron {
+  color: #7ADB8F !important;
+}
+
+/* Checked/selected menu items */
+[data-media-player] .vds-menu-item[aria-checked="true"],
+[data-media-player] .vds-menu-item[data-checked] {
+  background-color: rgba(122, 219, 143, 0.15) !important;
+  color: #7ADB8F !important;
+}
+
+[data-media-player] .vds-menu-item[aria-checked="true"] span,
+[data-media-player] .vds-menu-item[data-checked] span {
+  color: #7ADB8F !important;
+}
+
+/* Radio items styling */
+[data-media-player] .vds-radio-group {
+  background: transparent !important;
+}
+
+[data-media-player] .vds-radio {
+  color: #EEEEEE !important;
+  background: transparent !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  margin: 2px 0 !important;
+}
+
+[data-media-player] .vds-radio:hover,
+[data-media-player] .vds-radio[data-hocus] {
+  background-color: rgba(122, 219, 143, 0.12) !important;
+}
+
+[data-media-player] .vds-radio[data-checked] {
+  background-color: rgba(122, 219, 143, 0.15) !important;
+  color: #7ADB8F !important;
+}
+
+/* Radio indicator dot */
+[data-media-player] .vds-radio-check {
+  border-color: #686868 !important;
+  background: transparent !important;
+}
+
+[data-media-player] .vds-radio[data-checked] .vds-radio-check {
+  border-color: #7ADB8F !important;
+  background: #7ADB8F !important;
+}
+
+/* Submenu styling */
+[data-media-player] .vds-submenu-content,
+[data-media-player] [data-media-submenu] {
+  background-color: #1C1C1C !important;
+  border: 1px solid #383838 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Submenu header/back button */
+[data-media-player] .vds-menu-button,
+[data-media-player] [data-media-menu-button] {
+  color: #ABABAB !important;
+  padding: 10px 14px !important;
+  border-radius: 8px !important;
+}
+
+[data-media-player] .vds-menu-button:hover {
+  background-color: rgba(122, 219, 143, 0.12) !important;
+  color: #EEEEEE !important;
+}
+
+/* Dividers/separators */
+[data-media-player] .vds-menu-divider,
+[data-media-player] [class*="divider"] {
+  background-color: #383838 !important;
+  margin: 6px 8px !important;
+}
+
+/* Slider controls in menus (like speed slider) */
+[data-media-player] .vds-menu .vds-slider {
+  --media-slider-track-bg: #383838 !important;
+  --media-slider-track-fill-bg: #7ADB8F !important;
+}
+
+[data-media-player] .vds-menu .vds-slider-thumb {
+  background: #7ADB8F !important;
+  border: 2px solid #1C1C1C !important;
+}
+
+/* Section titles in menus */
+[data-media-player] .vds-menu-section-title {
+  color: #686868 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  padding: 8px 14px 4px !important;
+}
+
+/* ============================================
+   SETTINGS BUTTON IN CONTROL BAR
+   ============================================ */
+
+[data-media-player] .vds-settings-button,
+[data-media-player] .vds-menu-button {
+  color: #EEEEEE !important;
+  transition: color 0.15s ease, background-color 0.15s ease !important;
+}
+
+[data-media-player] .vds-settings-button:hover,
+[data-media-player] .vds-settings-button[data-open] {
+  color: #7ADB8F !important;
+  background-color: rgba(122, 219, 143, 0.15) !important;
+  border-radius: 6px !important;
+}
+
+/* ============================================
+   CONTROL BAR BUTTONS
+   ============================================ */
+
+/* Buffering progress color */
+[data-media-player] .vds-time-slider .vds-slider-progress {
   background-color: rgba(122, 219, 143, 0.3);
 }
 
-/* Dark mode active states */
-html[data-theme="dark"] [data-media-player] [data-active],
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] [data-active] {
+/* Play button accent */
+[data-media-player] .vds-play-button:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+  border-radius: 6px;
+}
+
+/* Active/selected states */
+[data-media-player] [data-active] {
   color: #7ADB8F;
 }
 
-html[data-theme="dark"] [data-media-player] .vds-menu-item[aria-checked="true"]::before,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-menu-item[aria-checked="true"]::before {
+/* Chapter markers on timeline */
+[data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
   background-color: #7ADB8F;
 }
 
-/* Dark mode chapter markers */
-html[data-theme="dark"] [data-media-player] .vds-slider-chapters .vds-slider-chapter::after,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
-  background-color: #7ADB8F;
-}
-
-/* Dark mode hover states */
-html[data-theme="dark"] [data-media-player] .vds-play-button:hover,
-html[data-theme="dark"] [data-media-player] .vds-pip-button:hover,
-html[data-theme="dark"] [data-media-player] .vds-fullscreen-button:hover,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-play-button:hover,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-pip-button:hover,
-[data-radix-theme][data-radix-theme-appearance="dark"] [data-media-player] .vds-fullscreen-button:hover {
+/* PiP button styling */
+[data-media-player] .vds-pip-button:hover {
   background-color: rgba(122, 219, 143, 0.15);
+  border-radius: 6px;
+}
+
+/* Fullscreen button styling */
+[data-media-player] .vds-fullscreen-button:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+  border-radius: 6px;
+}
+
+/* Mute button styling */
+[data-media-player] .vds-mute-button:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+  border-radius: 6px;
+}
+
+/* Captions button styling */
+[data-media-player] .vds-captions-button:hover {
+  background-color: rgba(122, 219, 143, 0.15);
+  border-radius: 6px;
+}
+
+/* ============================================
+   GREEN THEME SPECIFIC (SportAI theme)
+   ============================================ */
+
+html[data-theme="green"] [data-media-player],
+html[data-theme="sportai"] [data-media-player] {
+  --media-brand: #7ADB8F;
+  --media-focus: #7ADB8F;
+}
+
+html[data-theme="green"] [data-media-player] .vds-menu-items,
+html[data-theme="sportai"] [data-media-player] .vds-menu-items {
+  background-color: #001C0F !important;
+  border-color: #025940 !important;
+}
+
+html[data-theme="green"] [data-media-player] .vds-menu-item:hover,
+html[data-theme="sportai"] [data-media-player] .vds-menu-item:hover {
+  background-color: rgba(122, 219, 143, 0.15) !important;
 }
 
 /* ============================================
