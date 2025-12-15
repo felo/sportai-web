@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { Box, Text, Button } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
@@ -479,9 +480,12 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           }}
         >
           {isImage ? (
-            <img
-              src={videoSrc || undefined}
+            <Image
+              src={videoSrc || ""}
               alt="Uploaded image"
+              width={800}
+              height={600}
+              unoptimized
               onError={(e) => {
                 // Handle revoked blob URL errors gracefully
                 if (videoSrc?.startsWith("blob:")) {
@@ -490,6 +494,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 }
               }}
               style={{
+                width: "auto",
+                height: "auto",
                 maxWidth: "100%",
                 maxHeight: theatreMode ? "50vh" : "auto",
                 display: "block",
