@@ -428,8 +428,8 @@ function useCoachingChat(coachingContext: string, sport: string) {
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
-    const userMsgId = `user-${Date.now()}`;
-    const assistantMsgId = `assistant-${Date.now()}`;
+    const userMsgId = crypto.randomUUID();
+    const assistantMsgId = crypto.randomUUID();
 
     // Add user message
     setMessages(prev => [...prev, {

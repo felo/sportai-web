@@ -4,6 +4,8 @@ import { logger } from "@/lib/logger";
 import { extractS3KeyFromUrl } from "@/lib/s3";
 import type { Database } from "@/types/supabase";
 
+type SportType = Database["public"]["Tables"]["sportai_tasks"]["Insert"]["sport"];
+
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     const records = tasks.map(task => ({
       user_id: userId,
       task_type: task.taskType,
-      sport: task.sport,
+      sport: task.sport as SportType,
       sportai_task_id: null,
       video_url: task.videoUrl,
       video_s3_key: extractS3KeyFromUrl(task.videoUrl) || null,
@@ -133,3 +135,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
