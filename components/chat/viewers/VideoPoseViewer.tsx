@@ -1,10 +1,12 @@
 "use client";
 
 import { lazy, Suspense } from "react";
-import type { SupportedModel, PoseDetectionResult } from "@/hooks/usePoseDetection";
 import { Box } from "@radix-ui/themes";
 
-// Re-export PoseDetectionResult for consumers
+// Type-only imports - these are erased at compile time and don't trigger module resolution
+import type { SupportedModel, PoseDetectionResult } from "@/hooks/usePoseDetection";
+
+// Re-export PoseDetectionResult for consumers (type-only export)
 export type { PoseDetectionResult } from "@/hooks/usePoseDetection";
 
 // Dynamic import of the TensorFlow-heavy component

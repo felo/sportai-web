@@ -6,6 +6,18 @@ const withBundleAnalyzer = bundleAnalyzer({
 })
 
 const nextConfig: NextConfig = {
+  // Externalize TensorFlow and MediaPipe packages on server side
+  // These packages only work in the browser and cause issues with Turbopack bundling
+  serverExternalPackages: [
+    '@tensorflow/tfjs',
+    '@tensorflow/tfjs-core',
+    '@tensorflow/tfjs-backend-webgl',
+    '@tensorflow/tfjs-backend-webgpu',
+    '@tensorflow/tfjs-converter',
+    '@tensorflow-models/pose-detection',
+    '@mediapipe/pose',
+  ],
+  
   images: {
     remotePatterns: [
       {
@@ -29,12 +41,12 @@ const nextConfig: NextConfig = {
   },
   
   // Optimize package imports - reduces bundle size significantly
+  // Note: Don't include packages that are in serverExternalPackages
   experimental: {
     optimizePackageImports: [
       '@radix-ui/react-icons',
       '@radix-ui/themes',
       'three',
-      '@tensorflow/tfjs',
     ],
   },
   

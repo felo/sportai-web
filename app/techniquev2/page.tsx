@@ -7,7 +7,7 @@
  * The viewer and configuration are separate components that communicate via props.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
@@ -58,6 +58,34 @@ import {
 // ============================================================================
 
 export default function TechniqueV2Page() {
+  return (
+    <Suspense fallback={<TechniqueV2Loading />}>
+      <TechniqueV2Content />
+    </Suspense>
+  );
+}
+
+function TechniqueV2Loading() {
+  return (
+    <Box
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "#0a0a0a",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ color: "rgba(255, 255, 255, 0.5)" }}>Loading...</Text>
+    </Box>
+  );
+}
+
+function TechniqueV2Content() {
   const searchParams = useSearchParams();
 
   // URL state

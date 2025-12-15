@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Box, Container, Flex, Text, Card, TextField, Button, Heading } from "@radix-ui/themes";
 import { PlayIcon, Link2Icon } from "@radix-ui/react-icons";
@@ -8,6 +8,34 @@ import { TechniqueViewer } from "@/components/tasks/techniqueViewer";
 import buttonStyles from "@/styles/buttons.module.css";
 
 export default function TechniquePage() {
+  return (
+    <Suspense fallback={<TechniquePageLoading />}>
+      <TechniquePageContent />
+    </Suspense>
+  );
+}
+
+function TechniquePageLoading() {
+  return (
+    <Box
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "var(--gray-1)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text color="gray">Loading...</Text>
+    </Box>
+  );
+}
+
+function TechniquePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [videoUrl, setVideoUrl] = useState<string>("");
