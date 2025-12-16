@@ -1,8 +1,10 @@
 "use client";
 
-import { ReactNode, useRef, useCallback } from "react";
-import { Box, Flex, Text, Badge } from "@radix-ui/themes";
+import { ReactNode, useRef, useCallback, useState, useEffect } from "react";
+import { Box, Flex, Text, Badge, Tooltip } from "@radix-ui/themes";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { Colors } from "@/lib/config";
 
 export interface TabDefinition {
   id: string;
@@ -22,6 +24,46 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Check scroll state
+  const updateScrollState = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
+  }, []);
+
+  // Update scroll state on mount, resize, and scroll
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    updateScrollState();
+    
+    container.addEventListener("scroll", updateScrollState);
+    window.addEventListener("resize", updateScrollState);
+    
+    return () => {
+      container.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [updateScrollState, tabs]);
+
+  // Scroll by a fixed amount
+  const scroll = useCallback((direction: "left" | "right") => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const scrollAmount = 200;
+    container.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  }, []);
 
   // Auto-scroll to bring clicked tab into view
   const handleTabClick = useCallback((tabId: string, isDisabled: boolean) => {
@@ -62,6 +104,104 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
       }}
     >
       <Box style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 var(--space-4)", position: "relative" }}>
+        {/* Left scroll button (desktop) */}
+        {!isMobile && canScrollLeft && (
+          <Box
+            style={{
+              position: "absolute",
+              left: "var(--space-4)",
+              top: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              zIndex: 20,
+              background: "linear-gradient(to right, var(--gray-2) 60%, transparent)",
+              paddingRight: "12px",
+            }}
+          >
+            <Tooltip content="Scroll left">
+              <button
+                onClick={() => scroll("left")}
+                aria-label="Scroll left"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "9999px",
+                  backgroundColor: Colors.darkMint,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease-out",
+                  border: `2px solid ${Colors.white}`,
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(122, 219, 143, 0.2)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = Colors.lightMint;
+                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(122, 219, 143, 0.5), 0 2px 8px rgba(122, 219, 143, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = Colors.darkMint;
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(122, 219, 143, 0.2)";
+                }}
+              >
+                <ChevronLeftIcon width={16} height={16} color={Colors.darkGreen} />
+              </button>
+            </Tooltip>
+          </Box>
+        )}
+
+        {/* Right scroll button (desktop) */}
+        {!isMobile && canScrollRight && (
+          <Box
+            style={{
+              position: "absolute",
+              right: "var(--space-4)",
+              top: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              zIndex: 20,
+              background: "linear-gradient(to left, var(--gray-2) 60%, transparent)",
+              paddingLeft: "12px",
+            }}
+          >
+            <Tooltip content="Scroll right">
+              <button
+                onClick={() => scroll("right")}
+                aria-label="Scroll right"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "9999px",
+                  backgroundColor: Colors.darkMint,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease-out",
+                  border: `2px solid ${Colors.white}`,
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(122, 219, 143, 0.2)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = Colors.lightMint;
+                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(122, 219, 143, 0.5), 0 2px 8px rgba(122, 219, 143, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = Colors.darkMint;
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(122, 219, 143, 0.2)";
+                }}
+              >
+                <ChevronRightIcon width={16} height={16} color={Colors.darkGreen} />
+              </button>
+            </Tooltip>
+          </Box>
+        )}
+
         {/* Fade masks on mobile to indicate scrollability */}
         {isMobile && (
           <>
@@ -98,6 +238,8 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
             overflowX: "auto",
             scrollbarWidth: "none",
             msOverflowStyle: "none",
+            paddingLeft: !isMobile && canScrollLeft ? "32px" : undefined,
+            paddingRight: !isMobile && canScrollRight ? "32px" : undefined,
           }}
         >
           {tabs.map((tab) => {

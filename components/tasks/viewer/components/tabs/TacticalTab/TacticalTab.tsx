@@ -35,10 +35,10 @@ export function TacticalTab({
     setActiveSubTab,
     selectedBall,
     setSelectedBall,
-    selectedSwingType,
-    setSelectedSwingType,
-    selectedBallSwingType,
-    setSelectedBallSwingType,
+    selectedSwingTypes,
+    setSelectedSwingTypes,
+    selectedBallSwingTypes,
+    setSelectedBallSwingTypes,
     allShotsAnalyzedRef,
     ballSequenceAnalyzedRef,
     nicknamesGeneratedRef,
@@ -100,8 +100,8 @@ export function TacticalTab({
         <AllShotsContent
           allShotsData={allShotsData}
           hasAllShotsData={hasAllShotsData}
-          selectedSwingType={selectedSwingType}
-          onSwingTypeChange={setSelectedSwingType}
+          selectedSwingTypes={selectedSwingTypes}
+          onSwingTypesChange={setSelectedSwingTypes}
           portraits={portraits}
           nicknames={nicknames}
           nicknamesLoading={nicknamesLoading}
@@ -116,8 +116,8 @@ export function TacticalTab({
           selectedBall={selectedBall}
           onBallChange={setSelectedBall}
           ballDataMap={ballDataMap}
-          selectedBallSwingType={selectedBallSwingType}
-          onBallSwingTypeChange={setSelectedBallSwingType}
+          selectedBallSwingTypes={selectedBallSwingTypes}
+          onBallSwingTypesChange={setSelectedBallSwingTypes}
           portraits={portraits}
           nicknames={nicknames}
           nicknamesLoading={nicknamesLoading}

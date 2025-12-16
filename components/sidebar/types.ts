@@ -1,7 +1,7 @@
 import type { Chat } from "@/types/chat";
 import type { HighlightingPreferences, TTSSettings, InsightLevel } from "@/utils/storage";
 
-export type Appearance = "light" | "dark" | "green" | "sportai";
+export type Appearance = "light" | "dark" | "green";
 
 export interface SidebarProps {
   children?: React.ReactNode;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import {
   Box,
   Flex,
@@ -13,6 +14,14 @@ import {
 } from "@radix-ui/themes";
 import { TargetIcon, LightningBoltIcon } from "@radix-ui/react-icons";
 import { useIsMobile } from "@/hooks/useIsMobile";
+
+// Player colors for portrait borders
+const PLAYER_COLORS = [
+  { primary: "#7ADB8F", glow: "rgba(122, 219, 143, 0.5)" },
+  { primary: "#60A5FA", glow: "rgba(96, 165, 250, 0.5)" },
+  { primary: "#F59E0B", glow: "rgba(245, 158, 11, 0.5)" },
+  { primary: "#A78BFA", glow: "rgba(167, 139, 250, 0.5)" },
+];
 import type { StatisticsResult } from "../../types";
 import type { ZoneSystemId, ZoneStat, PlayerDominance } from "./types";
 import { getZoneSystemsForSport, type Sport } from "./constants";
@@ -237,7 +246,7 @@ export function CourtDominanceView({
                 </Text>
               </Flex>
 
-              {/* Player Selector */}
+              {/* Player Selector with Portrait Circles */}
               {playerDominance.length > 0 && (
                 <Flex direction="column" gap="2">
                   <Text
@@ -248,59 +257,130 @@ export function CourtDominanceView({
                   >
                     Player Filter
                   </Text>
-                  <Box style={{ position: "relative" }}>
-                    {/* Fade masks on mobile */}
-                    {isMobile && (
-                      <>
-                        <Box
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: "20px",
-                            background: "linear-gradient(to right, var(--gray-2), transparent)",
-                            zIndex: 10,
-                            pointerEvents: "none",
-                          }}
-                        />
-                        <Box
-                          style={{
-                            position: "absolute",
-                            right: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: "20px",
-                            background: "linear-gradient(to left, var(--gray-2), transparent)",
-                            zIndex: 10,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      </>
-                    )}
-                    <Box
-                      style={{
-                        overflowX: isMobile ? "auto" : "visible",
-                        scrollbarWidth: "none",
-                        msOverflowStyle: "none",
-                      }}
-                    >
-                      <SegmentedControl.Root
-                        value={String(selectedPlayer)}
-                        onValueChange={(v) =>
-                          setSelectedPlayer(v === "all" ? "all" : Number(v))
-                        }
-                        size="2"
+                  <Flex gap="2" wrap="wrap">
+                    {/* All Players option */}
+                    <Tooltip content={selectedPlayer === "all" ? "Showing all players" : "Click to show all"}>
+                      <Flex
+                        align="center"
+                        gap="2"
+                        onClick={() => setSelectedPlayer("all")}
+                        style={{
+                          cursor: "pointer",
+                          opacity: selectedPlayer === "all" ? 1 : 0.5,
+                          transition: "all 0.2s ease",
+                          padding: isMobile ? "6px 10px" : "4px 10px",
+                          borderRadius: 8,
+                          backgroundColor: selectedPlayer === "all" ? "var(--accent-a3)" : "transparent",
+                        }}
                       >
-                        <SegmentedControl.Item value="all">All Players</SegmentedControl.Item>
-                        {playerDominance.map((p) => (
-                          <SegmentedControl.Item key={p.playerId} value={String(p.playerId)}>
-                            {p.playerName}
-                          </SegmentedControl.Item>
-                        ))}
-                      </SegmentedControl.Root>
-                    </Box>
-                  </Box>
+                        <Box
+                          style={{
+                            width: isMobile ? 28 : 32,
+                            height: isMobile ? 28 : 32,
+                            borderRadius: "50%",
+                            border: `3px solid ${selectedPlayer === "all" ? "var(--accent-9)" : "var(--gray-6)"}`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: selectedPlayer === "all" ? "var(--accent-9)" : "var(--gray-6)",
+                            transition: "all 0.2s ease",
+                            boxShadow: selectedPlayer === "all" ? "0 0 12px var(--accent-a6)" : "none",
+                          }}
+                        >
+                          <Text size="1" weight="bold" style={{ color: "white" }}>All</Text>
+                        </Box>
+                        <Text
+                          size="2"
+                          weight="medium"
+                          style={{
+                            color: selectedPlayer === "all" ? "var(--gray-12)" : "var(--gray-8)",
+                            transition: "color 0.2s ease",
+                          }}
+                        >
+                          All Players
+                        </Text>
+                      </Flex>
+                    </Tooltip>
+
+                    {/* Individual player options */}
+                    {playerDominance.map((player, idx) => {
+                      const color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
+                      const isActive = selectedPlayer === player.playerId;
+                      const portrait = portraits[player.playerId];
+                      
+                      return (
+                        <Tooltip
+                          key={player.playerId}
+                          content={isActive ? `Showing ${player.playerName}` : `Click to filter by ${player.playerName}`}
+                        >
+                          <Flex
+                            align="center"
+                            gap="2"
+                            onClick={() => setSelectedPlayer(player.playerId)}
+                            style={{
+                              cursor: "pointer",
+                              opacity: isActive ? 1 : 0.5,
+                              transition: "all 0.2s ease",
+                              padding: isMobile ? "6px 10px" : "4px 10px",
+                              borderRadius: 8,
+                              backgroundColor: isActive ? `${color.primary}15` : "transparent",
+                            }}
+                          >
+                            <Box
+                              style={{
+                                position: "relative",
+                                width: isMobile ? 28 : 32,
+                                height: isMobile ? 28 : 32,
+                                borderRadius: "50%",
+                                overflow: "hidden",
+                                border: `3px solid ${isActive ? color.primary : "var(--gray-6)"}`,
+                                flexShrink: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: portrait
+                                  ? "transparent"
+                                  : isActive
+                                    ? color.primary
+                                    : "var(--gray-6)",
+                                transition: "all 0.2s ease",
+                                boxShadow: isActive ? `0 0 12px ${color.glow}` : "none",
+                              }}
+                            >
+                              {portrait ? (
+                                <Image
+                                  src={portrait}
+                                  alt={player.playerName}
+                                  fill
+                                  sizes="32px"
+                                  style={{
+                                    objectFit: "cover",
+                                    objectPosition: "top",
+                                    filter: isActive ? "none" : "grayscale(100%)",
+                                    transition: "filter 0.2s ease",
+                                  }}
+                                />
+                              ) : (
+                                <Text size="1" weight="bold" style={{ color: "white" }}>
+                                  {player.playerName.charAt(0)}
+                                </Text>
+                              )}
+                            </Box>
+                            <Text
+                              size="2"
+                              weight="medium"
+                              style={{
+                                color: isActive ? "var(--gray-12)" : "var(--gray-8)",
+                                transition: "color 0.2s ease",
+                              }}
+                            >
+                              {player.playerName}
+                            </Text>
+                          </Flex>
+                        </Tooltip>
+                      );
+                    })}
+                  </Flex>
                 </Flex>
               )}
             </Flex>

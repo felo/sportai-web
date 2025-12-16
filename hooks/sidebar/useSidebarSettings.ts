@@ -19,7 +19,7 @@ import {
 import type { Appearance, SidebarSettingsState } from "@/components/sidebar/types";
 
 export function useSidebarSettings(): SidebarSettingsState {
-  const [appearance, setAppearance] = useState<Appearance>("dark");
+  const [appearance, setAppearance] = useState<Appearance>("green");
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
   const [highlightingPrefs, setHighlightingPrefs] = useState<HighlightingPreferences>({

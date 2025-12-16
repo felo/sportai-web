@@ -14,7 +14,8 @@ import {
   isImageFile, 
   extractFirstFrameWithDuration, 
   extractFirstFrameFromUrl,
-  uploadThumbnailToS3 
+  uploadThumbnailToS3,
+  validateVideoUrl,
 } from "@/utils/video-utils";
 
 interface UseVideoPreAnalysisOptions {
@@ -31,6 +32,9 @@ interface UseVideoPreAnalysisReturn {
   detectedVideoUrl: string | null;
   setDetectedVideoUrl: React.Dispatch<React.SetStateAction<string | null>>;
   resetAnalysis: () => void;
+  /** True when a pasted video URL exceeds the 100MB size limit */
+  urlFileSizeTooLarge: boolean;
+  setUrlFileSizeTooLarge: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function useVideoPreAnalysis({
@@ -42,6 +46,7 @@ export function useVideoPreAnalysis({
   const [isDetectingSport, setIsDetectingSport] = useState(false);
   const [videoSportDetected, setVideoSportDetected] = useState<DomainExpertise | null>(null);
   const [detectedVideoUrl, setDetectedVideoUrl] = useState<string | null>(null);
+  const [urlFileSizeTooLarge, setUrlFileSizeTooLarge] = useState(false);
   
   const lastDetectedVideoRef = useRef<File | null>(null);
   const lastAnalyzedUrlRef = useRef<string | null>(null);
@@ -243,6 +248,20 @@ export function useVideoPreAnalysis({
       });
       
       try {
+        // First, check the file size via HEAD request
+        videoLogger.info("URL analysis - checking file size:", detectedVideoUrl);
+        const urlValidation = await validateVideoUrl(detectedVideoUrl);
+        
+        if (urlValidation.errorType === 'too-large') {
+          videoLogger.info("URL analysis - file too large:", urlValidation.error);
+          setUrlFileSizeTooLarge(true);
+          setVideoPreAnalysis(null);
+          setDetectedVideoUrl(null);
+          lastAnalyzedUrlRef.current = null;
+          isAnalyzingUrlRef.current = false;
+          return;
+        }
+        
         videoLogger.info("URL analysis starting:", detectedVideoUrl);
         const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(detectedVideoUrl, 640, 0.7);
         
@@ -385,6 +404,8 @@ export function useVideoPreAnalysis({
     detectedVideoUrl,
     setDetectedVideoUrl,
     resetAnalysis,
+    urlFileSizeTooLarge,
+    setUrlFileSizeTooLarge,
   };
 }
 

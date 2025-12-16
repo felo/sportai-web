@@ -1,305 +1,36 @@
 /* Vidstack Custom Theme - SportAI Brand Colors */
-/* Light mode: #025940 (dark green) | Dark mode: #7ADB8F (light green) */
-/* Base styles are imported directly in the component */
+/* Minimal styling that doesn't break default functionality */
 
-/* ============================================
-   GLOBAL DARK THEME (Default for video player)
-   Video players look best with dark UI regardless of app theme
-   ============================================ */
-
+/* Brand color variables */
 [data-media-player] {
-  /* Primary brand color - light green for contrast on dark */
   --media-brand: #7ADB8F;
   --media-focus: #7ADB8F;
-  
-  /* Slider/progress track colors */
-  --media-slider-track-fill-bg: #7ADB8F;
-  --media-slider-value-bg: #7ADB8F;
-  --media-slider-preview-bg: rgba(122, 219, 143, 0.15);
-  
-  /* Time slider specific */
-  --media-time-slider-track-fill-bg: #7ADB8F;
-  
-  /* Chapter markers */
-  --media-slider-chapter-title-color: #7ADB8F;
-  
-  /* Tooltip styling */
   --media-tooltip-bg: #1C1C1C;
   --media-tooltip-color: #EEEEEE;
-  
-  /* Menu styling - dark theme */
-  --media-menu-bg: #1C1C1C;
-  --media-menu-border: 1px solid #383838;
-  --media-menu-item-hover-bg: rgba(122, 219, 143, 0.12);
-  
-  /* Focus rings */
-  --media-focus-ring: 0 0 0 2px rgba(122, 219, 143, 0.5);
-  
-  /* Border radius to match Radix UI */
-  --media-border-radius: var(--radius-3, 8px);
-  
-  /* Control bar background */
-  --media-controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
-  
-  /* Font family to match your app */
   font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ============================================
-   SETTINGS MENU COMPREHENSIVE STYLING
-   ============================================ */
-
-/* Main menu container */
-[data-media-player] .vds-menu-items,
-[data-media-player] [data-media-menu-items] {
-  background-color: #1C1C1C !important;
-  border: 1px solid #383838 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(12px) !important;
-  padding: 6px !important;
-  min-width: 220px !important;
+/* Progress bar and sliders use brand color */
+[data-media-player] {
+  --media-slider-track-fill-bg: #7ADB8F;
+  --media-slider-value-bg: #7ADB8F;
+  --media-time-slider-track-fill-bg: #7ADB8F;
 }
 
-/* Menu item base styling */
-[data-media-player] .vds-menu-item,
-[data-media-player] [data-media-menu-item] {
-  color: #EEEEEE !important;
-  background: transparent !important;
-  border-radius: 8px !important;
-  padding: 10px 14px !important;
-  margin: 2px 0 !important;
-  transition: background-color 0.15s ease, color 0.15s ease !important;
+/* Menu dark theme */
+[data-media-player] .vds-menu-items {
+  background-color: #1C1C1C;
+  border: 1px solid #333;
+  border-radius: 8px;
 }
 
-/* Menu item text */
-[data-media-player] .vds-menu-item span,
-[data-media-player] .vds-menu-item-label {
-  color: #EEEEEE !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
-}
-
-/* Menu item icons */
-[data-media-player] .vds-menu-item svg,
-[data-media-player] .vds-menu-item [class*="icon"] {
-  color: #ABABAB !important;
-  opacity: 0.85 !important;
-}
-
-/* Menu item hover state */
-[data-media-player] .vds-menu-item:hover,
-[data-media-player] .vds-menu-item[data-hocus],
-[data-media-player] .vds-menu-item[data-focus] {
-  background-color: rgba(122, 219, 143, 0.12) !important;
-  color: #FFFFFF !important;
-}
-
-[data-media-player] .vds-menu-item:hover svg,
-[data-media-player] .vds-menu-item[data-hocus] svg {
-  color: #7ADB8F !important;
-  opacity: 1 !important;
-}
-
-/* Submenu arrows/chevrons */
-[data-media-player] .vds-menu-item [class*="arrow"],
-[data-media-player] .vds-menu-item [class*="chevron"],
-[data-media-player] .vds-menu-chevron {
-  color: #686868 !important;
-}
-
-[data-media-player] .vds-menu-item:hover [class*="arrow"],
-[data-media-player] .vds-menu-item:hover [class*="chevron"],
-[data-media-player] .vds-menu-item:hover .vds-menu-chevron {
-  color: #7ADB8F !important;
-}
-
-/* Checked/selected menu items */
-[data-media-player] .vds-menu-item[aria-checked="true"],
-[data-media-player] .vds-menu-item[data-checked] {
-  background-color: rgba(122, 219, 143, 0.15) !important;
-  color: #7ADB8F !important;
-}
-
-[data-media-player] .vds-menu-item[aria-checked="true"] span,
-[data-media-player] .vds-menu-item[data-checked] span {
-  color: #7ADB8F !important;
-}
-
-/* Radio items styling */
-[data-media-player] .vds-radio-group {
-  background: transparent !important;
-}
-
-[data-media-player] .vds-radio {
-  color: #EEEEEE !important;
-  background: transparent !important;
-  border-radius: 8px !important;
-  padding: 10px 14px !important;
-  margin: 2px 0 !important;
-}
-
-[data-media-player] .vds-radio:hover,
-[data-media-player] .vds-radio[data-hocus] {
-  background-color: rgba(122, 219, 143, 0.12) !important;
+[data-media-player] .vds-menu-item:hover {
+  background-color: rgba(122, 219, 143, 0.15);
 }
 
 [data-media-player] .vds-radio[data-checked] {
-  background-color: rgba(122, 219, 143, 0.15) !important;
-  color: #7ADB8F !important;
-}
-
-/* Radio indicator dot */
-[data-media-player] .vds-radio-check {
-  border-color: #686868 !important;
-  background: transparent !important;
-}
-
-[data-media-player] .vds-radio[data-checked] .vds-radio-check {
-  border-color: #7ADB8F !important;
-  background: #7ADB8F !important;
-}
-
-/* Submenu styling */
-[data-media-player] .vds-submenu-content,
-[data-media-player] [data-media-submenu] {
-  background-color: #1C1C1C !important;
-  border: 1px solid #383838 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* Submenu header/back button */
-[data-media-player] .vds-menu-button,
-[data-media-player] [data-media-menu-button] {
-  color: #ABABAB !important;
-  padding: 10px 14px !important;
-  border-radius: 8px !important;
-}
-
-[data-media-player] .vds-menu-button:hover {
-  background-color: rgba(122, 219, 143, 0.12) !important;
-  color: #EEEEEE !important;
-}
-
-/* Dividers/separators */
-[data-media-player] .vds-menu-divider,
-[data-media-player] [class*="divider"] {
-  background-color: #383838 !important;
-  margin: 6px 8px !important;
-}
-
-/* Slider controls in menus (like speed slider) */
-[data-media-player] .vds-menu .vds-slider {
-  --media-slider-track-bg: #383838 !important;
-  --media-slider-track-fill-bg: #7ADB8F !important;
-}
-
-[data-media-player] .vds-menu .vds-slider-thumb {
-  background: #7ADB8F !important;
-  border: 2px solid #1C1C1C !important;
-}
-
-/* Section titles in menus */
-[data-media-player] .vds-menu-section-title {
-  color: #686868 !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  padding: 8px 14px 4px !important;
-}
-
-/* ============================================
-   SETTINGS BUTTON IN CONTROL BAR
-   ============================================ */
-
-[data-media-player] .vds-settings-button,
-[data-media-player] .vds-menu-button {
-  color: #EEEEEE !important;
-  transition: color 0.15s ease, background-color 0.15s ease !important;
-}
-
-[data-media-player] .vds-settings-button:hover,
-[data-media-player] .vds-settings-button[data-open] {
-  color: #7ADB8F !important;
-  background-color: rgba(122, 219, 143, 0.15) !important;
-  border-radius: 6px !important;
-}
-
-/* ============================================
-   CONTROL BAR BUTTONS
-   ============================================ */
-
-/* Buffering progress color */
-[data-media-player] .vds-time-slider .vds-slider-progress {
-  background-color: rgba(122, 219, 143, 0.3);
-}
-
-/* Play button accent */
-[data-media-player] .vds-play-button:hover {
-  background-color: rgba(122, 219, 143, 0.15);
-  border-radius: 6px;
-}
-
-/* Active/selected states */
-[data-media-player] [data-active] {
   color: #7ADB8F;
 }
-
-/* Chapter markers on timeline */
-[data-media-player] .vds-slider-chapters .vds-slider-chapter::after {
-  background-color: #7ADB8F;
-}
-
-/* PiP button styling */
-[data-media-player] .vds-pip-button:hover {
-  background-color: rgba(122, 219, 143, 0.15);
-  border-radius: 6px;
-}
-
-/* Fullscreen button styling */
-[data-media-player] .vds-fullscreen-button:hover {
-  background-color: rgba(122, 219, 143, 0.15);
-  border-radius: 6px;
-}
-
-/* Mute button styling */
-[data-media-player] .vds-mute-button:hover {
-  background-color: rgba(122, 219, 143, 0.15);
-  border-radius: 6px;
-}
-
-/* Captions button styling */
-[data-media-player] .vds-captions-button:hover {
-  background-color: rgba(122, 219, 143, 0.15);
-  border-radius: 6px;
-}
-
-/* ============================================
-   GREEN THEME SPECIFIC (SportAI theme)
-   ============================================ */
-
-html[data-theme="green"] [data-media-player],
-html[data-theme="sportai"] [data-media-player] {
-  --media-brand: #7ADB8F;
-  --media-focus: #7ADB8F;
-}
-
-html[data-theme="green"] [data-media-player] .vds-menu-items,
-html[data-theme="sportai"] [data-media-player] .vds-menu-items {
-  background-color: #001C0F !important;
-  border-color: #025940 !important;
-}
-
-html[data-theme="green"] [data-media-player] .vds-menu-item:hover,
-html[data-theme="sportai"] [data-media-player] .vds-menu-item:hover {
-  background-color: rgba(122, 219, 143, 0.15) !important;
-}
-
-/* ============================================
-   LAYOUT ENHANCEMENTS
-   ============================================ */
 
 /* Make player fill container */
 [data-media-player] {
@@ -312,118 +43,7 @@ html[data-theme="sportai"] [data-media-player] .vds-menu-item:hover {
   border-radius: var(--radius-3, 8px);
 }
 
-/* Smoother transitions */
-[data-media-player] .vds-controls {
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* Timeline chapters styling */
-[data-media-player] .vds-slider-chapters {
-  gap: 2px;
-}
-
-[data-media-player] .vds-slider-chapter {
-  border-radius: 2px;
-}
-
-/* Speed menu improvements */
-[data-media-player] .vds-menu-items {
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-/* Thumbnail preview styling */
-[data-media-player] .vds-thumbnail {
-  border-radius: 4px;
-  border: 2px solid currentColor;
-  border-bottom: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Fix black line under thumbnail preview */
-[data-media-player] .vds-slider-preview {
-  background: transparent !important;
-  gap: 0 !important;
-}
-
-[data-media-player] .vds-slider-preview > * {
-  background: transparent !important;
-}
-
-[data-media-player] .vds-slider-value {
-  background: var(--media-tooltip-bg, #1C1C1C);
-  border-radius: 4px;
-  padding: 2px 6px;
-  margin-top: 4px;
-}
-
-/* Ensure thumbnail container doesn't have extra space */
-[data-media-player] .vds-slider-thumbnail {
-  background: transparent !important;
-  padding: 0;
-  margin: 0;
-  border: none !important;
-}
-
-/* Remove any gaps or backgrounds in the thumbnail preview stack */
-[data-media-player] .vds-thumbnail {
-  margin-bottom: 0 !important;
-}
-
-[data-media-player] .vds-thumbnail img {
-  display: block;
-}
-
-/* Chapter/time slider preview - ensure no dark backgrounds */
-[data-media-player] .vds-time-slider .vds-slider-preview,
-[data-media-player] .vds-time-slider .vds-slider-preview * {
-  background-color: transparent !important;
-}
-
-/* Chapter title on hover */
-[data-media-player] .vds-slider-chapter-title {
-  font-size: 12px;
-  font-weight: 500;
-  background-color: rgba(0, 0, 0, 0.8);
-  padding: 4px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-/* Time display styling */
-[data-media-player] .vds-time {
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-}
-
-/* Volume slider */
-[data-media-player] .vds-volume-slider {
-  --media-slider-track-fill-bg: currentColor;
-}
-
-/* PiP window styling */
-::backdrop {
-  background-color: rgba(0, 0, 0, 0.8);
-}
-
-/* ============================================
-   KEYBOARD SHORTCUTS INDICATOR
-   ============================================ */
-
-[data-media-player] .vds-gesture {
-  --gesture-icon-size: 64px;
-}
-
-[data-media-player] .vds-gesture[data-type="seek-forward"],
-[data-media-player] .vds-gesture[data-type="seek-backward"] {
-  opacity: 0.9;
-}
-
-/* ============================================
-   CUSTOM OVERLAY SUPPORT
-   ============================================ */
-
-/* Ensure overlays can be placed above video but below controls */
+/* Ensure overlays work */
 [data-media-player] [data-overlay] {
   position: absolute;
   inset: 0;
@@ -431,8 +51,6 @@ html[data-theme="sportai"] [data-media-player] .vds-menu-item:hover {
   z-index: 10;
 }
 
-/* Make sure controls are above everything */
 [data-media-player] .vds-controls {
   z-index: 50;
 }
-

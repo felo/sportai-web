@@ -11,11 +11,11 @@ interface UseTacticalTabStateReturn {
   selectedBall: number;
   setSelectedBall: (ball: number) => void;
   
-  // Swing type filters
-  selectedSwingType: string | null;
-  setSelectedSwingType: (type: string | null) => void;
-  selectedBallSwingType: string | null;
-  setSelectedBallSwingType: (type: string | null) => void;
+  // Swing type filters (arrays for multi-select)
+  selectedSwingTypes: string[];
+  setSelectedSwingTypes: (types: string[]) => void;
+  selectedBallSwingTypes: string[];
+  setSelectedBallSwingTypes: (types: string[]) => void;
   
   // Analysis tracking refs
   allShotsAnalyzedRef: React.MutableRefObject<boolean>;
@@ -30,8 +30,8 @@ interface UseTacticalTabStateReturn {
 export function useTacticalTabState(): UseTacticalTabStateReturn {
   const [activeSubTab, setActiveSubTab] = useState<TacticalSubTab>("all-shots");
   const [selectedBall, setSelectedBall] = useState(1);
-  const [selectedSwingType, setSelectedSwingType] = useState<string | null>(null);
-  const [selectedBallSwingType, setSelectedBallSwingType] = useState<string | null>(null);
+  const [selectedSwingTypes, setSelectedSwingTypes] = useState<string[]>([]);
+  const [selectedBallSwingTypes, setSelectedBallSwingTypes] = useState<string[]>([]);
   const [pendingScroll, setPendingScroll] = useState(false);
   
   // Track if we've already triggered analysis for each tab
@@ -44,7 +44,7 @@ export function useTacticalTabState(): UseTacticalTabStateReturn {
 
   // Reset ball swing type filter when ball tab changes
   useEffect(() => {
-    setSelectedBallSwingType(null);
+    setSelectedBallSwingTypes([]);
   }, [selectedBall]);
 
   // Scroll to ball sequence section when it becomes visible and scroll is pending
@@ -75,10 +75,10 @@ export function useTacticalTabState(): UseTacticalTabStateReturn {
     setActiveSubTab,
     selectedBall,
     setSelectedBall,
-    selectedSwingType,
-    setSelectedSwingType,
-    selectedBallSwingType,
-    setSelectedBallSwingType,
+    selectedSwingTypes,
+    setSelectedSwingTypes,
+    selectedBallSwingTypes,
+    setSelectedBallSwingTypes,
     allShotsAnalyzedRef,
     ballSequenceAnalyzedRef,
     nicknamesGeneratedRef,

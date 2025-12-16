@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { Select, Box, Flex, Text } from "@radix-ui/themes";
 
-type Appearance = "light" | "dark" | "green" | "sportai";
+type Appearance = "light" | "dark" | "green";
 type AccentColor = "blue" | "green" | "red" | "orange" | "purple" | "cyan" | "teal" | "jade" | "violet" | "iris" | "indigo" | "plum" | "pink" | "crimson" | "ruby" | "tomato" | "amber" | "yellow" | "lime" | "mint" | "grass" | "sky" | "bronze" | "gold" | "brown";
 type GrayColor = "gray" | "mauve" | "slate" | "sage" | "olive" | "sand";
 
 export function ThemeSwitcher() {
-  const [appearance, setAppearance] = useState<Appearance>("light");
-  const [accentColor, setAccentColor] = useState<AccentColor>("blue");
+  const [appearance, setAppearance] = useState<Appearance>("green");
+  const [accentColor, setAccentColor] = useState<AccentColor>("mint");
   const [grayColor, setGrayColor] = useState<GrayColor>("gray");
 
   useEffect(() => {
@@ -18,8 +18,8 @@ export function ThemeSwitcher() {
     if (stored) {
       try {
         const theme = JSON.parse(stored);
-        setAppearance(theme.appearance || "light");
-        setAccentColor(theme.accentColor || "blue");
+        setAppearance(theme.appearance || "green");
+        setAccentColor(theme.accentColor || "mint");
         setGrayColor(theme.grayColor || "gray");
       } catch (e) {
         // Invalid stored theme
@@ -47,7 +47,6 @@ export function ThemeSwitcher() {
             <Select.Item value="light">Light</Select.Item>
             <Select.Item value="dark">Dark</Select.Item>
             <Select.Item value="green">Green</Select.Item>
-            <Select.Item value="sportai">SportAI Default</Select.Item>
           </Select.Content>
         </Select.Root>
       </Box>

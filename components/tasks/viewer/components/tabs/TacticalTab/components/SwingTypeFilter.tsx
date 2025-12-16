@@ -1,21 +1,35 @@
 "use client";
 
-import { Box, Flex, DropdownMenu, IconButton } from "@radix-ui/themes";
-import { MixerHorizontalIcon, CheckIcon } from "@radix-ui/react-icons";
+import { Box, DropdownMenu, IconButton } from "@radix-ui/themes";
+import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import { formatSwingType } from "../../../../utils";
 
 interface SwingTypeFilterProps {
   availableTypes: string[];
-  selectedType: string | null;
-  onTypeChange: (type: string | null) => void;
+  selectedTypes: string[];
+  onTypesChange: (types: string[]) => void;
 }
 
 export function SwingTypeFilter({ 
   availableTypes, 
-  selectedType, 
-  onTypeChange 
+  selectedTypes, 
+  onTypesChange 
 }: SwingTypeFilterProps) {
   if (availableTypes.length === 0) return null;
+
+  const handleToggle = (swingType: string) => {
+    if (selectedTypes.includes(swingType)) {
+      onTypesChange(selectedTypes.filter(t => t !== swingType));
+    } else {
+      onTypesChange([...selectedTypes, swingType]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    onTypesChange([]);
+  };
+
+  const isAllSelected = selectedTypes.length === 0;
 
   return (
     <DropdownMenu.Root>
@@ -26,7 +40,7 @@ export function SwingTypeFilter({
           style={{ position: "relative" }}
         >
           <MixerHorizontalIcon width={16} height={16} />
-          {selectedType && (
+          {selectedTypes.length > 0 && (
             <Box
               style={{
                 position: "absolute",
@@ -44,33 +58,22 @@ export function SwingTypeFilter({
       <DropdownMenu.Content>
         <DropdownMenu.Label>Filter by Shot Type</DropdownMenu.Label>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item
-          onClick={() => onTypeChange(null)}
-          style={{ 
-            fontWeight: !selectedType ? 600 : 400,
-            color: !selectedType ? "var(--accent-11)" : undefined,
-          }}
+        <DropdownMenu.CheckboxItem
+          checked={isAllSelected}
+          onCheckedChange={handleSelectAll}
         >
-          <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
-            <span>All Shots</span>
-            {!selectedType && <CheckIcon width={16} height={16} />}
-          </Flex>
-        </DropdownMenu.Item>
+          All Shots
+        </DropdownMenu.CheckboxItem>
         <DropdownMenu.Separator />
         {availableTypes.map(swingType => (
-          <DropdownMenu.Item
+          <DropdownMenu.CheckboxItem
             key={swingType}
-            onClick={() => onTypeChange(swingType)}
-            style={{ 
-              fontWeight: selectedType === swingType ? 600 : 400,
-              color: selectedType === swingType ? "var(--accent-11)" : undefined,
-            }}
+            checked={selectedTypes.includes(swingType)}
+            onCheckedChange={() => handleToggle(swingType)}
+            onSelect={(e) => e.preventDefault()}
           >
-            <Flex align="center" justify="between" gap="3" style={{ width: "100%" }}>
-              <span>{formatSwingType(swingType)}</span>
-              {selectedType === swingType && <CheckIcon width={16} height={16} />}
-            </Flex>
-          </DropdownMenu.Item>
+            {formatSwingType(swingType)}
+          </DropdownMenu.CheckboxItem>
         ))}
       </DropdownMenu.Content>
     </DropdownMenu.Root>

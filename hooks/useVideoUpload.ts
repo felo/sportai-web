@@ -13,6 +13,9 @@ export function useVideoUpload() {
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // File size limit modal state
+  const [showFileSizeLimitModal, setShowFileSizeLimitModal] = useState(false);
+  
   // Server-side conversion flag (for HEVC/Apple QuickTime that need conversion)
   const [needsServerConversion, setNeedsServerConversion] = useState(false);
   
@@ -39,7 +42,14 @@ export function useVideoUpload() {
     
     const validation = validateVideoFile(file);
     if (!validation.valid) {
-      videoLogger.debug('[useVideoUpload] Validation failed:', validation.error);
+      videoLogger.debug('[useVideoUpload] Validation failed:', validation.errorType, validation.error);
+      
+      // Show modal for file size limit, callout for other errors
+      if (validation.errorType === 'file_size_limit') {
+        setShowFileSizeLimitModal(true);
+        return;
+      }
+      
       setError(validation.error || "Invalid video file");
       return;
     }
@@ -118,6 +128,9 @@ export function useVideoUpload() {
     handleVideoChange,
     // Server-side conversion flag (for HEVC/Apple QuickTime that need conversion)
     needsServerConversion,
+    // File size limit modal state
+    showFileSizeLimitModal,
+    setShowFileSizeLimitModal,
   };
 }
 

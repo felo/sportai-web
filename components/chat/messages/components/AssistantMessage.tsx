@@ -132,6 +132,7 @@ export function AssistantMessage({
             messageId={messageId} 
             onAskForHelp={onAskForHelp}
             onTTSUsage={onTTSUsage}
+            isStreaming={isStreaming}
             feedbackButtons={!isStreaming && !isIncomplete && !isGreeting ? (
               <FeedbackButtons 
                 messageId={messageId}

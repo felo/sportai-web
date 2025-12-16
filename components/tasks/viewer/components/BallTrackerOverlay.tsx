@@ -416,6 +416,11 @@ export function BallTrackerOverlay({
 
       // Draw bounce ripples
       if (showBounceRipples && ballBounces.length > 0 && ballPositions.length > 0) {
+        // Mobile: tone down ripples (smaller, more subtle)
+        const rippleMobileCheck = logicalWidth < 480;
+        const rippleMobileScale = rippleMobileCheck ? 0.6 : 1;
+        const rippleOpacityScale = rippleMobileCheck ? 0.5 : 1;
+        
         for (const bounce of ballBounces) {
           const timeSinceBounce = currentTime - bounce.timestamp;
           
@@ -434,17 +439,17 @@ export function BallTrackerOverlay({
             // Calculate perspective scale based on Y position
             const perspectiveScale = getPerspectiveScale(bouncePosition.Y);
             
-            // Animate radius from min to max (using scaled values)
-            const currentRadius = (rippleMinRadius + (rippleMaxRadius - rippleMinRadius) * progress) * perspectiveScale;
+            // Animate radius from min to max (using scaled values, reduced on mobile)
+            const currentRadius = (rippleMinRadius + (rippleMaxRadius - rippleMinRadius) * progress) * perspectiveScale * rippleMobileScale;
             
-            // Fade out opacity as ripple expands
-            const opacity = rippleConfig.startOpacity * (1 - progress);
+            // Fade out opacity as ripple expands (reduced on mobile)
+            const opacity = rippleConfig.startOpacity * (1 - progress) * rippleOpacityScale;
             
             // Get color based on bounce type
             const color = getBounceColor(bounce.type);
             
-            // Scale line width with perspective (using scaled value)
-            const lineWidth = rippleLineWidth * perspectiveScale;
+            // Scale line width with perspective (using scaled value, reduced on mobile)
+            const lineWidth = rippleLineWidth * perspectiveScale * rippleMobileScale;
             
             // Draw the ripple ring
             ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
@@ -453,8 +458,8 @@ export function BallTrackerOverlay({
             ctx.arc(x, y, currentRadius, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Draw a subtle inner glow at the start
-            if (progress < 0.3) {
+            // Draw a subtle inner glow at the start (skip on mobile for cleaner look)
+            if (progress < 0.3 && !rippleMobileCheck) {
               const glowOpacity = opacity * 0.5 * (1 - progress / 0.3);
               const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, currentRadius * 0.5);
               glowGradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${glowOpacity})`);
@@ -547,14 +552,14 @@ export function BallTrackerOverlay({
             const speedText = `${speed}`;
             const unit = "km/h";
             
-            // Calculate text dimensions (scaled for fullscreen)
-            const fontSize = velFontSize;
+            // Mobile detection: hide swing type and use smaller fonts on narrow screens
+            const isMobile = logicalWidth < 480;
+            const mobileScale = isMobile ? 0.75 : 1;
+            
+            // Calculate text dimensions (scaled for fullscreen and mobile)
+            const fontSize = velFontSize * mobileScale;
             const typeFontSize = fontSize * 0.6;
             const unitFontSize = fontSize * 0.65;
-            
-            // Measure swing type
-            ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
-            const typeMetrics = ctx.measureText(swingTypeFormatted);
             
             // Measure speed + unit
             ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
@@ -562,10 +567,22 @@ export function BallTrackerOverlay({
             ctx.font = `${unitFontSize}px system-ui, -apple-system, sans-serif`;
             const unitMetrics = ctx.measureText(unit);
             
-            const padding = velPadding;
+            const padding = velPadding * mobileScale;
             const speedRowWidth = speedMetrics.width + unitMetrics.width + padding * 0.5;
-            const totalWidth = Math.max(typeMetrics.width, speedRowWidth) + padding * 2;
-            const boxHeight = typeFontSize + fontSize + padding * 2.5;
+            
+            // On mobile: only speed row, no swing type row
+            let totalWidth: number;
+            let boxHeight: number;
+            if (isMobile) {
+              totalWidth = speedRowWidth + padding * 2;
+              boxHeight = fontSize + padding * 2;
+            } else {
+              // Measure swing type for desktop
+              ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
+              const typeMetrics = ctx.measureText(swingTypeFormatted);
+              totalWidth = Math.max(typeMetrics.width, speedRowWidth) + padding * 2;
+              boxHeight = typeFontSize + fontSize + padding * 2.5;
+            }
             
             // Clamp box position to canvas bounds
             boxX = Math.max(totalWidth / 2 + 5, Math.min(logicalWidth - totalWidth / 2 - 5, boxX));
@@ -574,22 +591,22 @@ export function BallTrackerOverlay({
             // Draw background box
             const boxLeft = boxX - totalWidth / 2;
             const boxTop = boxY - boxHeight / 2;
-            const borderRadius = velBorderRadius;
+            const borderRadius = velBorderRadius * mobileScale;
             
             ctx.globalAlpha = opacity;
             
-            // Draw connecting line from ball to box
-            ctx.strokeStyle = velocityConfig.borderColor;
-            ctx.lineWidth = 1.5 * scale;
+            // Draw connecting line from ball to box (hidden on mobile by using background color)
+            ctx.strokeStyle = isMobile ? velocityConfig.backgroundColor : velocityConfig.borderColor;
+            ctx.lineWidth = 1.5 * scale * mobileScale;
             ctx.beginPath();
             ctx.moveTo(ballX, ballY);
             ctx.lineTo(boxX, boxY);
             ctx.stroke();
             
-            // Draw small dot at ball end of line
-            ctx.fillStyle = velocityConfig.borderColor;
+            // Draw small dot at ball end of line (hidden on mobile by using background color)
+            ctx.fillStyle = isMobile ? velocityConfig.backgroundColor : velocityConfig.borderColor;
             ctx.beginPath();
-            ctx.arc(ballX, ballY, 3 * scale, 0, Math.PI * 2);
+            ctx.arc(ballX, ballY, 3 * scale * mobileScale, 0, Math.PI * 2);
             ctx.fill();
             
             // Draw rounded rectangle background
@@ -598,24 +615,36 @@ export function BallTrackerOverlay({
             ctx.roundRect(boxLeft, boxTop, totalWidth, boxHeight, borderRadius);
             ctx.fill();
             
-            // Draw border
-            ctx.strokeStyle = velocityConfig.borderColor;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(boxLeft, boxTop, totalWidth, boxHeight, borderRadius);
-            ctx.stroke();
+            // Draw border (only on desktop)
+            if (!isMobile) {
+              ctx.strokeStyle = velocityConfig.borderColor;
+              ctx.lineWidth = 2 * mobileScale;
+              ctx.beginPath();
+              ctx.roundRect(boxLeft, boxTop, totalWidth, boxHeight, borderRadius);
+              ctx.stroke();
+            }
             
-            // Draw swing type (above, smaller, gray)
-            const typeY = boxTop + padding + typeFontSize / 2;
-            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-            ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
-            ctx.textBaseline = "middle";
-            ctx.fillText(swingTypeFormatted, boxLeft + padding, typeY);
+            let speedY: number;
             
-            // Draw speed text (below type)
-            const speedY = typeY + typeFontSize / 2 + padding * 0.5 + fontSize / 2;
+            if (isMobile) {
+              // Mobile: just speed + unit centered vertically
+              speedY = boxTop + boxHeight / 2;
+            } else {
+              // Desktop: draw swing type (above, smaller, gray)
+              const typeY = boxTop + padding + typeFontSize / 2;
+              ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+              ctx.font = `${typeFontSize}px system-ui, -apple-system, sans-serif`;
+              ctx.textBaseline = "middle";
+              ctx.fillText(swingTypeFormatted, boxLeft + padding, typeY);
+              
+              // Speed text below type
+              speedY = typeY + typeFontSize / 2 + padding * 0.5 + fontSize / 2;
+            }
+            
+            // Draw speed text
             ctx.fillStyle = velocityConfig.textColor;
             ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+            ctx.textBaseline = "middle";
             ctx.fillText(speedText, boxLeft + padding, speedY);
             
             // Draw unit text (next to speed)

@@ -5,9 +5,12 @@ import { videoLogger } from "@/lib/logger";
 export const MAX_VIDEO_SIZE_MB = 100;
 export const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 
+export type VideoValidationErrorType = 'file_size_limit' | 'invalid_type' | 'extreme_size';
+
 export interface VideoValidationResult {
   valid: boolean;
   error?: string;
+  errorType?: VideoValidationErrorType;
 }
 
 // ============================================================================
@@ -181,20 +184,28 @@ export function validateVideoFile(file: File): VideoValidationResult {
   if (!isVideo && !isImage) {
     return {
       valid: false,
-      error: " Please select a valid video or image file (JPEG, PNG, GIF, WebP)",
+      error: "Please select a valid video or image file (JPEG, PNG, GIF, WebP)",
+      errorType: 'invalid_type',
     };
   }
 
-  // Client-side validation allows files through - even if > 100MB
-  // This ensures the server can respond with a natural dialogue message
-  // Only block extremely large files (> 10GB) that would cause upload issues
+  // For videos, enforce the 100MB limit immediately on selection/drop
+  if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) {
+    return {
+      valid: false,
+      errorType: 'file_size_limit',
+    };
+  }
+
+  // Block extremely large files (> 10GB) that would cause upload issues
   const EXTREME_SIZE_GB = 10;
   const EXTREME_SIZE_BYTES = EXTREME_SIZE_GB * 1024 * 1024 * 1024;
   
   if (file.size > EXTREME_SIZE_BYTES) {
     return {
       valid: false,
-      error: ` File is extremely large (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB). Please use a file under ${EXTREME_SIZE_GB}GB.`,
+      error: `File is extremely large (${(file.size / (1024 * 1024 / 1024)).toFixed(2)}GB). Please use a file under ${EXTREME_SIZE_GB}GB.`,
+      errorType: 'extreme_size',
     };
   }
 

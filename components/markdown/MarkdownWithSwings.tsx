@@ -20,6 +20,7 @@ interface MarkdownWithSwingsProps {
   feedbackButtons?: React.ReactNode;
   onTTSUsage?: (characters: number, cost: number, quality: string) => void;
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
+  isStreaming?: boolean;
 }
 
 /**
@@ -44,7 +45,7 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -60,6 +61,18 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   });
   const [ttsEnabled, setTTSEnabled] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Track when streaming just completed to trigger fade-in animation
+  const wasStreamingRef = useRef(isStreaming);
+  const [showSpeakerFadeIn, setShowSpeakerFadeIn] = useState(!isStreaming);
+  
+  useEffect(() => {
+    // When streaming changes from true to false, trigger the fade-in
+    if (wasStreamingRef.current && !isStreaming) {
+      setShowSpeakerFadeIn(true);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   useEffect(() => {
     // Load highlighting preferences from localStorage
@@ -195,13 +208,16 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
               </div>
               
               {/* Section speaker button - positioned on the separator line */}
-              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
-                <div style={{ 
-                  position: 'absolute',
-                  right: '0px',
-                  top: '0%',
-                  transform: 'translateY(-100%)',
-                }}>
+              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
+                <div 
+                  className="speaker-fade-in"
+                  style={{ 
+                    position: 'absolute',
+                    right: '0px',
+                    top: '0%',
+                    transform: 'translateY(-100%)',
+                  }}
+                >
                   <SectionSpeaker
                     sectionText={section.plainText}
                     sectionId={String(section.id)}
@@ -227,13 +243,15 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
               </div>
               
               {/* Speaker button on the right */}
-              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && (
-                <SectionSpeaker
-                  sectionText={section.plainText}
-                  sectionId={String(section.id)}
-                  messageId={messageId}
-                  onTTSUsage={onTTSUsage}
-                />
+              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
+                <div className="speaker-fade-in">
+                  <SectionSpeaker
+                    sectionText={section.plainText}
+                    sectionId={String(section.id)}
+                    messageId={messageId}
+                    onTTSUsage={onTTSUsage}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -259,6 +277,21 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
         coordinate={selectedCoordinate}
         zone={selectedZone}
       />
+      
+      {/* Fade-in animation for speaker buttons */}
+      <style jsx global>{`
+        .speaker-fade-in {
+          animation: speakerFadeIn 0.3s ease-in-out;
+        }
+        @keyframes speakerFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </>
   );
 }

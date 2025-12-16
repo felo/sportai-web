@@ -43,12 +43,6 @@ export function TimelineFilter({
     });
   };
 
-  const activeFiltersCount = [
-    filters.showOnlyRallies,
-    filters.rallyBuffer !== 1, // Count as active if different from default
-    filters.showTeamZoneSync,
-  ].filter(Boolean).length;
-
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
@@ -57,32 +51,10 @@ export function TimelineFilter({
           variant="soft"
           style={{
             cursor: "pointer",
-            position: "relative",
             padding: "var(--space-2)",
           }}
         >
           <MixerHorizontalIcon width={16} height={16} />
-          {activeFiltersCount > 0 && (
-            <Box
-              style={{
-                position: "absolute",
-                top: "-4px",
-                right: "-4px",
-                width: "16px",
-                height: "16px",
-                borderRadius: "50%",
-                backgroundColor: "var(--mint-9)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "10px",
-                fontWeight: 600,
-                color: "var(--gray-1)",
-              }}
-            >
-              {activeFiltersCount}
-            </Box>
-          )}
         </Button>
       </DropdownMenu.Trigger>
 
@@ -95,12 +67,6 @@ export function TimelineFilter({
         }}
       >
         <Flex direction="column" gap="3">
-          <Text size="2" weight="medium" style={{ color: "var(--gray-12)" }}>
-            Timeline Filters
-          </Text>
-
-          <Separator size="4" />
-
           {/* Show Only Rallies Toggle */}
           <Flex
             justify="between"

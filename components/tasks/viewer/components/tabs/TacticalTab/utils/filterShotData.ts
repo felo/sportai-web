@@ -16,16 +16,19 @@ export function extractSwingTypes(data: PlayerShotData[]): string[] {
 }
 
 /**
- * Filter player shot data by swing type
+ * Filter player shot data by swing types (supports multiple selection)
  */
 export function filterBySwingType(
   data: PlayerShotData[],
-  swingType: string | null
+  swingTypes: string[]
 ): PlayerShotData[] {
-  if (!swingType) return data;
+  // Empty array means "all shots" - no filtering
+  if (swingTypes.length === 0) return data;
   
   return data.map((player: PlayerShotData) => {
-    const filteredPairs = player.pairs.filter((p: ShotPair) => p.swingType === swingType);
+    const filteredPairs = player.pairs.filter((p: ShotPair) => 
+      p.swingType && swingTypes.includes(p.swingType)
+    );
     
     if (filteredPairs.length === 0) {
       return {

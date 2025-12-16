@@ -110,13 +110,15 @@ export function ReportsView({
                 </Text>
               </Flex>
 
-              {/* Export Button */}
-              <Tooltip content="Export as PDF">
-                <Button size="2" variant="soft" onClick={handleExportPDF} className="no-print">
-                  <DownloadIcon width={16} height={16} />
-                  Export
-                </Button>
-              </Tooltip>
+              {/* Export Button - hidden for now */}
+              {false && (
+                <Tooltip content="Export as PDF">
+                  <Button size="2" variant="soft" onClick={handleExportPDF} className="no-print">
+                    <DownloadIcon width={16} height={16} />
+                    Export
+                  </Button>
+                </Tooltip>
+              )}
             </Flex>
 
             {/* Reports List */}

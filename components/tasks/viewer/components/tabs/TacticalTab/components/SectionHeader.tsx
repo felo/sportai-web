@@ -9,20 +9,24 @@ interface SectionHeaderProps {
   icon: React.ReactNode;
   title: string;
   availableSwingTypes: string[];
-  selectedSwingType: string | null;
-  onSwingTypeChange: (type: string | null) => void;
+  selectedSwingTypes: string[];
+  onSwingTypesChange: (types: string[]) => void;
 }
 
 export function SectionHeader({
   icon,
   title,
   availableSwingTypes,
-  selectedSwingType,
-  onSwingTypeChange,
+  selectedSwingTypes,
+  onSwingTypesChange,
 }: SectionHeaderProps) {
+  const handleRemoveType = (typeToRemove: string) => {
+    onSwingTypesChange(selectedSwingTypes.filter(t => t !== typeToRemove));
+  };
+
   return (
     <Flex align="center" justify="between">
-      <Flex align="center" gap="2">
+      <Flex align="center" gap="2" style={{ flexWrap: "wrap" }}>
         <Box
           style={{
             width: 28,
@@ -32,28 +36,30 @@ export function SectionHeader({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
           }}
         >
           {icon}
         </Box>
         <Heading size="3" weight="medium">{title}</Heading>
-        {selectedSwingType && (
+        {selectedSwingTypes.map(swingType => (
           <Badge 
+            key={swingType}
             color="green" 
             variant="soft"
             style={{ cursor: "pointer" }}
-            onClick={() => onSwingTypeChange(null)}
+            onClick={() => handleRemoveType(swingType)}
           >
-            {formatSwingType(selectedSwingType)}
+            {formatSwingType(swingType)}
             <Cross2Icon width={12} height={12} style={{ marginLeft: 4 }} />
           </Badge>
-        )}
+        ))}
       </Flex>
       
       <SwingTypeFilter
         availableTypes={availableSwingTypes}
-        selectedType={selectedSwingType}
-        onTypeChange={onSwingTypeChange}
+        selectedTypes={selectedSwingTypes}
+        onTypesChange={onSwingTypesChange}
       />
     </Flex>
   );

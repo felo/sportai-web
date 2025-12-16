@@ -18,8 +18,8 @@ interface BallSequenceContentProps {
   selectedBall: number;
   onBallChange: (ball: number) => void;
   ballDataMap: Record<number, PlayerShotData[]>;
-  selectedBallSwingType: string | null;
-  onBallSwingTypeChange: (type: string | null) => void;
+  selectedBallSwingTypes: string[];
+  onBallSwingTypesChange: (types: string[]) => void;
   portraits: Record<number, string>;
   nicknames: Record<string, string>;
   nicknamesLoading: boolean;
@@ -37,8 +37,8 @@ export function BallSequenceContent({
   selectedBall,
   onBallChange,
   ballDataMap,
-  selectedBallSwingType,
-  onBallSwingTypeChange,
+  selectedBallSwingTypes,
+  onBallSwingTypesChange,
   portraits,
   nicknames,
   nicknamesLoading,
@@ -56,8 +56,8 @@ export function BallSequenceContent({
   );
   
   const filteredBallData = useMemo(
-    () => filterBySwingType(currentBallData, selectedBallSwingType),
-    [currentBallData, selectedBallSwingType]
+    () => filterBySwingType(currentBallData, selectedBallSwingTypes),
+    [currentBallData, selectedBallSwingTypes]
   );
 
   return (
@@ -94,20 +94,20 @@ export function BallSequenceContent({
               }
               title={currentTab.name}
               availableSwingTypes={availableBallSwingTypes}
-              selectedSwingType={selectedBallSwingType}
-              onSwingTypeChange={onBallSwingTypeChange}
+              selectedSwingTypes={selectedBallSwingTypes}
+              onSwingTypesChange={onBallSwingTypesChange}
             />
             
             <Text size="2" color="gray">
-              {selectedBallSwingType 
-                ? `Showing ${formatSwingType(selectedBallSwingType)} shots only`
+              {selectedBallSwingTypes.length > 0
+                ? `Showing ${selectedBallSwingTypes.map(formatSwingType).join(", ")} shots`
                 : currentTab.description
               }
             </Text>
             
             <ShotHeatmap
               data={filteredBallData}
-              shotLabel={selectedBallSwingType ? formatSwingType(selectedBallSwingType) : currentTab.name}
+              shotLabel={selectedBallSwingTypes.length === 1 ? formatSwingType(selectedBallSwingTypes[0]) : currentTab.name}
               originLabel={currentTab.originLabel}
               countLabel={currentTab.countLabel}
               emptyMessage={`No ${currentTab.name.toLowerCase()} data available`}

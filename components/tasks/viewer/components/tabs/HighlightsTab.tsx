@@ -456,9 +456,8 @@ function AchievementCard({
                 objectFit: "cover",
               }}
             />
-            {/* Ball Tracker Overlay - only for longest_rally */}
-            {achievement.type === "longest_rally" && 
-             (ballPositions.length > 0 || ballBounces.length > 0 || allSwings.length > 0) && (
+            {/* Ball Tracker Overlay - same defaults as VidstackPlayer in Rallies tab */}
+            {(ballPositions.length > 0 || ballBounces.length > 0 || allSwings.length > 0) && (
               <div style={{ position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none" }}>
                 <BallTrackerOverlay
                   ballPositions={ballPositions}
@@ -466,7 +465,7 @@ function AchievementCard({
                   swings={allSwings}
                   videoRef={videoRef}
                   usePerspective={true}
-                  showIndicator={true}
+                  showIndicator={false}
                   showTrail={true}
                   useSmoothing={true}
                   showBounceRipples={true}

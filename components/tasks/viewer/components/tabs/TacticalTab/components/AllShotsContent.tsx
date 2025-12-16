@@ -16,8 +16,8 @@ type Sport = "tennis" | "padel" | "pickleball";
 interface AllShotsContentProps {
   allShotsData: PlayerShotData[];
   hasAllShotsData: boolean;
-  selectedSwingType: string | null;
-  onSwingTypeChange: (type: string | null) => void;
+  selectedSwingTypes: string[];
+  onSwingTypesChange: (types: string[]) => void;
   portraits: Record<number, string>;
   nicknames: Record<string, string>;
   nicknamesLoading: boolean;
@@ -33,8 +33,8 @@ interface AllShotsContentProps {
 export function AllShotsContent({
   allShotsData,
   hasAllShotsData,
-  selectedSwingType,
-  onSwingTypeChange,
+  selectedSwingTypes,
+  onSwingTypesChange,
   portraits,
   nicknames,
   nicknamesLoading,
@@ -44,8 +44,8 @@ export function AllShotsContent({
 }: AllShotsContentProps) {
   const availableSwingTypes = useMemo(() => extractSwingTypes(allShotsData), [allShotsData]);
   const filteredData = useMemo(
-    () => filterBySwingType(allShotsData, selectedSwingType),
-    [allShotsData, selectedSwingType]
+    () => filterBySwingType(allShotsData, selectedSwingTypes),
+    [allShotsData, selectedSwingTypes]
   );
 
   return (
@@ -64,13 +64,13 @@ export function AllShotsContent({
             icon={<LayersIcon width={14} height={14} style={{ color: "white" }} />}
             title="Shot Placement Overview"
             availableSwingTypes={availableSwingTypes}
-            selectedSwingType={selectedSwingType}
-            onSwingTypeChange={onSwingTypeChange}
+            selectedSwingTypes={selectedSwingTypes}
+            onSwingTypesChange={onSwingTypesChange}
           />
           
           <Text size="2" color="gray">
-            {selectedSwingType 
-              ? `Showing ${formatSwingType(selectedSwingType)} shots only`
+            {selectedSwingTypes.length > 0
+              ? `Showing ${selectedSwingTypes.map(formatSwingType).join(", ")} shots`
               : "All shots from all players combined - see where shots originate and land"
             }
           </Text>
@@ -78,7 +78,7 @@ export function AllShotsContent({
           {hasAllShotsData ? (
             <ShotHeatmap
               data={filteredData}
-              shotLabel={selectedSwingType ? formatSwingType(selectedSwingType) : "Shot"}
+              shotLabel={selectedSwingTypes.length === 1 ? formatSwingType(selectedSwingTypes[0]) : "Shot"}
               originLabel="Shot position"
               countLabel="shot"
               emptyMessage="No shot data available"

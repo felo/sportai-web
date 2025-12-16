@@ -37,7 +37,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({
-  appearance = "dark",
+  appearance = "green",
   theatreMode = true,
   developerMode = false,
   highlightingPrefs = { terminology: true, technique: true, timestamps: true, swings: true },
@@ -230,12 +230,6 @@ export function UserMenu({
                   <DropdownMenu.Item onSelect={() => onThemeSelect?.("green")}>
                     <Text>Green</Text>
                     {appearance === "green" && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => onThemeSelect?.("sportai")}>
-                    <Text>SportAI Default</Text>
-                    {appearance === "sportai" && (
                       <Text ml="auto" size="1" color="gray">✓</Text>
                     )}
                   </DropdownMenu.Item>

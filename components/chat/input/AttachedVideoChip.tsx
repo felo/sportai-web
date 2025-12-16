@@ -1,8 +1,7 @@
 "use client";
 
-import { Flex, Text } from "@radix-ui/themes";
+import { Flex, Text, Popover } from "@radix-ui/themes";
 import { Link2Icon, Cross2Icon } from "@radix-ui/react-icons";
-import * as HoverCard from "@radix-ui/react-hover-card";
 
 // ============================================================================
 // Constants
@@ -49,7 +48,7 @@ function getDisplayName(url: string): string {
 }
 
 /**
- * Truncate URL for hover card display
+ * Truncate URL for popover display
  */
 function getTruncatedUrl(url: string, maxLength: number = 60): string {
   if (url.length <= maxLength) return url;
@@ -68,15 +67,15 @@ interface AttachedVideoChipProps {
 }
 
 /**
- * A compact chip showing "Attached video" with the full URL visible on hover.
- * Uses Radix HoverCard for smooth hover interactions.
+ * A compact chip showing "Attached video" with the full URL visible on click.
+ * Uses Radix Popover for click interactions.
  */
 export function AttachedVideoChip({ videoUrl, onRemove }: AttachedVideoChipProps) {
   const displayName = getDisplayName(videoUrl);
   
   return (
-    <HoverCard.Root openDelay={200} closeDelay={100}>
-      <HoverCard.Trigger asChild>
+    <Popover.Root>
+      <Popover.Trigger>
         <Flex
           align="center"
           gap="2"
@@ -84,7 +83,7 @@ export function AttachedVideoChip({ videoUrl, onRemove }: AttachedVideoChipProps
           px="3"
           style={{
             ...CHIP_STYLES,
-            cursor: "default",
+            cursor: "pointer",
             display: "inline-flex",
             maxWidth: "fit-content",
           }}
@@ -129,43 +128,33 @@ export function AttachedVideoChip({ videoUrl, onRemove }: AttachedVideoChipProps
             </button>
           )}
         </Flex>
-      </HoverCard.Trigger>
+      </Popover.Trigger>
       
-      <HoverCard.Portal>
-        <HoverCard.Content
-          sideOffset={8}
-          align="start"
-          style={{
-            backgroundColor: "var(--gray-2)",
-            border: "1px solid var(--gray-6)",
-            borderRadius: "var(--radius-2)",
-            padding: "var(--space-3)",
-            maxWidth: "400px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            zIndex: 9999,
-          }}
-        >
-          <Flex direction="column" gap="1">
-            <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
-              Video URL
-            </Text>
-            <Text 
-              size="1" 
-              style={{ 
-                color: "var(--gray-10)",
-                wordBreak: "break-all",
-                fontFamily: "monospace",
-                fontSize: "11px",
-                lineHeight: 1.4,
-              }}
-            >
-              {getTruncatedUrl(videoUrl, 100)}
-            </Text>
-          </Flex>
-          <HoverCard.Arrow style={{ fill: "var(--gray-2)" }} />
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+      <Popover.Content
+        side="top"
+        sideOffset={8}
+        align="start"
+        style={{ maxWidth: "400px" }}
+      >
+        <Flex direction="column" gap="1">
+          <Text size="1" weight="medium" style={{ color: "var(--gray-11)" }}>
+            Video URL
+          </Text>
+          <Text 
+            size="1" 
+            style={{ 
+              color: "var(--gray-10)",
+              wordBreak: "break-all",
+              fontFamily: "monospace",
+              fontSize: "11px",
+              lineHeight: 1.4,
+            }}
+          >
+            {getTruncatedUrl(videoUrl, 100)}
+          </Text>
+        </Flex>
+      </Popover.Content>
+    </Popover.Root>
   );
 }
 

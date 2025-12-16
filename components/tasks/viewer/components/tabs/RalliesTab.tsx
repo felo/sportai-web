@@ -114,6 +114,7 @@ export function RalliesTab({
             courtKeypoints={result?.debug_data?.court_keypoints}
             sport={task.sport}
             onVideoError={onVideoError}
+            rallyBuffer={timelineFilters.rallyBuffer}
           />
         }
         courtComponent={

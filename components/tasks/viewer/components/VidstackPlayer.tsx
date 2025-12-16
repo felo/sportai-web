@@ -2,7 +2,7 @@
 
 import { useState, forwardRef, useRef, useCallback, useEffect, useMemo } from "react";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { GearIcon, GridIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon } from "@radix-ui/react-icons";
+import { GearIcon, GridIcon, ChevronLeftIcon, ChevronRightIcon, MagicWandIcon, TrackPreviousIcon, TrackNextIcon } from "@radix-ui/react-icons";
 import { getDeveloperMode } from "@/utils/storage";
 import {
   MediaPlayer,
@@ -89,6 +89,8 @@ interface VidstackPlayerProps {
   sport?: "padel" | "tennis" | "pickleball" | "all";
   // Error callback for video loading failures
   onVideoError?: (message: string) => void;
+  // Rally navigation - buffer time before rally start (default 1s)
+  rallyBuffer?: number;
 }
 
 // Custom hook for frame stepping - Vidstack doesn't have built-in frame stepping
@@ -154,6 +156,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     courtKeypoints,
     sport = "padel",
     onVideoError,
+    rallyBuffer = 1,
   }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
     const [showBallTracker, setShowBallTracker] = useState(false); // Default OFF
@@ -181,6 +184,50 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     
     // Frame stepping hook
     const { skipFrameBackward, skipFrameForward } = useFrameStepping(playerRef);
+    
+    // Rally navigation functions
+    const skipToPreviousRally = useCallback(() => {
+      const player = playerRef.current;
+      if (!player || !rallies || rallies.length === 0) return;
+      
+      const currentTime = player.currentTime;
+      
+      // Find the previous rally (one that starts before current time - small buffer)
+      for (let i = rallies.length - 1; i >= 0; i--) {
+        const [startTime] = rallies[i];
+        // If rally starts more than 2 seconds before current position, go to it
+        if (startTime < currentTime - 2) {
+          player.currentTime = Math.max(0, startTime - rallyBuffer);
+          return;
+        }
+      }
+      
+      // If no previous rally found, go to start
+      if (rallies.length > 0) {
+        player.currentTime = Math.max(0, rallies[0][0] - rallyBuffer);
+      }
+    }, [rallies, rallyBuffer]);
+    
+    const skipToNextRally = useCallback(() => {
+      const player = playerRef.current;
+      if (!player || !rallies || rallies.length === 0) return;
+      
+      const currentTime = player.currentTime;
+      
+      // Find the next rally (one that starts after current time)
+      for (let i = 0; i < rallies.length; i++) {
+        const [startTime] = rallies[i];
+        if (startTime > currentTime + 0.5) {
+          player.currentTime = Math.max(0, startTime - rallyBuffer);
+          return;
+        }
+      }
+      
+      // If no next rally found, stay at current position (we're past all rallies)
+    }, [rallies, rallyBuffer]);
+    
+    // Check if rally navigation is available
+    const hasRallies = rallies && rallies.length > 0;
     
     // Convert rallies to chapters format
     const chapters = useMemo(() => {
@@ -463,6 +510,52 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
               <ChevronRightIcon width={14} height={14} />
             </IconButton>
           </Tooltip>
+
+          {/* Rally Navigation - only show if rallies exist */}
+          {hasRallies && (
+            <>
+              {/* Separator */}
+              <Box style={{ width: 1, height: 20, backgroundColor: "rgba(255,255,255,0.3)", margin: "4px 2px" }} />
+              
+              {/* Previous Rally */}
+              <Tooltip content="Previous rally">
+                <IconButton
+                  size="1"
+                  variant="solid"
+                  style={{
+                    backgroundColor: "#7ADB8F",
+                    color: "#1C1C1C",
+                    border: "2px solid white",
+                    borderRadius: "var(--radius-3)",
+                    width: 28,
+                    height: 28,
+                  }}
+                  onClick={skipToPreviousRally}
+                >
+                  <TrackPreviousIcon width={14} height={14} />
+                </IconButton>
+              </Tooltip>
+
+              {/* Next Rally */}
+              <Tooltip content="Next rally">
+                <IconButton
+                  size="1"
+                  variant="solid"
+                  style={{
+                    backgroundColor: "#7ADB8F",
+                    color: "#1C1C1C",
+                    border: "2px solid white",
+                    borderRadius: "var(--radius-3)",
+                    width: 28,
+                    height: 28,
+                  }}
+                  onClick={skipToNextRally}
+                >
+                  <TrackNextIcon width={14} height={14} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
 
           {/* Calibration Button */}
           {showCalibrationButton && onCalibrationComplete && (

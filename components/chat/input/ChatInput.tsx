@@ -208,6 +208,14 @@ export function ChatInput({
     }
   }, [videoFile, onVideoUrlDetected]);
 
+  // Clear video URL detection when prompt is cleared externally (e.g., file size limit)
+  useEffect(() => {
+    if (!prompt && detectedVideoUrls.length > 0) {
+      setDetectedVideoUrls([]);
+      onVideoUrlDetected?.(null);
+    }
+  }, [prompt, detectedVideoUrls.length, onVideoUrlDetected]);
+
   useEffect(() => {
     // Set initial height to base height
     if (textareaRef.current) {
@@ -487,7 +495,7 @@ export function ChatInput({
       }}
     >
       {error && (
-        <Callout.Root color="red" mb="3" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
+        <Callout.Root color="mint" variant="soft" mb="3" style={{ marginLeft: isMobile ? "var(--space-4)" : "0", marginRight: isMobile ? "var(--space-4)" : "0" }}>
           <Callout.Text size="2">{error}</Callout.Text>
         </Callout.Root>
       )}

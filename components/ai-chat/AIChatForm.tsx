@@ -17,6 +17,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { MessageList } from "@/components/chat/messages/MessageList";
 import { ChatInput } from "@/components/chat/input/ChatInput";
+import { FileSizeLimitModal } from "@/components/chat/input/FileSizeLimitModal";
 import { PageHeader } from "@/components/ui";
 import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
@@ -92,6 +93,8 @@ export function AIChatForm() {
     clearVideo,
     handleVideoChange,
     needsServerConversion,
+    showFileSizeLimitModal,
+    setShowFileSizeLimitModal,
   } = useVideoUpload();
 
   // AI Chat hook
@@ -148,11 +151,20 @@ export function AIChatForm() {
     detectedVideoUrl,
     setDetectedVideoUrl,
     resetAnalysis,
+    urlFileSizeTooLarge,
+    setUrlFileSizeTooLarge,
   } = useVideoPreAnalysis({
     videoFile,
     domainExpertise,
     setDomainExpertise,
   });
+
+  // Clear prompt when URL file size limit is hit
+  useEffect(() => {
+    if (urlFileSizeTooLarge) {
+      setPrompt("");
+    }
+  }, [urlFileSizeTooLarge]);
 
   // Auto-scroll hook
   const {
@@ -561,6 +573,14 @@ export function AIChatForm() {
           <AuthModal 
             open={authModalOpen} 
             onOpenChange={setAuthModalOpen} 
+          />
+
+          <FileSizeLimitModal
+            open={showFileSizeLimitModal || urlFileSizeTooLarge}
+            onOpenChange={(open) => {
+              setShowFileSizeLimitModal(open);
+              setUrlFileSizeTooLarge(open);
+            }}
           />
 
           <FloatingVideoPortal />

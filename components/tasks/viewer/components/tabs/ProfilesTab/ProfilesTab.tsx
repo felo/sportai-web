@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Box, Flex, Text, Tooltip } from "@radix-ui/themes";
 import { PersonIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { usePlayerProfiles } from "@/hooks/usePlayerProfiles";
+import { Colors } from "@/lib/config";
 import type { ProfilesTabProps } from "./types";
 import { PROFILE_COLORS } from "./constants";
 import { buildProfileData } from "./utils";
@@ -254,33 +255,33 @@ function ScrollButton({
             width: "36px",
             height: "36px",
             borderRadius: "9999px",
-            backgroundColor: "#7ADB8F",
+            backgroundColor: Colors.darkMint,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
             transition: "all 0.3s ease-out",
-            border: "2px solid white",
+            border: `2px solid ${Colors.white}`,
             boxShadow:
               "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = "#95E5A6";
+            e.currentTarget.style.backgroundColor = Colors.lightMint;
             e.currentTarget.style.transform = "translateY(-2px)";
             e.currentTarget.style.boxShadow =
               "0 0 20px rgba(122, 219, 143, 0.6), 0 0 40px rgba(122, 219, 143, 0.4), 0 4px 16px rgba(122, 219, 143, 0.5)";
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.currentTarget.style.backgroundColor = "#7ADB8F";
+            e.currentTarget.style.backgroundColor = Colors.darkMint;
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow =
               "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)";
           }}
         >
           {isLeft ? (
-            <ChevronLeftIcon width={18} height={18} color="#1C1C1C" />
+            <ChevronLeftIcon width={18} height={18} color={Colors.darkGreen} />
           ) : (
-            <ChevronRightIcon width={18} height={18} color="#1C1C1C" />
+            <ChevronRightIcon width={18} height={18} color={Colors.darkGreen} />
           )}
         </button>
       </Tooltip>
