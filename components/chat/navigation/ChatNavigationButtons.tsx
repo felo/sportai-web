@@ -254,7 +254,7 @@ export function ChatNavigationButtons({
     });
   }
 
-  if (showScrollToVideo) {
+  if (showScrollToVideo && !isMobile) {
     visibleButtons.push({
       id: "scroll-video",
       icon: <ArrowUpIcon width="18" height="18" color="#1C1C1C" />,

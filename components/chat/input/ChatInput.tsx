@@ -910,7 +910,7 @@ export function ChatInput({
             <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
               {isMobile ? (
                 <>
-                  Enjoy the free BETA, for enterprise level precision, please{" "}
+                  Enjoy the free BETA, for enterprise license {" "}
                   <a 
                     href="https://sportai.com/contact" 
                     target="_blank" 

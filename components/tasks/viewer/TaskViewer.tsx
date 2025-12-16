@@ -29,7 +29,7 @@ const TeamIcon = ({ width = 16, height = 16 }: { width?: number; height?: number
 import { useAuth } from "@/components/auth/AuthProvider";
 import { isSampleTask } from "@/components/tasks/sampleTasks";
 import { isGuestTask } from "@/utils/storage";
-import { useVideoPlayback, useEventTooltip } from "./hooks";
+import { useVideoPlayback } from "./hooks";
 import {
   useTaskFetching,
   usePlayerRankings,
@@ -133,6 +133,13 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     videoRef,
   });
 
+  // Sync local state with auto-selected rally (so auto-selection works during playback)
+  useEffect(() => {
+    if (autoSelectedRallyIndex !== null && autoSelectedRallyIndex !== selectedRallyIndex) {
+      setSelectedRallyIndex(autoSelectedRallyIndex);
+    }
+  }, [autoSelectedRallyIndex]);
+
   // Use the auto-selected rally index if local state is null
   const effectiveSelectedRallyIndex = selectedRallyIndex ?? autoSelectedRallyIndex;
   const handleRallySelect = (index: number | null) => {
@@ -141,8 +148,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   };
 
   // Event tooltip for rally timeline
-  const activeEventTooltip = useEventTooltip(result, effectiveSelectedRallyIndex, currentTime);
-
   // Calculate total video duration
   const totalDuration = useMemo(() => {
     const rallies = result?.rallies || [];
@@ -284,7 +289,6 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             playerDisplayNames={playerDisplayNames}
             enhancedBallBounces={enhancedBallBounces}
             allSwings={allSwings}
-            activeEventTooltip={activeEventTooltip}
             onVideoError={setVideoError}
           />
         </Box>

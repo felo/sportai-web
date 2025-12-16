@@ -601,6 +601,7 @@ function AchievementCard({
                 <Box
                   key={playerId}
                   style={{
+                    position: "relative",
                     width: isExpanded ? 60 : isMultiPlayer ? 52 : 56,
                     height: isExpanded ? 60 : isMultiPlayer ? 52 : 56,
                     borderRadius: "50%",

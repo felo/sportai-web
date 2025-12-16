@@ -26,6 +26,8 @@ export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResu
   const hasTasks = tasks.length > 0;
   const hasSamples = showSamples && sampleTasks.length > 0;
   
+  console.log("[TaskGridView] Sample tasks:", sampleTasks.length, sampleTasks.map(t => ({ id: t.id, video_url: t.video_url?.substring(0, 60) })));
+  
   // Show loading skeletons
   if (loading) {
     return (
@@ -116,28 +118,28 @@ export function TaskGridView({ tasks, sampleTasks = [], onTaskClick, onFetchResu
       {renderTaskSection(
         activeTasks, 
         "In Progress", 
-        `${activeTasks.length} ${activeTasks.length === 1 ? "analysis" : "analyses"}`
+        `(${activeTasks.length})`
       )}
       
       {/* Completed tasks */}
       {renderTaskSection(
         completedTasks, 
-        "Completed", 
-        `${completedTasks.length} ${completedTasks.length === 1 ? "analysis" : "analyses"}`
+        "Analyses", 
+        `(${completedTasks.length})`
       )}
       
       {/* Failed tasks */}
       {renderTaskSection(
         failedTasks, 
         "Failed", 
-        `${failedTasks.length} ${failedTasks.length === 1 ? "analysis" : "analyses"}`
+        `(${failedTasks.length})`
       )}
       
       {/* Sample videos section - only show if we have sample tasks passed in */}
       {hasSamples && sampleTasks.length > 0 && renderTaskSection(
         sampleTasks,
-        "Sample Videos",
-        "Try these demo analyses",
+        "Samples",
+        "Try these sample analyses",
         true
       )}
     </Flex>

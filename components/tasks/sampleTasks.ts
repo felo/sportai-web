@@ -2,19 +2,28 @@ import { useState, useEffect } from "react";
 import type { Task } from "./TaskTile/types";
 
 /**
+ * Extended sample task with optional pose data URL for direct loading.
+ */
+export interface SampleTask extends Task {
+  /** Direct URL to pose data JSON for samples stored in public buckets */
+  poseDataUrl?: string;
+}
+
+/**
  * Sample tasks that are shown to all users in the Library.
  * These are hardcoded demo videos that don't require API calls.
  */
-export const SAMPLE_TASKS: Task[] = [
+export const SAMPLE_TASKS: SampleTask[] = [
   {
     id: "sample-tennis-serve",
     task_type: "technique",
     sport: "tennis",
     sportai_task_id: null,
-    video_url: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4",
+    video_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/technique-analysis-serve-sample.mp4",
+    // video_s3_key is null because this is in the PUBLIC bucket (doesn't need presigned URL refresh)
     video_s3_key: null,
-    // Use Cloudinary's video-to-image transformation for thumbnail
-    thumbnail_url: "https://res.cloudinary.com/djtxhrly7/video/upload/so_0,w_400,h_300,c_fill/v1763677270/Serve.jpg",
+    // Static thumbnail from public bucket (CORS prevents dynamic generation)
+    thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/technique-analysis-serve-sample-thumbnail.jpg",
     thumbnail_s3_key: null,
     video_length: 3,
     status: "completed",
@@ -25,15 +34,17 @@ export const SAMPLE_TASKS: Task[] = [
     created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
     updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     completed_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    // Direct URL for pose data (public bucket, no presigned URL needed)
+    poseDataUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/technique-analysis-serve-sample.json",
   },
   {
     id: "sample-padel-match-one",
     task_type: "statistics",
     sport: "padel",
     sportai_task_id: null,
-    video_url: "https://sportai-llm-uploads.s3.eu-north-1.amazonaws.com/test/1765293768560_nthug5r97_3g2AQVBSF1M_003.mp4",
-    video_s3_key: "test/1765293768560_nthug5r97_3g2AQVBSF1M_003.mp4",
-    thumbnail_url: null, // Auto-generated from video
+    video_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/match-report-analysis-sample.mp4",
+    video_s3_key: null,
+    thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/match-report-analysis-sample-thumbnail.jpg",
     thumbnail_s3_key: null,
     video_length: 600, // 10 minutes
     status: "completed",
@@ -57,7 +68,7 @@ export function isSampleTask(taskId: string): boolean {
 /**
  * Get a sample task by ID
  */
-export function getSampleTask(taskId: string): Task | undefined {
+export function getSampleTask(taskId: string): SampleTask | undefined {
   return SAMPLE_TASKS.find(t => t.id === taskId);
 }
 

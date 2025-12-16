@@ -243,11 +243,29 @@ export async function savePoseData(
 }
 
 /**
- * Load pose data from S3 via API
+ * Load pose data from S3 via API or from a direct URL
  * @param videoS3Key - The S3 key of the video (unique identifier)
+ * @param directUrl - Optional direct URL to fetch pose data from (for public buckets)
  */
-export async function loadPoseData(videoS3Key: string): Promise<LoadPoseDataResponse> {
+export async function loadPoseData(videoS3Key: string, directUrl?: string): Promise<LoadPoseDataResponse> {
   try {
+    // If a direct URL is provided (e.g., for sample tasks in public buckets), fetch directly
+    if (directUrl) {
+      const response = await fetch(directUrl);
+      
+      if (response.status === 404) {
+        return { success: false, error: "No pose data found" };
+      }
+      
+      if (!response.ok) {
+        return { success: false, error: `Failed to fetch pose data: ${response.statusText}` };
+      }
+      
+      const data: StoredPoseData = await response.json();
+      return { success: true, data };
+    }
+    
+    // Otherwise, use the API to fetch from the private bucket
     const response = await fetch(`/api/pose-data?videoS3Key=${encodeURIComponent(videoS3Key)}`);
 
     if (response.status === 404) {

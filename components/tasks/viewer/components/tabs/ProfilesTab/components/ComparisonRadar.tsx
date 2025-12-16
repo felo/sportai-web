@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Box, Flex, Text, Heading, Card, Tooltip } from "@radix-ui/themes";
 import { ResponsiveRadar } from "@nivo/radar";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { PlayerProfile } from "@/types/player-profile";
 import { CHART_THEME, PROFILE_COLORS, ATTRIBUTE_CONFIG } from "../constants";
 import { toRadarData } from "../utils";
@@ -17,6 +18,7 @@ interface ComparisonRadarProps {
  * Comparison radar chart showing all players
  */
 export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
+  const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   // Track which players are active (shown in the chart)
   const [activePlayers, setActivePlayers] = useState<Set<number>>(
@@ -72,19 +74,33 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
         transition: "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
       }}
     >
-      <Box p="5">
-        <Flex align="center" justify="between" mb="4">
-          <Box>
-            <Heading size="4" weight="bold">
+      <Box p={isMobile ? "3" : "5"}>
+        <Flex 
+          align={isMobile ? "start" : "center"} 
+          justify="between" 
+          mb="4"
+          direction={isMobile ? "column" : "row"}
+          gap={isMobile ? "3" : "0"}
+        >
+          <Box style={{ flexShrink: 0 }}>
+            <Heading size={isMobile ? "3" : "4"} weight="bold">
               Player Comparison
             </Heading>
             <Text size="2" color="gray">
-              Tap players to show/hide from comparison
+              Tap players to compare
             </Text>
           </Box>
 
-          {/* Interactive Legend */}
-          <Flex gap="3" wrap="wrap">
+          {/* Interactive Legend - right aligned on desktop, full width on mobile */}
+          <Flex 
+            gap="2" 
+            wrap="wrap" 
+            justify={isMobile ? "start" : "end"}
+            style={{ 
+              width: isMobile ? "100%" : "auto",
+              marginLeft: isMobile ? 0 : "auto",
+            }}
+          >
             {profiles.map((profile, idx) => {
               const color = PROFILE_COLORS[idx % PROFILE_COLORS.length];
               const isActive = activePlayers.has(profile.playerId);
@@ -101,15 +117,16 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
                       cursor: "pointer",
                       opacity: isActive ? 1 : 0.4,
                       transition: "all 0.2s ease",
-                      padding: "4px 8px",
+                      padding: isMobile ? "6px 10px" : "4px 8px",
                       borderRadius: 8,
                       backgroundColor: isActive ? `${color.primary}10` : "transparent",
                     }}
                   >
                     <Box
                       style={{
-                        width: 32,
-                        height: 32,
+                        position: "relative",
+                        width: isMobile ? 28 : 32,
+                        height: isMobile ? 28 : 32,
                         borderRadius: "50%",
                         overflow: "hidden",
                         border: `3px solid ${isActive ? color.primary : "var(--gray-6)"}`,
@@ -162,14 +179,14 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
           </Flex>
         </Flex>
 
-        <Box style={{ height: 400 }}>
+        <Box style={{ height: isMobile ? 300 : 400 }}>
           {activeProfiles.length > 0 ? (
             <ResponsiveRadar
               data={radarData}
               keys={keys}
               indexBy="attribute"
               maxValue={100}
-              margin={{ top: 50, right: 100, bottom: 50, left: 100 }}
+              margin={isMobile ? { top: 40, right: 60, bottom: 40, left: 60 } : { top: 50, right: 100, bottom: 50, left: 100 }}
               curve="linearClosed"
               borderWidth={2}
               gridLevels={5}
@@ -242,19 +259,7 @@ export function ComparisonRadar({ profiles, portraits }: ComparisonRadarProps) {
                   </Box>
                 );
               }}
-              legends={[
-                {
-                  anchor: "top-left",
-                  direction: "column",
-                  translateX: -80,
-                  translateY: -20,
-                  itemWidth: 100,
-                  itemHeight: 20,
-                  itemTextColor: "var(--gray-11)",
-                  symbolSize: 12,
-                  symbolShape: "circle",
-                },
-              ]}
+              legends={[]}
             />
           ) : (
             <Flex align="center" justify="center" style={{ height: "100%" }}>

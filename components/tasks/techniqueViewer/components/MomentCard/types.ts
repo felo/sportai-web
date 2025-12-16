@@ -48,6 +48,8 @@ export interface MomentCardProps {
   moment: Moment;
   /** Video element to capture frame from */
   videoElement: HTMLVideoElement | null;
+  /** Detected video FPS (used for frame-based thumbnail capture) */
+  videoFPS?: number;
   /** Callback when "View" is clicked */
   onView: (moment: Moment) => void;
   /** Callback when "Analyse" is clicked */

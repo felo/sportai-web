@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3001;
 const API_SECRET = process.env.API_SECRET;
 const AWS_REGION = process.env.AWS_REGION || 'eu-north-1';
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'sportai-llm-uploads';
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB limit
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB limit
 
 // Initialize S3 client
 const s3Client = new S3Client({

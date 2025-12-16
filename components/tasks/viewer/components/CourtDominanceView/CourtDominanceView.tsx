@@ -12,6 +12,7 @@ import {
   Heading,
 } from "@radix-ui/themes";
 import { TargetIcon, LightningBoltIcon } from "@radix-ui/react-icons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { StatisticsResult } from "../../types";
 import type { ZoneSystemId, ZoneStat, PlayerDominance } from "./types";
 import { getZoneSystemsForSport, type Sport } from "./constants";
@@ -31,6 +32,7 @@ export function CourtDominanceView({
   portraits = {},
   sport = "padel",
 }: CourtDominanceViewProps) {
+  const isMobile = useIsMobile();
   const [selectedSystem, setSelectedSystem] = useState<ZoneSystemId>("traffic-light");
   const [selectedPlayer, setSelectedPlayer] = useState<number | "all">("all");
   const [isVisible, setIsVisible] = useState(false);
@@ -169,7 +171,7 @@ export function CourtDominanceView({
           }}
         >
           <Flex direction="column" gap="3" p="4">
-            <Flex justify="between" align="start" wrap="wrap" gap="4">
+            <Flex direction="column" gap="4">
               {/* Zone System Selector */}
               <Flex direction="column" gap="2">
                 <Text
@@ -180,17 +182,56 @@ export function CourtDominanceView({
                 >
                   Zone System
                 </Text>
-                <SegmentedControl.Root
-                  value={selectedSystem}
-                  onValueChange={(v) => setSelectedSystem(v as ZoneSystemId)}
-                  size="2"
-                >
-                  {zoneSystems.map((sys) => (
-                    <SegmentedControl.Item key={sys.id} value={sys.id}>
-                      {sys.name}
-                    </SegmentedControl.Item>
-                  ))}
-                </SegmentedControl.Root>
+                <Box style={{ position: "relative" }}>
+                  {/* Fade masks on mobile */}
+                  {isMobile && (
+                    <>
+                      <Box
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "20px",
+                          background: "linear-gradient(to right, var(--gray-2), transparent)",
+                          zIndex: 10,
+                          pointerEvents: "none",
+                        }}
+                      />
+                      <Box
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "20px",
+                          background: "linear-gradient(to left, var(--gray-2), transparent)",
+                          zIndex: 10,
+                          pointerEvents: "none",
+                        }}
+                      />
+                    </>
+                  )}
+                  <Box
+                    style={{
+                      overflowX: isMobile ? "auto" : "visible",
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                    }}
+                  >
+                    <SegmentedControl.Root
+                      value={selectedSystem}
+                      onValueChange={(v) => setSelectedSystem(v as ZoneSystemId)}
+                      size="2"
+                    >
+                      {zoneSystems.map((sys) => (
+                        <SegmentedControl.Item key={sys.id} value={sys.id}>
+                          {sys.name}
+                        </SegmentedControl.Item>
+                      ))}
+                    </SegmentedControl.Root>
+                  </Box>
+                </Box>
                 <Text size="1" color="gray">
                   {currentSystem.description}
                 </Text>
@@ -207,20 +248,59 @@ export function CourtDominanceView({
                   >
                     Player Filter
                   </Text>
-                  <SegmentedControl.Root
-                    value={String(selectedPlayer)}
-                    onValueChange={(v) =>
-                      setSelectedPlayer(v === "all" ? "all" : Number(v))
-                    }
-                    size="2"
-                  >
-                    <SegmentedControl.Item value="all">All Players</SegmentedControl.Item>
-                    {playerDominance.map((p) => (
-                      <SegmentedControl.Item key={p.playerId} value={String(p.playerId)}>
-                        {p.playerName}
-                      </SegmentedControl.Item>
-                    ))}
-                  </SegmentedControl.Root>
+                  <Box style={{ position: "relative" }}>
+                    {/* Fade masks on mobile */}
+                    {isMobile && (
+                      <>
+                        <Box
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: "20px",
+                            background: "linear-gradient(to right, var(--gray-2), transparent)",
+                            zIndex: 10,
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <Box
+                          style={{
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: "20px",
+                            background: "linear-gradient(to left, var(--gray-2), transparent)",
+                            zIndex: 10,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      </>
+                    )}
+                    <Box
+                      style={{
+                        overflowX: isMobile ? "auto" : "visible",
+                        scrollbarWidth: "none",
+                        msOverflowStyle: "none",
+                      }}
+                    >
+                      <SegmentedControl.Root
+                        value={String(selectedPlayer)}
+                        onValueChange={(v) =>
+                          setSelectedPlayer(v === "all" ? "all" : Number(v))
+                        }
+                        size="2"
+                      >
+                        <SegmentedControl.Item value="all">All Players</SegmentedControl.Item>
+                        {playerDominance.map((p) => (
+                          <SegmentedControl.Item key={p.playerId} value={String(p.playerId)}>
+                            {p.playerName}
+                          </SegmentedControl.Item>
+                        ))}
+                      </SegmentedControl.Root>
+                    </Box>
+                  </Box>
                 </Flex>
               )}
             </Flex>

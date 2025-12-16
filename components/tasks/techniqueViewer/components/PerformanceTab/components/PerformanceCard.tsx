@@ -297,6 +297,7 @@ function ThumbnailCircle({ thumbnailUrl, index, borderColor }: ThumbnailCirclePr
   return (
     <Box
       style={{
+        position: "relative",
         width: 64,
         height: 64,
         borderRadius: "50%",

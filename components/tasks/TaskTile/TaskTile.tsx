@@ -39,6 +39,8 @@ export function TaskTile({
     videoUrl: task.video_url,
     thumbnailUrl: task.thumbnail_url,
   });
+  
+  console.log("[TaskTile] Rendering:", task.id, { thumbnail: !!thumbnail, isGenerating, videoUrl: task.video_url?.substring(0, 60) });
 
   const progress = useTaskProgress({ task });
 
@@ -74,8 +76,12 @@ export function TaskTile({
 
       {/* Card content */}
       <Flex direction="column" gap="2" p="3">
-        {/* Status and actions row */}
+        {/* Title row with badges aligned right */}
         <Flex justify="between" align="center">
+          <Text size="2" weight="medium" style={{ textTransform: "capitalize" }}>
+            {task.task_type.replace(/_/g, " ")}
+          </Text>
+
           <Flex align="center" gap="2">
             {isSampleTask(task.id) ? (
               <Badge color="gray" variant="soft">
@@ -83,41 +89,39 @@ export function TaskTile({
               </Badge>
             ) : (
               <>
-                <Badge color={statusConfig.color} variant="soft">
-                  <StatusIcon width={12} height={12} />
-                  <Text size="1" ml="1">
-                    {statusConfig.label}
-                  </Text>
-                </Badge>
+                {/* Only show status badge for non-completed tasks */}
+                {task.status !== "completed" && (
+                  <Badge color={statusConfig.color} variant="soft">
+                    <StatusIcon width={12} height={12} />
+                    <Text size="1" ml="1">
+                      {statusConfig.label}
+                    </Text>
+                  </Badge>
+                )}
 
                 {isNew && task.status === "completed" && (
                   <Badge color="blue" variant="solid" size="1">
                     New
                   </Badge>
                 )}
+
+                {/* Fetch result button - only for SportAI tasks (not technique) */}
+                {task.status === "completed" && !task.result_s3_key && onFetchResult && task.task_type !== "technique" && (
+                  <IconButton
+                    icon={<UpdateIcon />}
+                    onClick={() => onFetchResult()}
+                    variant="soft"
+                    color="mint"
+                    size="1"
+                    ariaLabel="Fetch result"
+                    tooltip="Get result from SportAI"
+                    disabled={isFetching}
+                  />
+                )}
               </>
             )}
           </Flex>
-
-          {/* Fetch result button - only for SportAI tasks (not technique) */}
-          {task.status === "completed" && !task.result_s3_key && onFetchResult && task.task_type !== "technique" && (
-            <IconButton
-              icon={<UpdateIcon />}
-              onClick={() => onFetchResult()}
-              variant="soft"
-              color="mint"
-              size="1"
-              ariaLabel="Fetch result"
-              tooltip="Get result from SportAI"
-              disabled={isFetching}
-            />
-          )}
         </Flex>
-
-        {/* Task type */}
-        <Text size="2" weight="medium" style={{ textTransform: "capitalize" }}>
-          {task.task_type.replace(/_/g, " ")}
-        </Text>
 
         {/* Time info - hide for sample tasks */}
         {!isSampleTask(task.id) && (

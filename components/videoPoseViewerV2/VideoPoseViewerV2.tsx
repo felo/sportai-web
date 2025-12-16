@@ -1897,6 +1897,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             protocolAdjustments={momentsConfig.protocolAdjustments}
             swingBoundaryAdjustments={momentsConfig.swingBoundaryAdjustments}
             videoElement={videoRef.current}
+            videoFPS={usingPreprocessedPoses ? preprocessingFPS : videoFPS}
             poseData={preprocessedPoses}
             onViewMoment={(time) => {
               momentsConfig.onViewMoment?.(time);

@@ -8,12 +8,10 @@
  */
 
 import { useMemo, useState, useCallback } from "react";
-import { Box, Flex, Text, Select, Badge } from "@radix-ui/themes";
-import {
-  BookmarkIcon,
-  MixerHorizontalIcon,
-  ClockIcon,
-} from "@radix-ui/react-icons";
+import { Box, Flex, Text, Badge } from "@radix-ui/themes";
+import { BookmarkIcon } from "@radix-ui/react-icons";
+import { FilterSelect, type FilterSelectGroup } from "@/components/ui";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { MomentCard, type Moment, type MomentType } from "./MomentCard";
 import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
 import type { CustomEvent } from "./CustomEventDialog";
@@ -45,6 +43,8 @@ interface MomentsGalleryViewProps {
   }>;
   /** Video element for frame capture */
   videoElement: HTMLVideoElement | null;
+  /** Detected video FPS (used for accurate frame → time mapping) */
+  videoFPS?: number;
   /** Callback when user clicks View on a moment */
   onViewMoment: (time: number) => void;
   /** Callback when user clicks Analyse on a moment */
@@ -87,6 +87,7 @@ export function MomentsGalleryView({
   protocolAdjustments,
   swingBoundaryAdjustments,
   videoElement,
+  videoFPS,
   onViewMoment,
   onAnalyseMoment,
   poseData,
@@ -96,6 +97,7 @@ export function MomentsGalleryView({
 }: MomentsGalleryViewProps) {
   const [filter, setFilter] = useState<FilterOption>("all");
   const [sort, setSort] = useState<SortOption>("time");
+  const isMobile = useIsMobile();
 
   // Get pose confidence for a specific frame
   const getPoseConfidence = useCallback((frame: number): number | null => {
@@ -321,6 +323,10 @@ export function MomentsGalleryView({
           return confB - confA; // Highest confidence first
         });
         break;
+      default:
+        // Default to time sorting
+        sorted.sort((a, b) => a.time - b.time);
+        break;
     }
 
     return sorted;
@@ -344,6 +350,45 @@ export function MomentsGalleryView({
     comments: allMoments.filter(m => m.type === "comment").length,
   }), [allMoments]);
 
+  // Build filter options for FilterSelect
+  const filterOptions = useMemo((): FilterSelectGroup[] => {
+    const groups: FilterSelectGroup[] = [
+      {
+        label: "Filter",
+        options: [
+          { value: "all", label: "All moments", count: counts.total },
+          { value: "protocols", label: "Protocol events", count: counts.protocols },
+          { value: "custom", label: "Custom markers", count: counts.custom },
+          { value: "comments", label: "Video comments", count: counts.comments },
+        ],
+      },
+    ];
+    
+    if (swingOptions.length > 0) {
+      groups.push({
+        label: "By Swing",
+        options: swingOptions.map((swing) => ({
+          value: swing.id,
+          label: swing.label,
+        })),
+      });
+    }
+    
+    return groups;
+  }, [counts, swingOptions]);
+
+  // Build sort options for FilterSelect
+  const sortOptions = useMemo((): FilterSelectGroup[] => [
+    {
+      label: "Sort by",
+      options: [
+        { value: "time", label: "Time" },
+        { value: "type", label: "Type" },
+        { value: "confidence", label: "Confidence" },
+      ],
+    },
+  ], []);
+
   return (
     <Box
       style={{
@@ -354,7 +399,13 @@ export function MomentsGalleryView({
       }}
     >
       {/* Header */}
-      <Flex align="center" justify="between" style={{ marginBottom: "20px" }}>
+      <Flex
+        direction={isMobile ? "column" : "row"}
+        align={isMobile ? "stretch" : "center"}
+        justify="between"
+        gap={isMobile ? "3" : "0"}
+        style={{ marginBottom: "20px" }}
+      >
         <Flex align="center" gap="3">
           <Text size="4" weight="bold" style={{ color: "white" }}>
             Moments
@@ -366,47 +417,21 @@ export function MomentsGalleryView({
 
         <Flex align="center" gap="3">
           {/* Filter dropdown */}
-          <Flex align="center" gap="2">
-            <MixerHorizontalIcon width={14} height={14} style={{ color: "rgba(255,255,255,0.5)" }} />
-            <Select.Root value={filter} onValueChange={(value) => setFilter(value as FilterOption)}>
-              <Select.Trigger variant="soft" style={{ minWidth: "140px" }} />
-              <Select.Content>
-                <Select.Group>
-                  <Select.Label>Filter</Select.Label>
-                  <Select.Item value="all">All moments ({counts.total})</Select.Item>
-                  <Select.Item value="protocols">Protocol events ({counts.protocols})</Select.Item>
-                  <Select.Item value="custom">Custom markers ({counts.custom})</Select.Item>
-                  <Select.Item value="comments">Video comments ({counts.comments})</Select.Item>
-                </Select.Group>
-                {swingOptions.length > 0 && (
-                  <Select.Group>
-                    <Select.Label>By Swing</Select.Label>
-                    {swingOptions.map((swing) => (
-                      <Select.Item key={swing.id} value={swing.id}>
-                        {swing.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Group>
-                )}
-              </Select.Content>
-            </Select.Root>
-          </Flex>
+          <FilterSelect
+            value={filter}
+            onValueChange={(value) => setFilter(value as FilterOption)}
+            options={filterOptions}
+            icon="filter"
+            minWidth="140px"
+          />
 
           {/* Sort dropdown */}
-          <Flex align="center" gap="2">
-            <ClockIcon width={14} height={14} style={{ color: "rgba(255,255,255,0.5)" }} />
-            <Select.Root value={sort} onValueChange={(value) => setSort(value as SortOption)}>
-              <Select.Trigger variant="soft" style={{ minWidth: "120px" }} />
-              <Select.Content>
-                <Select.Group>
-                  <Select.Label>Sort by</Select.Label>
-                  <Select.Item value="time">Time</Select.Item>
-                  <Select.Item value="type">Type</Select.Item>
-                  <Select.Item value="confidence">Confidence</Select.Item>
-                </Select.Group>
-              </Select.Content>
-            </Select.Root>
-          </Flex>
+          <FilterSelect
+            value={sort}
+            onValueChange={(value) => setSort(value as SortOption)}
+            options={sortOptions}
+            minWidth="120px"
+          />
         </Flex>
       </Flex>
 
@@ -418,6 +443,7 @@ export function MomentsGalleryView({
               key={moment.id}
               moment={moment}
               videoElement={videoElement}
+              videoFPS={videoFPS}
               onView={handleView}
               onAnalyse={handleAnalyse}
               poseConfidence={getPoseConfidence(moment.frame)}

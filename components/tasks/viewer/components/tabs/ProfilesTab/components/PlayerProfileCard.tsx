@@ -71,6 +71,7 @@ export function PlayerProfileCard({
         <Flex align="center" gap="3">
           <Box
             style={{
+              position: "relative",
               width: 64,
               height: 64,
               borderRadius: "50%",
@@ -231,13 +232,14 @@ export function PlayerProfileCard({
   const backCard = (
     <Card
       style={{
-        border: `1px solid var(--gray-6)`,
+        border: "none",
         width: "100%",
         height: "100%",
         flexShrink: 0,
         boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
         overflow: "hidden",
         padding: 0,
+        borderRadius: 12,
       }}
     >
       <FIFAStyleCardBack

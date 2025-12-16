@@ -1,7 +1,8 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useRef, useCallback } from "react";
 import { Box, Flex, Text, Badge } from "@radix-ui/themes";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export interface TabDefinition {
   id: string;
@@ -18,6 +19,38 @@ interface TabNavigationProps {
 }
 
 export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationProps) {
+  const isMobile = useIsMobile();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Auto-scroll to bring clicked tab into view
+  const handleTabClick = useCallback((tabId: string, isDisabled: boolean) => {
+    if (isDisabled) return;
+    
+    const tabElement = tabRefs.current.get(tabId);
+    const scrollContainer = scrollContainerRef.current;
+    
+    if (tabElement && scrollContainer) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const tabRect = tabElement.getBoundingClientRect();
+      
+      // Check if tab is partially or fully outside the visible area
+      const isOutsideLeft = tabRect.left < containerRect.left;
+      const isOutsideRight = tabRect.right > containerRect.right;
+      
+      if (isOutsideLeft || isOutsideRight) {
+        // Scroll to center the tab
+        const scrollLeft = tabElement.offsetLeft - (containerRect.width / 2) + (tabRect.width / 2);
+        scrollContainer.scrollTo({
+          left: Math.max(0, scrollLeft),
+          behavior: "smooth",
+        });
+      }
+    }
+    
+    onTabChange(tabId);
+  }, [onTabChange]);
+
   return (
     <Box
       style={{
@@ -28,8 +61,38 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
         zIndex: 100,
       }}
     >
-      <Box style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 var(--space-4)" }}>
+      <Box style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 var(--space-4)", position: "relative" }}>
+        {/* Fade masks on mobile to indicate scrollability */}
+        {isMobile && (
+          <>
+            <Box
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: "24px",
+                background: "linear-gradient(to right, var(--gray-2), transparent)",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            />
+            <Box
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: "24px",
+                background: "linear-gradient(to left, var(--gray-2), transparent)",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        )}
         <Flex
+          ref={scrollContainerRef}
           gap="0"
           style={{
             overflowX: "auto",
@@ -44,9 +107,12 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
             return (
               <Box
                 key={tab.id}
-                onClick={() => !isDisabled && onTabChange(tab.id)}
+                ref={(el) => {
+                  if (el) tabRefs.current.set(tab.id, el);
+                }}
+                onClick={() => handleTabClick(tab.id, !!isDisabled)}
                 style={{
-                  padding: "14px 24px",
+                  padding: isMobile ? "12px 16px" : "14px 24px",
                   cursor: isDisabled ? "not-allowed" : "pointer",
                   borderBottom: isActive ? "2px solid var(--mint-9)" : "2px solid transparent",
                   backgroundColor: isActive ? "var(--gray-1)" : "transparent",

@@ -32,6 +32,3 @@ export { ChatNavigationButtons } from "./navigation/ChatNavigationButtons";
 // Overlays
 export { DragOverlay } from "./overlays/DragOverlay";
 
-// Header
-export { ChatHeader } from "./header/ChatHeader";
-

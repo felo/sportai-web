@@ -130,3 +130,5 @@ export async function downloadVideo(task: Task): Promise<void> {
     window.open(task.video_url, "_blank");
   }
 }
+
+

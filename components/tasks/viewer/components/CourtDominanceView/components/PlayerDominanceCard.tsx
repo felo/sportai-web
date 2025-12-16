@@ -43,6 +43,7 @@ export function PlayerDominanceCard({
         <Flex align="center" gap="3">
           <Box
             style={{
+              position: "relative",
               width: 52,
               height: 52,
               borderRadius: "50%",

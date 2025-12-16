@@ -81,6 +81,7 @@ interface TennisCourt2DProps {
   showBounces?: boolean;
   showTrajectories?: boolean;
   showPlayers?: boolean;
+  horizontal?: boolean; // When true, render court in landscape orientation (for mobile)
 }
 
 // Convert court_pos to view coordinates (offset by VIEW.minX/minY)
@@ -210,6 +211,7 @@ export function TennisCourt2D({
   showBounces = true,
   showTrajectories = true,
   showPlayers = true,
+  horizontal = false,
 }: TennisCourt2DProps) {
   // Tennis court colors (classic green/blue hard court style)
   const courtColor = "#2D7A4A";        // Green playing surface
@@ -335,6 +337,14 @@ export function TennisCourt2D({
     return positions;
   }, [playerPositions, playerDisplayNames, currentTime, showPlayers]);
 
+  // For horizontal mode, swap viewBox and use SVG transform to rotate content
+  // Rotate +90 (clockwise) so bottom half of court appears on LEFT side
+  const viewBoxWidth = horizontal ? VIEW.height : VIEW.width;
+  const viewBoxHeight = horizontal ? VIEW.width : VIEW.height;
+  
+  // Transform to rotate content: translate to new center, rotate +90, translate from old center
+  const horizontalTransform = `translate(${VIEW.height / 2}, ${VIEW.width / 2}) rotate(90) translate(${-VIEW.width / 2}, ${-VIEW.height / 2})`;
+
   return (
     <Box
       className={className}
@@ -343,7 +353,7 @@ export function TennisCourt2D({
         height: "100%",
         position: "relative",
         borderRadius: "var(--radius-3)",
-        overflow: "visible",
+        overflow: "hidden",
         backgroundColor: "var(--gray-3)",
         border: "1px solid var(--gray-6)",
       }}
@@ -351,10 +361,12 @@ export function TennisCourt2D({
       <svg
         width="100%"
         height="100%"
-        viewBox={`0 0 ${VIEW.width} ${VIEW.height}`}
+        viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ display: "block", overflow: "visible" }}
       >
+        {/* Content wrapper - apply rotation transform for horizontal mode */}
+        <g transform={horizontal ? horizontalTransform : undefined}>
         {/* Gradient definitions */}
         <defs>
           {recentTrajectories.map((traj, idx) => {
@@ -607,6 +619,7 @@ export function TennisCourt2D({
             >
               <circle cx={0} cy={0} r={playerRadius + 0.12} fill="none" stroke={color} strokeWidth={0.12} opacity={0.4} />
               <circle cx={0} cy={0} r={playerRadius} fill={color} stroke="#ffffff" strokeWidth={0.1} />
+              {/* Player label - rotate to stay horizontal when court is rotated */}
               <text
                 x={0}
                 y={0.18}
@@ -615,16 +628,20 @@ export function TennisCourt2D({
                 fontWeight="bold"
                 fill="#ffffff"
                 style={{ pointerEvents: "none" }}
+                transform={horizontal ? "rotate(-90)" : undefined}
               >
                 {player.displayName.replace("Player ", "P")}
               </text>
             </g>
           );
         })}
+        </g>
       </svg>
     </Box>
   );
 }
+
+
 
 
 

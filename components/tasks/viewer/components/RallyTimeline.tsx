@@ -1,11 +1,11 @@
 "use client";
 
 import { RefObject, useState, useRef, useCallback } from "react";
-import { Box, Flex, Heading, Badge, Text, Card, Switch, Tooltip } from "@radix-ui/themes";
-import { Cross2Icon, SpeakerLoudIcon } from "@radix-ui/react-icons";
-import { IconButton } from "@/components/ui";
+import { Box, Flex, Heading, Badge, Text, Switch, Tooltip } from "@radix-ui/themes";
+import { SpeakerLoudIcon } from "@radix-ui/react-icons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { CONFIG, FEATURE_FLAGS, OVERLAY_COLORS } from "../constants";
-import { StatisticsResult, ActiveEventTooltip, BallBounce, Swing } from "../types";
+import { StatisticsResult, BallBounce, Swing } from "../types";
 import { formatSwingType, formatDuration, getPlayerIndex } from "../utils";
 import { AudioWaveform } from "./AudioWaveform";
 import { DraggablePlayhead } from "./DraggablePlayhead";
@@ -162,7 +162,6 @@ interface RallyTimelineProps {
   result: StatisticsResult;
   selectedRallyIndex: number;
   currentTime: number;
-  activeEventTooltip: ActiveEventTooltip | null;
   videoRef: RefObject<HTMLVideoElement | null>;
   rallyTimelineRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
@@ -174,13 +173,13 @@ export function RallyTimeline({
   result,
   selectedRallyIndex,
   currentTime,
-  activeEventTooltip,
   videoRef,
   rallyTimelineRef,
   onClose,
   enhancedBallBounces,
   playerDisplayNames = {},
 }: RallyTimelineProps) {
+  const isMobile = useIsMobile();
   const [showAudioWaveform, setShowAudioWaveform] = useState(false);
   const [hoveredSwingIdx, setHoveredSwingIdx] = useState<number | null>(null);
   const [hoveredBounceIdx, setHoveredBounceIdx] = useState<number | null>(null);
@@ -235,31 +234,30 @@ export function RallyTimeline({
   const elapsedInRally = Math.max(0, Math.min(currentTime - rallyStart, rallyDuration));
 
   return (
-    <Box style={{ animation: "slideDown 0.5s ease-out", overflow: "hidden" }}>
-      <Card style={{ border: "1px solid var(--mint-9)", marginBottom: "var(--space-3)" }}>
-        <Flex direction="column" gap="2" p="3">
+    <Box style={{ animation: "slideDown 0.5s ease-out", overflow: "visible" }}>
+      <Box style={{ marginBottom: "4px", padding: "6px 0", overflow: "visible" }}>
+        <Flex direction="column" gap="0" p="0" style={{ overflow: "visible" }}>
           <Flex justify="between" align="center">
-            <Flex align="center" gap="2">
-              <Heading size="4" weight="medium">
+            <Flex align="center" gap="1">
+              <Heading size="1" weight="medium">
                 Rally {selectedRallyIndex + 1}
               </Heading>
-              <Badge color="mint">{formatDuration(rallyDuration)}</Badge>
-              <Box display={{ initial: "none", sm: "block" }}>
-                <Text size="2" color="gray">
-                  {rallySwings.length} swings • {rallyBounces.length} bounces
-                </Text>
-              </Box>
+              <Badge color="mint" size="1">{formatDuration(rallyDuration)}</Badge>
             </Flex>
-            <Flex align="center" gap="3">
-              <Flex gap="3">
+            <Flex align="center" gap="2">
+              {/* Compact legend */}
+              <Flex align="center" gap="2">
                 <Flex align="center" gap="1">
-                  <Box style={{ width: 4, height: 12, backgroundColor: "var(--blue-9)", borderRadius: 2 }} />
+                  <Box style={{ width: 3, height: 10, backgroundColor: "var(--blue-9)", borderRadius: 2 }} />
                   <Text size="1" color="gray">Swing</Text>
                 </Flex>
-                <Flex align="center" gap="1">
-                  <Box style={{ width: 10, height: 10, backgroundColor: "var(--yellow-9)", borderRadius: "50%" }} />
-                  <Text size="1" color="gray">Bounce</Text>
-                </Flex>
+                {/* Bounce legend - hidden on mobile */}
+                {!isMobile && (
+                  <Flex align="center" gap="1">
+                    <Box style={{ width: 8, height: 8, backgroundColor: "var(--yellow-9)", borderRadius: "50%" }} />
+                    <Text size="1" color="gray">Bounce</Text>
+                  </Flex>
+                )}
               </Flex>
               {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && (
                 <Tooltip content="Show audio waveform (play video to analyze)">
@@ -269,36 +267,36 @@ export function RallyTimeline({
                   </Flex>
                 </Tooltip>
               )}
-              <IconButton
-                icon={<Cross2Icon />}
-                variant="ghost"
-                size="1"
-                onClick={onClose}
-                ariaLabel="Close rally details"
-              />
             </Flex>
           </Flex>
 
+          {/* Wrapper for timeline with overflow visible for playhead */}
           <Box
-            ref={timelineContainerRef}
-            onClick={handleTimelineClick}
             style={{
-              height: "44px",
-              backgroundColor: "var(--gray-3)",
-              borderRadius: "var(--radius-3)",
               position: "relative",
+              marginTop: "4px",
               overflow: "visible",
-              marginTop: "16px",
-              cursor: "pointer",
             }}
           >
+            <Box
+              ref={timelineContainerRef}
+              onClick={handleTimelineClick}
+              style={{
+                height: "32px",
+                backgroundColor: "var(--gray-3)",
+                borderRadius: "4px",
+                position: "relative",
+                overflow: "visible",
+                cursor: "pointer",
+              }}
+            >
             {/* Audio Waveform (behind other elements) */}
             {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && showAudioWaveform && (
               <AudioWaveform
                 videoRef={videoRef}
                 startTime={rallyStart}
                 endTime={rallyEnd}
-                height={44}
+                height={32}
               />
             )}
 
@@ -375,8 +373,8 @@ export function RallyTimeline({
               );
             })}
 
-            {/* Bounces */}
-            {rallyBounces.map((bounce, idx) => {
+            {/* Bounces - hidden on mobile */}
+            {!isMobile && rallyBounces.map((bounce, idx) => {
               const relativeTime = bounce.timestamp - rallyStart;
               const position = (relativeTime / rallyDuration) * 100;
               const isNearPlayhead = Math.abs(currentTime - bounce.timestamp) < CONFIG.EVENT_DETECTION_THRESHOLD;
@@ -462,40 +460,10 @@ export function RallyTimeline({
               />
             )}
 
-            {/* Active event tooltip */}
-            {activeEventTooltip && timelineContainerRef.current && (() => {
-              const rect = timelineContainerRef.current!.getBoundingClientRect();
-              const leftPos = rect.left + (rect.width * activeEventTooltip.position) / 100;
-              const topPos = rect.top - 50;
-
-              return (
-                <Box
-                  style={{
-                    position: "fixed",
-                    left: `${leftPos}px`,
-                    top: `${topPos}px`,
-                    transform: "translateX(-50%)",
-                    backgroundColor: "var(--blue-9)",
-                    color: "white",
-                    padding: "6px 12px",
-                    borderRadius: "var(--radius-2)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    zIndex: 9999,
-                    pointerEvents: "none",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                    animation: "fadeIn 0.2s ease-out",
-                  }}
-                >
-                  {activeEventTooltip.text}
-                </Box>
-              );
-            })()}
+            </Box>
           </Box>
         </Flex>
-      </Card>
-
+      </Box>
     </Box>
   );
 }

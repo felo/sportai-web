@@ -25,6 +25,7 @@ import {
   type Moment,
 } from "./components";
 import { extractS3KeyFromUrl } from "@/lib/s3";
+import { isSampleTask, getSampleTask } from "../sampleTasks";
 
 // Types and constants
 import type { TechniqueViewerProps, ViewMode, ContextMenuTarget, ContextMenuPosition, DirtyFlags } from "./types";
@@ -84,6 +85,16 @@ export function TechniqueViewer({
 
   // Derived values
   const videoS3Key = useMemo(() => extractS3KeyFromUrl(videoUrl), [videoUrl]);
+  
+  // Get pose data URL for sample tasks (stored in public bucket)
+  const poseDataUrl = useMemo(() => {
+    if (taskId && isSampleTask(taskId)) {
+      const sampleTask = getSampleTask(taskId);
+      return sampleTask?.poseDataUrl;
+    }
+    return undefined;
+  }, [taskId]);
+  
   const swingCount = useMemo(
     () => protocolEvents.filter((e) => e.protocolId === "swing-detection-v3").length,
     [protocolEvents]
@@ -136,6 +147,7 @@ export function TechniqueViewer({
   // Server data management
   const serverDataHook = useServerData({
     videoS3Key,
+    poseDataUrl,
     viewerRef,
     viewerState: {
       isVideoReady: viewerState.isVideoReady,
@@ -243,6 +255,7 @@ export function TechniqueViewer({
             onAnglePrecisionChange={angleConfig.setAnglePrecision}
             showPanel={showPanel}
             onShowPanelChange={setShowPanel}
+            developerMode={developerMode}
           />
 
           {/* Video Viewer */}

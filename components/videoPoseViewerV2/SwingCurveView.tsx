@@ -1718,13 +1718,37 @@ export function SwingCurveView({
           flexShrink: 0,
         }}
       >
-        <Flex align="center" gap="3">
+        {/* Scrollable controls with fade mask */}
+        <Box
+          style={{
+            position: "relative",
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <Flex 
+            align="center" 
+            gap="3"
+            style={{
+              overflowX: "auto",
+              overflowY: "hidden",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+              paddingBottom: "2px",
+              marginBottom: "-2px",
+              paddingRight: "24px",
+            }}
+            className="hide-scrollbar"
+          >
           {/* Metric selector */}
           <SegmentedControl.Root
             defaultValue="velocity"
             value={selectedMetric}
             onValueChange={(value) => setSelectedMetric(value as MetricType)}
             size="1"
+            style={{ flexShrink: 0 }}
           >
             <SegmentedControl.Item value="velocity">
               <Flex align="center" gap="1">
@@ -1807,6 +1831,7 @@ export function SwingCurveView({
                 style={{ 
                   marginLeft: "12px",
                   textTransform: "capitalize",
+                  flexShrink: 0,
                 }} 
               />
               <Select.Content>
@@ -1826,7 +1851,7 @@ export function SwingCurveView({
               value={selectedWrist} 
               onValueChange={(value) => setSelectedWrist(value as WristType)}
             >
-              <Select.Trigger variant="soft" style={{ marginLeft: "8px" }} />
+              <Select.Trigger variant="soft" style={{ marginLeft: "8px", flexShrink: 0 }} />
               <Select.Content>
                 <Select.Item value="left">Left</Select.Item>
                 <Select.Item value="right">Right</Select.Item>
@@ -1842,7 +1867,7 @@ export function SwingCurveView({
               value={orientationType} 
               onValueChange={(value) => setOrientationType(value as OrientationType)}
             >
-              <Select.Trigger variant="soft" style={{ marginLeft: "12px" }} />
+              <Select.Trigger variant="soft" style={{ marginLeft: "12px", flexShrink: 0 }} />
               <Select.Content>
                 <Select.Item value="body">Body Orientation</Select.Item>
                 <Select.Item value="hipAngular">Hip Angular Velocity</Select.Item>
@@ -1854,7 +1879,7 @@ export function SwingCurveView({
           
           {/* Legend for velocity view */}
           {selectedMetric === "velocity" && (
-            <Flex align="center" gap="3" style={{ marginLeft: "12px" }}>
+            <Flex align="center" gap="3" style={{ marginLeft: "12px", flexShrink: 0 }}>
               <Flex align="center" gap="1">
                 <Box
                   style={{
@@ -1921,7 +1946,7 @@ export function SwingCurveView({
               value={angleType} 
               onValueChange={(value) => setAngleType(value as AngleType)}
             >
-              <Select.Trigger variant="soft" style={{ marginLeft: "12px", textTransform: "capitalize" }} />
+              <Select.Trigger variant="soft" style={{ marginLeft: "12px", textTransform: "capitalize", flexShrink: 0 }} />
               <Select.Content>
                 <Select.Item value="shoulder">Shoulder</Select.Item>
                 <Select.Item value="elbow">Elbow</Select.Item>
@@ -1938,7 +1963,7 @@ export function SwingCurveView({
               value={selectedKnee} 
               onValueChange={(value) => setSelectedKnee(value as KneeType)}
             >
-              <Select.Trigger variant="soft" style={{ marginLeft: "8px" }} />
+              <Select.Trigger variant="soft" style={{ marginLeft: "8px", flexShrink: 0 }} />
               <Select.Content>
                 <Select.Item value="left">Left</Select.Item>
                 <Select.Item value="right">Right</Select.Item>
@@ -1949,7 +1974,7 @@ export function SwingCurveView({
           
           {/* Legend for knee bend view */}
           {selectedMetric === "kneeBend" && (
-            <Flex align="center" gap="3" style={{ marginLeft: "12px" }}>
+            <Flex align="center" gap="3" style={{ marginLeft: "12px", flexShrink: 0 }}>
               <Flex align="center" gap="1">
                 <Box
                   style={{
@@ -2008,7 +2033,21 @@ export function SwingCurveView({
               </Tooltip>
             </Flex>
           )}
-        </Flex>
+          </Flex>
+          
+          {/* Fade mask on right edge */}
+          <Box
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: "32px",
+              background: "linear-gradient(to right, transparent, var(--gray-2))",
+              pointerEvents: "none",
+            }}
+          />
+        </Box>
 
         {/* Show phases toggle - hidden for now */}
         {false && (
@@ -2051,6 +2090,12 @@ export function SwingCurveView({
           orientationType={orientationType}
         />
       </Box>
+      
+      <style jsx>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </Box>
   );
 }

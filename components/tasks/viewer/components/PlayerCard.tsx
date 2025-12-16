@@ -37,6 +37,7 @@ export function PlayerCard({ player, displayIndex, displayName, portrait, maxDis
         <Flex direction="column" align="center" gap="2">
           <Box
             style={{
+              position: "relative",
               width: "72px",
               height: "72px",
               borderRadius: "50%",

@@ -177,7 +177,7 @@ export function BallTrackerOverlay({
   videoRef,
   timeThreshold = 0.1,
   usePerspective = true,
-  showIndicator = true,
+  showIndicator = false,
   showTrail = true,
   useSmoothing = true,
   showBounceRipples = true,

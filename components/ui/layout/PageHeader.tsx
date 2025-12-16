@@ -30,7 +30,7 @@ export function PageHeader({
   const isMobile = useIsMobile();
   const sidebarWidth = isCollapsed ? "64px" : "280px";
 
-  // Mobile layout: Hamburger menu (left), centered logo
+  // Mobile layout: Hamburger menu (left), centered logo (2/3 desktop size)
   if (isMobile) {
     return (
       <Box
@@ -39,8 +39,8 @@ export function PageHeader({
           borderBottom: "1px solid var(--gray-6)",
           backgroundColor: "var(--color-background)",
           backdropFilter: "blur(8px)",
-          paddingTop: "calc(var(--space-3) + env(safe-area-inset-top))",
-          paddingBottom: "var(--space-3)",
+          paddingTop: "calc(var(--space-1) + env(safe-area-inset-top))",
+          paddingBottom: "var(--space-1)",
           paddingLeft: "var(--space-4)",
           paddingRight: "var(--space-4)",
           display: "flex",
@@ -66,10 +66,12 @@ export function PageHeader({
           />
         </Box>
 
-        {/* Centered Logo - Tap to create new chat if handler provided */}
+        {/* Centered Logo - Tap to create new chat if handler provided (2/3 desktop size) */}
         <LogoNewChatButton
           onNewChat={onNewChat}
           directTapAction={!!onNewChat}
+          width={120}
+          height={38}
         />
 
         {/* Actions on the right */}

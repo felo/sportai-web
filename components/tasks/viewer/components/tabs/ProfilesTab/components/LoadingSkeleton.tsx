@@ -34,9 +34,6 @@ export function LoadingSkeleton() {
         <Text size="3" weight="medium" style={{ color: "var(--gray-11)" }}>
           Analyzing player profiles...
         </Text>
-        <Text size="2" color="gray">
-          AI is evaluating performance attributes
-        </Text>
         <Box style={{ marginTop: 8 }}>
           <StreamingIndicator />
         </Box>
@@ -55,6 +52,8 @@ export function LoadingSkeleton() {
     </Box>
   );
 }
+
+
 
 
 

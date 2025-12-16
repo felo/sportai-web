@@ -14,6 +14,8 @@ import { SAVE_DEBOUNCE_MS } from "../constants";
 
 interface UseServerDataOptions {
   videoS3Key: string | null;
+  /** Direct URL to load pose data from (for sample tasks in public buckets) */
+  poseDataUrl?: string;
   viewerRef: React.RefObject<ViewerActions | null>;
   viewerState: {
     isVideoReady: boolean;
@@ -50,6 +52,7 @@ interface UseServerDataOptions {
  */
 export function useServerData({
   videoS3Key,
+  poseDataUrl,
   viewerRef,
   viewerState,
   config,
@@ -105,14 +108,16 @@ export function useServerData({
    * Load pose data from server.
    */
   const loadFromServer = useCallback(async () => {
-    if (!videoS3Key || serverDataChecked || isLoadingServerData) return;
+    // Need either videoS3Key or poseDataUrl to load data
+    if ((!videoS3Key && !poseDataUrl) || serverDataChecked || isLoadingServerData) return;
     if (!viewerState.isVideoReady) return;
     if (!viewerRef.current) return;
 
     setIsLoadingServerData(true);
 
     try {
-      const result = await loadPoseData(videoS3Key);
+      // Use direct URL for sample tasks, otherwise use S3 key
+      const result = await loadPoseData(videoS3Key || "", poseDataUrl);
 
       if (result.success && result.data) {
         // Convert stored data to Map format
@@ -187,6 +192,7 @@ export function useServerData({
     }
   }, [
     videoS3Key,
+    poseDataUrl,
     viewerState.isVideoReady,
     serverDataChecked,
     isLoadingServerData,

@@ -5,6 +5,7 @@ import type { Message, CandidateOption } from "@/types/chat";
 import { getCurrentChatId } from "@/utils/storage-unified";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasCompletedInsightOnboarding } from "@/utils/storage";
+import { generateMessageId } from "../utils";
 
 // =============================================================================
 // Shared message content - defined once, reused across options
@@ -273,7 +274,7 @@ export function useGreetingMessage({
     }
 
     // Add the intro text with typewriter effect
-    const introMessageId = crypto.randomUUID();
+    const introMessageId = generateMessageId();
     const typingSpeed = 15; // ms per character
     
     // Start with first character to avoid ThinkingIndicator
@@ -299,7 +300,7 @@ export function useGreetingMessage({
       } else {
         // After typing completes, add the candidate options
         setTimeout(() => {
-          const optionsMessageId = crypto.randomUUID();
+          const optionsMessageId = generateMessageId();
           const optionsMessage: Message = {
             id: optionsMessageId,
             role: "assistant",

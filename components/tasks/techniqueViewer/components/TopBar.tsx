@@ -12,6 +12,7 @@ import {
 } from "@radix-ui/react-icons";
 import { ANGLE_PRESETS } from "@/components/videoPoseViewerV2";
 import { getSportColor } from "@/components/tasks/viewer/utils";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { ViewMode } from "../types";
 
 interface TopBarProps {
@@ -48,6 +49,9 @@ interface TopBarProps {
   // Settings Panel
   showPanel: boolean;
   onShowPanelChange: (show: boolean) => void;
+  
+  // Developer Mode
+  developerMode?: boolean;
 }
 
 /**
@@ -77,7 +81,10 @@ export function TopBar({
   onAnglePrecisionChange,
   showPanel,
   onShowPanelChange,
+  developerMode = false,
 }: TopBarProps) {
+  const isMobile = useIsMobile();
+
   return (
     <Flex
       align="center"
@@ -102,20 +109,22 @@ export function TopBar({
             </IconButton>
           </Tooltip>
         )}
-        {sport && sport !== "all" && (
+        {!isMobile && sport && sport !== "all" && (
           <Badge color={getSportColor(sport)} size="2">
             {sport.charAt(0).toUpperCase() + sport.slice(1)}
           </Badge>
         )}
-        <Badge variant="soft" size="2">
-          Technique
-        </Badge>
-        {handednessResult && (
+        {!isMobile && (
+          <Badge variant="soft" size="2">
+            Technique
+          </Badge>
+        )}
+        {!isMobile && handednessResult && (
           <Badge variant="soft" size="2">
             {handednessResult.dominantHand === "right" ? "Right" : "Left"}-handed
           </Badge>
         )}
-        {swingCount > 0 && (
+        {!isMobile && swingCount > 0 && (
           <Badge color="blue" size="2">
             {swingCount} Swing{swingCount !== 1 ? "s" : ""}
           </Badge>
@@ -304,7 +313,7 @@ export function TopBar({
         )}
 
         {/* View Swings / View Player toggle */}
-        {swingCount > 0 && (
+        {developerMode && swingCount > 0 && (
           <Tooltip
             content={viewMode === "player" ? "View detected swings" : "View full video"}
           >
@@ -325,20 +334,22 @@ export function TopBar({
           </Tooltip>
         )}
 
-        <Tooltip content={showPanel ? "Hide settings" : "Show settings"}>
-          <IconButton
-            size="2"
-            variant={showPanel ? "solid" : "ghost"}
-            onClick={() => onShowPanelChange(!showPanel)}
-            style={{ color: "white" }}
-          >
-            {showPanel ? (
-              <DoubleArrowRightIcon width={18} height={18} />
-            ) : (
-              <GearIcon width={18} height={18} />
-            )}
-          </IconButton>
-        </Tooltip>
+        {developerMode && (
+          <Tooltip content={showPanel ? "Hide settings" : "Show settings"}>
+            <IconButton
+              size="2"
+              variant={showPanel ? "solid" : "ghost"}
+              onClick={() => onShowPanelChange(!showPanel)}
+              style={{ color: "white" }}
+            >
+              {showPanel ? (
+                <DoubleArrowRightIcon width={18} height={18} />
+              ) : (
+                <GearIcon width={18} height={18} />
+              )}
+            </IconButton>
+          </Tooltip>
+        )}
       </Flex>
     </Flex>
   );

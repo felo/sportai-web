@@ -85,6 +85,7 @@ interface PadelCourt2DProps {
   showTrajectories?: boolean;
   showPlayers?: boolean;
   showTeamZoneSync?: boolean; // Show team zone sync overlay (traffic light system)
+  horizontal?: boolean; // When true, render court in landscape orientation (for mobile)
 }
 
 // Convert court_pos to court coordinates
@@ -307,6 +308,7 @@ export function PadelCourt2D({
   showTrajectories = true,
   showPlayers = true,
   showTeamZoneSync = false,
+  horizontal = false,
 }: PadelCourt2DProps) {
   // Court colors
   const courtColor = "#3B5DC9";
@@ -485,6 +487,17 @@ export function PadelCourt2D({
     return { topHalf: topHalfSync, bottomHalf: bottomHalfSync, isServePhase: false };
   }, [currentPlayerPositions, showTeamZoneSync, currentRallyStart, currentTime]);
 
+  // For horizontal mode, swap viewBox and use SVG transform to rotate content
+  // Original court: 10m wide x 20m long (vertical)
+  // Horizontal: 20m wide x 10m tall
+  // Rotate +90 (clockwise) so bottom half of court appears on LEFT side
+  const viewBoxWidth = horizontal ? COURT.length : COURT.width;   // 20 or 10
+  const viewBoxHeight = horizontal ? COURT.width : COURT.length;  // 10 or 20
+  
+  // Transform to rotate content: translate to new center, rotate +90, translate from old center
+  // Old center: (5, 10), New center: (10, 5)
+  const horizontalTransform = `translate(${COURT.length / 2}, ${COURT.width / 2}) rotate(90) translate(${-COURT.width / 2}, ${-COURT.length / 2})`;
+
   return (
     <Box
       className={className}
@@ -493,7 +506,7 @@ export function PadelCourt2D({
         height: "100%",
         position: "relative",
         borderRadius: "var(--radius-3)",
-        overflow: "visible", // Allow bounces, labels, etc. to overflow
+        overflow: "hidden",
         backgroundColor: "var(--gray-3)",
         border: "1px solid var(--gray-6)",
       }}
@@ -501,10 +514,12 @@ export function PadelCourt2D({
       <svg
         width="100%"
         height="100%"
-        viewBox={`0 0 ${COURT.width} ${COURT.length}`}
+        viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ display: "block", overflow: "visible" }}
       >
+        {/* Content wrapper - apply rotation transform for horizontal mode */}
+        <g transform={horizontal ? horizontalTransform : undefined}>
         {/* Gradient definitions (yellow at start/past → green at end/now) */}
         <defs>
           {recentTrajectories.map((traj, idx) => {
@@ -774,7 +789,7 @@ export function PadelCourt2D({
                 stroke="#ffffff"
                 strokeWidth={0.08}
               />
-              {/* Player label */}
+              {/* Player label - rotate to stay horizontal when court is rotated */}
               <text
                 x={0}
                 y={0.15}
@@ -783,12 +798,14 @@ export function PadelCourt2D({
                 fontWeight="bold"
                 fill="#ffffff"
                 style={{ pointerEvents: "none" }}
+                transform={horizontal ? "rotate(-90)" : undefined}
               >
                 {player.displayName.replace("Player ", "P")}
               </text>
             </g>
           );
         })}
+        </g>
       </svg>
     </Box>
   );

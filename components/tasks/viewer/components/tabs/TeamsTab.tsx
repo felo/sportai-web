@@ -591,6 +591,7 @@ function TeamCard({
               <Box
                 key={playerId}
                 style={{
+                  position: "relative",
                   width: 72,
                   height: 72,
                   borderRadius: "50%",

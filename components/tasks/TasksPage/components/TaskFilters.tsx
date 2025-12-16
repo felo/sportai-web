@@ -1,7 +1,9 @@
 "use client";
 
-import { Flex, Text, Select, SegmentedControl } from "@radix-ui/themes";
+import { useMemo } from "react";
+import { Flex, Text, SegmentedControl } from "@radix-ui/themes";
 import { ViewGridIcon, ListBulletIcon } from "@radix-ui/react-icons";
+import { FilterSelect } from "@/components/ui";
 import { TASK_TYPES, SPORTS } from "../constants";
 
 interface TaskFiltersProps {
@@ -30,38 +32,41 @@ export function TaskFilters({
 }: TaskFiltersProps) {
   const showFilterCount = filterSport !== "show_all" || filterTaskType !== "all";
 
+  // Build sport options
+  const sportOptions = useMemo(() => [
+    { value: "show_all", label: "All" },
+    ...SPORTS.map((s) => ({ value: s.value, label: s.label })),
+  ], []);
+
+  // Build task type options
+  const taskTypeOptions = useMemo(() => [
+    { value: "all", label: "All Analysis" },
+    ...TASK_TYPES.map((type) => ({ value: type.value, label: type.label })),
+  ], []);
+
   return (
     <Flex justify="between" align="center" mb="3" wrap="wrap" gap="3">
       <Flex gap="3" align="center">
-        <Text size="2" weight="medium" color="gray">
-          Videos
-        </Text>
-
         {/* Sport Filter */}
-        <Select.Root value={filterSport} onValueChange={onFilterSportChange} size="1">
-          <Select.Trigger placeholder="All Sports" style={{ minWidth: "110px" }} />
-          <Select.Content>
-            <Select.Item value="show_all">All</Select.Item>
-            {SPORTS.map((s) => (
-              <Select.Item key={s.value} value={s.value}>
-                {s.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
+        <FilterSelect
+          value={filterSport}
+          onValueChange={onFilterSportChange}
+          options={sportOptions}
+          icon="filter"
+          placeholder="All Sports"
+          minWidth="110px"
+          size="1"
+        />
 
         {/* Analysis Type Filter */}
-        <Select.Root value={filterTaskType} onValueChange={onFilterTaskTypeChange} size="1">
-          <Select.Trigger placeholder="All Analysis" style={{ minWidth: "120px" }} />
-          <Select.Content>
-            <Select.Item value="all">All Analysis</Select.Item>
-            {TASK_TYPES.map((type) => (
-              <Select.Item key={type.value} value={type.value}>
-                {type.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
+        <FilterSelect
+          value={filterTaskType}
+          onValueChange={onFilterTaskTypeChange}
+          options={taskTypeOptions}
+          placeholder="All Analysis"
+          minWidth="120px"
+          size="1"
+        />
 
         {/* Show count of filtered results */}
         {showFilterCount && (
@@ -78,13 +83,13 @@ export function TaskFilters({
       >
         <SegmentedControl.Item value="grid">
           <Flex align="center" gap="1">
-            <ViewGridIcon width={14} height={14} />
+            <ViewGridIcon width={12} height={12} />
             <Text size="1">Grid</Text>
           </Flex>
         </SegmentedControl.Item>
         <SegmentedControl.Item value="list">
           <Flex align="center" gap="1">
-            <ListBulletIcon width={14} height={14} />
+            <ListBulletIcon width={12} height={12} />
             <Text size="1">List</Text>
           </Flex>
         </SegmentedControl.Item>
@@ -92,3 +97,4 @@ export function TaskFilters({
     </Flex>
   );
 }
+

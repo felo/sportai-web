@@ -27,24 +27,21 @@ export function SubTabNavigation({ activeSubTab, onTabChange }: SubTabNavigation
               border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
             }}
           >
-            <Flex align="center" gap="2">
-              <Box style={{ color: isActive ? "white" : "var(--gray-11)" }}>
-                {tab.icon}
-              </Box>
-              <Text
-                size="2"
-                weight="medium"
-                style={{ color: isActive ? "white" : "var(--gray-11)" }}
-              >
-                {tab.label}
-              </Text>
-            </Flex>
+            <Text
+              size="2"
+              weight="medium"
+              style={{ color: isActive ? "white" : "var(--gray-11)" }}
+            >
+              {tab.label}
+            </Text>
           </Box>
         );
       })}
     </Flex>
   );
 }
+
+
 
 
 

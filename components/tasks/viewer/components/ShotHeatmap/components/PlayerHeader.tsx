@@ -43,6 +43,7 @@ export function PlayerHeader({
           {/* Player Portrait */}
           <Box
             style={{
+              position: "relative",
               width: 52,
               height: 52,
               borderRadius: "50%",

@@ -15,6 +15,9 @@ export type { ToggleSwitchProps } from "./inputs/ToggleSwitch";
 export { RangeSlider } from "./inputs/RangeSlider";
 export type { RangeSliderProps } from "./inputs/RangeSlider";
 
+export { FilterSelect } from "./inputs/FilterSelect";
+export type { FilterSelectProps, FilterSelectOption, FilterSelectGroup } from "./inputs/FilterSelect";
+
 // Layout
 export { SettingsSectionHeader } from "./layout/SettingsSectionHeader";
 export type { SettingsSectionHeaderProps } from "./layout/SettingsSectionHeader";

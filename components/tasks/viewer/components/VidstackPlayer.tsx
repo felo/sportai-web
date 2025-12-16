@@ -156,7 +156,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     onVideoError,
   }, ref) => {
     const [showVideoSettings, setShowVideoSettings] = useState(false);
-    const [showBallTracker, setShowBallTracker] = useState(true); // Default ON
+    const [showBallTracker, setShowBallTracker] = useState(false); // Default OFF
     const [usePerspective, setUsePerspective] = useState(true);
     const [showTrail, setShowTrail] = useState(true);
     const [useSmoothing, setUseSmoothing] = useState(true);
@@ -203,7 +203,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     }, []);
     
     // Toggle all visual overlays
-    // ON = restore defaults (ball tracker on, others off)
+    // ON = restore defaults (trail, bounces, velocity on; ball indicator off)
     // OFF = hide everything for clean video view
     const toggleAllOverlays = useCallback(() => {
       const newState = !showAllOverlays;
@@ -211,12 +211,18 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
       
       if (newState) {
         // Turning ON: restore default overlays
-        setShowBallTracker(true);
+        setShowTrail(true);
+        setShowBounceRipples(true);
+        setShowVelocity(true);
+        setShowBallTracker(false);
         setShowPlayerBoxes(false);
         setShowPose(false);
         setShowCourtKeypoints(false);
       } else {
-        // Turning OFF: hide all overlays
+        // Turning OFF: hide all overlays for clean video
+        setShowTrail(false);
+        setShowBounceRipples(false);
+        setShowVelocity(false);
         setShowBallTracker(false);
         setShowPlayerBoxes(false);
         setShowPose(false);

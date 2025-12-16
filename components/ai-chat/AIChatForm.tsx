@@ -17,7 +17,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { MessageList } from "@/components/chat/messages/MessageList";
 import { ChatInput } from "@/components/chat/input/ChatInput";
-import { ChatHeader } from "@/components/chat/header/ChatHeader";
+import { PageHeader } from "@/components/ui";
 import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
 import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoContext";
@@ -44,7 +44,7 @@ import {
   useChatSubmission,
   useGreetingMessage,
 } from "./hooks";
-import { generateHelpQuestion } from "./utils";
+import { generateHelpQuestion, generateMessageId } from "./utils";
 import { ChatLayout, NavigationDialog } from "./components";
 import type { ProgressStage } from "./types";
 
@@ -417,7 +417,7 @@ export function AIChatForm() {
     }
 
     // 3. Add the user's "message" (their selection) - only for non-demo options
-    const userMessageId = crypto.randomUUID();
+    const userMessageId = generateMessageId();
     addMessage({
       id: userMessageId,
       role: "user",
@@ -428,7 +428,7 @@ export function AIChatForm() {
     scrollToBottom();
 
     // 5. Add the premade assistant response with typewriter effect
-    const assistantMessageId = crypto.randomUUID();
+    const assistantMessageId = generateMessageId();
     const fullResponse = option.premadeResponse || "";
     const hasFollowUp = option.followUpOptions && option.followUpOptions.length > 0;
     
@@ -455,7 +455,7 @@ export function AIChatForm() {
       } else if (hasFollowUp) {
         // After typing completes, add follow-up options
         setTimeout(() => {
-          const followUpMessageId = crypto.randomUUID();
+          const followUpMessageId = generateMessageId();
           addMessage({
             id: followUpMessageId,
             role: "assistant",
@@ -484,7 +484,7 @@ export function AIChatForm() {
         </div>
         
         <div className={`h-screen flex flex-col overflow-hidden hydration-guard ${isHydrated ? 'hydrated' : ''}`}>
-          <ChatHeader messageCount={messages.length} onNewChat={handleNewChat} />
+          <PageHeader onNewChat={handleNewChat} />
           
           <Sidebar 
             onClearChat={handleClearConversation}

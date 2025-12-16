@@ -36,3 +36,5 @@ export function convertVelocityToKmh(
   const velocityMetersPerSecond = velocityPxPerFrame * metersPerPixel * fps;
   return velocityMetersPerSecond * 3.6;
 }
+
+

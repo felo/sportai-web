@@ -50,3 +50,5 @@ export function resetInsightOnboarding(): void {
     storageLogger.error("Failed to reset insight onboarding:", error);
   }
 }
+
+

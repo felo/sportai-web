@@ -35,7 +35,7 @@ interface CaptureRequest {
 // Module-level Cache State
 // ============================================================================
 
-const DEBUG = false;
+const DEBUG = true;
 
 function log(...args: unknown[]) {
   if (DEBUG) console.log("[ThumbnailCache]", ...args);
@@ -52,6 +52,9 @@ let captureQueue: CaptureRequest[] = [];
 let isProcessingQueue = false;
 let currentVideoElement: HTMLVideoElement | null = null;
 let currentOptions: ThumbnailOptions = {};
+
+// Track which video sources have been processed this session
+const processedVideoSources = new Set<string>();
 
 // ============================================================================
 // Cache Key Generation
@@ -79,15 +82,26 @@ export function getCacheKeyByFrame(videoSrc: string, frame: number): string {
 
 /**
  * Get cached thumbnail synchronously by time.
+ * Returns null if this video hasn't been processed this session (to avoid stale cache).
  */
 export function getCachedThumbnail(videoSrc: string, time: number): string | null {
+  // Don't return cached values for videos that haven't been processed this session
+  if (!processedVideoSources.has(videoSrc)) {
+    return null;
+  }
   return thumbnailCache.get(getCacheKey(videoSrc, time)) ?? null;
 }
 
 /**
  * Get cached thumbnail synchronously by frame.
+ * Returns null if this video hasn't been processed this session (to avoid stale cache).
  */
 export function getCachedThumbnailByFrame(videoSrc: string, frame: number): string | null {
+  // Don't return cached values for videos that haven't been processed this session
+  // This prevents stale thumbnails from previous page loads
+  if (!processedVideoSources.has(videoSrc)) {
+    return null;
+  }
   return thumbnailCache.get(getCacheKeyByFrame(videoSrc, frame)) ?? null;
 }
 
@@ -110,8 +124,24 @@ export function requestThumbnailCapture(
   time: number,
   options: ThumbnailOptions = {}
 ): Promise<string | null> {
-  const key = getCacheKey(videoElement.src, time);
+  const videoSrc = videoElement.src;
+  const key = getCacheKey(videoSrc, time);
   log(`Request: time=${time.toFixed(2)}, key=${key}`);
+
+  // Clear old cache entries if this is a new video source this session
+  if (!processedVideoSources.has(videoSrc)) {
+    // Clear any cached thumbnails for this video from previous sessions
+    const srcKey = videoSrc.split("/").pop() || videoSrc.slice(-50);
+    const keysToDelete: string[] = [];
+    thumbnailCache.forEach((_, k) => {
+      if (k.includes(srcKey)) {
+        keysToDelete.push(k);
+      }
+    });
+    keysToDelete.forEach((k) => thumbnailCache.delete(k));
+    processedVideoSources.add(videoSrc);
+    log(`Cleared ${keysToDelete.length} stale cache entries for ${srcKey}`);
+  }
 
   // Already cached - return immediately
   if (thumbnailCache.has(key)) {
@@ -137,8 +167,25 @@ export function requestThumbnailCapture(
   });
 }
 
+// ============================================================================
+// Sequential Frame Capture Queue
+// ============================================================================
+
+interface FrameCaptureRequest {
+  videoElement: HTMLVideoElement;
+  frame: number;
+  time: number;
+  key: string;
+  options: ThumbnailOptions;
+  resolve: (url: string | null) => void;
+}
+
+const frameCaptureQueue: FrameCaptureRequest[] = [];
+let isProcessingFrameQueue = false;
+
 /**
  * Request thumbnail capture by frame number.
+ * Uses a strict sequential queue - one frame at a time.
  */
 export function requestThumbnailCaptureByFrame(
   videoElement: HTMLVideoElement,
@@ -149,18 +196,147 @@ export function requestThumbnailCaptureByFrame(
   const time = frame / fps;
   const key = getCacheKeyByFrame(videoElement.src, frame);
 
-  // Check frame-based cache first
+  log(`[Frame ${frame}] Request queued for ${time.toFixed(3)}s`);
+
+  // Clear stale cache if needed
+  if (!processedVideoSources.has(videoElement.src)) {
+    const srcKey = videoElement.src.split("/").pop() || videoElement.src.slice(-50);
+    const keysToDelete: string[] = [];
+    thumbnailCache.forEach((_, k) => {
+      if (k.includes(srcKey)) {
+        keysToDelete.push(k);
+      }
+    });
+    keysToDelete.forEach((k) => thumbnailCache.delete(k));
+    processedVideoSources.add(videoElement.src);
+    log(`Cleared ${keysToDelete.length} stale cache entries`);
+  }
+
+  // Check cache first
   if (thumbnailCache.has(key)) {
+    log(`[Frame ${frame}] Cache hit`);
     return Promise.resolve(thumbnailCache.get(key)!);
   }
 
-  // Request capture and store with frame key
-  return requestThumbnailCapture(videoElement, time, options).then((url) => {
-    if (url) {
-      thumbnailCache.set(key, url);
+  // Add to queue and return promise
+  return new Promise((resolve) => {
+    frameCaptureQueue.push({
+      videoElement,
+      frame,
+      time,
+      key,
+      options,
+      resolve,
+    });
+    
+    // Start processing if not already running
+    if (!isProcessingFrameQueue) {
+      processFrameCaptureQueue();
     }
-    return url;
   });
+}
+
+/**
+ * Process the frame capture queue one item at a time.
+ */
+async function processFrameCaptureQueue(): Promise<void> {
+  if (isProcessingFrameQueue) return;
+  isProcessingFrameQueue = true;
+  
+  log(`Starting queue processing, ${frameCaptureQueue.length} items`);
+
+  while (frameCaptureQueue.length > 0) {
+    const request = frameCaptureQueue.shift()!;
+    const { videoElement, frame, time, key, options, resolve } = request;
+    
+    // Check cache again (might have been filled by earlier request)
+    if (thumbnailCache.has(key)) {
+      log(`[Frame ${frame}] Cache hit during queue processing`);
+      resolve(thumbnailCache.get(key)!);
+      continue;
+    }
+
+    log(`[Frame ${frame}] Processing - seeking to ${time.toFixed(3)}s`);
+    
+    try {
+      // Wait for video to be ready
+      if (videoElement.readyState < 2) {
+        log(`[Frame ${frame}] Waiting for video ready...`);
+        await waitForVideoReady(videoElement);
+      }
+
+      // Pause the video
+      if (!videoElement.paused) {
+        videoElement.pause();
+      }
+
+      // STEP 1: Set the time
+      const beforeTime = videoElement.currentTime;
+      videoElement.currentTime = time;
+      log(`[Frame ${frame}] Set currentTime from ${beforeTime.toFixed(3)}s to ${time.toFixed(3)}s`);
+
+      // STEP 2: Wait for seeked event
+      await new Promise<void>((res) => {
+        const onSeeked = () => {
+          videoElement.removeEventListener("seeked", onSeeked);
+          res();
+        };
+        videoElement.addEventListener("seeked", onSeeked);
+        // Timeout fallback
+        setTimeout(() => {
+          videoElement.removeEventListener("seeked", onSeeked);
+          res();
+        }, 3000);
+      });
+      
+      log(`[Frame ${frame}] After seeked event: ${videoElement.currentTime.toFixed(3)}s`);
+
+      // STEP 3: Wait a long time for the frame to decode
+      await new Promise((r) => setTimeout(r, 500));
+
+      // STEP 4: Verify we're at the right time, retry if needed
+      if (Math.abs(videoElement.currentTime - time) > 0.1) {
+        log(`[Frame ${frame}] Time mismatch! Retrying seek...`);
+        videoElement.currentTime = time;
+        await new Promise<void>((res) => {
+          const onSeeked = () => {
+            videoElement.removeEventListener("seeked", onSeeked);
+            res();
+          };
+          videoElement.addEventListener("seeked", onSeeked);
+          setTimeout(() => {
+            videoElement.removeEventListener("seeked", onSeeked);
+            res();
+          }, 2000);
+        });
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      log(`[Frame ${frame}] Final time: ${videoElement.currentTime.toFixed(3)}s (target: ${time.toFixed(3)}s)`);
+
+      // STEP 5: Capture
+      const dataUrl = captureFrame(videoElement, options);
+      
+      if (dataUrl) {
+        thumbnailCache.set(key, dataUrl);
+        log(`[Frame ${frame}] ✓ Captured successfully`);
+        resolve(dataUrl);
+      } else {
+        log(`[Frame ${frame}] ✗ Capture failed`);
+        resolve(null);
+      }
+
+      // STEP 6: Small delay before next capture
+      await new Promise((r) => setTimeout(r, 100));
+      
+    } catch (error) {
+      log(`[Frame ${frame}] Error:`, error);
+      resolve(null);
+    }
+  }
+
+  log(`Queue processing complete`);
+  isProcessingFrameQueue = false;
 }
 
 // ============================================================================
@@ -187,7 +363,7 @@ async function processQueue(): Promise<void> {
   const wasPlaying = !videoElement.paused;
   if (wasPlaying) videoElement.pause();
 
-  // Process all requests
+  // Process all requests ONE AT A TIME with proper synchronization
   let processed = 0;
   while (captureQueue.length > 0) {
     const request = captureQueue.shift()!;
@@ -199,12 +375,38 @@ async function processQueue(): Promise<void> {
     }
 
     try {
-      // Seek to target time
-      videoElement.currentTime = request.time;
+      // Force seek with explicit waiting and verification
+      const targetTime = request.time;
+      
+      // Step 1: Set the time
+      videoElement.currentTime = targetTime;
+      
+      // Step 2: Wait for seeked event
       await waitForSeek(videoElement);
-
-      // Small delay for frame render
-      await new Promise((r) => setTimeout(r, 50));
+      
+      // Step 3: Poll until the video is actually at the target time (max 1 second)
+      let attempts = 0;
+      const maxAttempts = 20;
+      while (Math.abs(videoElement.currentTime - targetTime) > 0.05 && attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 50));
+        attempts++;
+        // Re-trigger seek if still not there
+        if (attempts % 5 === 0) {
+          videoElement.currentTime = targetTime;
+        }
+      }
+      
+      // Step 4: Extra wait for the frame to actually render to canvas
+      await new Promise((r) => setTimeout(r, 100));
+      
+      // Step 5: Use requestAnimationFrame to ensure the frame is painted
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve();
+          });
+        });
+      });
 
       // Capture frame
       const dataUrl = captureFrame(videoElement, options);
@@ -212,9 +414,14 @@ async function processQueue(): Promise<void> {
         thumbnailCache.set(request.key, dataUrl);
         notifyCallbacks(request.key, dataUrl);
         processed++;
+        log(`Captured frame at ${targetTime.toFixed(2)}s (actual: ${videoElement.currentTime.toFixed(2)}s)`);
       } else {
         notifyCallbacks(request.key, null);
       }
+      
+      // Small delay between captures to let the video element settle
+      await new Promise((r) => setTimeout(r, 50));
+      
     } catch (error) {
       log(`  -> Error:`, error);
       notifyCallbacks(request.key, null);
@@ -230,7 +437,7 @@ async function processQueue(): Promise<void> {
 
   // Continue if more items were added
   if (captureQueue.length > 0) {
-    setTimeout(processQueue, 10);
+    setTimeout(processQueue, 100);
   }
 }
 
@@ -240,17 +447,20 @@ async function processQueue(): Promise<void> {
 
 function waitForVideoReady(videoElement: HTMLVideoElement): Promise<void> {
   return new Promise<void>((resolve) => {
+    // Need readyState >= 3 (HAVE_FUTURE_DATA) for reliable seeking
     const checkReady = () => {
-      if (videoElement.readyState >= 2) {
+      if (videoElement.readyState >= 3 && videoElement.videoWidth > 0) {
         videoElement.removeEventListener("canplay", checkReady);
         videoElement.removeEventListener("loadeddata", checkReady);
+        videoElement.removeEventListener("canplaythrough", checkReady);
         resolve();
       }
     };
     videoElement.addEventListener("canplay", checkReady);
     videoElement.addEventListener("loadeddata", checkReady);
+    videoElement.addEventListener("canplaythrough", checkReady);
     checkReady();
-    setTimeout(resolve, 2000); // Timeout fallback
+    setTimeout(resolve, 3000); // Timeout fallback
   });
 }
 
@@ -265,13 +475,14 @@ function waitForSeek(videoElement: HTMLVideoElement): Promise<void> {
       }
     };
     videoElement.addEventListener("seeked", handleSeeked);
+    // Increased timeout from 200ms to 500ms for more reliable seeking
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
         videoElement.removeEventListener("seeked", handleSeeked);
         resolve();
       }
-    }, 200);
+    }, 500);
   });
 }
 
@@ -286,8 +497,9 @@ function captureFrame(
     return null;
   }
 
-  const width = options.width ?? 200;
-  const quality = options.quality ?? 0.7;
+  // Increased default resolution from 200 to 480 for better quality
+  const width = options.width ?? 480;
+  const quality = options.quality ?? 0.85;
   const aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
 
   canvas.width = width;

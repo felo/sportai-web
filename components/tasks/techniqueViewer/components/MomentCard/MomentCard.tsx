@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Box, Flex, Text, Badge, Card, DropdownMenu, Spinner, Button, Tooltip } from "@radix-ui/themes";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   MagicWandIcon,
   Pencil2Icon,
@@ -38,6 +39,7 @@ function log(...args: unknown[]) {
 export function MomentCard({
   moment,
   videoElement,
+  videoFPS,
   onView,
   onAnalyse,
   isSelected = false,
@@ -50,6 +52,7 @@ export function MomentCard({
   const initialCached = videoElement ? getCachedThumbnailByFrame(videoElement.src, moment.frame) : null;
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initialCached);
   const [isCapturing, setIsCapturing] = useState(!initialCached);
+  const captureFPS = videoFPS && videoFPS > 0 ? videoFPS : 30;
 
   // Handle analyse click
   const handleAnalyseClick = (e: React.MouseEvent) => {
@@ -83,9 +86,7 @@ export function MomentCard({
     log(`[${moment.frame}]: Requesting capture`);
     setIsCapturing(true);
 
-    // Default to 30 FPS if not known - frame number is used primarily for cache key
-    const fps = 30;
-    requestThumbnailCaptureByFrame(videoElement, moment.frame, fps).then((url) => {
+    requestThumbnailCaptureByFrame(videoElement, moment.frame, captureFPS).then((url) => {
       if (url) {
         log(`[${moment.frame}]: Promise resolved with thumbnail`);
         setThumbnailUrl(url);
@@ -94,10 +95,11 @@ export function MomentCard({
       }
       setIsCapturing(false);
     });
-  }, [videoElement, moment.time, moment.frame, thumbnailUrl]);
+  }, [videoElement, moment.time, moment.frame, thumbnailUrl, captureFPS]);
 
   // Use pose confidence if available, otherwise fall back to metadata confidence
   const confidence = poseConfidence ?? (moment.metadata?.confidence as number | undefined);
+  const isMobile = useIsMobile();
 
   return (
     <Card
@@ -114,6 +116,8 @@ export function MomentCard({
         position: "relative",
         display: "flex",
         flexDirection: "column",
+        width: isMobile ? "100%" : "320px",
+        maxWidth: isMobile ? "100%" : "320px",
       }}
       onClick={() => onView(moment)}
     >
@@ -128,6 +132,7 @@ export function MomentCard({
         onDelete={onDelete}
         onResetAdjustment={onResetAdjustment}
         onEditName={onEditName}
+        isMobile={isMobile}
       />
 
       {/* Content Area - structured like TaskTile */}
@@ -186,6 +191,7 @@ interface ThumbnailAreaProps {
   onDelete?: MomentCardProps["onDelete"];
   onResetAdjustment?: MomentCardProps["onResetAdjustment"];
   onEditName?: MomentCardProps["onEditName"];
+  isMobile?: boolean;
 }
 
 function ThumbnailArea({
@@ -198,6 +204,7 @@ function ThumbnailArea({
   onDelete,
   onResetAdjustment,
   onEditName,
+  isMobile = false,
 }: ThumbnailAreaProps) {
   return (
     <Box
@@ -251,7 +258,7 @@ function ThumbnailArea({
       )}
 
       {/* Type Badge - top left */}
-      <TypeBadge moment={moment} />
+      <TypeBadge moment={moment} isMobile={isMobile} />
 
       {/* Menu Dropdown - top right */}
       <MenuDropdown
@@ -263,21 +270,28 @@ function ThumbnailArea({
         onEditName={onEditName}
       />
 
-      {/* Confidence Badge - bottom left */}
-      {confidence != null && <ConfidenceBadge confidence={confidence} />}
+      {/* Confidence Badge - bottom left (hidden on mobile) */}
+      {!isMobile && confidence != null && <ConfidenceBadge confidence={confidence} />}
 
       {/* Time Badge - bottom right */}
       <Box
         style={{
           position: "absolute",
-          bottom: "8px",
-          right: "8px",
+          bottom: isMobile ? "4px" : "8px",
+          right: isMobile ? "4px" : "8px",
           backgroundColor: "rgba(0,0,0,0.75)",
-          padding: "2px 6px",
+          padding: isMobile ? "2px 4px" : "2px 6px",
           borderRadius: "4px",
         }}
       >
-        <Text size="1" style={{ color: "white", fontWeight: 500 }}>
+        <Text
+          size="1"
+          style={{
+            color: "white",
+            fontWeight: 500,
+            fontSize: isMobile ? "10px" : undefined,
+          }}
+        >
           {formatTime(moment.time)}
         </Text>
       </Box>
@@ -287,18 +301,23 @@ function ThumbnailArea({
 
 interface TypeBadgeProps {
   moment: MomentCardProps["moment"];
+  isMobile?: boolean;
 }
 
-function TypeBadge({ moment }: TypeBadgeProps) {
+function TypeBadge({ moment, isMobile = false }: TypeBadgeProps) {
+  const displayLabel = isMobile && moment.label.length > 11
+    ? `${moment.label.slice(0, 11)}…`
+    : moment.label;
+
   return (
     <Box
       style={{
         position: "absolute",
-        top: "8px",
-        left: "8px",
+        top: isMobile ? "4px" : "8px",
+        left: isMobile ? "4px" : "8px",
         backgroundColor: moment.color,
         color: getContrastTextColor(moment.color),
-        padding: "2px 8px",
+        padding: isMobile ? "2px 6px" : "2px 8px",
         borderRadius: "4px",
         fontSize: "11px",
         fontWeight: 600,
@@ -306,10 +325,11 @@ function TypeBadge({ moment }: TypeBadgeProps) {
         alignItems: "center",
         gap: "4px",
         boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+        opacity: isMobile ? 0.7 : 1,
       }}
     >
-      {getMomentIcon(moment)}
-      <span>{moment.label}</span>
+      {!isMobile && getMomentIcon(moment)}
+      <span>{displayLabel}</span>
     </Box>
   );
 }
@@ -423,12 +443,7 @@ function ConfidenceBadge({ confidence }: ConfidenceBadgeProps) {
           position: "absolute",
           bottom: "8px",
           left: "8px",
-          backgroundColor:
-            confidence >= 0.7
-              ? "rgba(34, 197, 94, 0.9)"
-              : confidence >= 0.5
-                ? "rgba(234, 179, 8, 0.9)"
-                : "rgba(100, 100, 100, 0.9)",
+          backgroundColor: "rgba(0,0,0,0.75)",
           padding: "2px 6px",
           borderRadius: "4px",
           cursor: "help",

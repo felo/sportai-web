@@ -2,7 +2,7 @@
 
 import { RefObject, Ref } from "react";
 import { Box, Flex } from "@radix-ui/themes";
-import { Task, StatisticsResult, BallBounce, SwingWithPlayer, ActiveEventTooltip } from "../../types";
+import { Task, StatisticsResult, BallBounce, SwingWithPlayer } from "../../types";
 import type { TimelineFilterState } from "../TimelineFilter";
 // import { useVideoThumbnails } from "../../hooks";
 import {
@@ -38,7 +38,6 @@ interface RalliesTabProps {
   playerDisplayNames: Record<number, string>;
   enhancedBallBounces: BallBounce[];
   allSwings: SwingWithPlayer[];
-  activeEventTooltip: ActiveEventTooltip | null;
   onVideoError?: (message: string) => void;
 }
 
@@ -65,7 +64,6 @@ export function RalliesTab({
   playerDisplayNames,
   enhancedBallBounces,
   allSwings,
-  activeEventTooltip,
   onVideoError,
 }: RalliesTabProps) {
   // Video thumbnails for timeline preview (disabled - limited value, causes issues)
@@ -151,7 +149,6 @@ export function RalliesTab({
           result={result}
           selectedRallyIndex={selectedRallyIndex}
           currentTime={currentTime}
-          activeEventTooltip={activeEventTooltip}
           videoRef={videoRef}
           rallyTimelineRef={rallyTimelineRef}
           onClose={() => onRallySelect(null)}

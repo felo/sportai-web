@@ -187,14 +187,14 @@ export function validateVideoFile(file: File): VideoValidationResult {
 
   // Client-side validation allows files through - even if > 100MB
   // This ensures the server can respond with a natural dialogue message
-  // Only block extremely large files (> 500MB) that would cause upload issues
-  const EXTREME_SIZE_MB = 500;
-  const EXTREME_SIZE_BYTES = EXTREME_SIZE_MB * 1024 * 1024;
+  // Only block extremely large files (> 10GB) that would cause upload issues
+  const EXTREME_SIZE_GB = 10;
+  const EXTREME_SIZE_BYTES = EXTREME_SIZE_GB * 1024 * 1024 * 1024;
   
   if (file.size > EXTREME_SIZE_BYTES) {
     return {
       valid: false,
-      error: ` File is extremely large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please use a file under ${EXTREME_SIZE_MB}MB.`,
+      error: ` File is extremely large (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB). Please use a file under ${EXTREME_SIZE_GB}GB.`,
     };
   }
 

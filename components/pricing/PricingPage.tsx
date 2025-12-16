@@ -309,7 +309,7 @@ export function PricingPage() {
           height: "100vh",
           backgroundColor: "var(--gray-1)",
           padding: "24px",
-          paddingTop: isMobile ? "calc(57px + 48px + env(safe-area-inset-top))" : "calc(57px + 48px)",
+          paddingTop: isMobile ? "calc(46px + 48px + env(safe-area-inset-top))" : "calc(57px + 48px)",
           paddingBottom: "96px",
           marginLeft: isMobile ? 0 : isCollapsed ? "64px" : "280px",
           transition: isInitialLoad ? "none" : "margin-left 0.2s ease-in-out",
