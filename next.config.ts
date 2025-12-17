@@ -73,6 +73,14 @@ const nextConfig: NextConfig = {
       });
     }
     
+    // Provide empty fallback for @tensorflow/tfjs-backend-webgpu
+    // The pose-detection library imports it unconditionally but we only use WebGL
+    config.resolve = config.resolve || {};
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      '@tensorflow/tfjs-backend-webgpu': false,
+    };
+    
     return config;
   },
 
