@@ -17,7 +17,7 @@ export default function TaskViewerPage({
 }) {
   const { taskId } = use(params);
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { developerMode } = useSidebarSettings();
   const [taskType, setTaskType] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -82,11 +82,11 @@ export default function TaskViewerPage({
     }
     
     async function fetchTaskType() {
-      if (!user) return;
+      if (!user || !session?.access_token) return;
       
       try {
         const response = await fetch(`/api/tasks/${taskId}/status`, {
-          headers: { Authorization: `Bearer ${user.id}` },
+          headers: { Authorization: `Bearer ${session.access_token}` },
         });
         
         if (response.ok) {
@@ -102,12 +102,12 @@ export default function TaskViewerPage({
       }
     }
 
-    if (user) {
+    if (user && session?.access_token) {
       fetchTaskType();
     } else if (!authLoading) {
       setLoading(false);
     }
-  }, [taskId, user, authLoading]);
+  }, [taskId, user, session?.access_token, authLoading]);
 
   // For sample and guest tasks, allow viewing without authentication
   const isSample = isSampleTask(taskId);

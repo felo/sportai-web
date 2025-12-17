@@ -19,6 +19,8 @@ interface UseAnalysisOptionsOptions {
   thinkingMode: ThinkingMode;
   mediaResolution: MediaResolution;
   user: User | null;
+  /** JWT access token for authenticated API calls */
+  accessToken: string | null;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
   scrollToBottom: () => void;
@@ -38,6 +40,7 @@ export function useAnalysisOptions({
   thinkingMode,
   mediaResolution,
   user,
+  accessToken,
   addMessage,
   updateMessage,
   scrollToBottom,
@@ -240,7 +243,7 @@ export function useAnalysisOptions({
     // Create PRO analysis task
     let taskCreated = false;
     let createdTaskId: string | undefined;
-    if (user) {
+    if (user && accessToken) {
       try {
         analysisLogger.info(`Creating PRO ${taskType} task for URL:`, videoUrl);
         
@@ -248,7 +251,7 @@ export function useAnalysisOptions({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.id}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             taskType,
@@ -337,7 +340,7 @@ export function useAnalysisOptions({
       showTechniqueStudioPrompt: isTechniqueAnalysis,
       taskId: createdTaskId,
     });
-  }, [messages, user, addMessage, updateMessage, scrollToBottom, startQuickAnalysis, refreshLibraryTasks]);
+  }, [messages, user, accessToken, addMessage, updateMessage, scrollToBottom, startQuickAnalysis, refreshLibraryTasks]);
 
   /**
    * Handle user selecting "Quick Chat Only" analysis option

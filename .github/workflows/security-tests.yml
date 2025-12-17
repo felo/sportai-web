@@ -1,0 +1,61 @@
+name: Security Tests
+
+on:
+  deployment_status:
+    # Runs after Vercel deployment completes
+
+jobs:
+  security-tests:
+    # Only run on successful deployments
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Security Tests
+        env:
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          echo "Testing deployment at: $DEPLOYMENT_URL"
+          chmod +x ./scripts/test-auth-security.sh
+          ./scripts/test-auth-security.sh "$DEPLOYMENT_URL"
+
+      - name: Post Results to PR
+        if: always() && github.event.deployment_status.environment == 'Preview'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deploymentUrl = '${{ github.event.deployment_status.target_url }}';
+            const success = '${{ job.status }}' === 'success';
+            
+            // Find the PR associated with this deployment
+            const { data: deployments } = await github.rest.repos.listDeployments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+            });
+            
+            if (deployments.length === 0) return;
+            
+            // Try to find a PR for this commit
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            
+            if (prs.length === 0) return;
+            
+            const pr = prs[0];
+            const emoji = success ? '✅' : '❌';
+            const status = success ? 'passed' : 'failed';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: `## ${emoji} Security Tests ${status}\n\nTested against: ${deploymentUrl}\n\nAll API endpoints correctly reject unauthorized requests.`
+            });
+

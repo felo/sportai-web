@@ -55,7 +55,7 @@ export function AIChatForm() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Context & external hooks
-  const { user, profile } = useAuth();
+  const { user, session, profile } = useAuth();
   
   // Extract first name from profile for personalization
   const userFirstName = profile?.full_name?.split(" ")[0];
@@ -195,6 +195,7 @@ export function AIChatForm() {
     thinkingMode,
     mediaResolution,
     user,
+    accessToken: session?.access_token ?? null,
     addMessage,
     updateMessage,
     scrollToBottom,

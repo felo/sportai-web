@@ -58,7 +58,7 @@ function isFirstTimeUser(): boolean {
 }
 
 export function LibraryTasksProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [processingCount, setProcessingCount] = useState(0);
   const [newCompletedCount, setNewCompletedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,7 +72,7 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const fetchTaskStatus = useCallback(async () => {
-    if (!user) {
+    if (!user || !session?.access_token) {
       setProcessingCount(0);
       setNewCompletedCount(0);
       setIsLoading(false);
@@ -81,7 +81,7 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
 
     try {
       const response = await fetch("/api/tasks", {
-        headers: { Authorization: `Bearer ${user.id}` },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (!response.ok) throw new Error("Failed to fetch tasks");
@@ -118,7 +118,7 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, session?.access_token]);
 
   // Initial fetch and polling
   useEffect(() => {
@@ -130,11 +130,11 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
 
   // Mark all completed tasks as seen (call when user visits Library)
   const markTasksAsSeen = useCallback(async () => {
-    if (!user) return;
+    if (!user || !session?.access_token) return;
 
     try {
       const response = await fetch("/api/tasks", {
-        headers: { Authorization: `Bearer ${user.id}` },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (!response.ok) return;
@@ -152,7 +152,7 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
     } catch {
       // Silent fail
     }
-  }, [user]);
+  }, [user, session?.access_token]);
 
   // Mark a single task as seen (call when user clicks on a task)
   const markTaskAsSeen = useCallback((taskId: string) => {

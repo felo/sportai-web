@@ -19,7 +19,7 @@ interface UseTaskFetchingResult {
 }
 
 export function useTaskFetching(taskId: string): UseTaskFetchingResult {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   
   const [task, setTask] = useState<Task | null>(null);
   const [result, setResult] = useState<StatisticsResult | null>(null);
@@ -30,7 +30,7 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
 
   // Fetch result data (can be called manually for retry)
   const fetchResult = useCallback(async () => {
-    if (!user) return;
+    if (!user || !session?.access_token) return;
     
     setLoadingResult(true);
     setLoadingPhase("result");
@@ -39,7 +39,7 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
     try {
       const response = await fetch(`/api/tasks/${taskId}/result`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${user.id}` },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       
       if (!response.ok) {
@@ -68,7 +68,7 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
     } finally {
       setLoadingResult(false);
     }
-  }, [user, taskId]);
+  }, [user, session?.access_token, taskId]);
 
   // Main loading effect - fetch task and result in parallel
   useEffect(() => {
@@ -81,7 +81,7 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
     const isSample = isSampleTask(taskId);
     const isGuest = isGuestTask(taskId);
     
-    if (!user && !isSample && !isGuest) {
+    if ((!user || !session?.access_token) && !isSample && !isGuest) {
       setLoading(false);
       return;
     }
@@ -188,11 +188,11 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
         // AND start fetching result in parallel
         const [taskResponse, resultResponse] = await Promise.all([
           fetch(`/api/tasks/${taskId}/status`, {
-            headers: { Authorization: `Bearer ${user!.id}` },
+            headers: { Authorization: `Bearer ${session!.access_token}` },
           }),
           fetch(`/api/tasks/${taskId}/result`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${user!.id}` },
+            headers: { Authorization: `Bearer ${session!.access_token}` },
           }),
         ]);
         
@@ -235,7 +235,7 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
     };
     
     loadTaskAndResult();
-  }, [user, authLoading, taskId]);
+  }, [user, session?.access_token, authLoading, taskId]);
 
   return {
     task,
