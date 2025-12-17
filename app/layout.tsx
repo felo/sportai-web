@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { LibraryTasksProvider } from "@/components/sidebar/LibraryTasksContext";
@@ -99,6 +100,7 @@ export default function RootLayout({
               {children}
               <CookieConsent />
             </LibraryTasksProvider>
+            <SpeedInsights />
           </AuthProvider>
         </RadixThemeProvider>
       </body>
