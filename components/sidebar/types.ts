@@ -56,6 +56,8 @@ export interface SidebarDialogsState {
   setStorageDebugOpen: (open: boolean) => void;
   contextDebugOpen: boolean;
   setContextDebugOpen: (open: boolean) => void;
+  redisDebugOpen: boolean;
+  setRedisDebugOpen: (open: boolean) => void;
 }
 
 // Chat list item props
@@ -118,6 +120,8 @@ export interface SidebarDialogsProps {
   setStorageDebugOpen: (open: boolean) => void;
   contextDebugOpen: boolean;
   setContextDebugOpen: (open: boolean) => void;
+  redisDebugOpen: boolean;
+  setRedisDebugOpen: (open: boolean) => void;
   developerMode: boolean;
   messageCount: number;
   onClearChat?: () => void;

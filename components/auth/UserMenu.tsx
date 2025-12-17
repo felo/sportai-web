@@ -32,6 +32,7 @@ interface UserMenuProps {
   onClearChat?: () => void;
   onOpenStorageDebug?: () => void;
   onOpenContextDebug?: () => void;
+  onOpenRedisDebug?: () => void;
   onResetOnboardingTips?: () => void;
   onSetAlertOpen?: (open: boolean) => void;
 }
@@ -55,6 +56,7 @@ export function UserMenu({
   onClearChat,
   onOpenStorageDebug,
   onOpenContextDebug,
+  onOpenRedisDebug,
   onResetOnboardingTips,
   onSetAlertOpen,
 }: UserMenuProps = {}) {
@@ -295,6 +297,9 @@ export function UserMenu({
                           </DropdownMenu.Item>
                           <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
                             <Text>Storage</Text>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onSelect={() => onOpenRedisDebug?.()}>
+                            <Text>Redis / Rate Limit</Text>
                           </DropdownMenu.Item>
                           <DropdownMenu.Item onSelect={() => onResetOnboardingTips?.()}>
                             <Text>Reset Onboarding Tips</Text>

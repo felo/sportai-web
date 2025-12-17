@@ -3,5 +3,6 @@
  */
 
 export { ContextDebugDialog } from "./ContextDebugDialog";
+export { RedisDebugDialog } from "./RedisDebugDialog";
 
 

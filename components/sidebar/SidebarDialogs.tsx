@@ -2,7 +2,7 @@
 
 import { Box, Flex, Button, Dialog, TextField, AlertDialog } from "@radix-ui/themes";
 import { SupabaseDebug } from "@/components/auth/SupabaseDebug";
-import { ContextDebugDialog } from "@/components/debug";
+import { ContextDebugDialog, RedisDebugDialog } from "@/components/debug";
 import buttonStyles from "@/styles/buttons.module.css";
 import type { SidebarDialogsProps } from "./types";
 
@@ -19,6 +19,8 @@ export function SidebarDialogs({
   setStorageDebugOpen,
   contextDebugOpen,
   setContextDebugOpen,
+  redisDebugOpen,
+  setRedisDebugOpen,
   developerMode,
   messageCount,
   onClearChat,
@@ -135,6 +137,11 @@ export function SidebarDialogs({
       {/* Context Debug Dialog */}
       {developerMode && (
         <ContextDebugDialog open={contextDebugOpen} onOpenChange={setContextDebugOpen} />
+      )}
+
+      {/* Redis Debug Dialog */}
+      {developerMode && (
+        <RedisDebugDialog open={redisDebugOpen} onOpenChange={setRedisDebugOpen} />
       )}
     </>
   );

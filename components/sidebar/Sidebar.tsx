@@ -162,6 +162,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
                   dialogsState.setDropdownOpen(false);
                   dialogsState.setContextDebugOpen(true);
                 }}
+                onOpenRedisDebug={() => {
+                  dialogsState.setDropdownOpen(false);
+                  dialogsState.setRedisDebugOpen(true);
+                }}
                 onResetOnboardingTips={() => {
                   resetAllOnboardingTooltips();
                   dialogsState.setDropdownOpen(false);
@@ -188,6 +192,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           setStorageDebugOpen={dialogsState.setStorageDebugOpen}
           contextDebugOpen={dialogsState.contextDebugOpen}
           setContextDebugOpen={dialogsState.setContextDebugOpen}
+          redisDebugOpen={dialogsState.redisDebugOpen}
+          setRedisDebugOpen={dialogsState.setRedisDebugOpen}
           developerMode={settingsState.developerMode}
           messageCount={messageCount}
           onClearChat={onClearChat}
@@ -336,6 +342,10 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             dialogsState.setDropdownOpen(false);
             dialogsState.setContextDebugOpen(true);
           }}
+          onOpenRedisDebug={() => {
+            dialogsState.setDropdownOpen(false);
+            dialogsState.setRedisDebugOpen(true);
+          }}
           onResetOnboardingTips={() => {
             resetAllOnboardingTooltips();
             dialogsState.setDropdownOpen(false);
@@ -360,6 +370,8 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         setStorageDebugOpen={dialogsState.setStorageDebugOpen}
         contextDebugOpen={dialogsState.contextDebugOpen}
         setContextDebugOpen={dialogsState.setContextDebugOpen}
+        redisDebugOpen={dialogsState.redisDebugOpen}
+        setRedisDebugOpen={dialogsState.setRedisDebugOpen}
         developerMode={settingsState.developerMode}
         messageCount={messageCount}
         onClearChat={onClearChat}

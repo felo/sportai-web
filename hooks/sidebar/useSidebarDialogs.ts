@@ -12,6 +12,7 @@ export function useSidebarDialogs(): SidebarDialogsState {
   const [editTitle, setEditTitle] = useState("");
   const [storageDebugOpen, setStorageDebugOpen] = useState(false);
   const [contextDebugOpen, setContextDebugOpen] = useState(false);
+  const [redisDebugOpen, setRedisDebugOpen] = useState(false);
 
   return {
     alertOpen,
@@ -28,6 +29,8 @@ export function useSidebarDialogs(): SidebarDialogsState {
     setStorageDebugOpen,
     contextDebugOpen,
     setContextDebugOpen,
+    redisDebugOpen,
+    setRedisDebugOpen,
   };
 }
 
