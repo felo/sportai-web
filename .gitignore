@@ -19,6 +19,11 @@
 # misc
 .DS_Store
 *.pem
+*.p8
+
+# Apple Sign In secrets (never commit these!)
+AuthKey_*.p8
+scripts/generate-apple-secret.js
 
 # debug
 npm-debug.log*

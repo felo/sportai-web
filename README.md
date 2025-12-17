@@ -1,227 +1,250 @@
-# sportai-web
+# SportAI Open
 
-A Next.js application with minimal UI, Radix UI components, server-side rendering, and Gemini 3 integration.
+AI-powered sports video analysis for **tennis**, **pickleball**, and **padel**. Upload your gameplay videos and get expert coaching insights, technique breakdowns, and personalized improvement recommendations.
+
+🌐 **Live**: [open.sportai.com](https://open.sportai.com)
+
+---
+
+## ⚠️ CRITICAL: Apple Sign In Secret Rotation
+
+> **🍎 Apple OAuth secrets expire every 6 months!**
+> 
+> If users can't sign in with Apple, the secret has probably expired.
+
+### Automatic Rotation Setup
+
+Add these **GitHub Secrets** (Settings → Secrets → Actions):
+
+| Secret | Value |
+|--------|-------|
+| `APPLE_TEAM_ID` | `G32F34A58U` |
+| `APPLE_CLIENT_ID` | `com.sportai.web.auth` |
+| `APPLE_KEY_ID` | `PVNFLYW3W9` |
+| `APPLE_PRIVATE_KEY` | Contents of the `.p8` key file |
+| `SUPABASE_PROJECT_REF` | `voneabjokpqksnermeub` |
+| `SUPABASE_ACCESS_TOKEN` | From [Supabase → Account → Access Tokens](https://supabase.com/dashboard/account/tokens) |
+
+The workflow `.github/workflows/rotate-apple-secret.yml` runs automatically on **Jan 1** and **June 1**.
+
+### Manual Rotation
+
+```bash
+node scripts/generate-apple-secret.js
+```
+
+Then paste the output into Supabase Dashboard → Auth → Providers → Apple → Secret Key.
+
+---
 
 ## Features
 
-- ⚡ Next.js 15 with App Router
-- 🎨 Radix UI components for accessible UI
-- 🔄 Server-side rendering
-- 🤖 Gemini 3 API integration
-- 📹 Video and image upload support with S3 integration
-- 💅 Tailwind CSS for styling
-- 📝 TypeScript for type safety
+- 🎾 **Multi-Sport Support** - Tennis, pickleball, and padel analysis
+- 📹 **Video Analysis** - Upload videos for AI-powered technique breakdown
+- 🤖 **AI Coaching** - Powered by Google Gemini for natural language insights
+- 🦴 **Pose Detection** - Real-time body tracking with TensorFlow.js & MediaPipe
+- 🎯 **Swing Detection** - Automatic identification of serves, forehands, backhands, volleys
+- 🗣️ **Text-to-Speech** - Listen to coaching feedback
+- 📊 **Performance Analytics** - Track progress with Nivo charts
+- 🔐 **Authentication** - Google & Apple Sign In via Supabase
+- 📱 **Mobile Friendly** - Installable as home screen app
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 16 (App Router) |
+| UI | Radix UI, Tailwind CSS |
+| Auth | Supabase (Google OAuth, Apple Sign In) |
+| AI/ML | Google Gemini API, TensorFlow.js, MediaPipe |
+| Storage | AWS S3 |
+| Database | Supabase (PostgreSQL) |
+| Rate Limiting | Upstash Redis |
+| Analytics | PostHog, Vercel Analytics |
+| Deployment | Vercel |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ installed
-- A Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-- (Optional) AWS S3 bucket for video uploads - see [S3 Configuration](#s3-configuration) below
+- Node.js 18+
+- Accounts for: [Supabase](https://supabase.com), [Google AI Studio](https://makersuite.google.com), [AWS](https://aws.amazon.com), [Upstash](https://upstash.com)
 
 ### Installation
 
-1. Install dependencies:
 ```bash
+# Clone the repository
+git clone https://github.com/felo/sportai-web.git
+cd sportai-web
+
+# Install dependencies
 npm install
-```
 
-2. Create a `.env.local` file in the root directory and add your environment variables:
-```
-GEMINI_API_KEY=your_api_key_here
+# Copy environment template
+cp .env.example .env.local
 
-# Optional: AWS S3 configuration for video uploads
-# If not configured, the app will fall back to direct uploads (limited to 4.5MB on Vercel)
-# Default region is eu-north-1 (Europe). Set this in Vercel to force Europe region.
-AWS_REGION=eu-north-1
-AWS_S3_BUCKET_NAME=sportai-llm-uploads
-AWS_ACCESS_KEY_ID=your_access_key_id
-AWS_SECRET_ACCESS_KEY=your_secret_access_key
-
-# Optional: Upstash Redis for rate limiting (recommended for production)
-# Without these, rate limiting uses in-memory storage (doesn't work across serverless instances)
-# Get these from https://console.upstash.com/
-UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
-UPSTASH_REDIS_REST_TOKEN=your_token_here
-```
-
-4. Run the development server:
-```bash
+# Start development server
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000)
+
+### Environment Variables
+
+Create `.env.local` with:
+
+```bash
+# Gemini AI
+GEMINI_API_KEY=your_gemini_api_key
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# AWS S3 (for video uploads)
+AWS_REGION=eu-north-1
+AWS_S3_BUCKET_NAME=sportai-llm-uploads
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+
+# Upstash Redis (rate limiting)
+UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_token
+
+# Google Cloud (text-to-speech)
+GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account",...}
+
+# PostHog Analytics (optional)
+NEXT_PUBLIC_POSTHOG_KEY=your_posthog_key
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+```
 
 ## Project Structure
 
 ```
 ├── app/
-│   ├── api/
-│   │   └── gemini/
-│   │       └── route.ts      # API route for Gemini queries
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Home page
+│   ├── api/                    # API routes
+│   │   ├── analyze-frame/      # Frame-by-frame analysis
+│   │   ├── detect-sport/       # Sport detection
+│   │   ├── llm/                # Gemini AI endpoint
+│   │   ├── pose-data/          # Pose detection data
+│   │   ├── profile/            # User profile management
+│   │   ├── tactical-analysis/  # Game strategy analysis
+│   │   ├── tasks/              # Background task processing
+│   │   └── tts/                # Text-to-speech
+│   ├── auth/callback/          # OAuth callback handler
+│   ├── library/                # User's saved analyses
+│   ├── pricing/                # Pricing page
+│   └── profile/                # User profile page
 ├── components/
-│   └── gemini-query-form.tsx # Gemini query form component
-├── lib/
-│   └── gemini.ts             # Gemini API utilities
-└── package.json
+│   ├── ai-chat/                # AI chat interface
+│   ├── auth/                   # Authentication components
+│   ├── chat/                   # Chat UI components
+│   ├── sidebar/                # Navigation sidebar
+│   └── videoPoseViewerV2/      # Video player with pose overlay
+├── database/                   # Sport-specific knowledge bases
+│   ├── tennis/
+│   ├── pickleball/
+│   └── padel/
+├── hooks/                      # React hooks
+├── lib/                        # Utilities and configs
+└── scripts/
+    └── generate-apple-secret.js  # Apple OAuth secret generator
 ```
 
-## Usage
+## Scripts
 
-The app includes a simple form where you can query Gemini 3. The queries are processed server-side through the API route at `/api/gemini`.
+```bash
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run typecheck    # TypeScript check
+npm run analyze      # Bundle analyzer
+```
 
-### Video Uploads
+## Authentication Setup
 
-The app supports uploading videos and images for analysis. There are two upload methods:
+### Google OAuth
 
-1. **S3 Upload (Recommended)**: Videos are uploaded directly to AWS S3 using presigned URLs, bypassing server size limits. This allows for larger file uploads (up to 20MB by default).
+1. Create OAuth credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add authorized redirect URI: `https://your-project.supabase.co/auth/v1/callback`
+3. Configure in Supabase Dashboard → Auth → Providers → Google
 
-2. **Direct Upload (Fallback)**: If S3 is not configured, videos are uploaded directly to the API route. This is limited to 4.5MB on Vercel deployments.
+### Apple Sign In
 
-### S3 Configuration
+1. Create App ID with Sign in with Apple in [Apple Developer Portal](https://developer.apple.com/account/resources/identifiers/list)
+2. Create Services ID linked to the App ID
+3. Create a Key for Sign in with Apple
+4. Generate client secret: `node scripts/generate-apple-secret.js`
+5. Configure in Supabase Dashboard → Auth → Providers → Apple
 
-To enable S3 uploads, you need to:
+See the [Apple Sign In Secret Rotation](#-critical-apple-sign-in-secret-rotation) section above.
 
-1. **Create an S3 bucket** in AWS (or use an existing one)
-   - Bucket name: `sportai-llm-uploads` (or configure via `AWS_S3_BUCKET_NAME`)
-   - Region: `eu-north-1` (default, Europe). Set `AWS_REGION=eu-north-1` in Vercel to force Europe region.
-   - Make the bucket public or configure CORS appropriately
+## S3 Configuration
 
-2. **Create an IAM user** with S3 permissions:
-   - Create a new IAM user in AWS Console
-   - Attach a policy with `s3:PutObject` permission for your bucket
-   - Generate access keys for the user
+### CORS Settings
 
-3. **Configure bucket CORS** (REQUIRED for browser uploads):
-   
-   **Step-by-step instructions:**
-   
-   a. Go to AWS Console → S3 → Click on your bucket (`sportai-llm-uploads`)
-   
-   b. Click on the **Permissions** tab (at the top)
-   
-   c. Scroll down to find **Cross-origin resource sharing (CORS)** section
-   
-   d. Click **Edit** button
-   
-   e. Delete any existing CORS configuration and paste this (includes localhost for development and production):
-   ```json
-   [
-     {
-       "AllowedHeaders": ["*"],
-       "AllowedMethods": ["PUT", "POST", "GET", "HEAD"],
-       "AllowedOrigins": [
-         "http://localhost:3000",
-         "https://sportai-web-llm-git-main-sport-ai.vercel.app",
-         "https://*.vercel.app",
-         "https://llm.sportai.com"
-       ],
-       "ExposeHeaders": ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"],
-       "MaxAgeSeconds": 3600
-     }
-   ]
-   ```
-   
-   **Important**: If you're using Vercel preview deployments, you may need to add `"https://*.vercel.app"` or be more specific with your production domain. The wildcard `*.vercel.app` covers all Vercel preview deployments.
-   
-   f. Click **Save changes**
-   
-   **Note**: The `AllowedOrigins: ["*"]` allows all origins. For production, you should restrict this to your domain (e.g., `["https://yourdomain.com"]`). For local development, you can also add `["*", "http://localhost:3000"]` to be explicit.
-   
-   **If you get an error**, try this more permissive configuration:
-   ```json
-   [
-     {
-       "AllowedHeaders": ["*"],
-       "AllowedMethods": ["PUT", "POST", "GET", "HEAD", "DELETE"],
-       "AllowedOrigins": ["*"],
-       "ExposeHeaders": ["*"],
-       "MaxAgeSeconds": 3600
-     }
-   ]
-   ```
+Add to your S3 bucket's CORS configuration:
 
-4. **Set bucket policy** to allow public reads (if bucket is public):
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Sid": "PublicReadGetObject",
-         "Effect": "Allow",
-         "Principal": "*",
-         "Action": "s3:GetObject",
-         "Resource": "arn:aws:s3:::sportai-llm-uploads/*"
-       }
-     ]
-   }
-   ```
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "POST", "GET", "HEAD"],
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "https://open.sportai.com",
+      "https://*.vercel.app"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
 
-5. **Add environment variables** to your `.env.local` (and **set them in Vercel for production**):
-   ```
-   AWS_REGION=eu-north-1
-   AWS_S3_BUCKET_NAME=sportai-llm-uploads
-   AWS_ACCESS_KEY_ID=your_access_key_id
-   AWS_SECRET_ACCESS_KEY=your_secret_access_key
-   ```
-   
-   **⚠️ CRITICAL**: Set `AWS_REGION=eu-north-1` in Vercel environment variables to force the Europe region. This ensures all S3 operations use the European bucket.
+### Bucket Policy
 
-**Note**: Make sure your `AWS_REGION` environment variable matches your bucket's actual region. You can check your bucket's region in the AWS Console. The bucket URL format is `https://bucket-name.s3.region.amazonaws.com/`.
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::sportai-llm-uploads/*"
+    }
+  ]
+}
+```
 
-### Troubleshooting S3 Uploads
+## Deployment
 
-If you get "Upload failed due to network error" or CORS errors:
+### Vercel
 
-1. **Check CORS configuration**: Make sure CORS is properly configured (see step 3 above). The error usually means CORS is missing or incorrect.
-   
-   **Common CORS Error**: If you see `"No 'Access-Control-Allow-Origin' header is present"`:
-   - Your production domain must be in the `AllowedOrigins` array
-   - For Vercel deployments, add `"https://*.vercel.app"` or your specific domain
-   - Make sure `AllowedMethods` includes `"PUT"`
-   - Make sure `AllowedHeaders` includes `"*"` or at least `"Content-Type"`
+1. Connect your GitHub repository to Vercel
+2. Add all environment variables
+3. Deploy
 
-2. **Check IAM permissions**: Your IAM user needs both `s3:PutObject` (for uploads) and `s3:GetObject` (for downloads). The policy should look like:
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "s3:PutObject",
-           "s3:GetObject"
-         ],
-         "Resource": "arn:aws:s3:::sportai-llm-uploads/*"
-       }
-     ]
-   }
-   ```
-   
-   **To fix the current error:**
-   - Go to AWS Console → IAM → Users → `WebLLM`
-   - Click on the policy attached to this user
-   - Edit the policy and add `s3:GetObject` to the Action array
-   - Save the changes
+### Environment Variables in Vercel
 
-3. **Check browser console**: Open browser DevTools (F12) → Console tab. Look for CORS errors or detailed error messages.
+Make sure to set `AWS_REGION=eu-north-1` to force the European S3 bucket.
 
-4. **Verify bucket region**: Make sure `AWS_REGION` matches your bucket's actual region.
+## Contributing
 
-5. **Test presigned URL**: The console logs will show if the presigned URL is generated successfully. If it fails at that step, check your AWS credentials.
-
-## Tech Stack
-
-- **Next.js 15** - React framework with App Router
-- **Radix UI** - Accessible component primitives
-- **Tailwind CSS** - Utility-first CSS framework
-- **TypeScript** - Type-safe JavaScript
-- **Google Generative AI** - Gemini 3 API client
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## License
 
 MIT
+
+---
+
+Built with ❤️ by the SportAI team
