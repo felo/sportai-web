@@ -41,3 +41,5 @@ gcloud-credentials.json
 *.tsbuildinfo
 next-env.d.ts
 *.onnx
+
+.env.local

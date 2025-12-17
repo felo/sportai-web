@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { track } from "@/lib/analytics";
 import type {
   AnalysisType,
   FrameAnalysisResult,
@@ -161,6 +162,12 @@ export function useFrameAnalysis(
     setError(null);
     onAnalysisStart?.(analysisType);
     
+    // Track frame analysis request
+    track('frame_analysis_requested', {
+      analysisType: analysisType,
+      sport,
+    });
+    
     try {
       // Capture frame
       const frameBlob = await captureFrame(videoElement);
@@ -175,12 +182,29 @@ export function useFrameAnalysis(
         } else if (result.type === "camera-angle") {
           setCameraAngleResult(result);
         }
+        
+        // Track successful analysis
+        track('analysis_completed', {
+          analysisType: analysisType,
+          sport,
+          success: true,
+        });
+        
         onAnalysisComplete?.(result);
       }
       
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Analysis failed";
+      
+      // Track failed analysis
+      track('analysis_failed', {
+        analysisType: analysisType,
+        sport,
+        success: false,
+        errorMessage,
+      });
+      
       setError(errorMessage);
       onAnalysisError?.(errorMessage, analysisType);
       return null;

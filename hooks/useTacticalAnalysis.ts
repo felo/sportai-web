@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { logger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 import type { 
   BallSequenceType, 
   PlayerTacticalData, 
@@ -90,6 +91,12 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
     
     onAnalysisStart?.();
     
+    // Track tactical analysis request
+    track('tactical_analysis_requested', {
+      analysisType: 'tactical',
+      sport,
+    });
+    
     try {
       const response = await fetch("/api/tactical-analysis", {
         method: "POST",
@@ -140,6 +147,13 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
         error: null,
       });
       
+      // Track successful analysis
+      track('analysis_completed', {
+        analysisType: 'tactical',
+        sport,
+        success: true,
+      });
+      
       onAnalysisComplete?.(accumulatedText);
       
     } catch (error) {
@@ -153,6 +167,14 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
       }
       
       const errorMessage = error instanceof Error ? error.message : "Analysis failed";
+      
+      // Track failed analysis
+      track('analysis_failed', {
+        analysisType: 'tactical',
+        sport,
+        success: false,
+        errorMessage,
+      });
       
       setState({
         isAnalyzing: false,
@@ -186,6 +208,12 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
     });
     
     onAnalysisStart?.();
+    
+    // Track tactical analysis request (all ball types)
+    track('tactical_analysis_requested', {
+      analysisType: 'tactical',
+      sport,
+    });
     
     try {
       const response = await fetch("/api/tactical-analysis", {
@@ -234,6 +262,13 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
         error: null,
       });
       
+      // Track successful analysis
+      track('analysis_completed', {
+        analysisType: 'tactical',
+        sport,
+        success: true,
+      });
+      
       onAnalysisComplete?.(accumulatedText);
       
     } catch (error) {
@@ -247,6 +282,14 @@ export function useTacticalAnalysis(options: UseTacticalAnalysisOptions = {}) {
       }
       
       const errorMessage = error instanceof Error ? error.message : "Analysis failed";
+      
+      // Track failed analysis
+      track('analysis_failed', {
+        analysisType: 'tactical',
+        sport,
+        success: false,
+        errorMessage,
+      });
       
       setState({
         isAnalyzing: false,

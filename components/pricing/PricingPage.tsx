@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { PageHeader } from "@/components/ui";
+import { track } from "@/lib/analytics";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import buttonStyles from "@/styles/buttons.module.css";
 import { WaitlistModal } from "./WaitlistModal";
@@ -325,6 +326,13 @@ export function PricingPage() {
     setCurrentChatId(newChat.id);
     router.push("/");
   }, [router]);
+
+  // Track pricing page view on mount
+  useEffect(() => {
+    track('pricing_page_viewed', {
+      source: 'direct_navigation',
+    });
+  }, []);
 
   // Track scroll position to update active dot indicator
   useEffect(() => {

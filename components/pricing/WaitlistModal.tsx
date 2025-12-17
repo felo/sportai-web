@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Dialog, Flex, Text, Button, Box, IconButton, TextField } from "@radix-ui/themes";
 import { Cross2Icon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { supabase } from "@/lib/supabase";
+import { track } from "@/lib/analytics";
 import buttonStyles from "@/styles/buttons.module.css";
 
 type PlanInterest = "pro-player" | "pro-coach";
@@ -51,6 +52,12 @@ export function WaitlistModal({
         }
       } else {
         setIsSuccess(true);
+        
+        // Track successful waitlist signup
+        track('waitlist_joined', {
+          plan: planInterest,
+          source: 'pricing_page',
+        });
       }
     } catch (err) {
       console.error("Error joining waitlist:", err);

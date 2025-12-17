@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { User, Session } from "@supabase/supabase-js";
 import { createLogger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { track, analytics } from "@/lib/analytics";
 import { clearUserDataFromStorage, migrateGuestTasks } from "@/utils/storage";
 import { migrateChatIds } from "@/utils/chat-id-migration";
 
@@ -260,6 +261,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (_event === "SIGNED_IN" && session?.user) {
         authLogger.info("User signed in");
         
+        // Track successful authentication
+        track('auth_completed', {
+          method: session.user.app_metadata?.provider || 'unknown',
+          success: true,
+        });
+        
+        // Identify user for analytics
+        analytics.identify(session.user.id, {
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+        });
+        
         // Clean up OAuth parameters from URL
         const url = new URL(window.location.href);
         if (url.searchParams.has('code') || url.searchParams.has('error')) {
@@ -323,6 +336,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } else if (_event === "SIGNED_OUT") {
         authLogger.info("User signed out");
+        
+        // Track logout
+        track('logout', {});
+        
+        // Reset analytics identity
+        analytics.reset();
+        
         setProfile(null);
         window.dispatchEvent(new CustomEvent("auth-state-change", { detail: { event: _event } }));
         setLoading(false);

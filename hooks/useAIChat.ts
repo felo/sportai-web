@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { chatLogger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 import type { Message, ProgressStage } from "@/types/chat";
 import {
   loadMessagesFromStorage,
@@ -424,6 +425,15 @@ export function useAIChat() {
       hasVideo: !!(message.videoFile || message.videoPreview || message.videoUrl),
       currentMessagesCount: messages.length,
     });
+    
+    // Track user messages being sent
+    if (message.role === 'user') {
+      track('chat_message_sent', {
+        messageType: 'user',
+        hasVideo: !!(message.videoFile || message.videoPreview || message.videoUrl),
+      });
+    }
+    
     setMessages((prev) => {
       const newMessages = [...prev, message];
       chatLogger.debug("State updated:", {

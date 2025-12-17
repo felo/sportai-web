@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { videoLogger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 import {
   validateVideoFile,
   createVideoPreview,
@@ -35,6 +36,13 @@ export function useVideoUpload() {
     const previewUrl = createVideoPreview(file);
     setVideoPreview(previewUrl);
     previousPreviewRef.current = previewUrl;
+
+    // Track successful video upload
+    track('video_uploaded', {
+      fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,
+      // Extract basic info from file
+      source: 'file_input',
+    });
   }, []);
 
   const processVideoFile = useCallback(async (file: File) => {
@@ -43,6 +51,12 @@ export function useVideoUpload() {
     const validation = validateVideoFile(file);
     if (!validation.valid) {
       videoLogger.debug('[useVideoUpload] Validation failed:', validation.errorType, validation.error);
+      
+      // Track upload failure
+      track('video_upload_failed', {
+        error: validation.errorType || 'validation_failed',
+        fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,
+      });
       
       // Show modal for file size limit, callout for other errors
       if (validation.errorType === 'file_size_limit') {
