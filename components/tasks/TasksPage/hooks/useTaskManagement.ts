@@ -14,6 +14,7 @@ import { extractS3KeyFromUrl } from "@/lib/s3";
 import { deleteGuestTask, isGuestTask } from "@/utils/storage";
 import { isSampleTask } from "../../sampleTasks";
 import { loadPoseData } from "@/lib/poseDataService";
+import { supabase } from "@/lib/supabase";
 
 interface UseTaskManagementOptions {
   /** User ID - for logging/display purposes only */
@@ -79,6 +80,19 @@ export function useTaskManagement({
       const response = await fetch("/api/tasks", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+
+      // Handle 401 - try to refresh session
+      if (response.status === 401) {
+        const { error } = await supabase.auth.refreshSession();
+        if (error) {
+          // Token refresh failed - don't set error, just stop loading
+          setLoading(false);
+          return;
+        }
+        // Let the auth state change trigger a re-fetch with new token
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) throw new Error("Failed to fetch tasks");
 
@@ -405,6 +419,12 @@ export function useTaskManagement({
           const response = await fetch(`/api/tasks/${task.id}/status`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
+
+          // Handle 401 - try to refresh session, then skip this poll cycle
+          if (response.status === 401) {
+            await supabase.auth.refreshSession();
+            return; // Exit early, let next poll use refreshed token
+          }
 
           if (response.ok) {
             const { task: updatedTask } = await response.json();

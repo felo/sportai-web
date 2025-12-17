@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { supabase } from "@/lib/supabase";
 
 const SEEN_TASKS_KEY = "sportai-seen-completed-tasks";
 const POLL_INTERVAL = 60000; // 1 minute
@@ -84,6 +85,21 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
+      // Handle 401 errors - try to refresh the session
+      if (response.status === 401) {
+        const { error } = await supabase.auth.refreshSession();
+        if (error) {
+          // Token refresh failed - user needs to re-authenticate
+          // Don't spam the console, just silently stop polling
+          setIsLoading(false);
+          return;
+        }
+        // Token refreshed - the auth state change will update session
+        // Skip this fetch, let the next polling cycle use the new token
+        setIsLoading(false);
+        return;
+      }
+
       if (!response.ok) throw new Error("Failed to fetch tasks");
 
       const { tasks } = await response.json();
@@ -136,6 +152,12 @@ export function LibraryTasksProvider({ children }: { children: React.ReactNode }
       const response = await fetch("/api/tasks", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+
+      // Handle 401 - try refresh, but don't spam errors
+      if (response.status === 401) {
+        await supabase.auth.refreshSession();
+        return;
+      }
 
       if (!response.ok) return;
 
