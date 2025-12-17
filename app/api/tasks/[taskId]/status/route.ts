@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
 import { generatePresignedDownloadUrl } from "@/lib/s3";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 import type { Database } from "@/types/supabase";
 
 export const runtime = "nodejs";
@@ -12,19 +12,6 @@ const STATUS_ENDPOINTS: Record<string, string> = {
   statistics: "/api/statistics",
   activity_detection: "/api/activity_detection",
 };
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error(
-      `Missing Supabase environment variables: ${!supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL ' : ''}${!supabaseServiceKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''}`
-    );
-  }
-  
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * Check if a presigned URL has expired or is about to expire
@@ -63,7 +50,7 @@ function isUrlExpiredOrExpiring(url: string): boolean {
  */
 async function refreshTaskUrls(
   task: Database["public"]["Tables"]["sportai_tasks"]["Row"],
-  supabase: ReturnType<typeof getSupabaseClient>,
+  supabase: ReturnType<typeof getSupabaseAdmin>,
   requestId: string
 ): Promise<Database["public"]["Tables"]["sportai_tasks"]["Row"]> {
   let updatedTask = { ...task };
@@ -116,12 +103,13 @@ export async function GET(
   const requestId = `task_status_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     
     const SPORTAI_API_URL = getSportAIApiUrl();
     const SPORTAI_API_KEY = getSportAIApiKey();
@@ -134,7 +122,7 @@ export async function GET(
       );
     }
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // Get the task from database
     const { data: task, error: fetchError } = await supabase

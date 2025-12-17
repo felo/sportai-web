@@ -16,7 +16,10 @@ import { isSampleTask } from "../../sampleTasks";
 import { loadPoseData } from "@/lib/poseDataService";
 
 interface UseTaskManagementOptions {
-  user: { id: string } | null;
+  /** User ID - for logging/display purposes only */
+  userId: string | null;
+  /** JWT access token for authenticated API calls */
+  accessToken: string | null;
   markTaskAsSeen: (taskId: string) => void;
 }
 
@@ -48,7 +51,8 @@ interface UseTaskManagementReturn {
  * Hook for managing task CRUD operations and status polling.
  */
 export function useTaskManagement({
-  user,
+  userId,
+  accessToken,
   markTaskAsSeen,
 }: UseTaskManagementOptions): UseTaskManagementReturn {
   const router = useRouter();
@@ -66,14 +70,14 @@ export function useTaskManagement({
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
-    if (!user) {
+    if (!accessToken) {
       setLoading(false);
       return;
     }
 
     try {
       const response = await fetch("/api/tasks", {
-        headers: { Authorization: `Bearer ${user.id}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       if (!response.ok) throw new Error("Failed to fetch tasks");
@@ -85,12 +89,12 @@ export function useTaskManagement({
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [accessToken]);
 
   // Submit new task
   const submitTask = useCallback(
     async (videoUrl: string, taskType: string, sport: string) => {
-      if (!user || !videoUrl.trim()) return;
+      if (!accessToken || !videoUrl.trim()) return;
 
       setSubmitting(true);
       setError(null);
@@ -123,7 +127,7 @@ export function useTaskManagement({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.id}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             taskType,
@@ -148,7 +152,7 @@ export function useTaskManagement({
         setSubmitting(false);
       }
     },
-    [user]
+    [accessToken]
   );
 
   // Delete task
@@ -169,11 +173,11 @@ export function useTaskManagement({
           return;
         }
 
-        if (!user) return;
+        if (!accessToken) return;
 
         const response = await fetch(`/api/tasks/${taskId}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${user.id}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!response.ok) {
@@ -188,13 +192,13 @@ export function useTaskManagement({
         setDeletingTask(null);
       }
     },
-    [user]
+    [accessToken]
   );
 
   // Fetch result
   const fetchResult = useCallback(
     async (taskId: string) => {
-      if (!user) return;
+      if (!accessToken) return;
 
       setFetchingResult(taskId);
       setError(null);
@@ -202,7 +206,7 @@ export function useTaskManagement({
       try {
         const response = await fetch(`/api/tasks/${taskId}/result?force=true`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${user.id}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (response.status === 202) {
@@ -225,17 +229,17 @@ export function useTaskManagement({
         setFetchingResult(null);
       }
     },
-    [user]
+    [accessToken]
   );
 
   // Download result
   const downloadResult = useCallback(
     async (taskId: string) => {
-      if (!user) return;
+      if (!accessToken) return;
 
       try {
         const response = await fetch(`/api/tasks/${taskId}/download`, {
-          headers: { Authorization: `Bearer ${user.id}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!response.ok) {
@@ -256,7 +260,7 @@ export function useTaskManagement({
         setError(err instanceof Error ? err.message : "Failed to download result");
       }
     },
-    [user]
+    [accessToken]
   );
 
   // Download pose data (for technique videos)
@@ -333,7 +337,7 @@ export function useTaskManagement({
         return;
       }
 
-      if (!user) return;
+      if (!accessToken) return;
 
       const task = tasks.find((t) => t.id === taskId);
       if (!task) return;
@@ -358,7 +362,7 @@ export function useTaskManagement({
       try {
         const response = await fetch(`/api/tasks/${taskId}/result`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${user.id}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (response.status === 202) {
@@ -382,7 +386,7 @@ export function useTaskManagement({
         setPreparingTask(null);
       }
     },
-    [user, tasks, router, markTaskAsSeen]
+    [accessToken, tasks, router, markTaskAsSeen]
   );
 
   // Initial fetch
@@ -393,13 +397,13 @@ export function useTaskManagement({
   // Status polling
   useEffect(() => {
     const activeTasks = tasks.filter((t) => t.status === "processing" || t.status === "pending");
-    if (activeTasks.length === 0 || !user) return;
+    if (activeTasks.length === 0 || !accessToken) return;
 
     const checkStatus = async () => {
       for (const task of activeTasks) {
         try {
           const response = await fetch(`/api/tasks/${task.id}/status`, {
-            headers: { Authorization: `Bearer ${user.id}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
           });
 
           if (response.ok) {
@@ -418,7 +422,7 @@ export function useTaskManagement({
 
     const interval = setInterval(checkStatus, TASK_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [tasks, user]);
+  }, [tasks, accessToken]);
 
   return {
     tasks,

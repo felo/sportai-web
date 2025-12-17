@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
-import type { Database } from "@/types/supabase";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabaseClient() {
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * PUT /api/profile/coach
@@ -20,17 +12,18 @@ export async function PUT(request: NextRequest) {
   const requestId = `coach_put_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const body = await request.json();
     
     logger.info(`[${requestId}] Upserting coach profile for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // Build the upsert data
     const coachData = {
@@ -76,16 +69,17 @@ export async function DELETE(request: NextRequest) {
   const requestId = `coach_delete_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     
     logger.info(`[${requestId}] Deleting coach profile for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // Delete coach sports first (cascade should handle this, but being explicit)
     await supabase
@@ -124,12 +118,13 @@ export async function POST(request: NextRequest) {
   const requestId = `coach_sport_post_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const body = await request.json();
     
     if (!body.sport) {
@@ -138,7 +133,7 @@ export async function POST(request: NextRequest) {
     
     logger.info(`[${requestId}] Upserting coach sport for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // First ensure coach profile exists
     const { data: coachProfile } = await supabase
@@ -184,4 +179,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

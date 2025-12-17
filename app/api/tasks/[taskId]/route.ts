@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
-import type { Database } from "@/types/supabase";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error(
-      `Missing Supabase environment variables: ${!supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL ' : ''}${!supabaseServiceKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''}`
-    );
-  }
-  
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * DELETE /api/tasks/[taskId]
@@ -30,16 +16,17 @@ export async function DELETE(
   const requestId = `task_delete_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     
     logger.info(`[${requestId}] Deleting task: ${taskId} for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // First verify the task belongs to the user
     const { data: task, error: fetchError } = await supabase
@@ -77,6 +64,3 @@ export async function DELETE(
     );
   }
 }
-
-
-

@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
-import type { Database } from "@/types/supabase";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabaseClient() {
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * PUT /api/profile/business
@@ -20,12 +12,13 @@ export async function PUT(request: NextRequest) {
   const requestId = `business_put_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const body = await request.json();
     
     // Company name is required for business profile
@@ -38,7 +31,7 @@ export async function PUT(request: NextRequest) {
     
     logger.info(`[${requestId}] Upserting business profile for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     const businessData = {
       profile_id: userId,
@@ -82,16 +75,17 @@ export async function DELETE(request: NextRequest) {
   const requestId = `business_delete_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     
     logger.info(`[${requestId}] Deleting business profile for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     const { error } = await supabase
       .from("business_profiles")
@@ -114,4 +108,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

@@ -7,7 +7,8 @@ import { validateVideoFile, extractFirstFrameWithDuration, uploadThumbnailToS3 }
 import { uploadToS3 } from "@/lib/s3";
 
 interface UseVideoUploadOptions {
-  user: { id: string } | null;
+  /** JWT access token for authenticated API calls */
+  accessToken: string | null;
   onTaskCreated: (task: Task) => void;
   onError: (error: string) => void;
 }
@@ -29,7 +30,7 @@ interface UseVideoUploadReturn {
  * Hook for handling video file uploads.
  */
 export function useVideoUpload({
-  user,
+  accessToken,
   onTaskCreated,
   onError,
 }: UseVideoUploadOptions): UseVideoUploadReturn {
@@ -64,7 +65,7 @@ export function useVideoUpload({
   // Submit file upload
   const handleFileUploadSubmit = useCallback(
     async (taskType: string, sport: string) => {
-      if (!user || !selectedFile) return;
+      if (!accessToken || !selectedFile) return;
 
       setUploadingVideo(true);
       setUploadProgress(0);
@@ -123,7 +124,7 @@ export function useVideoUpload({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.id}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             taskType,
@@ -150,7 +151,7 @@ export function useVideoUpload({
         setUploadProgress(0);
       }
     },
-    [user, selectedFile, onTaskCreated, onError, clearSelectedFile]
+    [accessToken, selectedFile, onTaskCreated, onError, clearSelectedFile]
   );
 
   return {

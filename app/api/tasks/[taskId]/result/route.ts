@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { logger } from "@/lib/logger";
 import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
-import type { Database } from "@/types/supabase";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Allow more time for downloading large files
@@ -18,19 +17,6 @@ const RESULT_ENDPOINTS: Record<string, string> = {
   statistics: "/api/statistics",
   activity_detection: "/api/activity_detection",
 };
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error(
-      `Missing Supabase environment variables: ${!supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL ' : ''}${!supabaseServiceKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''}`
-    );
-  }
-  
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 function getS3Client(): S3Client | null {
   const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
@@ -66,12 +52,13 @@ export async function POST(
   const forceRefresh = searchParams.get("force") === "true";
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     
     const SPORTAI_API_URL = getSportAIApiUrl();
     const SPORTAI_API_KEY = getSportAIApiKey();
@@ -84,7 +71,7 @@ export async function POST(
       );
     }
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     // Get the task from database
     const { data: task, error: fetchError } = await supabase
@@ -262,4 +249,3 @@ export async function POST(
     );
   }
 }
-

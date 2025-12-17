@@ -31,7 +31,7 @@ import { NewTaskForm, TaskFilters, SortableHeader } from "./components";
  */
 export function TasksPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { isCollapsed, isInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
   const { markTaskAsSeen, isTaskNew } = useLibraryTasks();
@@ -51,8 +51,12 @@ export function TasksPage() {
   const [taskType, setTaskType] = useState("technique");
   const [sport, setSport] = useState("all");
 
-  // Task management hook
-  const taskManagement = useTaskManagement({ user, markTaskAsSeen });
+  // Task management hook - use access token for secure API calls
+  const taskManagement = useTaskManagement({
+    userId: user?.id ?? null,
+    accessToken: session?.access_token ?? null,
+    markTaskAsSeen,
+  });
   const {
     tasks,
     setTasks,
@@ -83,7 +87,7 @@ export function TasksPage() {
 
   // Video upload hook
   const videoUpload = useVideoUpload({
-    user,
+    accessToken: session?.access_token ?? null,
     onTaskCreated: (task) => setTasks((prev) => [task, ...prev]),
     onError: setError,
   });

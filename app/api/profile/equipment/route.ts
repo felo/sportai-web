@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
-import type { Database } from "@/types/supabase";
+import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabaseClient() {
-  return createClient<Database>(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * POST /api/profile/equipment
@@ -20,12 +12,13 @@ export async function POST(request: NextRequest) {
   const requestId = `equipment_post_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const body = await request.json();
     
     // Validate required fields
@@ -38,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     logger.info(`[${requestId}] Adding equipment for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     const { data, error } = await supabase
       .from("player_equipment")
@@ -78,12 +71,13 @@ export async function PUT(request: NextRequest) {
   const requestId = `equipment_put_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const body = await request.json();
     
     if (!body.id) {
@@ -92,7 +86,7 @@ export async function PUT(request: NextRequest) {
     
     logger.info(`[${requestId}] Updating equipment ${body.id} for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     const updates: Record<string, unknown> = {};
     const fields = ["sport", "equipment_type", "brand", "model_name", "notes"];
@@ -140,12 +134,13 @@ export async function DELETE(request: NextRequest) {
   const requestId = `equipment_delete_${Date.now()}`;
   
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate JWT and get authenticated user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
     
-    const userId = authHeader.replace("Bearer ", "");
+    const userId = user.id;
     const { searchParams } = new URL(request.url);
     const equipmentId = searchParams.get("id");
     
@@ -155,7 +150,7 @@ export async function DELETE(request: NextRequest) {
     
     logger.info(`[${requestId}] Deleting equipment ${equipmentId} for user: ${userId}`);
     
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseAdmin();
     
     const { error } = await supabase
       .from("player_equipment")
@@ -179,4 +174,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-
