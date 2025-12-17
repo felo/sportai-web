@@ -25,7 +25,7 @@ export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  messageType?: "standard" | "analysis_options" | "technique_studio_prompt" | "candidate_responses"; // Type of message (default is standard)
+  messageType?: "standard" | "analysis_options" | "technique_studio_prompt" | "candidate_responses" | "profile_completion_prompt"; // Type of message (default is standard)
   // Candidate responses (for messageType === "candidate_responses")
   candidateResponses?: {
     options: CandidateOption[];

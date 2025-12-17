@@ -117,11 +117,11 @@ export function UserMenu({
 
   // Get display name and avatar
   const email = user.email || "Unknown";
-  const displayName = profile?.full_name || email.split("@")[0];
+  const displayName = profile?.full_name || "User";
   const avatarUrl = profile?.avatar_url;
   
-  // Generate initials from name or email
-  const initials = (profile?.full_name || email.split("@")[0])
+  // Generate initials from name (fallback to "U" for User)
+  const initials = (profile?.full_name || "U")
     .split(/[\s.]+/)
     .map((n) => n[0])
     .join("")
@@ -183,21 +183,20 @@ export function UserMenu({
               gap: "0",
               paddingLeft: "var(--space-2)",
             }}>
-              {profile?.full_name && (
-                <Text size="2" weight="medium" style={{ 
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}>
-                  {profile.full_name}
-                </Text>
-              )}
-              <Text size="1" color="gray" style={{ 
+              <Text size="2" weight="medium" style={{ 
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
-                {email}
+                {displayName}
+              </Text>
+              <Text size="1" weight="medium" style={{ 
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                color: "#7ADB8F",
+              }}>
+                BETA ACCESS
               </Text>
             </div>
           )}

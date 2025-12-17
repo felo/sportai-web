@@ -8,7 +8,7 @@ import { calculatePricing } from "@/lib/token-utils";
 import { SHOW_PRO_UPSELL_BANNER } from "@/lib/limitations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions, ProfileCompletionPrompt } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -598,6 +598,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     )}
                     onTTSUsage={handleTTSUsage}
                   />
+                </>
+              ) : message.messageType === "profile_completion_prompt" ? (
+                <>
+                  <ProfileCompletionPrompt onTTSUsage={handleTTSUsage} />
                 </>
               ) : (
                 <>

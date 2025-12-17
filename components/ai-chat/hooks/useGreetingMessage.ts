@@ -313,6 +313,22 @@ export function useGreetingMessage({
             },
           };
           addMessage(optionsMessage);
+          
+          // If user is signed in but has no name, add profile completion prompt
+          const needsProfileCompletion = isSignedIn && !profile?.full_name;
+          if (needsProfileCompletion) {
+            setTimeout(() => {
+              const profilePromptId = generateMessageId();
+              const profilePromptMessage: Message = {
+                id: profilePromptId,
+                role: "assistant",
+                content: "",
+                messageType: "profile_completion_prompt",
+                isGreeting: true,
+              };
+              addMessage(profilePromptMessage);
+            }, 300); // Small delay after options appear
+          }
         }, 200); // Small delay after typing completes before showing options
       }
     };

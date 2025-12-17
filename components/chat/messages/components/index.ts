@@ -9,6 +9,7 @@ export { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 export { AnalysisOptionsMessage } from "./AnalysisOptionsMessage";
 export { TechniqueStudioPrompt } from "./TechniqueStudioPrompt";
 export { StudioPromptCard } from "./StudioPromptCard";
+export { ProfileCompletionPrompt } from "./ProfileCompletionPrompt";
 export { MatchReportPrompt } from "./MatchReportPrompt";
 export { CandidateResponsesMessage } from "./CandidateResponsesMessage";
 export { 
