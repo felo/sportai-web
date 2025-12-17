@@ -9,6 +9,39 @@ export const size = {
 }
 export const contentType = 'image/png'
 
+// Ball trace configuration - follows 135deg gradient direction (top-left to bottom-right)
+const ballTraces = [
+  // Top trace - fast moving ball (shifted left so trail[1] hits center of O)
+  {
+    ball: { x: 127, y: 110, size: 48, opacity: 0.85 },
+    trail: [
+      { x: 92, y: 65, size: 36, opacity: 0.5 },
+      { x: 65, y: 38, size: 28, opacity: 0.35 },  // This one hits center of O
+      { x: 43, y: 16, size: 20, opacity: 0.2 },
+      { x: 25, y: -2, size: 14, opacity: 0.1 },
+    ]
+  },
+  // Middle trace - arc trajectory  
+  {
+    ball: { x: 800, y: 520, size: 42, opacity: 0.75 },
+    trail: [
+      { x: 1020, y: 485, size: 32, opacity: 0.45 },
+      { x: 995, y: 455, size: 24, opacity: 0.3 },
+      { x: 975, y: 430, size: 18, opacity: 0.18 },
+      { x: 958, y: 408, size: 12, opacity: 0.08 },
+    ]
+  },
+  // Subtle background trace
+  {
+    ball: { x: 85, y: 480, size: 28, opacity: 0.4 },
+    trail: [
+      { x: 62, y: 457, size: 22, opacity: 0.25 },
+      { x: 44, y: 439, size: 16, opacity: 0.15 },
+      { x: 30, y: 425, size: 10, opacity: 0.08 },
+    ]
+  },
+]
+
 export default async function Image() {
   // Fetch the logo SVG
   const logoData = await fetch(
@@ -59,19 +92,41 @@ export default async function Image() {
           }}
         />
         
-        {/* Tennis ball decoration */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '80px',
-            right: '120px',
-            fontSize: '72px',
-            opacity: 0.6,
-            display: 'flex',
-          }}
-        >
-          🎾
-        </div>
+        {/* Ball traces with motion trails - following 135deg gradient direction */}
+        {ballTraces.map((trace, traceIndex) => (
+          <div key={traceIndex} style={{ display: 'flex' }}>
+            {/* Trail circles - rendered first so ball appears on top */}
+            {trace.trail.map((dot, dotIndex) => (
+              <div
+                key={`trail-${traceIndex}-${dotIndex}`}
+                style={{
+                  position: 'absolute',
+                  left: `${dot.x}px`,
+                  top: `${dot.y}px`,
+                  width: `${dot.size}px`,
+                  height: `${dot.size}px`,
+                  borderRadius: '50%',
+                  background: `radial-gradient(circle, rgba(200, 230, 100, ${dot.opacity}) 0%, rgba(180, 210, 80, ${dot.opacity * 0.6}) 50%, transparent 100%)`,
+                  display: 'flex',
+                }}
+              />
+            ))}
+            {/* Main ball with highlight */}
+            <div
+              style={{
+                position: 'absolute',
+                left: `${trace.ball.x}px`,
+                top: `${trace.ball.y}px`,
+                width: `${trace.ball.size}px`,
+                height: `${trace.ball.size}px`,
+                borderRadius: '50%',
+                background: `radial-gradient(circle at 35% 35%, rgba(220, 245, 120, ${trace.ball.opacity}) 0%, rgba(190, 220, 80, ${trace.ball.opacity}) 40%, rgba(160, 190, 60, ${trace.ball.opacity}) 100%)`,
+                boxShadow: `0 0 ${trace.ball.size / 3}px rgba(200, 230, 100, ${trace.ball.opacity * 0.5})`,
+                display: 'flex',
+              }}
+            />
+          </div>
+        ))}
         
         {/* Main content */}
         <div
