@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, IconButton, Tooltip } from "@radix-ui/themes";
-import { ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, ExitFullScreenIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { useFloatingVideoContext } from "./FloatingVideoContext";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -32,6 +32,10 @@ const MAX_HEIGHT = 700; // Accommodate tall portrait videos in theatre mode
 const EDGE_PADDING = 16;
 const HEADER_OFFSET = 80;
 const BOTTOM_OFFSET = 100;
+
+// Mobile fixed video settings
+const MOBILE_TOP_OFFSET = 57; // Below navbar
+const MOBILE_MAX_WIDTH_RATIO = 2 / 3; // 2/3 of screen width
 
 type ResizeHandle = "nw" | "ne" | "sw" | "se" | null;
 
@@ -96,6 +100,7 @@ export function FloatingVideoPortal() {
   const [customSize, setCustomSize] = useState<{ width: number; height: number } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [activeResizeHandle, setActiveResizeHandle] = useState<ResizeHandle>(null);
+  const [mobileViewportWidth, setMobileViewportWidth] = useState(0);
   
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
@@ -159,6 +164,7 @@ export function FloatingVideoPortal() {
   useEffect(() => {
     setMounted(true);
     setTheatreMode(getTheatreMode());
+    setMobileViewportWidth(window.innerWidth);
     
     const handleTheatreModeChange = () => {
       setTheatreMode(getTheatreMode());
@@ -166,6 +172,18 @@ export function FloatingVideoPortal() {
     window.addEventListener("theatre-mode-change", handleTheatreModeChange);
     return () => window.removeEventListener("theatre-mode-change", handleTheatreModeChange);
   }, []);
+
+  // Handle mobile viewport resize
+  useEffect(() => {
+    if (!isMobile) return;
+    
+    const handleResize = () => {
+      setMobileViewportWidth(window.innerWidth);
+    };
+    
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isMobile]);
 
   // Set the floating container ref for portal rendering
   useEffect(() => {
@@ -483,7 +501,127 @@ export function FloatingVideoPortal() {
 
   // Hide floating video when sidebar is open (only on mobile - desktop can show both)
   const shouldHideForSidebar = !isSidebarCollapsed && isMobile;
+
+  // Calculate mobile video dimensions
+  const getMobileDimensions = () => {
+    const viewportWidth = mobileViewportWidth || window.innerWidth;
+    const maxWidth = viewportWidth * MOBILE_MAX_WIDTH_RATIO;
+    const aspectRatio = getAspectRatio();
+    const width = Math.min(maxWidth, MAX_WIDTH);
+    const height = width / aspectRatio;
+    return { width, height };
+  };
+
+  // Mobile: Fixed position video below navbar (no backdrop, floats above content)
+  if (isMobile) {
+    const mobileDimensions = getMobileDimensions();
+    
+    const mobileContent = (
+      <>
+        {/* Fixed video container */}
+        <Box
+          style={{
+            position: "fixed",
+            top: MOBILE_TOP_OFFSET + EDGE_PADDING,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: mobileDimensions.width,
+            height: mobileDimensions.height,
+            zIndex: 9999,
+            borderRadius: "12px",
+            overflow: "hidden",
+            border: "2px solid #7ADB8F",
+            boxShadow: `
+              0 0 15px rgba(122, 219, 143, 0.4),
+              0 0 30px rgba(122, 219, 143, 0.2),
+              0 12px 40px rgba(0, 0, 0, 0.5)
+            `,
+            backgroundColor: "#000",
+            // Hide when sidebar is open
+            opacity: shouldHideForSidebar ? 0 : 1,
+            pointerEvents: shouldHideForSidebar ? "none" : "auto",
+            visibility: shouldHideForSidebar ? "hidden" : "visible",
+          }}
+        >
+          {/* Video content container */}
+          <Box
+            ref={videoContainerRef}
+            className="floating-video-content"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "#000",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {(() => {
+              const content = typeof registration.renderContent === "function" 
+                ? registration.renderContent() 
+                : null;
+              if (content) return content;
+              return (
+                <video
+                  key={registration.id}
+                  src={registration.videoUrl}
+                  controls
+                  playsInline
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    backgroundColor: "#000",
+                  }}
+                />
+              );
+            })()}
+          </Box>
+          
+          {/* Close button - brand colors */}
+          <Box
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 100,
+            }}
+          >
+            <IconButton
+              size="2"
+              variant="solid"
+              style={{ 
+                backgroundColor: "#7ADB8F",
+                color: "#1C1C1C",
+                border: "2px solid white",
+                borderRadius: "var(--radius-3)",
+                width: 28,
+                height: 28,
+                cursor: "pointer",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setIsMinimized(true);
+              }}
+            >
+              <Cross2Icon width={14} height={14} />
+            </IconButton>
+          </Box>
+        </Box>
+      </>
+    );
+
+    return createPortal(mobileContent, document.body);
+  }
   
+  // Desktop: Original floating/draggable behavior
   const floatingContent = (
     <Box
       style={{
@@ -593,24 +731,18 @@ export function FloatingVideoPortal() {
             })()}
           </Box>
           
-          {/* Mid-left control buttons - appear on hover/tap */}
-          {/* Positioned at vertical center to avoid corners where native device controls appear */}
+          {/* Close button - top right */}
           <Box
             style={{
               position: "absolute",
-              left: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              zIndex: 100, // Ensure above video
-              opacity: showControls || isDragging ? 1 : 0.4,
+              top: 8,
+              right: 8,
+              zIndex: 100,
+              opacity: showControls || isDragging ? 1 : 0.6,
               transition: "opacity 0.2s ease",
             }}
           >
-            {/* Minimize button */}
-            <Tooltip content="Minimize" side="right">
+            <Tooltip content="Close" side="left">
               <IconButton
                 size="1"
                 variant="solid"
@@ -621,32 +753,11 @@ export function FloatingVideoPortal() {
                   borderRadius: "var(--radius-3)",
                   width: 28,
                   height: 28,
+                  cursor: "pointer",
                 }}
                 onClick={handleMinimize}
               >
-                <ExitFullScreenIcon width={14} height={14} />
-              </IconButton>
-            </Tooltip>
-            
-            {/* Movement Analysis toggle */}
-            <Tooltip content={poseEnabled ? "Disable Movement Analysis" : "Analyse Movement"} side="right">
-              <IconButton
-                size="1"
-                variant="solid"
-                style={{ 
-                  backgroundColor: poseEnabled ? "#7ADB8F" : "rgba(60, 60, 60, 0.9)",
-                  color: poseEnabled ? "#1C1C1C" : "#7ADB8F",
-                  border: poseEnabled ? "2px solid white" : "2px solid #7ADB8F",
-                  borderRadius: "var(--radius-3)",
-                  width: 28,
-                  height: 28,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPoseEnabled(!poseEnabled);
-                }}
-              >
-                <MagicWandIcon width={14} height={14} />
+                <Cross2Icon width={14} height={14} />
               </IconButton>
             </Tooltip>
           </Box>
