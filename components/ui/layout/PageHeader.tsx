@@ -5,6 +5,7 @@ import { HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { IconButton, BadgeWithTooltip, LogoNewChatButton } from "@/components/ui";
+import { getDisplayVersion, getFullVersion, getBuildInfo } from "@/lib/version";
 import type { ReactNode } from "react";
 
 export interface PageHeaderProps {
@@ -138,8 +139,8 @@ export function PageHeader({
         
         {showVersionBadge && (
           <BadgeWithTooltip
-            text="API version 0.5.58"
-            tooltip="Stable v0.5.58 - Last updated 2025-10-01"
+            text={getDisplayVersion()}
+            tooltip={`${getFullVersion()} • ${getBuildInfo()}`}
             variant="soft"
             color="gray"
             radius="full"

@@ -1,11 +1,57 @@
 import type { NextConfig } from 'next'
 import bundleAnalyzer from '@next/bundle-analyzer'
+import { execSync } from 'child_process'
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 })
 
+// Generate version info at build time
+function getVersionInfo() {
+  // Base version (update these for major/minor releases)
+  const MAJOR = 0
+  const MINOR = 7
+  
+  // Check for Vercel environment variables first
+  const vercelSha = process.env.VERCEL_GIT_COMMIT_SHA
+  const vercelBranch = process.env.VERCEL_GIT_COMMIT_REF
+  
+  let commitCount: string
+  let shortSha: string
+  
+  if (vercelSha) {
+    // Running on Vercel - use timestamp-based patch for uniqueness
+    shortSha = vercelSha.substring(0, 7)
+    const now = new Date()
+    // Format: YYMMDDHH ensures always-increasing version
+    commitCount = `${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`
+  } else {
+    // Local development - use git
+    try {
+      commitCount = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim()
+      shortSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+    } catch {
+      commitCount = 'dev'
+      shortSha = 'local'
+    }
+  }
+  
+  return {
+    version: `v${MAJOR}.${MINOR}.${commitCount}`,
+    shortSha,
+    buildDate: new Date().toISOString(),
+  }
+}
+
+const versionInfo = getVersionInfo()
+
 const nextConfig: NextConfig = {
+  // Expose version info to client-side code
+  env: {
+    NEXT_PUBLIC_APP_VERSION: versionInfo.version,
+    NEXT_PUBLIC_GIT_SHA: versionInfo.shortSha,
+    NEXT_PUBLIC_BUILD_DATE: versionInfo.buildDate,
+  },
   // Externalize TensorFlow and MediaPipe packages on server side
   // These packages only work in the browser and cause issues with Turbopack bundling
   serverExternalPackages: [
