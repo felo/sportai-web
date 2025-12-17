@@ -335,8 +335,8 @@ export function ChatNavigationButtons({
         })}
       </div>
 
-      {/* Onboarding tooltip for floating video button */}
-      {showVideoButton && (
+      {/* TODO: Re-enable onboarding tooltip for floating video button */}
+      {/* {showVideoButton && (
         <OnboardingTooltip
           tooltipId="floating-video-button"
           targetRef={videoButtonRef}
@@ -347,7 +347,7 @@ export function ChatNavigationButtons({
           onDismiss={handleVideoTooltipDismiss}
           autoDismissMs={12000}
         />
-      )}
+      )} */}
     </>
   );
 }

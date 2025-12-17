@@ -1,8 +1,65 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
+import "@tensorflow/tfjs-backend-webgpu";
 import * as tf from "@tensorflow/tfjs";
 import { detectionLogger } from "@/lib/logger";
+
+// Detect if running on a mobile device
+// Mobile devices use WebGL for stability; desktop uses WebGPU for performance
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+}
+
+// Check if WebGPU is available in this browser
+function hasWebGPUSupport(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return "gpu" in navigator;
+}
+
+// Initialize the optimal TensorFlow backend
+// Desktop: WebGPU (faster) with WebGL fallback
+// Mobile: WebGL (more stable)
+async function initializeTensorFlowBackend(): Promise<string> {
+  const mobile = isMobileDevice();
+  const webgpuAvailable = hasWebGPUSupport();
+  
+  detectionLogger.debug("Backend selection:", {
+    isMobile: mobile,
+    hasWebGPU: webgpuAvailable,
+  });
+
+  // Mobile devices: prefer WebGL for stability
+  if (mobile) {
+    await tf.setBackend("webgl");
+    await tf.ready();
+    return tf.getBackend() || "webgl";
+  }
+
+  // Desktop: try WebGPU first for better performance
+  if (webgpuAvailable) {
+    try {
+      await tf.setBackend("webgpu");
+      await tf.ready();
+      const backend = tf.getBackend();
+      if (backend === "webgpu") {
+        detectionLogger.info("✨ Using WebGPU backend (faster performance)");
+        return backend;
+      }
+    } catch (err) {
+      detectionLogger.warn("WebGPU initialization failed, falling back to WebGL:", err);
+    }
+  }
+
+  // Fallback to WebGL
+  await tf.setBackend("webgl");
+  await tf.ready();
+  detectionLogger.info("Using WebGL backend");
+  return tf.getBackend() || "webgl";
+}
 
 // Enable TensorFlow.js model caching
 // This ensures models are cached in the browser's Cache API
@@ -13,6 +70,8 @@ if (typeof window !== "undefined") {
   detectionLogger.debug("TensorFlow.js environment initialized", {
     platform: tf.env().platformName,
     hasWebGL: tf.env().getBool('HAS_WEBGL'),
+    hasWebGPU: hasWebGPUSupport(),
+    isMobile: isMobileDevice(),
     hasIndexedDB: typeof indexedDB !== 'undefined',
     hasCacheAPI: typeof caches !== 'undefined',
   });
@@ -60,6 +119,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
   const [error, setError] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [loadingFromCache, setLoadingFromCache] = useState(false);
+  const [activeBackend, setActiveBackend] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   const {
@@ -88,12 +148,12 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
         setIsLoading(true);
         setError(null);
 
-        // Set backend to webgl for better performance
-        await tf.setBackend("webgl");
-        await tf.ready();
+        // Initialize optimal backend (WebGPU on desktop, WebGL on mobile)
+        const backend = await initializeTensorFlowBackend();
+        setActiveBackend(backend);
         
         // Enable model caching - this ensures models are saved to IndexedDB
-        detectionLogger.debug("TensorFlow.js backend ready:", tf.getBackend());
+        detectionLogger.debug("TensorFlow.js backend ready:", backend);
 
         let detectorConfig: any;
         let supportedModel: poseDetection.SupportedModels;
@@ -436,5 +496,7 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
     startDetection,
     stopDetection,
     clearModelCache,
+    /** The active TensorFlow backend: "webgpu" (desktop) or "webgl" (mobile/fallback) */
+    activeBackend,
   };
 }
