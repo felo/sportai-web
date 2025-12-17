@@ -143,7 +143,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         <Text size="1" color="gray" mt="4" align="center" as="p">
           By signing in, you agree to our{" "}
           <a
-            href="https://sportai.com/terms-of-use"
+            href="/terms"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--mint-9)", textDecoration: "underline" }}
@@ -152,7 +152,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           </a>{" "}
           and{" "}
           <a
-            href="https://sportai.com/privacy-policy"
+            href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--mint-9)", textDecoration: "underline" }}

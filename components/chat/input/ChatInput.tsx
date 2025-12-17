@@ -11,6 +11,7 @@ import type { ProgressStage, VideoPreAnalysis } from "@/types/chat";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise, getDeveloperMode } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { extractVideoUrls } from "@/utils/video-utils";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface ChatInputProps {
   prompt: string;
@@ -67,6 +68,8 @@ export function ChatInput({
   videoPreAnalysis = null,
 }: ChatInputProps) {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const isSignedIn = !!user;
   
   // Video URL detection state
   const [detectedVideoUrls, setDetectedVideoUrls] = useState<string[]>([]);
@@ -916,28 +919,53 @@ export function ChatInput({
           {/* Disclaimer text */}
           {!hideDisclaimer && (
             <Text size="1" color="gray" style={{ textAlign: "center", marginTop: "var(--space-1)", marginBottom: 0 }}>
-              {isMobile ? (
-                <>
-                  Enjoy the free BETA, for enterprise license {" "}
-                  <a 
-                    href="https://sportai.com/contact" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ color: "inherit", textDecoration: "underline" }}
-                  >
-                    contact us
-                  </a>.
-                </>
+              {isSignedIn ? (
+                // Signed-in users have already accepted terms
+                isMobile ? (
+                  <>
+                    Enjoy the free BETA, for enterprise license{" "}
+                    <a 
+                      href="https://sportai.com/contact" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "underline" }}
+                    >
+                      contact us
+                    </a>.
+                  </>
+                ) : (
+                  <>
+                    Enjoy the free BETA. For enterprise-level precision, performance, and dedicated support, please{" "}
+                    <a 
+                      href="https://sportai.com/contact" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "underline" }}
+                    >
+                      contact us
+                    </a>.
+                  </>
+                )
               ) : (
+                // Guest users see Terms/Privacy links
                 <>
-                  Enjoy the free BETA. For enterprise-level precision, performance, and dedicated support, please{" "}
+                  By using SportAI Open, you agree to our{" "}
                   <a 
-                    href="https://sportai.com/contact" 
+                    href="/terms" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     style={{ color: "inherit", textDecoration: "underline" }}
                   >
-                    contact us
+                    Terms
+                  </a>{" "}
+                  and{" "}
+                  <a 
+                    href="/privacy" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit", textDecoration: "underline" }}
+                  >
+                    Privacy Policy
                   </a>.
                 </>
               )}

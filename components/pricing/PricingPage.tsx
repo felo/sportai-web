@@ -3,13 +3,16 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Flex, Text, Button, Badge, Card } from "@radix-ui/themes";
-import { CheckIcon, RocketIcon, ChatBubbleIcon } from "@radix-ui/react-icons";
+import { CheckIcon, RocketIcon, ChatBubbleIcon, PersonIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { PageHeader } from "@/components/ui";
 import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
 import buttonStyles from "@/styles/buttons.module.css";
+import { WaitlistModal } from "./WaitlistModal";
 
 interface PlanFeature {
   text: string;
@@ -35,11 +38,11 @@ const plans: PricingPlan[] = [
   {
     name: "Free",
     price: "$0",
-    priceNote: "forever",
+    priceNote: "",
     description: "Perfect for getting started with AI-powered sports analysis",
     features: [
       { text: "Unlimited AI coaching conversations", included: true },
-      { text: "Upload and analyze short clips (100MB, ~2-3 minutes)", included: true },
+      { text: "Upload and analyze short clips (100MB, ~1-3 minutes)", included: true },
       { text: "Basic technique and tactical feedback", included: true },
       { text: "Chat about any sport with deep knowledge on Tennis, Padel & Pickleball", included: true },
       { text: "Advanced match statistics and tactical insights", included: false },
@@ -52,13 +55,12 @@ const plans: PricingPlan[] = [
   {
     name: "PRO",
     subtitle: "Player",
-    price: "$15",
-    priceNote: "/month",
+    price: "TBA",
     description: "For athletes looking to improve their game",
     features: [
       { text: "Everything in Free, plus:", included: true },
-      { text: "Video analysis up to 30 min per video", included: true },
-      { text: "5GB video storage", included: true },
+      { text: "Longer video analysis", included: true },
+      { text: "Cloud-based video storage", included: true },
       { text: "Advanced match statistics & tactical insights", included: true },
       { text: "Shot-by-shot breakdown", included: true },
       { text: "Performance trends over time", included: true },
@@ -72,14 +74,13 @@ const plans: PricingPlan[] = [
   {
     name: "PRO",
     subtitle: "Coach",
-    price: "$30",
-    priceNote: "/month",
+    price: "TBA",
     description: "Advanced tools for coaches and serious athletes",
     features: [
       { text: "Everything in PRO Player, plus:", included: true },
-      { text: "Full-length match analysis (up to 2 hours per video)", included: true },
-      { text: "50GB video storage", included: true },
-      { text: "Player tracking & movement analysis", included: true },
+      { text: "Full-length match analysis", included: true },
+      { text: "Larger cloud-based video storage", included: true },
+      { text: "Advanced Technique Studio", included: true },
       { text: "Coaching tools & client management", included: true },
       { text: "Export detailed reports", included: true },
       { text: "Priority video processing", included: true },
@@ -108,11 +109,44 @@ const plans: PricingPlan[] = [
   },
 ];
 
-function PlanCard({ plan, onGetStarted, isMobile }: { plan: PricingPlan; onGetStarted: () => void; isMobile: boolean }) {
+interface PlanCardProps {
+  plan: PricingPlan;
+  onGetStarted: () => void;
+  onComingSoonClick?: () => void;
+  onSignInClick?: () => void;
+  isSignedIn: boolean;
+  isMobile: boolean;
+}
+
+function PlanCard({ plan, onGetStarted, onComingSoonClick, onSignInClick, isSignedIn, isMobile }: PlanCardProps) {
   // Determine button style based on plan type
   const getButtonClass = () => {
     if (plan.contactSales) return buttonStyles.actionButtonSquareSecondary;
+    // PRO plans get pulse effect
+    if (plan.comingSoon) return `${buttonStyles.actionButtonSquare} ${buttonStyles.actionButtonPulse}`;
     return buttonStyles.actionButtonSquare;
+  };
+
+  // Determine button text for Free plan based on auth state
+  const getButtonText = () => {
+    if (plan.name === "Free") {
+      if (isSignedIn) {
+        return "You're In! 🎉";
+      }
+      return "Sign In";
+    }
+    if (plan.comingSoon) {
+      return "Get Early Access";
+    }
+    return plan.cta;
+  };
+
+  // Determine button icon
+  const renderButtonIcon = () => {
+    if (plan.contactSales) return <ChatBubbleIcon width={16} height={16} />;
+    if (plan.name === "Free" && !isSignedIn) return <PersonIcon width={16} height={16} />;
+    if (plan.name === "Free" && isSignedIn) return null;
+    return null;
   };
   
   return (
@@ -176,7 +210,7 @@ function PlanCard({ plan, onGetStarted, isMobile }: { plan: PricingPlan; onGetSt
             weight="bold"
             style={{
               color: "var(--gray-12)",
-              fontSize: plan.price === "Custom" ? "32px" : "48px",
+              fontSize: plan.price === "Custom" || plan.price === "TBA" ? "32px" : "48px",
               lineHeight: 1,
             }}
           >
@@ -237,12 +271,19 @@ function PlanCard({ plan, onGetStarted, isMobile }: { plan: PricingPlan; onGetSt
       {/* CTA Button */}
       <Button
         size="3"
-        disabled={plan.disabled}
         className={getButtonClass()}
+        disabled={plan.name === "Free" && isSignedIn}
         onClick={() => {
           if (plan.contactSales) {
             window.open("https://sportai.com/contact", "_blank");
-          } else if (!plan.disabled) {
+          } else if (plan.comingSoon && onComingSoonClick) {
+            onComingSoonClick();
+          } else if (plan.name === "Free" && !isSignedIn && onSignInClick) {
+            onSignInClick();
+          } else if (plan.name === "Free" && isSignedIn) {
+            // Already signed in, do nothing
+            return;
+          } else {
             onGetStarted();
           }
         }}
@@ -251,9 +292,8 @@ function PlanCard({ plan, onGetStarted, isMobile }: { plan: PricingPlan; onGetSt
           height: "48px",
         }}
       >
-        {plan.contactSales && <ChatBubbleIcon width={16} height={16} />}
-        {plan.name === "Free" && <RocketIcon width={16} height={16} />}
-        {plan.cta}
+        {renderButtonIcon()}
+        {getButtonText()}
       </Button>
     </Card>
   );
@@ -263,8 +303,21 @@ export function PricingPage() {
   const router = useRouter();
   const { isCollapsed, isInitialLoad } = useSidebar();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Auth modal state
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  
+  // Waitlist modal state
+  const [waitlistModalOpen, setWaitlistModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<{
+    name: string;
+    interest: "pro-player" | "pro-coach";
+  } | null>(null);
+  
+  const isSignedIn = !!user;
 
   // Handle creating a new chat and navigating to it
   const handleNewChat = useCallback(async () => {
@@ -342,7 +395,7 @@ export function PricingPage() {
                 lineHeight: 1.6,
               }}
             >
-              Get AI-powered coaching insights for tennis, padel, and pickleball.
+              Get AI-powered coaching insights for Tennis, Padel, and Pickleball.
               Start free and upgrade as you grow.
             </Text>
           </Flex>
@@ -350,7 +403,26 @@ export function PricingPage() {
           {/* Pricing Cards */}
           <Box ref={scrollRef} className="pricing-grid">
             {plans.map((plan) => (
-              <PlanCard key={`${plan.name}-${plan.subtitle || 'base'}`} plan={plan} onGetStarted={handleNewChat} isMobile={isMobile} />
+              <PlanCard
+                key={`${plan.name}-${plan.subtitle || 'base'}`}
+                plan={plan}
+                onGetStarted={handleNewChat}
+                onSignInClick={() => setAuthModalOpen(true)}
+                isSignedIn={isSignedIn}
+                onComingSoonClick={
+                  plan.comingSoon
+                    ? () => {
+                        const interest = plan.subtitle === "Player" ? "pro-player" : "pro-coach";
+                        setSelectedPlan({
+                          name: `${plan.name} ${plan.subtitle}`,
+                          interest: interest as "pro-player" | "pro-coach",
+                        });
+                        setWaitlistModalOpen(true);
+                      }
+                    : undefined
+                }
+                isMobile={isMobile}
+              />
             ))}
           </Box>
 
@@ -375,6 +447,19 @@ export function PricingPage() {
           )}
         </Box>
       </Box>
+
+      {/* Auth Modal */}
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+
+      {/* Waitlist Modal */}
+      {selectedPlan && (
+        <WaitlistModal
+          open={waitlistModalOpen}
+          onOpenChange={setWaitlistModalOpen}
+          planName={selectedPlan.name}
+          planInterest={selectedPlan.interest}
+        />
+      )}
     </>
   );
 }

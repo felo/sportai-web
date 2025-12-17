@@ -674,3 +674,29 @@ CREATE TRIGGER update_sportai_tasks_updated_at
 -- =============================================
 -- ALTER TABLE sportai_tasks ADD COLUMN IF NOT EXISTS video_s3_key TEXT;
 
+-- =============================================
+-- PRICING_WAITLIST TABLE
+-- Captures interest for upcoming PRO plans
+-- =============================================
+CREATE TABLE IF NOT EXISTS pricing_waitlist (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email TEXT NOT NULL,
+  plan_interest TEXT NOT NULL CHECK (plan_interest IN ('pro-player', 'pro-coach')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Prevent duplicate signups per plan
+  UNIQUE(email, plan_interest)
+);
+
+-- Create index for faster lookups
+CREATE INDEX IF NOT EXISTS pricing_waitlist_email_idx ON pricing_waitlist(email);
+CREATE INDEX IF NOT EXISTS pricing_waitlist_plan_interest_idx ON pricing_waitlist(plan_interest);
+
+-- Enable RLS
+ALTER TABLE pricing_waitlist ENABLE ROW LEVEL SECURITY;
+
+-- Allow anyone to insert (no auth required for waitlist)
+CREATE POLICY "Anyone can join waitlist"
+  ON pricing_waitlist FOR INSERT
+  WITH CHECK (true);
+

@@ -862,7 +862,7 @@ html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlight
 
 @media (min-width: 640px) {
   .pricing-grid {
-    display: grid;
+    display: grid !important;
     grid-template-columns: 1fr;
     max-width: 480px;
     margin: 0 auto;
@@ -881,14 +881,7 @@ html[data-theme="green"] .radix-themes [data-radix-menu-content] [data-highlight
 @media (min-width: 900px) {
   .pricing-grid {
     grid-template-columns: repeat(2, 1fr);
-    max-width: 800px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .pricing-grid {
-    grid-template-columns: repeat(4, 1fr);
-    max-width: none;
+    max-width: 900px;
   }
 }
 

@@ -480,6 +480,25 @@ export interface Database {
           }
         ];
       };
+      pricing_waitlist: {
+        Row: {
+          id: string;
+          email: string;
+          plan_interest: "pro-player" | "pro-coach";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          plan_interest: "pro-player" | "pro-coach";
+          created_at?: string;
+        };
+        Update: {
+          email?: string;
+          plan_interest?: "pro-player" | "pro-coach";
+        };
+        Relationships: [];
+      };
       sportai_tasks: {
         Row: {
           id: string;
