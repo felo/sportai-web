@@ -9,6 +9,7 @@ import {
 import { uploadToS3 } from "@/lib/s3";
 import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 
 // Rough estimate for system prompt token count (server-side prompt is not exposed to client)
@@ -59,6 +60,19 @@ export function useAIApi(options: UseAIApiOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  
+  // Get auth session for rate limiting (authenticated users get higher limits)
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
+  
+  // Helper to get headers with optional auth
+  const getHeaders = useCallback((additionalHeaders: Record<string, string> = {}) => {
+    const headers: Record<string, string> = { ...additionalHeaders };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+    return headers;
+  }, [accessToken]);
 
   const sendTextOnlyQuery = useCallback(
     async (
@@ -176,9 +190,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
 
       const response = await fetch("/api/llm", {
         method: "POST",
-        headers: {
-          "x-stream": "true",
-        },
+        headers: getHeaders({ "x-stream": "true" }),
         body: formData,
         signal: abortController?.signal,
       });
@@ -568,9 +580,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         try {
           res = await fetch("/api/llm", {
             method: "POST",
-            headers: {
-              "x-stream": "true",
-            },
+            headers: getHeaders({ "x-stream": "true" }),
             body: formData,
             signal: abortController?.signal,
           });
@@ -797,9 +807,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         setStage("processing");
         const res = await fetch("/api/llm", {
           method: "POST",
-          headers: {
-            "x-stream": "true",
-          },
+          headers: getHeaders({ "x-stream": "true" }),
           body: formData,
           signal: abortController?.signal,
         });

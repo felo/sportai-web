@@ -32,6 +32,8 @@ interface UseChatSubmissionOptions {
   videoPlaybackSpeed: number;
   poseData: StarterPromptConfig["poseSettings"] | undefined;
   needsServerConversion: boolean;
+  /** JWT access token for authenticated API calls (optional - unauthenticated users get lower rate limits) */
+  accessToken?: string | null;
    // Setters
    setPrompt: (prompt: string) => void;
    setLoading: (loading: boolean) => void;
@@ -104,6 +106,7 @@ export function useChatSubmission({
   videoPlaybackSpeed,
   poseData,
   needsServerConversion,
+  accessToken,
   setPrompt,
   setLoading,
    setProgressStage,
@@ -381,9 +384,14 @@ export function useChatSubmission({
        if (context.length > 0) formData.append("history", JSON.stringify(context));
      }
      
+     const headers: Record<string, string> = { "x-stream": "true" };
+     if (accessToken) {
+       headers["Authorization"] = `Bearer ${accessToken}`;
+     }
+     
      const response = await fetch("/api/llm", {
        method: "POST",
-       headers: { "x-stream": "true" },
+       headers,
        body: formData,
        signal: abortController.signal,
      });

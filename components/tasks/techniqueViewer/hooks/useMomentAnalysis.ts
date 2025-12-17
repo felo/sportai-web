@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { ViewerConfig, ViewerActions, MomentReport } from "@/components/videoPoseViewerV2";
 import type { Moment } from "../components";
 import { calculateAngle } from "@/types/pose";
@@ -23,6 +24,10 @@ export function useMomentAnalysis({
   sport,
 }: UseMomentAnalysisOptions) {
   const [reports, setReports] = useState<MomentReport[]>([]);
+  
+  // Get auth for rate limiting (authenticated users get higher limits)
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
 
   /**
    * Generate a unique report ID.
@@ -249,12 +254,15 @@ Keep the analysis focused and actionable.`;
 
         console.log("[useMomentAnalysis] Sending to LLM API...");
 
+        const headers: Record<string, string> = { "x-stream": "true" };
+        if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+        
         const response = await fetch("/api/llm", {
           method: "POST",
           body: formData,
-          headers: {
-            "x-stream": "true",
-          },
+          headers,
         });
 
         if (!response.ok) {

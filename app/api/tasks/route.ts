@@ -3,9 +3,16 @@ import { logger } from "@/lib/logger";
 import { getSportAIApiUrl, getSportAIApiKey, getEnvironmentLabel } from "@/lib/sportai-api";
 import { extractS3KeyFromUrl, generatePresignedDownloadUrl } from "@/lib/s3";
 import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
+import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse, addRateLimitHeaders, type RateLimitTier } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+// Rate limit helper for this route
+async function applyRateLimit(request: Request, userId: string | null, tier: RateLimitTier = "standard") {
+  const identifier = getRateLimitIdentifier(request, userId);
+  return checkRateLimit(identifier, tier);
+}
 
 // Task type to API endpoint mapping
 // Note: "technique" tasks don't use SportAI API - they're processed client-side
@@ -70,6 +77,14 @@ export async function GET(request: NextRequest) {
     }
     
     const userId = user.id;
+    
+    // Apply rate limiting (standard tier for reads)
+    const rateLimitResult = await applyRateLimit(request, userId, "standard");
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for user: ${userId}`);
+      return rateLimitedResponse(rateLimitResult);
+    }
+    
     const { searchParams } = new URL(request.url);
     const taskType = searchParams.get("taskType");
     
@@ -166,6 +181,13 @@ export async function POST(request: NextRequest) {
     }
     
     const userId = user.id;
+    
+    // Apply rate limiting (veryExpensive tier for task creation)
+    const rateLimitResult = await applyRateLimit(request, userId, "veryExpensive");
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for user: ${userId}`);
+      return rateLimitedResponse(rateLimitResult);
+    }
     
     const body = await request.json();
     const { taskType, sport = "padel", videoUrl, thumbnailUrl, thumbnailS3Key, videoLength, params = {} } = body;

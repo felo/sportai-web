@@ -38,6 +38,12 @@ AWS_REGION=eu-north-1
 AWS_S3_BUCKET_NAME=sportai-llm-uploads
 AWS_ACCESS_KEY_ID=your_access_key_id
 AWS_SECRET_ACCESS_KEY=your_secret_access_key
+
+# Optional: Upstash Redis for rate limiting (recommended for production)
+# Without these, rate limiting uses in-memory storage (doesn't work across serverless instances)
+# Get these from https://console.upstash.com/
+UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_token_here
 ```
 
 4. Run the development server:

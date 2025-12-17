@@ -246,6 +246,7 @@ export function AIChatForm() {
     videoPlaybackSpeed,
     poseData,
     needsServerConversion,
+    accessToken: session?.access_token,
     setPrompt,
     setLoading,
     setProgressStage: (stage) => setProgressStage(stage as ProgressStage),

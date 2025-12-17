@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from "react";
 import { chatLogger } from "@/lib/logger";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { Message } from "@/types/chat";
 import { generateAIChatTitle } from "@/utils/storage";
 import { getCurrentChatId, loadChat, updateExistingChat } from "@/utils/storage-unified";
@@ -22,6 +23,10 @@ const titleGenerationInProgress = new Set<string>();
 
 export function useChatTitle({ messages, loading, isHydrated }: UseChatTitleOptions): void {
   const hasGeneratedRef = useRef<string | null>(null);
+  
+  // Get auth for rate limiting (authenticated users get higher limits)
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
   
   useEffect(() => {
     if (!isHydrated || loading) return;
@@ -56,7 +61,7 @@ export function useChatTitle({ messages, loading, isHydrated }: UseChatTitleOpti
         
         // Only generate if title is still a placeholder
         if (chat && (chat.title === "New Chat" || chat.title === "Video Analysis")) {
-          const title = await generateAIChatTitle(messages);
+          const title = await generateAIChatTitle(messages, accessToken);
           const stillCurrentChatId = getCurrentChatId();
           if (stillCurrentChatId === currentChatId) {
             await updateExistingChat(currentChatId, { title }, false);

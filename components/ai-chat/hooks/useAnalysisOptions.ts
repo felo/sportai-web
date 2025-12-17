@@ -123,9 +123,14 @@ export function useAnalysisOptions({
       formData.append("mediaResolution", mediaResolution);
       formData.append("domainExpertise", sport as DomainExpertise);
       
+      const headers: Record<string, string> = { "x-stream": "true" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
       const response = await fetch("/api/llm", {
         method: "POST",
-        headers: { "x-stream": "true" },
+        headers,
         body: formData,
         signal: abortController.signal,
       });

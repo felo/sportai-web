@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
+import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,13 @@ export async function GET(request: NextRequest) {
     }
     
     const userId = user.id;
+    
+    // Apply rate limiting
+    const rateLimitResult = await checkRateLimit(getRateLimitIdentifier(request, userId), "standard");
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for user: ${userId}`);
+      return rateLimitedResponse(rateLimitResult);
+    }
     
     logger.info(`[${requestId}] Fetching profile for user: ${userId}`);
     
@@ -83,6 +91,13 @@ export async function PUT(request: NextRequest) {
     }
     
     const userId = user.id;
+    
+    // Apply rate limiting
+    const rateLimitResult = await checkRateLimit(getRateLimitIdentifier(request, userId), "standard");
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for user: ${userId}`);
+      return rateLimitedResponse(rateLimitResult);
+    }
     
     const body = await request.json();
     

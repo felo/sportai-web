@@ -6,6 +6,7 @@
 
 import { useEffect, useCallback } from "react";
 import { chatLogger } from "@/lib/logger";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { Message } from "@/types/chat";
 import { generateMessageId, stripStreamMetadata } from "../utils";
 import type { ProgressStage } from "../types";
@@ -29,6 +30,10 @@ export function useImageInsight({
   scrollToBottom,
   setApiError,
 }: UseImageInsightOptions): void {
+  // Get auth for rate limiting (authenticated users get higher limits)
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
+  
   const handleImageInsightRequest = useCallback(async (event: CustomEvent<{
     imageBlob: Blob;
     domainExpertise: string;
@@ -131,12 +136,15 @@ export function useImageInsight({
       formData.append("mediaResolution", "high");
       formData.append("domainExpertise", insightDomainExpertise);
 
+      const headers: Record<string, string> = { "x-stream": "true" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
       const response = await fetch("/api/llm", {
         method: "POST",
         body: formData,
-        headers: {
-          "x-stream": "true",
-        },
+        headers,
       });
 
       if (!response.ok) {

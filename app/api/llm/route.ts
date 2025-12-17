@@ -3,6 +3,8 @@ import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
+import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse, type RateLimitTier } from "@/lib/rate-limit";
+import { getAuthenticatedUser } from "@/lib/supabase-server";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
 import type { PromptType } from "@/lib/prompts";
 
@@ -64,6 +66,56 @@ export async function POST(request: NextRequest) {
     const existingCacheName = formData.get("cacheName") as string | null;
     // AI Insight Level - controls complexity and depth of responses
     const insightLevel = (formData.get("insightLevel") as InsightLevel) || "beginner";
+    
+    // =========================================================================
+    // RATE LIMITING - Applied after parsing to determine request type
+    // =========================================================================
+    // Try to get authenticated user (optional - allows both auth and non-auth usage)
+    const user = await getAuthenticatedUser(request);
+    
+    // Determine if this is a "heavy" or "light" request:
+    // - Heavy: Has video OR deep thinking mode (expensive operations)
+    // - Light: Text-only AND fast thinking mode (quick flash requests)
+    const hasVideo = !!(videoFile || videoUrl);
+    const isDeepThinking = thinkingMode === "deep";
+    const isHeavyRequest = hasVideo || isDeepThinking;
+    
+    // Apply rate limiting based on authentication and request type:
+    // - Authenticated + heavy: "heavy" tier (10 req/min)
+    // - Authenticated + light: "light" tier (30 req/min)
+    // - Unauthenticated: "trial" tier (12 req/min per IP)
+    const identifier = getRateLimitIdentifier(request, user?.id);
+    let rateLimitTier: RateLimitTier;
+    
+    if (!user) {
+      rateLimitTier = "trial";
+    } else {
+      rateLimitTier = isHeavyRequest ? "heavy" : "light";
+    }
+    
+    const rateLimitResult = await checkRateLimit(identifier, rateLimitTier);
+    
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for: ${identifier} (tier: ${rateLimitTier}, heavy: ${isHeavyRequest})`);
+      
+      // Give helpful message for unauthenticated users
+      if (!user) {
+        const retryAfter = Math.ceil((rateLimitResult.reset - Date.now()) / 1000);
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded",
+            message: `You've reached the limit for guest users (12 requests/minute). Sign in for higher limits. Retry in ${retryAfter} seconds.`,
+            retryAfter,
+            signInRequired: false,
+          },
+          { status: 429 }
+        );
+      }
+      
+      return rateLimitedResponse(rateLimitResult);
+    }
+    
+    logger.debug(`[${requestId}] Rate limit check passed (tier: ${rateLimitTier}, heavy: ${isHeavyRequest}, remaining: ${rateLimitResult.remaining})`);
     // User context for personalization
     const userFirstName = formData.get("userFirstName") as string | null;
 

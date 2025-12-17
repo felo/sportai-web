@@ -19,8 +19,10 @@ export function generateChatTitle(messages: Message[]): string {
 /**
  * Generate an AI-powered chat title after analysis completes.
  * Uses Gemini API to create a concise, descriptive title based on the conversation.
+ * @param messages - The chat messages to generate a title from
+ * @param accessToken - Optional JWT access token for higher rate limits
  */
-export async function generateAIChatTitle(messages: Message[]): Promise<string> {
+export async function generateAIChatTitle(messages: Message[], accessToken?: string | null): Promise<string> {
   // Find the first substantial assistant response (the analysis)
   const analysisResponse = messages.find(
     (msg) => msg.role === "assistant" && 
@@ -48,9 +50,15 @@ Title:`;
     formData.append("thinkingMode", "fast");
     formData.append("mediaResolution", "low");
     
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+    
     const response = await fetch("/api/llm", {
       method: "POST",
       body: formData,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
     });
     
     if (!response.ok) {

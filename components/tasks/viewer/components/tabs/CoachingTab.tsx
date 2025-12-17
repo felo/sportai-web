@@ -5,6 +5,7 @@ import { Box, Flex, Text, Card, TextArea, IconButton } from "@radix-ui/themes";
 import { PaperPlaneIcon, PersonIcon, ResetIcon } from "@radix-ui/react-icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { StatisticsResult } from "../../types";
 import type { PlayerRankings } from "../../hooks/usePlayerRankings";
 
@@ -442,6 +443,10 @@ function useCoachingChat(coachingContext: string, sport: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Get auth for rate limiting (authenticated users get higher limits)
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
 
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
@@ -495,9 +500,14 @@ ${coachingContext}`;
       }
       formData.append("queryComplexity", "simple");
 
+      const headers: Record<string, string> = { "x-stream": "true" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
       const response = await fetch("/api/llm", {
         method: "POST",
-        headers: { "x-stream": "true" },
+        headers,
         body: formData,
         signal: abortControllerRef.current.signal,
       });

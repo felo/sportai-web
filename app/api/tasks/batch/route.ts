@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { extractS3KeyFromUrl } from "@/lib/s3";
 import { getSupabaseAdmin, getAuthenticatedUser, unauthorizedResponse } from "@/lib/supabase-server";
+import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse } from "@/lib/rate-limit";
 import type { Database } from "@/types/supabase";
 
 type SportType = Database["public"]["Tables"]["sportai_tasks"]["Insert"]["sport"];
@@ -38,6 +39,13 @@ export async function POST(request: NextRequest) {
     }
     
     const userId = user.id;
+    
+    // Apply rate limiting (veryExpensive tier for batch operations)
+    const rateLimitResult = await checkRateLimit(getRateLimitIdentifier(request, userId), "veryExpensive");
+    if (!rateLimitResult.success) {
+      logger.warn(`[${requestId}] Rate limit exceeded for user: ${userId}`);
+      return rateLimitedResponse(rateLimitResult);
+    }
     
     const body = await request.json();
     const { tasks } = body as { tasks: BatchTaskInput[] };
