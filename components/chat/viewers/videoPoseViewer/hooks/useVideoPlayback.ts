@@ -1,5 +1,6 @@
-import { useState, useCallback, RefObject } from "react";
+import { useState, useCallback, useRef, RefObject } from "react";
 import { videoLogger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 
 interface UseVideoPlaybackProps {
   videoRef: RefObject<HTMLVideoElement>;
@@ -22,6 +23,7 @@ export function useVideoPlayback({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(initialPlaybackSpeed);
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+  const hasTrackedPlay = useRef(false);
 
   /**
    * Handle play/pause toggle
@@ -34,6 +36,14 @@ export function useVideoPlayback({
       video.play().then(() => {
         setIsPlaying(true);
         setHasStartedPlaying(true);
+        
+        // Track first play only (not every resume)
+        if (!hasTrackedPlay.current) {
+          hasTrackedPlay.current = true;
+          track('video_play_started', {
+            durationSeconds: Math.round(video.duration || 0),
+          });
+        }
       }).catch(err => videoLogger.error("Video play error:", err));
     } else {
       video.pause();

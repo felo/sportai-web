@@ -72,10 +72,10 @@ export function AnalyticsProvider({
       });
     };
 
-    window.addEventListener('consentChanged', handleConsentChange as EventListener);
+    window.addEventListener('cookie-consent', handleConsentChange as EventListener);
 
     return () => {
-      window.removeEventListener('consentChanged', handleConsentChange as EventListener);
+      window.removeEventListener('cookie-consent', handleConsentChange as EventListener);
     };
   }, [debug, enableVercel, enableGoogle]);
 
@@ -89,7 +89,7 @@ function getSavedConsent(): { analytics: boolean; marketing: boolean } | null {
   if (typeof window === 'undefined') return null;
   
   try {
-    const saved = localStorage.getItem('cookie-consent');
+    const saved = localStorage.getItem('sportai-cookie-consent');
     if (saved) {
       return JSON.parse(saved);
     }

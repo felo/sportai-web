@@ -24,7 +24,8 @@ class AnalyticsManager {
   private debug = false;
   private defaultProperties: Record<string, unknown> = {};
   private respectDoNotTrack = true;
-  private consent: AnalyticsConsent = { analytics: true, marketing: true };
+  // GDPR: Default to no consent until user explicitly accepts
+  private consent: AnalyticsConsent = { analytics: false, marketing: false };
 
   /**
    * Initialize the analytics manager with configuration

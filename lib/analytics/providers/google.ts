@@ -24,7 +24,7 @@ import type {
 declare global {
   interface Window {
     gtag?: (
-      command: 'config' | 'event' | 'set' | 'js',
+      command: 'config' | 'event' | 'set' | 'js' | 'consent',
       targetId: string | Date,
       params?: Record<string, unknown>
     ) => void;
@@ -205,11 +205,18 @@ export class GoogleAnalyticsProvider implements IAnalyticsProvider {
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     
-    // GA4 supports consent mode
+    // GA4 Consent Mode v2 - update consent state
     if (this.isAvailable()) {
-      window.gtag?.('set', this.measurementId, {
-        'analytics_storage': enabled ? 'granted' : 'denied',
+      window.gtag?.('consent', 'update', {
+        analytics_storage: enabled ? 'granted' : 'denied',
+        ad_storage: enabled ? 'granted' : 'denied',
+        ad_user_data: enabled ? 'granted' : 'denied',
+        ad_personalization: enabled ? 'granted' : 'denied',
       });
+
+      if (this.debug) {
+        console.log('[Google Analytics] Consent updated:', enabled ? 'granted' : 'denied');
+      }
     }
   }
 

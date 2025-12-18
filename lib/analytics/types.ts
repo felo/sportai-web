@@ -98,6 +98,9 @@ export interface AnalyticsEventMap {
   'video_upload_started': VideoEventProperties;
   'video_upload_failed': VideoEventProperties & { error?: string };
   'video_deleted': VideoEventProperties;
+  'video_play_started': VideoEventProperties;
+  'video_progress': VideoEventProperties & { percentComplete?: number };
+  'video_completed': VideoEventProperties;
   
   // Analysis Events
   'analysis_started': AnalysisEventProperties;
