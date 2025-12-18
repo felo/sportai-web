@@ -50,6 +50,11 @@ export {
   type GoogleAnalyticsConfig,
 } from './providers/google';
 
+export {
+  PostHogProvider,
+  createPostHogProvider,
+} from './providers/posthog';
+
 // ============================================================================
 // Convenience Initialization
 // ============================================================================
@@ -57,6 +62,7 @@ export {
 import { analytics } from './manager';
 import { createVercelAnalyticsProvider } from './providers/vercel';
 import { createGoogleAnalyticsProviderFromEnv } from './providers/google';
+import { createPostHogProvider } from './providers/posthog';
 
 /**
  * Initialize analytics with default configuration.
@@ -70,11 +76,13 @@ export async function initAnalytics(options?: {
   debug?: boolean;
   enableVercel?: boolean;
   enableGoogle?: boolean;
+  enablePostHog?: boolean;
 }): Promise<void> {
   const {
     debug = process.env.NODE_ENV === 'development',
     enableVercel = true,
     enableGoogle = true,
+    enablePostHog = true,
   } = options ?? {};
 
   const providers = [];
@@ -90,6 +98,11 @@ export async function initAnalytics(options?: {
     if (gaProvider) {
       providers.push(gaProvider);
     }
+  }
+
+  // Add PostHog (already initialized in instrumentation-client.ts)
+  if (enablePostHog && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+    providers.push(createPostHogProvider({ debug }));
   }
 
   // Initialize the manager

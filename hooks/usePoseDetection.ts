@@ -4,6 +4,7 @@ import "@tensorflow/tfjs-backend-webgl";
 import "@tensorflow/tfjs-backend-webgpu";
 import * as tf from "@tensorflow/tfjs";
 import { detectionLogger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 
 // Detect if running on a mobile device
 // Mobile devices use WebGL for stability; desktop uses WebGPU for performance
@@ -303,6 +304,13 @@ export function usePoseDetection(config: PoseDetectionConfig = {}) {
             networkRequests: networkRequestCount,
             bytesLoaded: networkLoadedBytes,
             cacheSize: detectorCache.size,
+          });
+
+          // Track pose detection model loaded
+          track('pose_detection_started', {
+            analysisType: 'pose',
+            processingTimeMs: Math.round(loadTime),
+            success: true,
           });
 
           if (mounted) {

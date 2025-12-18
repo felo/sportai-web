@@ -5,6 +5,13 @@
  * 
  * Initializes analytics on the client side and provides
  * consent-aware tracking throughout the app.
+ * 
+ * Note: Page views are tracked automatically by each provider's built-in mechanism:
+ * - Vercel Analytics: <Analytics /> component
+ * - Google Analytics: gtag auto page_view
+ * - PostHog: autocapture
+ * 
+ * Custom events use the unified track() function.
  */
 
 import { useEffect, useRef } from 'react';
@@ -39,8 +46,9 @@ export function AnalyticsProvider({
   const initialized = useRef(false);
 
   useEffect(() => {
-    // Only initialize once
+    // Only initialize once, and only in production
     if (initialized.current) return;
+    if (process.env.NODE_ENV !== 'production') return;
     initialized.current = true;
 
     // Check for existing consent

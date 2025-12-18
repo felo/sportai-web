@@ -21,7 +21,7 @@ import { getDeveloperMode, getGuestTasks } from "@/utils/storage";
 import { TaskGridView } from "../TaskGridView";
 import { isSampleTask, useRefreshedSampleTasks } from "../sampleTasks";
 import type { Task } from "./types";
-import { STATUS_COLORS, SPORT_COLORS, SPORT_LABELS, TICK_INTERVAL_MS } from "./constants";
+import { STATUS_COLORS, SPORT_COLORS, SPORT_LABELS, TASK_TYPES, TICK_INTERVAL_MS } from "./constants";
 import { formatDate, formatDuration, formatElapsed, downloadVideo } from "./utils";
 import { useTaskManagement, useTaskFiltering, useVideoUpload } from "./hooks";
 import { NewTaskForm, TaskFilters, SortableHeader } from "./components";
@@ -164,7 +164,10 @@ export function TasksPage() {
     <Badge color={STATUS_COLORS[status]}>{status}</Badge>
   );
 
-  const getTypeBadge = (type: string) => <Badge variant="soft">{type}</Badge>;
+  const getTypeBadge = (type: string) => {
+    const typeLabel = TASK_TYPES.find(t => t.value === type)?.label || type;
+    return <Badge variant="soft">{typeLabel}</Badge>;
+  };
 
   const getSportBadge = (sportValue: Task["sport"]) => {
     if (sportValue === "all") return null;

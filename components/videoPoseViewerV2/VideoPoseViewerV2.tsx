@@ -185,6 +185,8 @@ interface VideoPoseViewerV2Props {
   onConfidenceThresholdChange?: (threshold: number) => void;
   /** Moments tab configuration (custom events, comments, adjustments) */
   momentsConfig?: MomentsConfig;
+  /** Sport type for context-aware AI analysis */
+  sport?: "tennis" | "padel" | "pickleball";
 }
 
 // ============================================================================
@@ -214,7 +216,7 @@ function shouldUseCrossOrigin(url: string): boolean {
 
 export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Props>(
   function VideoPoseViewerV2(
-    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false, confidenceThreshold, onConfidenceThresholdChange, momentsConfig },
+    { videoUrl, config, poseEnabled, callbacks, className, style, lite = false, developerMode = false, confidenceThreshold, onConfidenceThresholdChange, momentsConfig, sport = "padel" },
     ref
   ) {
     // Refs
@@ -278,15 +280,38 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       callbacksRef.current?.onActiveTabChange?.(activeTab);
     }, [activeTab]);
 
+    // Switch away from performance tab if swing data is cleared
+    useEffect(() => {
+      const swingEventCount = protocolEvents.filter((e) => e.protocolId === "swing-detection-v3").length;
+      if (activeTab === "performance" && swingEventCount === 0) {
+        setActiveTab("swings");
+      }
+    }, [activeTab, protocolEvents]);
+
     // Tab definitions
     const reportsCount = momentsConfig?.reports?.length ?? 0;
-    const tabs: TabDefinition[] = useMemo(() => [
-      { id: "swings", label: "Swings", icon: <PlayIcon width={16} height={16} /> },
-      { id: "performance", label: "Performance", icon: <BarChartIcon width={16} height={16} /> },
-      { id: "moments", label: "Moments", icon: <BookmarkIcon width={16} height={16} /> },
-      { id: "reports", label: "Reports", icon: <FileTextIcon width={16} height={16} />, badge: reportsCount > 0 ? reportsCount : undefined },
-      { id: "data-analysis", label: "Data Analysis", icon: <ActivityLogIcon width={16} height={16} /> },
-    ], [reportsCount]);
+    const swingCount = useMemo(
+      () => protocolEvents.filter((e) => e.protocolId === "swing-detection-v3").length,
+      [protocolEvents]
+    );
+    const tabs: TabDefinition[] = useMemo(() => {
+      const baseTabs: TabDefinition[] = [
+        { id: "swings", label: "Video", icon: <PlayIcon width={16} height={16} /> },
+      ];
+      
+      // Only show performance tab when swing data is available
+      if (swingCount > 0) {
+        baseTabs.push({ id: "performance", label: "Performance", icon: <BarChartIcon width={16} height={16} /> });
+      }
+      
+      baseTabs.push(
+        { id: "moments", label: "Moments", icon: <BookmarkIcon width={16} height={16} /> },
+        { id: "reports", label: "Reports", icon: <FileTextIcon width={16} height={16} />, badge: reportsCount > 0 ? reportsCount : undefined },
+        { id: "data-analysis", label: "Data Analysis", icon: <ActivityLogIcon width={16} height={16} /> },
+      );
+      
+      return baseTabs;
+    }, [reportsCount, swingCount]);
 
     // Swing detection V1 hook
     const {
@@ -1107,7 +1132,6 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       ) {
         const swingV1Enabled = config.protocols.enabledProtocols.includes("swing-detection-v1");
         const swingV1Ran = protocolsRunRef.current.has("swing-detection-v1");
-        const swingV3Enabled = config.protocols.enabledProtocols.includes("swing-detection-v3");
         const swingV3Ran = protocolsRunRef.current.has("swing-detection-v3");
 
         // Run swing detection v1 if enabled and not yet run
@@ -1123,17 +1147,12 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
           clearSwingResult();
         }
 
-        // Run swing detection v3 if enabled and not yet run
-        if (swingV3Enabled && !swingV3Ran) {
-          detectionLogger.info("🔄 Running Swing Detection V3 protocol (orientation-enhanced)...");
+        // Always run swing detection v3 for frame data (needed for Data Analysis charts)
+        // The actual swing events are only emitted if the protocol is enabled (see protocol events effect)
+        if (!swingV3Ran && !isSwingAnalyzingV3) {
+          detectionLogger.info("🔄 Running Swing Detection V3 for frame data analysis...");
           protocolsRunRef.current.add("swing-detection-v3");
           analyzeSwingsV3();
-        }
-        
-        // Clear swing v3 results if disabled
-        if (!swingV3Enabled && swingV3Ran) {
-          protocolsRunRef.current.delete("swing-detection-v3");
-          clearSwingResultV3();
         }
 
         // Run handedness detection if enabled and not yet run
@@ -1163,7 +1182,6 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
       detectSwings,
       clearSwingResult,
       analyzeSwingsV3,
-      clearSwingResultV3,
       analyzeHandedness,
       clearHandednessResult,
     ]);
@@ -2018,6 +2036,7 @@ export const VideoPoseViewerV2 = forwardRef<ViewerActions, VideoPoseViewerV2Prop
             videoElement={videoRef.current}
             videoFPS={usingPreprocessedPoses ? preprocessingFPS : videoFPS}
             swingResult={swingResultV3}
+            sport={sport}
             onSeekTo={(time) => {
               const video = videoRef.current;
               if (!video) return;

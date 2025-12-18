@@ -455,22 +455,32 @@ export function MomentsGalleryView({
         </Flex>
       ) : (
         <Flex
+          direction="column"
           align="center"
           justify="center"
-          style={{ height: "300px" }}
+          gap="3"
+          style={{ padding: "48px 24px", textAlign: "center" }}
         >
-          <Flex direction="column" align="center" gap="3">
-            <BookmarkIcon
-              width={48}
-              height={48}
-              style={{ color: "rgba(255,255,255,0.2)" }}
-            />
-            <Text size="2" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <Box
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "16px",
+              backgroundColor: "var(--gray-3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BookmarkIcon width={28} height={28} style={{ color: "var(--gray-8)" }} />
+          </Box>
+          <Flex direction="column" gap="1" align="center">
+            <Text size="3" weight="medium" style={{ color: "var(--gray-11)" }}>
               {filter === "all"
-                ? "No moments yet"
-                : "No moments match this filter"}
+                ? "No Moments Yet"
+                : "No Moments Match This Filter"}
             </Text>
-            <Text size="1" style={{ color: "rgba(255,255,255,0.3)" }}>
+            <Text size="2" style={{ color: "var(--gray-9)", maxWidth: 280 }}>
               {filter === "all"
                 ? "Add markers or comments on the timeline to create moments"
                 : "Try a different filter or add custom markers"}

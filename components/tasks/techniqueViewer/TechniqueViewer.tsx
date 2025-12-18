@@ -323,6 +323,7 @@ export function TechniqueViewer({
                   }
                 },
               }}
+              sport={sport as "tennis" | "padel" | "pickleball" | undefined}
               style={{
                 position: "absolute",
                 top: 0,

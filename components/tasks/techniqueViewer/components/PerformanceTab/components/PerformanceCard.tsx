@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Box, Flex, Text, Card, Separator } from "@radix-ui/themes";
-import { PersonIcon } from "@radix-ui/react-icons";
+import { Box, Flex, Text, Card, Separator, Skeleton } from "@radix-ui/themes";
+import { PersonIcon, CheckCircledIcon, TargetIcon } from "@radix-ui/react-icons";
 import { ResponsiveRadar } from "@nivo/radar";
+import type { SwingProfile } from "@/types/swing-profile";
 import type { SwingPerformanceData, SwingMetrics } from "../types";
 import { ATTRIBUTE_CONFIG, CHART_THEME, LEFT_ATTRIBUTES, RIGHT_ATTRIBUTES } from "../constants";
 import { getRatingTier, toRadarData } from "../utils";
@@ -18,13 +19,25 @@ interface PerformanceCardProps {
   videoElement: HTMLVideoElement | null;
   onSeekTo?: (time: number) => void;
   delay: number;
+  /** AI-generated profile with insights */
+  profile?: SwingProfile;
+  /** Whether the profile is being loaded */
+  isLoadingProfile?: boolean;
 }
 
 /**
  * A performance card showing swing analysis with radar chart (front)
  * and FIFA-style stats view (back).
+ * Displays AI-generated strengths and focus areas when available.
  */
-export function PerformanceCard({ data, videoElement, onSeekTo, delay }: PerformanceCardProps) {
+export function PerformanceCard({ 
+  data, 
+  videoElement, 
+  onSeekTo, 
+  delay,
+  profile,
+  isLoadingProfile = false,
+}: PerformanceCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const tier = getRatingTier(data.saiScore);
@@ -76,7 +89,10 @@ export function PerformanceCard({ data, videoElement, onSeekTo, delay }: Perform
           />
           <Box style={{ flex: 1 }}>
             <Text size="4" weight="bold" style={{ lineHeight: 1.2 }}>
-              Technique Analysis
+              {profile?.techniqueName || "Technique Analysis"}
+            </Text>
+            <Text size="1" color="gray" style={{ display: "block", marginTop: 2 }}>
+              Swing {data.index} • {data.swingType}
             </Text>
           </Box>
           <SAIRatingBadge rating={data.saiScore} />
@@ -117,34 +133,77 @@ export function PerformanceCard({ data, videoElement, onSeekTo, delay }: Perform
           />
         </Box>
 
-        {/* Summary text */}
+        {/* Summary text - AI generated or fallback to metrics */}
         <Box style={{ maxHeight: 80, overflow: "auto", flex: 1 }}>
-          <Text size="2" color="gray" style={{ lineHeight: 1.5, fontStyle: "italic" }}>
-            {data.peakVelocityKmh >= 20
-              ? `Peak wrist: ${Math.round(data.peakVelocityKmh)} km/h. Shoulder: ${Math.round(data.peakShoulderVelocityKmh)} km/h. Hip: ${Math.round(data.peakHipVelocityKmh)} km/h. X-factor: ${Math.round(Math.abs(data.peakXFactor))}°.`
-              : "Swing analysis metrics captured."}
-          </Text>
+          {isLoadingProfile ? (
+            <Skeleton style={{ height: 40 }} />
+          ) : profile?.summary ? (
+            <Text size="2" color="gray" style={{ lineHeight: 1.5, fontStyle: "italic" }}>
+              {profile.summary}
+            </Text>
+          ) : (
+            <Text size="2" color="gray" style={{ lineHeight: 1.5, fontStyle: "italic" }}>
+              {data.peakVelocityKmh >= 20
+                ? `Peak wrist: ${Math.round(data.peakVelocityKmh)} km/h. Shoulder: ${Math.round(data.peakShoulderVelocityKmh)} km/h. Hip: ${Math.round(data.peakHipVelocityKmh)} km/h. X-factor: ${Math.round(Math.abs(data.peakXFactor))}°.`
+                : "Swing analysis metrics captured."}
+            </Text>
+          )}
         </Box>
 
         <Separator size="4" style={{ opacity: 0.3, flexShrink: 0 }} />
 
-        {/* Strengths & Focus Areas */}
+        {/* Strengths & Focus Areas - AI generated */}
         <Flex gap="4">
           <Box style={{ flex: 1 }}>
-            <Text size="1" weight="bold" style={{ color: "#10B981", marginBottom: 4, display: "block" }}>
-              Strengths
-            </Text>
-            <Text size="1" color="gray" style={{ display: "block", marginTop: 2, fontStyle: "italic" }}>
-              • Analysis pending
-            </Text>
+            <Flex align="center" gap="1" style={{ marginBottom: 4 }}>
+              <CheckCircledIcon width={12} height={12} style={{ color: "#10B981" }} />
+              <Text size="1" weight="bold" style={{ color: "#10B981" }}>
+                Strengths
+              </Text>
+            </Flex>
+            {isLoadingProfile ? (
+              <Flex direction="column" gap="1">
+                <Skeleton style={{ height: 14, width: "80%" }} />
+                <Skeleton style={{ height: 14, width: "60%" }} />
+              </Flex>
+            ) : profile?.strengths && profile.strengths.length > 0 ? (
+              <Flex direction="column" gap="1">
+                {profile.strengths.map((strength, i) => (
+                  <Text key={i} size="1" color="gray" style={{ display: "block", lineHeight: 1.3 }}>
+                    • {strength}
+                  </Text>
+                ))}
+              </Flex>
+            ) : (
+              <Text size="1" color="gray" style={{ display: "block", fontStyle: "italic" }}>
+                • Analyzing...
+              </Text>
+            )}
           </Box>
           <Box style={{ flex: 1 }}>
-            <Text size="1" weight="bold" style={{ color: "#F59E0B", marginBottom: 4, display: "block" }}>
-              Focus Areas
-            </Text>
-            <Text size="1" color="gray" style={{ display: "block", marginTop: 2, fontStyle: "italic" }}>
-              • Analysis pending
-            </Text>
+            <Flex align="center" gap="1" style={{ marginBottom: 4 }}>
+              <TargetIcon width={12} height={12} style={{ color: "#F59E0B" }} />
+              <Text size="1" weight="bold" style={{ color: "#F59E0B" }}>
+                Focus Areas
+              </Text>
+            </Flex>
+            {isLoadingProfile ? (
+              <Flex direction="column" gap="1">
+                <Skeleton style={{ height: 14, width: "70%" }} />
+              </Flex>
+            ) : profile?.focusAreas && profile.focusAreas.length > 0 ? (
+              <Flex direction="column" gap="1">
+                {profile.focusAreas.map((area, i) => (
+                  <Text key={i} size="1" color="gray" style={{ display: "block", lineHeight: 1.3 }}>
+                    • {area}
+                  </Text>
+                ))}
+              </Flex>
+            ) : (
+              <Text size="1" color="gray" style={{ display: "block", fontStyle: "italic" }}>
+                • Analyzing...
+              </Text>
+            )}
           </Box>
         </Flex>
       </Flex>
@@ -222,7 +281,10 @@ export function PerformanceCard({ data, videoElement, onSeekTo, delay }: Perform
                 textTransform: "uppercase",
               }}
             >
-              Technique Analysis
+              {profile?.techniqueName || "Technique Analysis"}
+            </Text>
+            <Text size="2" color="gray" style={{ display: "block", marginTop: 4 }}>
+              Swing {data.index} • {data.swingType}
             </Text>
           </Box>
 

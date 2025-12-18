@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Box, Button, Text } from "@radix-ui/themes";
 import { PlusIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
+import { track } from "@/lib/analytics";
 
 export interface LogoNewChatButtonProps {
   onNewChat?: () => void;
@@ -31,12 +32,14 @@ export function LogoNewChatButton({
 
   const handleClick = () => {
     if (directTapAction) {
+      track('chat_started', { messageType: 'user' });
       onNewChat?.();
     }
   };
 
   const handleNewChatClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    track('chat_started', { messageType: 'user' });
     onNewChat?.();
   };
 

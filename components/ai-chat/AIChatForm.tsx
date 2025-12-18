@@ -91,7 +91,6 @@ export function AIChatForm() {
     setError: setVideoError,
     processVideoFile,
     clearVideo,
-    handleVideoChange,
     needsServerConversion,
     showFileSizeLimitModal,
     setShowFileSizeLimitModal,
@@ -179,9 +178,45 @@ export function AIChatForm() {
     progressStage,
   });
 
+  /**
+   * Handles video upload with automatic new chat creation.
+   * If there's already a video attachment or existing user messages,
+   * creates a new chat first to ensure fresh context.
+   */
+  const handleVideoUploadWithNewChat = useCallback(async (file: File) => {
+    // Check if we need a new chat: either we have a video OR we have user messages
+    const hasExistingVideo = !!videoFile;
+    const hasUserMessages = messages.some(m => m.role === "user");
+    
+    if (hasExistingVideo || hasUserMessages) {
+      // Create new chat for fresh context
+      const newChat = await createNewChat();
+      setCurrentChatId(newChat.id);
+      setShowingVideoSizeError(false);
+      setThinkingMode(newChat.thinkingMode ?? "fast");
+      setMediaResolution(newChat.mediaResolution ?? "medium");
+      setDomainExpertise(newChat.domainExpertise ?? "all-sports");
+    }
+    
+    // Process the video in the (possibly new) chat
+    processVideoFile(file);
+  }, [videoFile, messages, processVideoFile, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise]);
+
+  /**
+   * Wraps handleVideoChange to create a new chat if needed before processing the video.
+   */
+  const handleVideoChangeWithNewChat = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handleVideoUploadWithNewChat(file);
+    }
+    // Reset the input value so the same file can be selected again
+    e.target.value = '';
+  }, [handleVideoUploadWithNewChat]);
+
   // Drag and drop hook
   const { isDragging, hasJustDropped, handlers: dragHandlers } = useDragAndDrop({
-    onFileDrop: (file) => processVideoFile(file),
+    onFileDrop: (file) => handleVideoUploadWithNewChat(file),
     onError: (error) => setVideoError(error),
   });
 
@@ -527,7 +562,7 @@ export function AIChatForm() {
                   domainExpertise={domainExpertise}
                   onPromptChange={setPrompt}
                   onVideoRemove={clearVideo}
-                  onVideoChange={handleVideoChange}
+                  onVideoChange={handleVideoChangeWithNewChat}
                   onSubmit={handleSubmit}
                   onStop={handleStop}
                   onPickleballCoachClick={handlePickleballCoachPrompt}

@@ -16,6 +16,8 @@ export interface PerformanceTabProps {
   onSeekTo?: (time: number) => void;
   /** Swing detection result with frame-level data */
   swingResult?: SwingDetectionResultV3 | null;
+  /** Sport type for context-aware AI analysis */
+  sport?: "tennis" | "padel" | "pickleball";
 }
 
 // ============================================================================

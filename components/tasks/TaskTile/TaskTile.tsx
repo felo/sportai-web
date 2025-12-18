@@ -7,6 +7,7 @@ import { IconButton } from "@/components/ui";
 
 import type { TaskTileProps } from "./types";
 import { STATUS_CONFIG } from "./constants";
+import { TASK_TYPES } from "../TasksPage/constants";
 import { formatTimeAgo } from "./utils";
 import { isSampleTask } from "../sampleTasks";
 import { useThumbnail, useTaskProgress } from "./hooks";
@@ -79,7 +80,7 @@ export function TaskTile({
         {/* Title row with badges aligned right */}
         <Flex justify="between" align="center">
           <Text size="2" weight="medium" style={{ textTransform: "capitalize" }}>
-            {task.task_type.replace(/_/g, " ")}
+            {TASK_TYPES.find(t => t.value === task.task_type)?.label || task.task_type.replace(/_/g, " ")}
           </Text>
 
           <Flex align="center" gap="2">

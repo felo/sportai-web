@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Box, Button, Flex, Text } from "@radix-ui/themes";
 import { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
+import { track } from "@/lib/analytics";
 import buttonStyles from "@/styles/buttons.module.css";
 
 interface ConversationLimitBannerProps {
@@ -14,6 +16,15 @@ interface ConversationLimitBannerProps {
  * Reuses ProUpsellBanner styling patterns
  */
 export function ConversationLimitBanner({ show, onStartNewChat }: ConversationLimitBannerProps) {
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    if (show && !tracked.current) {
+      tracked.current = true;
+      track('feature_gated', { feature: 'conversation_limit', source: 'chat' });
+    }
+  }, [show]);
+
   if (!show) return null;
 
   return (

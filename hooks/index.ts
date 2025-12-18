@@ -14,6 +14,7 @@ export { useFrameAnalysis } from "./useFrameAnalysis";
 export { useTacticalAnalysis } from "./useTacticalAnalysis";
 export { usePlayerNicknames } from "./usePlayerNicknames";
 export { usePlayerProfiles } from "./usePlayerProfiles";
+export { useSwingProfiles } from "./useSwingProfiles";
 export { useFFmpegClip, downloadBlob } from "./useFFmpegClip";
 
 // Sidebar hooks

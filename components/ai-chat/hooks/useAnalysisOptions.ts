@@ -245,6 +245,9 @@ export function useAnalysisOptions({
     const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
     const taskType = isTechniqueAnalysis ? "technique" : "statistics";
     
+    // Map "other" sport to "all" for task storage (valid sports: tennis, padel, pickleball, all)
+    const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
+    
     // Create PRO analysis task
     let taskCreated = false;
     let createdTaskId: string | undefined;
@@ -260,7 +263,7 @@ export function useAnalysisOptions({
           },
           body: JSON.stringify({
             taskType,
-            sport: preAnalysis.sport,
+            sport: taskSport,
             videoUrl: videoUrl,
             thumbnailUrl: preAnalysis.thumbnailUrl || null,
             thumbnailS3Key: preAnalysis.thumbnailS3Key || null,
@@ -285,8 +288,6 @@ export function useAnalysisOptions({
       // Create guest task for technique analysis (stored in localStorage)
       try {
         analysisLogger.info(`Creating guest technique task for URL:`, videoUrl);
-        // Map "other" sport to "all" for task storage (valid sports: tennis, padel, pickleball, all)
-        const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
         const guestTask = createGuestTechniqueTask({
           videoUrl,
           sport: taskSport,

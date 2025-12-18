@@ -12,7 +12,7 @@ import { MIN_SWING_DURATION } from "./constants";
  * - Tennis: swing detection + serve protocols
  * - Padel: swing detection only
  * - Pickleball: swing detection only
- * - Other sports: no protocols
+ * - Other sports: no protocols (but charts UI still visible)
  */
 export function getEnabledProtocolsForSport(sport?: string): ProtocolId[] {
   const normalizedSport = sport?.toLowerCase();

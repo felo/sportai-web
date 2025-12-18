@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
@@ -102,6 +103,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={poppins.variable}>
+      {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && process.env.NODE_ENV === 'production' && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}')`}
+          </Script>
+        </>
+      )}
       <body className="font-sans" suppressHydrationWarning>
         <RadixThemeProvider>
           <AuthProvider>
@@ -111,8 +123,12 @@ export default function RootLayout({
               </AnalyticsProvider>
               <CookieConsent />
             </LibraryTasksProvider>
-            <SpeedInsights />
-            <Analytics />
+{process.env.NODE_ENV === 'production' && (
+              <>
+                <SpeedInsights />
+                <Analytics />
+              </>
+            )}
           </AuthProvider>
         </RadixThemeProvider>
       </body>

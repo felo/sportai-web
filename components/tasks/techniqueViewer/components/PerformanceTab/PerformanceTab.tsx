@@ -6,11 +6,15 @@
  * Displays technique performance cards for each detected swing.
  * Shows metrics like knee bend (Footwork), hip rotation, shoulder rotation,
  * wrist velocity (Power), and acceleration (Agility) in a radar chart.
+ * 
+ * Uses AI-powered analysis to generate strengths and focus areas for each swing.
  */
 
-import { useMemo } from "react";
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { useMemo, useEffect, useRef } from "react";
+import { Box, Flex, Text, Spinner } from "@radix-ui/themes";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
+import { useSwingProfiles } from "@/hooks/useSwingProfiles";
+import type { SwingProfileData } from "@/types/swing-profile";
 import type { PerformanceTabProps, SwingPerformanceData, SwingMetrics } from "./types";
 import { NORMALIZATION_RANGES } from "./constants";
 import {
@@ -25,6 +29,7 @@ import { PerformanceCard } from "./components";
 /**
  * Main PerformanceTab component.
  * Extracts swing performance data from protocol events and renders performance cards.
+ * Uses AI to generate technique insights for each swing.
  */
 export function PerformanceTab({
   protocolEvents,
@@ -32,7 +37,14 @@ export function PerformanceTab({
   videoFPS,
   onSeekTo,
   swingResult,
+  sport = "padel",
 }: PerformanceTabProps) {
+  // AI-powered swing profile generation
+  const { profiles, isGenerating, error, generate, getProfileBySwingId } = useSwingProfiles({
+    sport,
+  });
+  const hasGeneratedRef = useRef(false);
+
   // Extract swing events and calculate performance data
   const swingData = useMemo(() => {
     const swingEvents = protocolEvents.filter(
@@ -134,6 +146,45 @@ export function PerformanceTab({
     return performanceData;
   }, [protocolEvents, videoFPS, swingResult]);
 
+  // Build swing profile data for AI analysis
+  const swingProfileData: SwingProfileData[] = useMemo(() => {
+    return swingData.map((data) => ({
+      swingId: data.id,
+      swingIndex: data.index,
+      swingType: data.swingType,
+      metrics: {
+        power: data.metrics.power,
+        agility: data.metrics.agility,
+        footwork: data.metrics.footwork,
+        hip: data.metrics.hip,
+        rotation: data.metrics.rotation,
+      },
+      rawMetrics: {
+        peakWristVelocityKmh: data.peakVelocityKmh,
+        peakShoulderVelocityKmh: data.peakShoulderVelocityKmh,
+        peakHipVelocityKmh: data.peakHipVelocityKmh,
+        peakXFactor: data.peakXFactor,
+        peakAcceleration: data.rawMetrics.peakAcceleration ?? 0,
+        kneeBend: data.rawMetrics.kneeBend,
+      },
+      saiScore: data.saiScore,
+      contactTime: data.contactTime,
+    }));
+  }, [swingData]);
+
+  // Auto-generate profiles when swing data is available
+  useEffect(() => {
+    if (
+      swingProfileData.length > 0 &&
+      !hasGeneratedRef.current &&
+      !isGenerating &&
+      profiles.length === 0
+    ) {
+      hasGeneratedRef.current = true;
+      generate(swingProfileData);
+    }
+  }, [swingProfileData, isGenerating, profiles.length, generate]);
+
   // Empty state
   if (swingData.length === 0) {
     return (
@@ -179,9 +230,24 @@ export function PerformanceTab({
     >
       {/* Header */}
       <Flex align="center" justify="between" style={{ marginBottom: "20px" }}>
-        <Text size="4" weight="bold" style={{ color: "white" }}>
-          Performance Analysis
-        </Text>
+        <Flex align="center" gap="3">
+          <Text size="4" weight="bold" style={{ color: "white" }}>
+            Performance Analysis
+          </Text>
+          {isGenerating && (
+            <Flex align="center" gap="2">
+              <Spinner size="1" />
+              <Text size="2" color="gray">
+                Analyzing technique...
+              </Text>
+            </Flex>
+          )}
+        </Flex>
+        {error && (
+          <Text size="2" color="red">
+            Analysis unavailable
+          </Text>
+        )}
       </Flex>
 
       {/* Cards Grid */}
@@ -193,6 +259,8 @@ export function PerformanceTab({
             videoElement={videoElement}
             onSeekTo={onSeekTo}
             delay={200 + idx * 150}
+            profile={getProfileBySwingId(data.id)}
+            isLoadingProfile={isGenerating}
           />
         ))}
       </Flex>

@@ -3,7 +3,7 @@
 // ============================================================================
 
 export const TASK_TYPES = [
-  { value: "statistics", label: "Statistics" },
+  { value: "statistics", label: "Match" },
   { value: "technique", label: "Technique" },
   // Add more task types as needed
   // { value: "activity_detection", label: "Activity Detection" },
