@@ -33,7 +33,23 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 export async function getSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error) {
-    authLogger.error("Error getting session:", error);
+    // Check for refresh token errors - these are expected when token is invalid
+    const isRefreshTokenError = 
+      error.message?.includes("Refresh Token Not Found") ||
+      error.message?.includes("Invalid Refresh Token") ||
+      error.message?.includes("refresh_token_not_found");
+    
+    if (isRefreshTokenError) {
+      authLogger.warn("Invalid refresh token - session cleared:", error.message);
+      // Clear the invalid session
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        authLogger.error("Error signing out after invalid refresh token:", signOutError);
+      }
+    } else {
+      authLogger.error("Error getting session:", error);
+    }
     return null;
   }
   return data.session;
@@ -46,7 +62,25 @@ export async function getUser() {
   const { data, error } = await supabase.auth.getUser();
   if (error) {
     // Suppress "Auth session missing" error - it's expected when not logged in
-    if (error.message !== "Auth session missing!") {
+    if (error.message === "Auth session missing!") {
+      return null;
+    }
+    
+    // Check for refresh token errors - these are expected when token is invalid
+    const isRefreshTokenError = 
+      error.message?.includes("Refresh Token Not Found") ||
+      error.message?.includes("Invalid Refresh Token") ||
+      error.message?.includes("refresh_token_not_found");
+    
+    if (isRefreshTokenError) {
+      authLogger.warn("Invalid refresh token - session cleared:", error.message);
+      // Clear the invalid session
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        authLogger.error("Error signing out after invalid refresh token:", signOutError);
+      }
+    } else {
       authLogger.error("Error getting user:", error);
     }
     return null;

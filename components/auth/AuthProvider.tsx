@@ -225,6 +225,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, fetchProfile]);
 
+  // Handle invalid refresh token by clearing session gracefully
+  const handleInvalidRefreshToken = useCallback(async () => {
+    authLogger.warn("Invalid refresh token detected, clearing session");
+    try {
+      // Clear user data from storage
+      clearUserDataFromStorage();
+      
+      // Clear Supabase session
+      await supabase.auth.signOut();
+      
+      // Reset state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+      
+      // Reset analytics
+      analytics.reset();
+      
+      authLogger.info("Session cleared due to invalid refresh token");
+    } catch (error) {
+      authLogger.error("Error clearing session:", error);
+      // Force clear state even if signOut fails
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     let subscription: any = null;
@@ -255,6 +285,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Handle token refresh errors
+      if (_event === "TOKEN_REFRESHED" && !session) {
+        // Token refresh failed - invalid refresh token
+        authLogger.warn("Token refresh failed - invalid refresh token");
+        await handleInvalidRefreshToken();
+        return;
+      }
       
       // Handle different auth events
       // SIGNED_IN is fired when Supabase successfully processes OAuth callback
@@ -360,18 +398,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing session after a brief delay to let Supabase process URL params
     const timer = setTimeout(async () => {
       if (!mounted) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      authLogger.debug("Initial getSession check:", session?.user?.email || "no session");
-      
-      // If we have a session, make sure state is updated (fallback in case event didn't fire)
-      if (session?.user) {
-        setSession(session);
-        setUser(session.user);
-        await syncProfileFromOAuth(session.user);
-        setLoading(false);
-      } else if (!session) {
-        // No session at all
-        setLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // Check for refresh token errors
+        if (error) {
+          const isRefreshTokenError = 
+            error.message?.includes("Refresh Token Not Found") ||
+            error.message?.includes("Invalid Refresh Token") ||
+            error.message?.includes("refresh_token_not_found");
+          
+          if (isRefreshTokenError) {
+            authLogger.warn("Invalid refresh token on getSession:", error.message);
+            await handleInvalidRefreshToken();
+            return;
+          }
+          
+          authLogger.error("Error getting session:", error);
+          setLoading(false);
+          return;
+        }
+        
+        authLogger.debug("Initial getSession check:", session?.user?.email || "no session");
+        
+        // If we have a session, make sure state is updated (fallback in case event didn't fire)
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+          await syncProfileFromOAuth(session.user);
+          setLoading(false);
+        } else if (!session) {
+          // No session at all
+          setLoading(false);
+        }
+      } catch (error: any) {
+        // Catch any unexpected errors during session check
+        const isRefreshTokenError = 
+          error?.message?.includes("Refresh Token Not Found") ||
+          error?.message?.includes("Invalid Refresh Token") ||
+          error?.message?.includes("refresh_token_not_found");
+        
+        if (isRefreshTokenError) {
+          authLogger.warn("Invalid refresh token exception:", error.message);
+          await handleInvalidRefreshToken();
+        } else {
+          authLogger.error("Exception during getSession:", error);
+          setLoading(false);
+        }
       }
     }, 100);
 
@@ -380,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       subscription?.unsubscribe();
     };
-  }, [syncProfileFromOAuth]);
+  }, [syncProfileFromOAuth, handleInvalidRefreshToken]);
 
   const signOut = async () => {
     // Clear user data from localStorage before signing out
