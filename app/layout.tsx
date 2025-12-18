@@ -8,6 +8,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { LibraryTasksProvider } from "@/components/sidebar/LibraryTasksContext";
 import { CookieConsent } from "@/components/consent";
 import { AnalyticsProvider } from "@/lib/analytics";
+import { ErrorTrackingProvider } from "@/components/ErrorTrackingProvider";
 // Import Radix CSS in proper order to allow overrides
 import "@radix-ui/themes/tokens.css";
 import "@radix-ui/themes/components.css";
@@ -123,7 +124,9 @@ export default function RootLayout({
           <AuthProvider>
             <LibraryTasksProvider>
               <AnalyticsProvider>
-                {children}
+                <ErrorTrackingProvider>
+                  {children}
+                </ErrorTrackingProvider>
               </AnalyticsProvider>
               <CookieConsent />
             </LibraryTasksProvider>

@@ -133,7 +133,18 @@ export interface AnalyticsEventMap {
   // Engagement Events
   'share_clicked': BaseEventProperties & { shareType?: string };
   'feedback_submitted': BaseEventProperties & { rating?: number; feedback?: string };
-  'error_displayed': BaseEventProperties & { errorType?: string; errorMessage?: string };
+  'error_displayed': BaseEventProperties & { 
+    errorType?: string; 
+    errorMessage?: string;
+    errorName?: string;
+    errorStack?: string;
+    errorFilename?: string;
+    errorLine?: number;
+    errorColumn?: number;
+    errorSource?: 'global' | 'react' | 'promise' | 'console';
+    url?: string;
+    userAgent?: string;
+  };
   
   // Custom/Generic Event (escape hatch for one-off events)
   'custom': BaseEventProperties & Record<string, unknown>;
