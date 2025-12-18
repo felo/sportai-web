@@ -460,8 +460,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
               />
             </Box>
             
-            {/* "Stop poking me!" speech bubble */}
-            {showPokeBubble && (
+            {/* "Stop poking me!" speech bubble - hidden for now */}
+            {false && showPokeBubble && (
               <Box
                 style={{
                   position: "absolute",

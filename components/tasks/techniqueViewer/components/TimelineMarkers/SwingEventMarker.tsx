@@ -3,6 +3,7 @@ import type { ProtocolEvent, ViewerActions } from "@/components/videoPoseViewerV
 import { getEffectiveSwingBoundaries, getTimelinePosition } from "../../utils";
 import type { SwingBoundaryAdjustment } from "../../utils";
 import { MIN_SWING_DURATION } from "../../constants";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface SwingEventMarkerProps {
   event: ProtocolEvent;
@@ -36,6 +37,7 @@ export function SwingEventMarker({
   viewerRef,
   onSwingEdgeDragStart,
 }: SwingEventMarkerProps) {
+  const isMobile = useIsMobile();
   const { startTime, endTime, isAdjusted } = getEffectiveSwingBoundaries(
     event,
     swingBoundaryAdjustments
@@ -63,6 +65,9 @@ export function SwingEventMarker({
     <Box
       key={event.id}
       data-event-marker
+      // On mobile, allow clicks to pass through to create markers
+      // On desktop, stop propagation to allow seeking to swings
+      onClick={isMobile ? undefined : (e) => e.stopPropagation()}
       style={{
         position: "absolute",
         left: `${startPercent}%`,
@@ -70,6 +75,8 @@ export function SwingEventMarker({
         transform: "translateY(-50%)",
         width: isRange ? `${widthPercent}%` : "6px",
         height: "18px",
+        // On mobile, make swing areas non-interactive so taps pass through
+        pointerEvents: isMobile ? "none" : "auto",
       }}
     >
       {/* Main swing bar */}
@@ -77,7 +84,7 @@ export function SwingEventMarker({
         content={`${event.label} (${displayStartTime.toFixed(2)}s - ${displayEndTime.toFixed(2)}s)${isAdjusted ? " [adjusted]" : ""}`}
       >
         <Box
-          onClick={(e) => {
+          onClick={isMobile ? undefined : (e) => {
             e.stopPropagation();
             viewerRef.current?.seekTo(displayStartTime);
           }}

@@ -37,7 +37,7 @@ export function FileSizeLimitModal({ open, onOpenChange }: FileSizeLimitModalPro
           </Flex>
 
           <Text size="2" color="gray">
-            Oops, this BETA only allows you to upload a maximum size of 100MB (~10 minutes of video).{" "}
+            Oops, this BETA only allows you to upload a maximum size of 100MB (~1-3 minutes of video).{" "}
             <Link href="https://sportai.com/contact" target="_blank" rel="noopener noreferrer">
               Contact us
             </Link>

@@ -8,6 +8,7 @@ import type { CustomEvent, VideoComment } from "./index";
 import type { ContextMenuTarget, ContextMenuPosition, DirtyFlags } from "../types";
 import type { SwingBoundaryAdjustment, ProtocolAdjustment } from "../utils";
 import { TIMELINE_MARKERS } from "../constants";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   SwingEventMarker,
   ProtocolEventMarker,
@@ -106,6 +107,8 @@ export function TimelineScrubber({
   setPendingCustomEventTime,
   setCustomEventDialogOpen,
 }: TimelineScrubberProps) {
+  const isMobile = useIsMobile();
+  
   // Context menu handlers
   const handleContextMenuAddMarker = useCallback(() => {
     if (contextMenuPosition) {
@@ -343,7 +346,7 @@ export function TimelineScrubber({
               />
             ))}
 
-            {/* Hint text */}
+            {/* Hint text - shows different message on mobile vs desktop */}
             {customEvents.length === 0 && (
               <Flex
                 align="center"
@@ -361,7 +364,7 @@ export function TimelineScrubber({
                   size="1"
                   style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "10px" }}
                 >
-                  + Right-click to add marker
+                  {isMobile ? "+ Tap to add marker" : "+ Right-click to add marker"}
                 </Text>
               </Flex>
             )}

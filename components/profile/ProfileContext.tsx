@@ -56,7 +56,7 @@ interface ProfileContextValue {
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, refreshProfile: refreshAuthProfile } = useAuth();
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -191,6 +191,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           ...prev,
           player: { ...prev.player, ...data } as PlayerProfile,
         } : null);
+        
+        // Also refresh the global auth profile so sidebar updates
+        refreshAuthProfile();
       }
       
       setSaving(false);
@@ -201,7 +204,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSaving(false);
       return false;
     }
-  }, [user?.id]);
+  }, [user?.id, refreshAuthProfile]);
   
   // Add sport
   const addSport = useCallback(async (

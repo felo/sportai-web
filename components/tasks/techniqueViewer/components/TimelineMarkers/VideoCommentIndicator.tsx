@@ -25,6 +25,7 @@ export function VideoCommentIndicator({
       content={`📍 ${comment.title} (${comment.time.toFixed(2)}s • Frame ${comment.frame}) - click to jump`}
     >
       <Box
+        data-event-marker
         onClick={(e) => {
           e.stopPropagation();
           viewerRef.current?.seekTo(comment.time);
