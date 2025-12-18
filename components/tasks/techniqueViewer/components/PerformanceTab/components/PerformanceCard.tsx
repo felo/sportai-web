@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Box, Flex, Text, Card, Separator, Skeleton } from "@radix-ui/themes";
-import { PersonIcon, CheckCircledIcon, TargetIcon } from "@radix-ui/react-icons";
+import { PersonIcon } from "@radix-ui/react-icons";
 import { ResponsiveRadar } from "@nivo/radar";
 import type { SwingProfile } from "@/types/swing-profile";
 import type { SwingPerformanceData, SwingMetrics } from "../types";
@@ -12,6 +12,7 @@ import { getRatingTier, toRadarData } from "../utils";
 import { requestThumbnailCapture, getCachedThumbnail } from "@/components/shared/hooks";
 import { SAIRatingBadge } from "./SAIRatingBadge";
 import { AttributeRow } from "./AttributeRow";
+import { ScrollableBox } from "./ScrollableBox";
 import { FlipCard } from "@/components/ui/animations";
 
 interface PerformanceCardProps {
@@ -134,78 +135,82 @@ export function PerformanceCard({
         </Box>
 
         {/* Summary text - AI generated or fallback to metrics */}
-        <Box style={{ maxHeight: 80, overflow: "auto", flex: 1 }}>
+        <ScrollableBox maxHeight={100} color={tier.gradient[0]}>
           {isLoadingProfile ? (
             <Skeleton style={{ height: 40 }} />
           ) : profile?.summary ? (
-            <Text size="2" color="gray" style={{ lineHeight: 1.5, fontStyle: "italic" }}>
+            <Text size="2" color="gray" style={{ lineHeight: 1.5 }}>
               {profile.summary}
             </Text>
           ) : (
-            <Text size="2" color="gray" style={{ lineHeight: 1.5, fontStyle: "italic" }}>
+            <Text size="2" color="gray" style={{ lineHeight: 1.5 }}>
               {data.peakVelocityKmh >= 20
                 ? `Peak wrist: ${Math.round(data.peakVelocityKmh)} km/h. Shoulder: ${Math.round(data.peakShoulderVelocityKmh)} km/h. Hip: ${Math.round(data.peakHipVelocityKmh)} km/h. X-factor: ${Math.round(Math.abs(data.peakXFactor))}°.`
                 : "Swing analysis metrics captured."}
             </Text>
           )}
-        </Box>
+        </ScrollableBox>
 
         <Separator size="4" style={{ opacity: 0.3, flexShrink: 0 }} />
 
         {/* Strengths & Focus Areas - AI generated */}
-        <Flex gap="4">
-          <Box style={{ flex: 1 }}>
-            <Flex align="center" gap="1" style={{ marginBottom: 4 }}>
-              <CheckCircledIcon width={12} height={12} style={{ color: "#10B981" }} />
-              <Text size="1" weight="bold" style={{ color: "#10B981" }}>
+        <ScrollableBox flex={1} color={tier.gradient[0]}>
+          <Flex gap="4">
+            <Box style={{ flex: 1 }}>
+              <Text size="1" weight="bold" style={{ color: "#10B981", marginBottom: 4, display: "block" }}>
                 Strengths
               </Text>
-            </Flex>
-            {isLoadingProfile ? (
-              <Flex direction="column" gap="1">
-                <Skeleton style={{ height: 14, width: "80%" }} />
-                <Skeleton style={{ height: 14, width: "60%" }} />
-              </Flex>
-            ) : profile?.strengths && profile.strengths.length > 0 ? (
-              <Flex direction="column" gap="1">
-                {profile.strengths.map((strength, i) => (
-                  <Text key={i} size="1" color="gray" style={{ display: "block", lineHeight: 1.3 }}>
-                    • {strength}
-                  </Text>
-                ))}
-              </Flex>
-            ) : (
-              <Text size="1" color="gray" style={{ display: "block", fontStyle: "italic" }}>
-                • Analyzing...
+              {isLoadingProfile ? (
+                <Flex direction="column" gap="1">
+                  <Skeleton style={{ height: 14, width: "80%" }} />
+                  <Skeleton style={{ height: 14, width: "60%" }} />
+                </Flex>
+              ) : profile?.strengths && profile.strengths.length > 0 ? (
+                <>
+                  {profile.strengths.map((strength, i) => (
+                    <Text key={i} size="1" color="gray" style={{ display: "block", marginTop: 2 }}>
+                      • {strength}
+                    </Text>
+                  ))}
+                </>
+              ) : (
+              <Text size="1" color="gray" style={{ display: "block" }}>
+                • Analysis pending
               </Text>
-            )}
-          </Box>
-          <Box style={{ flex: 1 }}>
-            <Flex align="center" gap="1" style={{ marginBottom: 4 }}>
-              <TargetIcon width={12} height={12} style={{ color: "#F59E0B" }} />
-              <Text size="1" weight="bold" style={{ color: "#F59E0B" }}>
-                Focus Areas
-              </Text>
-            </Flex>
-            {isLoadingProfile ? (
-              <Flex direction="column" gap="1">
-                <Skeleton style={{ height: 14, width: "70%" }} />
-              </Flex>
-            ) : profile?.focusAreas && profile.focusAreas.length > 0 ? (
-              <Flex direction="column" gap="1">
+              )}
+            </Box>
+            {(!isLoadingProfile && profile?.focusAreas && profile.focusAreas.length > 0) ? (
+              <Box style={{ flex: 1 }}>
+                <Text size="1" weight="bold" style={{ color: "#F59E0B", marginBottom: 4, display: "block" }}>
+                  Focus Areas
+                </Text>
                 {profile.focusAreas.map((area, i) => (
-                  <Text key={i} size="1" color="gray" style={{ display: "block", lineHeight: 1.3 }}>
+                  <Text key={i} size="1" color="gray" style={{ display: "block", marginTop: 2 }}>
                     • {area}
                   </Text>
                 ))}
-              </Flex>
+              </Box>
+            ) : isLoadingProfile ? (
+              <Box style={{ flex: 1 }}>
+                <Text size="1" weight="bold" style={{ color: "#F59E0B", marginBottom: 4, display: "block" }}>
+                  Focus Areas
+                </Text>
+                <Flex direction="column" gap="1">
+                  <Skeleton style={{ height: 14, width: "70%" }} />
+                </Flex>
+              </Box>
             ) : (
-              <Text size="1" color="gray" style={{ display: "block", fontStyle: "italic" }}>
-                • Analyzing...
+              <Box style={{ flex: 1 }}>
+                <Text size="1" weight="bold" style={{ color: "#F59E0B", marginBottom: 4, display: "block" }}>
+                  Focus Areas
+                </Text>
+              <Text size="1" color="gray" style={{ display: "block" }}>
+                • Analysis pending
               </Text>
+              </Box>
             )}
-          </Box>
-        </Flex>
+          </Flex>
+        </ScrollableBox>
       </Flex>
     </Card>
   );

@@ -40,12 +40,16 @@ export function useVideoUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle file selection
+  // In developer mode, we allow files up to 10GB (skipping the 100MB limit)
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validation = validateVideoFile(file);
+      // Skip the 100MB size limit - only enforce the 10GB max for dev mode uploads
+      const validation = validateVideoFile(file, { skipSizeLimit: true });
       if (!validation.valid) {
-        onError(validation.error || "Invalid video file");
+        // Provide specific error messages based on the error type
+        const errorMessage = validation.error || "Please select a valid video file (MP4, MOV, WebM, etc.)";
+        onError(errorMessage);
         return;
       }
       setSelectedFile(file);

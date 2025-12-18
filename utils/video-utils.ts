@@ -177,7 +177,15 @@ const SUPPORTED_IMAGE_TYPES = [
   "image/webp",
 ];
 
-export function validateVideoFile(file: File): VideoValidationResult {
+export interface ValidateVideoFileOptions {
+  /** 
+   * Skip the 100MB size limit check (still enforces 10GB max).
+   * Used for developer mode uploads where larger files are allowed.
+   */
+  skipSizeLimit?: boolean;
+}
+
+export function validateVideoFile(file: File, options?: ValidateVideoFileOptions): VideoValidationResult {
   const isVideo = file.type.startsWith("video/");
   const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
 
@@ -190,7 +198,8 @@ export function validateVideoFile(file: File): VideoValidationResult {
   }
 
   // For videos, enforce the 100MB limit immediately on selection/drop
-  if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) {
+  // (unless skipSizeLimit is true, e.g., for developer mode uploads)
+  if (isVideo && !options?.skipSizeLimit && file.size > MAX_VIDEO_SIZE_BYTES) {
     return {
       valid: false,
       errorType: 'file_size_limit',
@@ -204,7 +213,7 @@ export function validateVideoFile(file: File): VideoValidationResult {
   if (file.size > EXTREME_SIZE_BYTES) {
     return {
       valid: false,
-      error: `File is extremely large (${(file.size / (1024 * 1024 / 1024)).toFixed(2)}GB). Please use a file under ${EXTREME_SIZE_GB}GB.`,
+      error: `File is extremely large (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB). Please use a file under ${EXTREME_SIZE_GB}GB.`,
       errorType: 'extreme_size',
     };
   }

@@ -169,7 +169,7 @@ function buildSwingProfilePrompt(
     "4. **attributes**: Use the SAME normalized metric values provided (power, agility, footwork, hip, rotation) - do NOT change them"
   );
   lines.push(
-    "5. **techniqueName**: A creative 2-4 word technique descriptor (e.g., 'Explosive Drive', 'Smooth Accelerator', 'Power Foundation', 'Quick Release')"
+    "5. **techniqueName**: A creative, POSITIVE 2-4 word technique descriptor. Always encouraging - higher scores get more impressive names, but ALL scores should feel good. Examples: 'Explosive Drive' (high), 'Smooth Flow' (mid), 'Building Momentum' (lower). NEVER use negative-sounding names like 'Work in Progress' or 'Needs Work'."
   );
   lines.push(
     "6. **summary**: A 1-2 sentence analysis of the technique quality based on the metrics"
@@ -178,7 +178,7 @@ function buildSwingProfilePrompt(
     "7. **strengths**: 2-3 specific technique strengths based on the highest metrics (short phrases like 'Strong hip rotation', 'Explosive acceleration')"
   );
   lines.push(
-    "8. **focusAreas**: 1-2 areas to improve based on the lowest metrics (constructive phrases like 'Increase knee bend for better balance')"
+    "8. **focusAreas**: 1-2 opportunities for growth based on lower metrics. Use positive, coaching-style phrases like 'Unlock more power with deeper knee bend' or 'Add hip drive for extra speed'. Frame as potential gains, not weaknesses."
   );
   lines.push("");
   lines.push("## Analysis Guidelines");
@@ -189,11 +189,19 @@ function buildSwingProfilePrompt(
   );
   lines.push("- Consider the kinetic chain: feet → hips → shoulders → wrist");
   lines.push(
-    "- Higher metrics (70+) are strengths, lower metrics (<50) are focus areas"
+    "- Higher metrics (70+) are clear strengths, lower metrics are growth opportunities"
   );
   lines.push(
     "- X-factor (hip-shoulder separation) indicates rotational efficiency"
   );
+  lines.push("");
+  lines.push("## IMPORTANT: Positive Coaching Tone");
+  lines.push("");
+  lines.push("- ALL technique names must be positive and encouraging");
+  lines.push("- Scale enthusiasm with score: higher scores = more impressive names");
+  lines.push("- Lower scores still get positive names that feel like the player is on a good path");
+  lines.push("- Focus areas should feel like unlocking potential, not fixing problems");
+  lines.push("- Every player should feel good reading their analysis");
 
   return lines.join("\n");
 }
@@ -311,19 +319,23 @@ export async function POST(request: NextRequest) {
             hip: Math.round(swing.metrics.hip),
             rotation: Math.round(swing.metrics.rotation),
           },
-          summary: `This ${swing.swingType.toLowerCase()} shows ${swing.saiScore >= 70 ? "strong" : swing.saiScore >= 50 ? "balanced" : "developing"} technique fundamentals.`,
+          summary: `This ${swing.swingType.toLowerCase()} shows ${swing.saiScore >= 70 ? "excellent" : swing.saiScore >= 50 ? "solid" : "promising"} technique fundamentals.`,
           techniqueName:
-            swing.saiScore >= 75
-              ? "Power Technique"
-              : swing.saiScore >= 50
-                ? "Balanced Form"
-                : "Work in Progress",
+            swing.saiScore >= 85
+              ? "Elite Power"
+              : swing.saiScore >= 70
+                ? "Strong Drive"
+                : swing.saiScore >= 55
+                  ? "Smooth Flow"
+                  : swing.saiScore >= 40
+                    ? "Rising Form"
+                    : "Building Momentum",
           strengths: highest.map(
             ([key, val]) =>
               `${val >= 70 ? "Strong" : "Good"} ${metricLabels[key]}`
           ),
           focusAreas: lowest.map(
-            ([key]) => `Improve ${metricLabels[key]}`
+            ([key]) => `Unlock more ${metricLabels[key]}`
           ),
         };
       });
