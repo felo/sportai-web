@@ -215,6 +215,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           let cacheUsed = false;
           let modelUsed: string | undefined;
           let modelReason: string | undefined;
+          let hasVideo: boolean | undefined;
           
           while (true) {
             const { done, value } = await reader.read();
@@ -235,7 +236,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
                   cacheUsed = meta.cacheUsed;
                   modelUsed = meta.modelUsed;
                   modelReason = meta.modelReason;
-                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                  hasVideo = meta.hasVideo;
+                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason, hasVideo });
                 }
               } catch (e) {
                 // Ignore parse errors
@@ -272,6 +274,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             modelUsed,
             modelReason,
             cacheUsed,
+            hasVideo,
             hasContextUsage: !!contextUsageInfo,
           });
           
@@ -283,6 +286,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             cacheUsed,
             modelUsed,
             modelReason,
+            hasVideo,
             modelSettings: {
               thinkingMode,
               mediaResolution,
@@ -628,6 +632,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           let cacheUsed = false;
           let modelUsed: string | undefined;
           let modelReason: string | undefined;
+          let hasVideo: boolean | undefined;
           
           while (true) {
             const { done, value } = await reader.read();
@@ -651,7 +656,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
                   cacheUsed = meta.cacheUsed;
                   modelUsed = meta.modelUsed;
                   modelReason = meta.modelReason;
-                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason });
+                  hasVideo = meta.hasVideo;
+                  apiLogger.debug("Stream metadata received:", { cacheName, cacheUsed, modelUsed, modelReason, hasVideo });
                 }
               } catch (e) {
                 // Ignore parse errors
@@ -693,6 +699,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             modelUsed,
             modelReason,
             cacheUsed,
+            hasVideo,
             cacheName: cacheName ? 'set' : 'not set',
             hasContextUsage: !!contextUsageInfo,
           });
@@ -705,6 +712,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             cacheUsed,
             modelUsed,
             modelReason,
+            hasVideo,
             modelSettings: {
               thinkingMode,
               mediaResolution,

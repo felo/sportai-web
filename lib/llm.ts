@@ -128,13 +128,15 @@ export async function queryLLM(
 ): Promise<LLMResponse> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
+  // Check if video is present
+  const hasVideo = !!videoData;
+  
   // Get system prompt with domain-specific, insight level, AND user context enhancement
   const systemPrompt = promptType === "frame" 
     ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
-    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext);
+    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext, hasVideo);
   
   // Select model based on query characteristics
-  const hasVideo = !!videoData;
   const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
   const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
   
@@ -527,13 +529,15 @@ export async function streamLLM(
 ): Promise<StreamLLMResult> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
+  // Check if video is present
+  const hasVideo = !!videoData;
+  
   // Get system prompt with domain-specific, insight level, AND user context enhancement
   const systemPrompt = promptType === "frame" 
     ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
-    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext);
+    : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext, hasVideo);
   
   // Select model based on query characteristics
-  const hasVideo = !!videoData;
   const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
   const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
   

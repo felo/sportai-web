@@ -657,6 +657,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                 cacheName={message.cacheName}
                 modelUsed={message.modelUsed}
                 modelReason={message.modelReason}
+                hasVideo={message.hasVideo}
               />
             </Box>
           )}

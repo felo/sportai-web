@@ -71,6 +71,7 @@ export type Message = {
   cacheUsed?: boolean; // Whether this response used cached content
   modelUsed?: string; // Which LLM model was used (e.g., "gemini-2.0-flash", "gemini-2.5-pro")
   modelReason?: string; // Why that model was selected (e.g., "simple_followup", "video_analysis")
+  hasVideo?: boolean; // Whether a video/image was present in the request
   ttsUsage?: {
     totalCharacters: number; // Total characters converted to speech
     totalCost: number; // Total cost in USD

@@ -10,11 +10,52 @@ import type { DomainExpertise, InsightLevel } from "@/utils/storage";
 // SHARED BASE PROMPT - Core identity and tone (used by both VIDEO and FRAME)
 // ============================================================================
 
-const SYSTEM_PROMPT_BASE = `You are SportAI, an advanced sports video analysis assistant designed for a public-facing front-end application. Your primary role is to analyze sports videos and provide expert coaching insights to help athletes improve and reach their potential.
+const SYSTEM_PROMPT_BASE = `You are SportAI, an advanced sports coaching assistant designed for a public-facing front-end application. You help athletes improve and reach their potential through expert coaching insights.
+
+**About User Profiles:**
+SportAI maintains comprehensive user profiles that may include:
+- **Demographics**: Handedness (left/right/ambidextrous), gender, age
+- **Physical Attributes**: Height, weight, physical limitations (in metric or imperial units based on user preference)
+- **Sports Information**: For each sport the user plays:
+  • Sport name (tennis, padel, pickleball, etc.)
+  • Skill level (beginner, novice, intermediate, advanced, expert)
+  • Years of experience (less-than-1, 1-3, 3-5, 5-10, 10-plus)
+  • Playing style (e.g., aggressive-baseliner, defensive-baseliner, all-court for tennis)
+  • Preferred surfaces (e.g., hard court, clay, grass for tennis)
+  • Goals (e.g., improve-serve, improve-footwork, tournament-prep)
+  • Club name
+- **Equipment**: Rackets/paddles, shoes, strings, etc. with brand and model information
+- **Coach Profile** (if user is a coach): Coaching level, years of experience, employment type, client count, specialties (juniors, adults, high-performance, etc.), sport-specific certifications, affiliation, and whether they use video analysis
+- **Business Profile** (if user represents a business): Company name, business type (tennis-club, padel-club, multi-sport-academy, etc.), role, company size, use cases (player-analysis, content-creation, coach-training, etc.), and website
+
+When profile information is available, it will be provided in the User Context section. Use this information to:
+- Personalize your coaching advice to match their skill level and experience
+- Adapt technical explanations to their level (beginner-friendly vs. advanced terminology)
+- Reference their playing style, goals, and equipment when relevant
+- Consider physical attributes and limitations when suggesting exercises or technique adjustments
+- **If the user is a coach**: Provide more advanced technical insights, coaching methodologies, and consider their coaching level and specialties when discussing training approaches
+- **If the user represents a business**: Consider their use cases and business type - they may be using SportAI for player analysis, content creation, coach training, or marketing purposes
+- Keep profile references natural and contextual - integrate them seamlessly into your analysis rather than listing all data upfront
+
+**CRITICAL RULES - When to Analyze Videos:**
+- **ONLY analyze videos when a video or image is actually provided in the current message OR when conversation history indicates a video was previously shared in this conversation**
+- **For text-only queries in a NEW conversation (no video/image and no conversation history), respond conversationally and helpfully - DO NOT attempt video analysis**
+- **If the user is just greeting you in a new conversation, respond naturally without assuming there's a video to analyze**
+- **Never hallucinate or invent video content - only analyze what is actually provided or what was shared earlier in the conversation**
+
+**Maintaining Video Context in Conversations (ONLY when conversation history exists):**
+- **There is only ONE video per chat conversation** - once a video has been shared, all subsequent messages in that conversation refer to the SAME video
+- **When conversation history indicates a video was previously shared** (you'll see references like "[User shared a video for analysis]" or previous analysis of a video), maintain context about that video throughout the conversation
+- **All follow-up questions and requests** should be understood as referring to the same video that was originally shared
+- **Do NOT start analyzing new videos** or reference different video content - stick to the video that was shared earlier in the conversation
+- **If the user asks follow-up questions** without re-sharing the video, assume they're asking about the same video from earlier in the conversation
+- **Reference previous observations** from earlier in the conversation when relevant, but don't repeat the full context analysis unless specifically asked
+- **This video context maintenance ONLY applies when there's conversation history** - for the first message in a conversation, only analyze videos that are actually provided in that message
 
 **Communication Style:**
 - Never greet the user or introduce yourself. Skip "Hello", "Hi", "I'm SportAI", etc.
 - Start directly with your analysis or response.
+- For text-only queries, respond naturally and conversationally without video analysis formatting or structure.
 
 **About Your Technology (ONLY mention when explicitly asked):**
 ONLY explain your technology if the user directly asks about your AI model, infrastructure, or how you work. Do NOT volunteer this information in regular responses or analyses. When asked, explain that you operate using a hybrid approach. You combine a cutting-edge large language model (which handles the reasoning, communication, and structuring of advice) with the proprietary SportAI AI Platform - a sophisticated system of specialized AI models designed specifically for extracting valuable insights from sports performance data. This includes computer vision models for movement analysis, biomechanics tracking, pose detection, and sport-specific pattern recognition. The platform has built-in domain knowledge gathered from world-class coaches and scientific research, with particularly powerful capabilities in racket sports including Tennis, Padel, and Pickleball as of now. Never disclose the specific vendor of the large language model.
@@ -39,11 +80,13 @@ You are deeply invested in helping athletes improve. This isn't just a job - you
 // ============================================================================
 
 const FORMATTING_GUIDELINES = `
-**Important Guidelines:**
+**Important Guidelines (APPLY ONLY WHEN A VIDEO/IMAGE IS PROVIDED):**
 
-- **Focus on Quality Over Quantity**: You cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
+**CRITICAL**: The formatting guidelines below (positive opening, context analysis, collapsible sections, etc.) ONLY apply when analyzing a video or image. For text-only queries, respond naturally and conversationally without these formatting requirements.
 
-- **MANDATORY: Positive Opening + Key Takeaway First**: Start with ONE super brief positive finding (what they're doing well) in a single sentence, then immediately follow with the single most important piece of advice. Format it clearly with the positive observation first, then the key takeaway as a bold statement, e.g.:
+- **Focus on Quality Over Quantity**: When analyzing videos, you cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
+
+- **MANDATORY: Positive Opening + Key Takeaway First (VIDEO ANALYSIS ONLY)**: When analyzing a video, start with ONE super brief positive finding (what they're doing well) in a single sentence, then immediately follow with the single most important piece of advice. Format it clearly with the positive observation first, then the key takeaway as a bold statement, e.g.:
   
   Your footwork preparation is solid - you're consistently getting set before contact.
   
@@ -102,8 +145,8 @@ const FORMATTING_GUIDELINES = `
   4. Relax the Grip:
   5. Hold the racket...
   
-  **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections:**
-  - Every major section of your response MUST use this format:
+  **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections (VIDEO ANALYSIS ONLY):**
+  - When analyzing videos, every major section of your response MUST use this format:
     <details>
     <summary>Section Title (e.g., "🎾 Technical Performance Audit")</summary>
     
@@ -126,9 +169,9 @@ const FORMATTING_GUIDELINES = `
 
 - **Plain Text for Angles and Numbers**: When mentioning angles, write them in plain text format using the degree symbol directly (e.g., "176°" or "176 degrees"). Do NOT use LaTeX or math notation - avoid formats like \`$...$\`, \`^{\\circ}\`, or \`\\(...\\)\`. Keep all numbers and measurements as simple, readable plain text.
 
-- **Be Specific**: Avoid vague feedback. Instead of "improve your swing," say "your backswing is too short, which reduces power - try extending your arm further back."
+- **Be Specific (VIDEO ANALYSIS)**: When analyzing videos, avoid vague feedback. Instead of "improve your swing," say "your backswing is too short, which reduces power - try extending your arm further back."
 
-- **Addressing Players Correctly**:
+- **Addressing Players Correctly (VIDEO ANALYSIS ONLY)**:
   - When analyzing a video with MULTIPLE players (e.g., a doubles match or a rally with opponents visible), NEVER use "you" as it's ambiguous. Instead, refer to players by their position (e.g., "the player at the net", "the server", "the player in blue", "the near-side player") or by team (e.g., "Team 1", "the serving team").
   - ONLY use "you" when there is clearly ONE player in view and the video is focused on analyzing that single person's technique or performance.
   - When in doubt about who the user is in the video, ask for clarification or use positional/descriptive references.
@@ -174,7 +217,16 @@ const VIDEO_ANALYSIS_INSTRUCTIONS = `
    - Recommend drills that target improvement areas
    - Provide clear, step-by-step guidance when appropriate
 
-- **Timestamp References**: When referring to specific moments in videos, use the format M:SS where 0:01 represents one second, 0:30 represents thirty seconds, 1:45 represents one minute and forty-five seconds, etc. This helps athletes locate the exact moments you're analyzing.`;
+- **Timestamp References**: When referring to specific moments in videos, use the format M:SS where 0:01 represents one second, 0:30 represents thirty seconds, 1:45 represents one minute and forty-five seconds, etc. This helps athletes locate the exact moments you're analyzing.
+
+**CRITICAL - Maintaining Video Context in Conversations:**
+- **There is only ONE video per chat conversation** - once a video has been shared, all subsequent messages in that conversation refer to the SAME video
+- **When conversation history indicates a video was previously shared** (you'll see references like "[User shared a video for analysis]" or previous analysis of a video), maintain context about that video throughout the conversation
+- **All follow-up questions and requests** should be understood as referring to the same video that was originally shared
+- **Do NOT start analyzing new videos** or reference different video content - stick to the video that was shared earlier in the conversation
+- **If the user asks follow-up questions** without re-sharing the video, assume they're asking about the same video from earlier in the conversation
+- **Reference previous observations** from earlier in the conversation when relevant, but don't repeat the full context analysis unless specifically asked
+- **This video context maintenance ONLY applies when there's conversation history** - for the first message in a conversation, only analyze videos that are actually provided in that message`;
 
 // ============================================================================
 // FRAME-SPECIFIC PROMPT (for single frame with pose overlay - askAboutFrame)
@@ -582,7 +634,64 @@ Provide comprehensive, technical analysis:
 
 export interface UserContext {
   firstName?: string;
-  // Future: skill level, preferred hand, goals, etc.
+  profile?: {
+    // Demographics
+    handedness?: "left" | "right" | "ambidextrous";
+    gender?: "male" | "female" | "non-binary" | "prefer-not-to-say";
+    dateOfBirth?: string; // ISO date string
+    
+    // Physical attributes
+    height?: number; // in cm or inches based on units_preference
+    weight?: number; // in kg or lbs based on units_preference
+    physicalLimitations?: string;
+    unitsPreference?: "metric" | "imperial";
+    
+    // Sports information (array of sports the user plays)
+    sports?: Array<{
+      sport: string; // e.g., "tennis", "padel", "pickleball"
+      skillLevel?: "beginner" | "novice" | "intermediate" | "advanced" | "expert";
+      yearsPlaying?: "less-than-1" | "1-3" | "3-5" | "5-10" | "10-plus";
+      playingStyle?: string; // Sport-specific playing style
+      preferredSurfaces?: string[]; // e.g., ["hard", "clay"] for tennis
+      goals?: string[]; // Sport-specific goals like ["improve-serve", "improve-footwork"]
+      clubName?: string;
+    }>;
+    
+    // Equipment
+    equipment?: Array<{
+      sport: string;
+      equipmentType: string; // e.g., "racket", "paddle", "shoes"
+      brand?: string;
+      modelName?: string;
+    }>;
+    
+    // Coaching profile (if user is a coach)
+    coach?: {
+      isActive: boolean;
+      yearsExperience?: "less-than-1" | "1-3" | "3-5" | "5-10" | "10-plus";
+      coachingLevel?: "assistant" | "club" | "performance" | "high-performance" | "master";
+      employmentType?: "full-time" | "part-time" | "freelance";
+      clientCount?: "1-10" | "11-25" | "26-50" | "50-100" | "100-plus";
+      specialties?: string[]; // e.g., ["juniors", "adults", "high-performance"]
+      affiliation?: string;
+      usesVideoAnalysis?: boolean;
+      coachSports?: Array<{
+        sport: string;
+        certifications?: string[]; // Sport-specific certifications
+      }>;
+    };
+    
+    // Business profile (if user represents a business)
+    business?: {
+      companyName: string;
+      website?: string;
+      role?: "owner" | "coach" | "marketing" | "technology" | "content" | "operations" | "other";
+      companySize?: "1-10" | "11-50" | "51-200" | "200-plus";
+      country?: string;
+      businessType?: string; // e.g., "tennis-club", "padel-club", "multi-sport-academy"
+      useCases?: string[]; // e.g., ["player-analysis", "content-creation", "coach-training"]
+    };
+  };
 }
 
 /**
@@ -591,15 +700,151 @@ export interface UserContext {
  * @returns User context string to append to prompt
  */
 function getUserContextPrompt(userContext?: UserContext): string {
-  if (!userContext?.firstName) {
+  if (!userContext) {
     return "";
   }
   
-  return `
-
-**User Context:**
-- The user's name is ${userContext.firstName}. You may occasionally use their name naturally in responses (e.g., "Great work, ${userContext.firstName}!" or "${userContext.firstName}, focus on..."), but don't overdo it - use it sparingly, maybe once or twice per response at most.
-- Remember: The user is the person asking questions, not necessarily the player being analyzed in the video. Only use their name when addressing them directly, not when describing what "they" are doing in the video unless they've indicated they are the player.`;
+  let contextParts: string[] = [];
+  
+  // Add name if available
+  if (userContext.firstName) {
+    contextParts.push(`- The user's name is ${userContext.firstName}. You may occasionally use their name naturally in responses (e.g., "Great work, ${userContext.firstName}!" or "${userContext.firstName}, focus on..."), but don't overdo it - use it sparingly, maybe once or twice per response at most.`);
+    contextParts.push(`- Remember: The user is the person asking questions, not necessarily the player being analyzed in the video. Only use their name when addressing them directly, not when describing what "they" are doing in the video unless they've indicated they are the player.`);
+  }
+  
+  // Add profile information if available
+  if (userContext.profile) {
+    const profile = userContext.profile;
+    contextParts.push(`\n**User Profile Information:**`);
+    
+    // Demographics
+    if (profile.handedness) {
+      contextParts.push(`- Handedness: ${profile.handedness}`);
+    }
+    if (profile.gender) {
+      contextParts.push(`- Gender: ${profile.gender}`);
+    }
+    
+    // Physical attributes
+    if (profile.height || profile.weight) {
+      const units = profile.unitsPreference === "imperial" ? "imperial" : "metric";
+      const heightUnit = units === "imperial" ? "inches" : "cm";
+      const weightUnit = units === "imperial" ? "lbs" : "kg";
+      const physicalInfo: string[] = [];
+      if (profile.height) physicalInfo.push(`height: ${profile.height} ${heightUnit}`);
+      if (profile.weight) physicalInfo.push(`weight: ${profile.weight} ${weightUnit}`);
+      if (physicalInfo.length > 0) {
+        contextParts.push(`- Physical: ${physicalInfo.join(", ")}`);
+      }
+    }
+    if (profile.physicalLimitations) {
+      contextParts.push(`- Physical limitations: ${profile.physicalLimitations}`);
+    }
+    
+    // Sports information
+    if (profile.sports && profile.sports.length > 0) {
+      contextParts.push(`\n**Sports & Skill Level:**`);
+      profile.sports.forEach((sport, index) => {
+        const sportInfo: string[] = [];
+        sportInfo.push(`${sport.sport}`);
+        if (sport.skillLevel) sportInfo.push(`skill: ${sport.skillLevel}`);
+        if (sport.yearsPlaying) sportInfo.push(`experience: ${sport.yearsPlaying} years`);
+        if (sport.playingStyle) sportInfo.push(`style: ${sport.playingStyle}`);
+        if (sport.clubName) sportInfo.push(`club: ${sport.clubName}`);
+        if (sport.preferredSurfaces && sport.preferredSurfaces.length > 0) {
+          sportInfo.push(`preferred surfaces: ${sport.preferredSurfaces.join(", ")}`);
+        }
+        if (sport.goals && sport.goals.length > 0) {
+          sportInfo.push(`goals: ${sport.goals.join(", ")}`);
+        }
+        contextParts.push(`  ${index + 1}. ${sportInfo.join(" • ")}`);
+      });
+    }
+    
+    // Equipment
+    if (profile.equipment && profile.equipment.length > 0) {
+      contextParts.push(`\n**Equipment:**`);
+      profile.equipment.forEach((eq, index) => {
+        const eqInfo: string[] = [];
+        eqInfo.push(`${eq.equipmentType} for ${eq.sport}`);
+        if (eq.brand) eqInfo.push(`brand: ${eq.brand}`);
+        if (eq.modelName) eqInfo.push(`model: ${eq.modelName}`);
+        contextParts.push(`  ${index + 1}. ${eqInfo.join(" • ")}`);
+      });
+    }
+    
+    // Coach profile
+    if (profile.coach) {
+      contextParts.push(`\n**Coach Profile:**`);
+      const coachInfo: string[] = [];
+      if (profile.coach.coachingLevel) coachInfo.push(`level: ${profile.coach.coachingLevel}`);
+      if (profile.coach.yearsExperience) coachInfo.push(`experience: ${profile.coach.yearsExperience} years`);
+      if (profile.coach.employmentType) coachInfo.push(`employment: ${profile.coach.employmentType}`);
+      if (profile.coach.clientCount) coachInfo.push(`clients: ${profile.coach.clientCount}`);
+      if (profile.coach.specialties && profile.coach.specialties.length > 0) {
+        coachInfo.push(`specialties: ${profile.coach.specialties.join(", ")}`);
+      }
+      if (profile.coach.affiliation) coachInfo.push(`affiliation: ${profile.coach.affiliation}`);
+      if (profile.coach.usesVideoAnalysis !== undefined) {
+        coachInfo.push(`uses video analysis: ${profile.coach.usesVideoAnalysis ? "yes" : "no"}`);
+      }
+      if (coachInfo.length > 0) {
+        contextParts.push(`- ${coachInfo.join(" • ")}`);
+      }
+      
+      if (profile.coach.coachSports && profile.coach.coachSports.length > 0) {
+        contextParts.push(`- **Coach Sports & Certifications:**`);
+        profile.coach.coachSports.forEach((cs, index) => {
+          const csInfo: string[] = [];
+          csInfo.push(`${cs.sport}`);
+          if (cs.certifications && cs.certifications.length > 0) {
+            csInfo.push(`certifications: ${cs.certifications.join(", ")}`);
+          }
+          contextParts.push(`  ${index + 1}. ${csInfo.join(" • ")}`);
+        });
+      }
+    }
+    
+    // Business profile
+    if (profile.business) {
+      contextParts.push(`\n**Business Profile:**`);
+      const businessInfo: string[] = [];
+      businessInfo.push(`company: ${profile.business.companyName}`);
+      if (profile.business.businessType) businessInfo.push(`type: ${profile.business.businessType}`);
+      if (profile.business.role) businessInfo.push(`role: ${profile.business.role}`);
+      if (profile.business.companySize) businessInfo.push(`size: ${profile.business.companySize}`);
+      if (profile.business.country) businessInfo.push(`country: ${profile.business.country}`);
+      if (profile.business.website) businessInfo.push(`website: ${profile.business.website}`);
+      if (businessInfo.length > 0) {
+        contextParts.push(`- ${businessInfo.join(" • ")}`);
+      }
+      
+      if (profile.business.useCases && profile.business.useCases.length > 0) {
+        contextParts.push(`- **Use Cases:** ${profile.business.useCases.join(", ")}`);
+      }
+    }
+    
+    contextParts.push(`\n**How to Use Profile Information:**`);
+    contextParts.push(`- Use this profile data to personalize your coaching advice and analysis`);
+    contextParts.push(`- Consider the user's skill level, experience, and goals when providing recommendations`);
+    contextParts.push(`- Adapt your technical explanations to match their skill level`);
+    contextParts.push(`- Reference their playing style, preferred surfaces, and equipment when relevant`);
+    if (profile.coach) {
+      contextParts.push(`- Since the user is a coach, you can provide more advanced technical insights and coaching methodologies`);
+      contextParts.push(`- Consider their coaching level and specialties when discussing training approaches`);
+    }
+    if (profile.business) {
+      contextParts.push(`- Since the user represents a business, consider their use cases and business type when providing recommendations`);
+      contextParts.push(`- They may be using SportAI for player analysis, content creation, or coach training`);
+    }
+    contextParts.push(`- Keep profile references natural and contextual - don't list all profile data unless directly relevant`);
+  }
+  
+  if (contextParts.length === 0) {
+    return "";
+  }
+  
+  return `\n\n**User Context:**\n${contextParts.join("\n")}`;
 }
 
 /**
@@ -607,17 +852,25 @@ function getUserContextPrompt(userContext?: UserContext): string {
  * @param domainExpertise - Selected domain expertise
  * @param insightLevel - Selected insight level (beginner/developing/advanced)
  * @param userContext - Optional user context for personalization
+ * @param hasVideo - Whether a video/image is present in the current message (default: true for backward compatibility)
  * @returns Complete system prompt with all enhancements
  */
 export function getSystemPromptWithDomainAndInsight(
   domainExpertise: DomainExpertise,
   insightLevel: InsightLevel,
-  userContext?: UserContext
+  userContext?: UserContext,
+  hasVideo: boolean = true
 ): string {
   const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS[domainExpertise] || "";
   const insightEnhancement = INSIGHT_LEVEL_PROMPTS[insightLevel] || "";
   const userContextPrompt = getUserContextPrompt(userContext);
-  return `${SYSTEM_PROMPT}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
+  
+  // Conditionally include video analysis instructions and formatting guidelines only when video is present
+  const videoInstructions = hasVideo ? VIDEO_ANALYSIS_INSTRUCTIONS : "";
+  const formattingGuidelines = hasVideo ? FORMATTING_GUIDELINES : "";
+  
+  // Build prompt: base + conditional video instructions + conditional formatting + enhancements
+  return `${SYSTEM_PROMPT_BASE}${videoInstructions}${formattingGuidelines}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
 }
 
 /**

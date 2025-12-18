@@ -53,6 +53,7 @@ interface DeveloperInfoProps {
   cacheName?: string;
   modelUsed?: string;
   modelReason?: string;
+  hasVideo?: boolean;
 }
 
 /**
@@ -97,6 +98,7 @@ export function DeveloperInfo({
   cacheName,
   modelUsed,
   modelReason,
+  hasVideo,
 }: DeveloperInfoProps) {
   if (!show) return null;
 
@@ -108,8 +110,9 @@ export function DeveloperInfo({
   const hasContextUsage = !!contextUsage && contextUsage.messagesInContext > 0;
   const hasCacheInfo = cacheUsed !== undefined;
   const hasTTSData = ttsUsage.requestCount > 0;
+  const hasVideoInfo = hasVideo !== undefined;
   
-  const hasAnyData = hasTokenData || hasTimingData || hasModelData || hasModelSettings || hasContextUsage || hasCacheInfo || hasTTSData;
+  const hasAnyData = hasTokenData || hasTimingData || hasModelData || hasModelSettings || hasContextUsage || hasCacheInfo || hasTTSData || hasVideoInfo;
   
   // Debug: Log what data is available (only in development)
   if (process.env.NODE_ENV === 'development' && !hasAnyData) {
@@ -238,6 +241,16 @@ export function DeveloperInfo({
                 </span>
               ) : (
                 <span style={{ color: "var(--gray-10)" }}>Not cached (video &lt; 22MB or first request)</span>
+              )}
+            </Text>
+          )}
+          {hasVideoInfo && (
+            <Text size="1">
+              <strong>Media:</strong>{" "}
+              {hasVideo ? (
+                <span style={{ color: "var(--blue-11)" }}>Video/image provided</span>
+              ) : (
+                <span style={{ color: "var(--gray-10)" }}>Text-only query</span>
               )}
             </Text>
           )}

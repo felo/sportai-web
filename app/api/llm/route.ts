@@ -4,9 +4,10 @@ import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
 import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse, type RateLimitTier } from "@/lib/rate-limit";
-import { getAuthenticatedUser } from "@/lib/supabase-server";
+import { getAuthenticatedUser, getSupabaseAdmin } from "@/lib/supabase-server";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
-import type { PromptType } from "@/lib/prompts";
+import type { PromptType, UserContext } from "@/lib/prompts";
+import type { FullProfile } from "@/types/profile";
 
 // Ensure this route uses Node.js runtime (required for file uploads and Buffer)
 export const runtime = "nodejs";
@@ -130,17 +131,6 @@ export async function POST(request: NextRequest) {
     logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
     logger.debug(`[${requestId}] User: ${userFirstName || "anonymous"}`);
     
-    // Build user context for personalization
-    const userContext = userFirstName ? { firstName: userFirstName } : undefined;
-
-    if (!prompt || typeof prompt !== "string") {
-      logger.error(`[${requestId}] Validation failed: Prompt is required`);
-      return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 }
-      );
-    }
-
     // Parse conversation history if provided
     let conversationHistory: ConversationHistory[] | undefined;
     if (historyJson) {
@@ -151,6 +141,129 @@ export async function POST(request: NextRequest) {
         logger.error(`[${requestId}] Failed to parse conversation history, continuing without it:`, error);
         conversationHistory = undefined;
       }
+    }
+    
+    // Check if this is the first message (no conversation history)
+    const isFirstMessage = !conversationHistory || conversationHistory.length === 0;
+    
+    // Build user context for personalization
+    // For first message, fetch full profile if user is authenticated
+    let userContext: UserContext | undefined = userFirstName ? { firstName: userFirstName } : undefined;
+    
+    // Fetch profile data for first message if user is authenticated
+    if (isFirstMessage && user) {
+      try {
+        logger.debug(`[${requestId}] Fetching profile for first message`);
+        const supabase = getSupabaseAdmin();
+        
+        // Fetch all profile data in parallel
+        const [
+          profileResult,
+          sportsResult,
+          equipmentResult,
+          coachResult,
+          coachSportsResult,
+          businessResult,
+        ] = await Promise.all([
+          supabase.from("profiles").select("*").eq("id", user.id).single(),
+          supabase.from("player_sports").select("*").eq("profile_id", user.id),
+          supabase.from("player_equipment").select("*").eq("profile_id", user.id),
+          supabase.from("coach_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
+          // Note: coach_sports uses coach_profile_id which references coach_profiles.profile_id
+          // We need to fetch coach_sports after we know the coach profile exists
+          supabase.from("coach_sports").select("*").eq("coach_profile_id", user.id),
+          supabase.from("business_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
+        ]);
+        
+        if (!profileResult.error && profileResult.data) {
+          const profileData = profileResult.data;
+          const sports = (sportsResult.data || []) as any[];
+          const equipment = (equipmentResult.data || []) as any[];
+          const coach = coachResult.data as any;
+          const coachSports = (coachSportsResult.data || []) as any[];
+          const business = businessResult.data as any;
+          
+          // Transform profile data to UserContext format
+          userContext = {
+            firstName: userFirstName || profileData.full_name?.split(" ")[0] || undefined,
+            profile: {
+              handedness: profileData.handedness as "left" | "right" | "ambidextrous" | undefined,
+              gender: profileData.gender as "male" | "female" | "non-binary" | "prefer-not-to-say" | undefined,
+              dateOfBirth: profileData.date_of_birth || undefined,
+              height: profileData.height || undefined,
+              weight: profileData.weight || undefined,
+              physicalLimitations: profileData.physical_limitations || undefined,
+              unitsPreference: (profileData.units_preference as "metric" | "imperial") || undefined,
+              sports: sports.map(sport => ({
+                sport: sport.sport,
+                skillLevel: sport.skill_level,
+                yearsPlaying: sport.years_playing,
+                playingStyle: sport.playing_style || undefined,
+                preferredSurfaces: sport.preferred_surfaces || [],
+                goals: sport.goals || [],
+                clubName: sport.club_name || undefined,
+              })),
+              equipment: equipment.map(eq => ({
+                sport: eq.sport,
+                equipmentType: eq.equipment_type,
+                brand: eq.brand || undefined,
+                modelName: eq.model_name || undefined,
+              })),
+              // Add coach profile if available
+              ...(coach && !coachResult.error ? {
+                coach: {
+                  isActive: coach.is_active,
+                  yearsExperience: coach.years_experience,
+                  coachingLevel: coach.coaching_level,
+                  employmentType: coach.employment_type,
+                  clientCount: coach.client_count,
+                  specialties: coach.specialties || [],
+                  affiliation: coach.affiliation || undefined,
+                  usesVideoAnalysis: coach.uses_video_analysis,
+                  coachSports: coachSports.map(cs => ({
+                    sport: cs.sport,
+                    certifications: cs.certifications || [],
+                  })),
+                },
+              } : {}),
+              // Add business profile if available
+              ...(business && !businessResult.error ? {
+                business: {
+                  companyName: business.company_name,
+                  website: business.website || undefined,
+                  role: business.role,
+                  companySize: business.company_size,
+                  country: business.country || undefined,
+                  businessType: business.business_type,
+                  useCases: business.use_cases || [],
+                },
+              } : {}),
+            },
+          };
+          
+          const profileInfo = [
+            `${sports.length} sports`,
+            `${equipment.length} equipment items`,
+            coach && !coachResult.error ? "coach profile" : null,
+            business && !businessResult.error ? "business profile" : null,
+          ].filter(Boolean).join(", ");
+          
+          logger.debug(`[${requestId}] Profile loaded: ${profileInfo}`);
+        } else {
+          logger.debug(`[${requestId}] No profile found or error: ${profileResult.error?.message || "not found"}`);
+        }
+      } catch (error) {
+        logger.warn(`[${requestId}] Failed to fetch profile for first message:`, error);
+        // Continue with basic userContext if profile fetch fails
+      }
+    }
+
+    if (!prompt || typeof prompt !== "string") {
+      logger.error(`[${requestId}] Validation failed: Prompt is required`);
+      return NextResponse.json(
+        { error: "Prompt is required" },
+        { status: 400 }
+      );
     }
 
     let videoData: { data: Buffer; mimeType: string } | null = null;
@@ -339,6 +452,7 @@ export async function POST(request: NextRequest) {
               cacheUsed: streamResult.cacheUsed,
               modelUsed: streamResult.modelUsed,
               modelReason: streamResult.modelReason,
+              hasVideo: hasVideo,
             });
             try {
               controller.enqueue(new TextEncoder().encode(`\n__STREAM_META__${streamMetadata}`));
@@ -421,6 +535,7 @@ export async function POST(request: NextRequest) {
       cacheUsed: llmResponse.cacheUsed,
       modelUsed: llmResponse.modelUsed,
       modelReason: llmResponse.modelReason,
+      hasVideo: hasVideo,
     });
   } catch (error) {
     const duration = Date.now() - startTime;
