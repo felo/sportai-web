@@ -6,6 +6,7 @@ import { getCurrentChatId } from "@/utils/storage-unified";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { hasCompletedInsightOnboarding } from "@/utils/storage";
 import { generateMessageId } from "../utils";
+import { DEMO_VIDEOS } from "@/components/tasks/sampleTasks";
 
 // =============================================================================
 // Shared message content - defined once, reused across options
@@ -31,24 +32,15 @@ const getOnboardingGreeting = (name: string) =>
   `Hi ${name}, now that you've signed in, let me tailor my responses better to your needs.\n\nHow detailed would you like me to be when answering?`;
 
 // =============================================================================
-// Demo video options
+// Demo video options - derived from shared DEMO_VIDEOS constant
 // =============================================================================
 
-const DEMO_VIDEO_OPTIONS: CandidateOption[] = [
-  {
-    id: "demo-tennis-serve",
-    text: "Technique Analysis of a Tennis Serve",
-    premadeResponse: "Analyzing the Tennis Serve Demo video...",
-    demoVideoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4",
-  },
-  {
-    id: "demo-padel-match",
-    text: "Padel Match (Back-Mounted Camera)",
-    premadeResponse: "Analyzing the Padel Match Demo video…",
-    demoVideoUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.mp4",
-    demoPoseDataUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.json",
-  },
-];
+const DEMO_VIDEO_OPTIONS: CandidateOption[] = DEMO_VIDEOS.map(demo => ({
+  id: demo.id,
+  text: demo.text,
+  premadeResponse: demo.premadeResponse,
+  demoVideoUrl: demo.demoVideoUrl,
+}));
 
 // =============================================================================
 // Reusable option builders

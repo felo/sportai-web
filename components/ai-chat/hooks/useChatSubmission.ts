@@ -13,6 +13,7 @@
  import { generateMessageId, stripStreamMetadata, calculateUserMessageTokens } from "../utils";
  import type { ProgressStage } from "../types";
  import type { StarterPromptConfig } from "@/utils/prompts";
+ import { getDemoVideoByUrl } from "@/components/tasks/sampleTasks";
 
 interface UseChatSubmissionOptions {
   // State
@@ -419,12 +420,11 @@ export function useChatSubmission({
       if (chatId === requestChatId) {
         updateMessage(assistantMessageId, { isStreaming: false });
         
-        // Add Technique Studio prompt after analysis completes
+        // Add Studio prompt after analysis completes
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Check if this is the demo video - link to sample task in library
-        const DEMO_VIDEO_URL = "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4";
-        const isDemoVideo = currentVideoUrl === DEMO_VIDEO_URL;
+        // Look up demo video config to get sample task ID and analysis type
+        const demoConfig = getDemoVideoByUrl(currentVideoUrl);
         
         const studioPromptId = generateMessageId();
         const studioPromptMessage: Message = {
@@ -434,7 +434,8 @@ export function useChatSubmission({
           messageType: "technique_studio_prompt",
           techniqueStudioPrompt: {
             videoUrl: currentVideoUrl,
-            taskId: isDemoVideo ? "sample-tennis-serve" : undefined,
+            taskId: demoConfig?.sampleTaskId,
+            analysisType: demoConfig?.analysisType,
           },
         };
         addMessage(studioPromptMessage);

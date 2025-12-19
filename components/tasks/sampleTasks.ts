@@ -9,6 +9,71 @@ export interface SampleTask extends Task {
   poseDataUrl?: string;
 }
 
+// =============================================================================
+// Demo Video Configuration
+// =============================================================================
+
+/**
+ * Analysis type determines which studio to show after analysis.
+ * - "technique" → Technique Studio (TechniqueViewer) - for swing/form analysis
+ * - "match" → Match Studio (TaskViewer) - for rally/tactical analysis
+ */
+export type AnalysisType = "technique" | "match";
+
+/**
+ * Demo video configuration for chat examples.
+ * Maps demo video URLs to their corresponding sample tasks and analysis types.
+ */
+export interface DemoVideoConfig {
+  /** Unique identifier for the demo */
+  id: string;
+  /** Display text shown in chat options */
+  text: string;
+  /** Response text shown when demo is selected */
+  premadeResponse: string;
+  /** URL of the demo video used for LLM analysis in chat */
+  demoVideoUrl: string;
+  /** ID of the sample task to navigate to after analysis */
+  sampleTaskId: string;
+  /** Type of analysis - determines which studio prompt and viewer to use */
+  analysisType: AnalysisType;
+}
+
+/**
+ * Demo videos shown in the chat greeting.
+ * Single source of truth for demo video configuration.
+ */
+export const DEMO_VIDEOS: DemoVideoConfig[] = [
+  {
+    id: "demo-tennis-serve",
+    text: "Technique Analysis of a Tennis Serve",
+    premadeResponse: "Analyzing the Tennis Serve Demo video...",
+    demoVideoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4",
+    sampleTaskId: "sample-tennis-serve",
+    analysisType: "technique",
+  },
+  {
+    id: "demo-padel-match",
+    text: "Padel Match (Back-Mounted Camera)",
+    premadeResponse: "Analyzing the Padel Match Demo video…",
+    demoVideoUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample-micro.mp4",
+    sampleTaskId: "sample-padel-match-one",
+    analysisType: "match",
+  },
+];
+
+/**
+ * Look up demo video config by URL.
+ * Returns undefined if the URL is not a known demo video.
+ */
+export function getDemoVideoByUrl(url: string): DemoVideoConfig | undefined {
+  return DEMO_VIDEOS.find(demo => demo.demoVideoUrl === url);
+}
+
+// =============================================================================
+// Sample Tasks (Library)
+// =============================================================================
+
 /**
  * Sample tasks that are shown to all users in the Library.
  * These are hardcoded demo videos that don't require API calls.
@@ -42,11 +107,11 @@ export const SAMPLE_TASKS: SampleTask[] = [
     task_type: "statistics",
     sport: "padel",
     sportai_task_id: null,
-    video_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/match-report-analysis-sample.mp4",
+    video_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.mp4",
     video_s3_key: null,
-    thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/match-report-analysis-sample-thumbnail.jpg",
+    thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample-thumbnail.jpg",
     thumbnail_s3_key: null,
-    video_length: 600, // 10 minutes
+    video_length: 525, // 10 minutes
     status: "completed",
     estimated_compute_time: null,
     request_params: null,

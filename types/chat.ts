@@ -97,10 +97,13 @@ export type Message = {
   poseDataS3Key?: string | null; // S3 key for preprocessed pose detection data
   // Technique LITE eligibility - enables pose preprocessing when true (side camera + < 20s)
   isTechniqueLiteEligible?: boolean;
-  // Technique Studio prompt (for messageType === "technique_studio_prompt")
+  // Studio prompt (for messageType === "technique_studio_prompt")
+  // Note: messageType is still "technique_studio_prompt" for backward compatibility,
+  // but analysisType determines which studio (Technique or Match) to show
   techniqueStudioPrompt?: {
     videoUrl: string;
-    taskId?: string; // If a technique task was already created
+    taskId?: string; // If a task was already created
+    analysisType?: "technique" | "match"; // Determines which studio to show
   };
 };
 

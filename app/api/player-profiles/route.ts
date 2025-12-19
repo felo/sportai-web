@@ -3,8 +3,8 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-
 import { logger } from "@/lib/logger";
 import type { PlayerProfileData, PlayerProfile, PlayerProfileResponse } from "@/types/player-profile";
 
-// Use Gemini Flash for fast profile generation
-const MODEL_NAME = "gemini-2.0-flash";
+// Use Gemini 3 Flash for fast profile generation
+const MODEL_NAME = "gemini-3-flash-preview";
 
 // Ensure this route uses Node.js runtime
 export const runtime = "nodejs";

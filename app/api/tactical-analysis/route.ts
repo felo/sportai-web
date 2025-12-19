@@ -11,8 +11,8 @@ import type {
   PlayerAllBallTypesData,
 } from "@/types/tactical-analysis";
 
-// Use Gemini 2.0 Flash for tactical analysis (fast, text-only structured data)
-const MODEL_NAME = "gemini-2.0-flash";
+// Use Gemini 3 Flash for tactical analysis (fast, text-only structured data)
+const MODEL_NAME = "gemini-3-flash-preview";
 
 // Ensure this route uses Node.js runtime
 export const runtime = "nodejs";

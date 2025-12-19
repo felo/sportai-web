@@ -12,8 +12,8 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 30; // 30 seconds max for frame analysis
 
-// Use Gemini 3 Pro - same model used for main chat, best reasoning
-const PRO_MODEL = "gemini-3-pro-preview";
+// Use Gemini 3 Flash - same model used for main chat, best reasoning
+const PRO_MODEL = "gemini-3-flash-preview";
 
 // Lazy initialization
 let genAI: GoogleGenerativeAI | null = null;

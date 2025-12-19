@@ -592,6 +592,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                   <TechniqueStudioPrompt
                     videoUrl={message.techniqueStudioPrompt.videoUrl}
                     taskId={message.techniqueStudioPrompt.taskId}
+                    analysisType={message.techniqueStudioPrompt.analysisType}
                     onOpenStudio={() => onOpenTechniqueStudio?.(
                       message.techniqueStudioPrompt!.videoUrl,
                       message.techniqueStudioPrompt!.taskId
