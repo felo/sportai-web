@@ -10,6 +10,7 @@ export type CandidateOption = {
   followUpOptions?: CandidateOption[]; // Optional follow-up options to show after this response
   demoVideoUrl?: string; // If set, triggers video analysis with this URL (no upload needed)
   demoVideoS3Key?: string; // If set, fetches presigned URL from this S3 key before analysis
+  demoPoseDataUrl?: string; // Optional direct URL to pose data JSON for demo videos (for public buckets)
   action?: "sign_in" | "set_insight_beginner" | "set_insight_developing" | "set_insight_advanced"; // If set, triggers a special action instead of showing premadeResponse
 };
 

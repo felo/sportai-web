@@ -38,7 +38,7 @@ export async function generateAIChatTitle(messages: Message[], accessToken?: str
     // Use first 300 chars of the analysis to generate a meaningful title
     const analysisExcerpt = analysisResponse.content.trim().slice(0, 300);
     
-    const titlePrompt = `Generate a concise, descriptive title (maximum 6 words) for this sports video analysis. The title should capture what was analyzed (sport, shot type, technique, etc.). Examples: "Tennis Forehand Technique Analysis", "Padel Serve Form Review", "Basketball Free Throw Breakdown".
+    const titlePrompt = `Generate a concise, descriptive title (minimum 3 characters, maximum 50 characters) for this sports video analysis. The title should capture what was analyzed (sport, shot type, technique, etc.). Examples: "Tennis Forehand Technique Analysis", "Padel Serve Form Review", "Basketball Free Throw Breakdown". It should not be something generic as upload video or tutorial content.
 
 Analysis excerpt:
 ${analysisExcerpt}
@@ -68,12 +68,12 @@ Title:`;
     const data = await response.json();
     const title = data.response?.trim();
     
-    if (!title) {
+    if (!title || title.length < 3) {
       return "Video Analysis";
     }
     
-    // Ensure title is reasonable length
-    return title.length > 60 ? title.slice(0, 57) + "..." : title;
+    // Ensure title is maximum 50 characters
+    return title.length > 50 ? title.slice(0, 47) + "..." : title;
   } catch (error) {
     storageLogger.error("Failed to generate AI title:", error);
     return "Video Analysis";

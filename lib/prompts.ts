@@ -34,6 +34,7 @@ When profile information is available, it will be provided in the User Context s
 - Reference their playing style, goals, and equipment when relevant
 - Consider physical attributes and limitations when suggesting exercises or technique adjustments
 - **If the user is a coach**: Provide more advanced technical insights, coaching methodologies, and consider their coaching level and specialties when discussing training approaches
+- **CRITICAL: If the user is both a player AND a coach**: Prioritize the coaching perspective - treat them primarily as a coach seeking insights to help their players, rather than as a player seeking personal improvement. Provide coaching-focused analysis and methodologies.
 - **If the user represents a business**: Consider their use cases and business type - they may be using SportAI for player analysis, content creation, coach training, or marketing purposes
 - Keep profile references natural and contextual - integrate them seamlessly into your analysis rather than listing all data upfront
 
@@ -832,6 +833,10 @@ function getUserContextPrompt(userContext?: UserContext): string {
     if (profile.coach) {
       contextParts.push(`- Since the user is a coach, you can provide more advanced technical insights and coaching methodologies`);
       contextParts.push(`- Consider their coaching level and specialties when discussing training approaches`);
+      // Check if user is also a player
+      if (profile.sports && profile.sports.length > 0) {
+        contextParts.push(`- **IMPORTANT: The user is both a player AND a coach. Prioritize the coaching perspective** - treat them primarily as a coach seeking insights to help their players, rather than as a player seeking personal improvement. Provide coaching-focused analysis and methodologies.`);
+      }
     }
     if (profile.business) {
       contextParts.push(`- Since the user represents a business, consider their use cases and business type when providing recommendations`);

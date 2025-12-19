@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flex, Button, Dialog, TextField, AlertDialog } from "@radix-ui/themes";
+import { Box, Flex, Button, Dialog, TextField, AlertDialog, Text } from "@radix-ui/themes";
 import { SupabaseDebug } from "@/components/auth/SupabaseDebug";
 import { ContextDebugDialog, RedisDebugDialog } from "@/components/debug";
 import buttonStyles from "@/styles/buttons.module.css";
@@ -28,13 +28,17 @@ export function SidebarDialogs({
   closeSidebar,
 }: SidebarDialogsProps) {
   const handleSaveEdit = async () => {
-    if (editTitle.trim() && editingChat) {
-      await onEditChatSave(editingChat.id, editTitle.trim());
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle && trimmedTitle.length >= 3 && trimmedTitle.length <= 50 && editingChat) {
+      await onEditChatSave(editingChat.id, trimmedTitle);
       setEditDialogOpen(false);
       setEditingChat(null);
       setEditTitle("");
     }
   };
+
+  const trimmedTitle = editTitle.trim();
+  const isValid = trimmedTitle.length >= 3 && trimmedTitle.length <= 50;
 
   return (
     <>
@@ -83,13 +87,27 @@ export function SidebarDialogs({
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder="Chat name"
+              maxLength={50}
               onKeyDown={async (e) => {
-                if (e.key === "Enter" && editTitle.trim() && editingChat) {
+                if (e.key === "Enter" && isValid && editingChat) {
                   e.preventDefault();
                   await handleSaveEdit();
                 }
               }}
             />
+            <Text 
+              size="1" 
+              color={
+                trimmedTitle.length > 50 
+                  ? "red" 
+                  : trimmedTitle.length > 0 && trimmedTitle.length < 3 
+                  ? "red" 
+                  : "gray"
+              }
+            >
+              {editTitle.length}/50 characters
+              {trimmedTitle.length > 0 && trimmedTitle.length < 3 && " (minimum 3 characters)"}
+            </Text>
 
             <Flex gap="3" justify="end" mt="2">
               <Dialog.Close>
@@ -100,7 +118,7 @@ export function SidebarDialogs({
               <Button
                 className={buttonStyles.actionButtonSquare}
                 onClick={handleSaveEdit}
-                disabled={!editTitle.trim()}
+                disabled={!isValid}
               >
                 Save
               </Button>

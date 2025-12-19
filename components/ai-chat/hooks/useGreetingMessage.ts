@@ -37,21 +37,16 @@ const getOnboardingGreeting = (name: string) =>
 const DEMO_VIDEO_OPTIONS: CandidateOption[] = [
   {
     id: "demo-tennis-serve",
-    text: "Tennis serve technique analysis",
-    premadeResponse: "Analyzing the tennis serve demo...",
+    text: "Technique Analysis of a Tennis Serve",
+    premadeResponse: "Analyzing the Tennis Serve Demo video...",
     demoVideoUrl: "https://res.cloudinary.com/djtxhrly7/video/upload/v1763677270/Serve.mp4",
   },
   {
     id: "demo-padel-match",
-    text: "Padel match (10 min, back camera)",
-    premadeResponse: "Analyzing the padel match demo...\n\nThis 10-minute doubles match will show tactical analysis including court positioning, shot selection, and movement patterns.",
-    demoVideoS3Key: "test/1765293768560_nthug5r97_3g2AQVBSF1M_003.mp4",
-  },
-  {
-    id: "demo-tennis-match",
-    text: "Tennis match (10 min, back camera)",
-    premadeResponse: "Great choice! Loading the Tennis match analysis...\n\nThis demo shows full match analysis including rally patterns, court coverage, and strategic insights.",
-    // TODO: Add demoVideoUrl when ready
+    text: "Padel Match (Back-Mounted Camera)",
+    premadeResponse: "Analyzing the Padel Match Demo video…",
+    demoVideoUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.mp4",
+    demoPoseDataUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.json",
   },
 ];
 
@@ -199,7 +194,7 @@ export function useGreetingMessage({
   updateMessage,
 }: UseGreetingMessageProps) {
   // Get auth state
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   
   // Track current chat ID to detect changes
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -232,8 +227,8 @@ export function useGreetingMessage({
 
   // Effect to add the greeting when chat is empty
   useEffect(() => {
-    // Don't proceed if not ready
-    if (!isHydrated || loading || !currentChatId) {
+    // Don't proceed if not ready - wait for both chat and auth to be ready
+    if (!isHydrated || loading || authLoading || !currentChatId) {
       return;
     }
 
@@ -334,7 +329,7 @@ export function useGreetingMessage({
     };
     
     setTimeout(typeNextChar, typingSpeed);
-  }, [isHydrated, loading, currentChatId, addMessage, updateMessage, user, profile]);
+  }, [isHydrated, loading, authLoading, currentChatId, addMessage, updateMessage, user, profile]);
 }
 
 // Export the options for use elsewhere if needed
