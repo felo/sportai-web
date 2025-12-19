@@ -10,9 +10,9 @@ import {
 import { getSystemPromptWithDomainAndInsight, getFramePromptWithDomainAndInsight, type PromptType, type UserContext } from "./prompts";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
 
-// Model selection: Use Gemini 3 Flash for all main queries
+// Model selection: Gemini 3 Flash for complex, Gemini 2.5 Flash for simple
 const MODEL_NAME_PRO = "gemini-3-flash-preview";
-const MODEL_NAME_FLASH = "gemini-3-flash-preview";
+const MODEL_NAME_FLASH = "gemini-2.5-flash";
 
 // Minimum tokens for explicit caching (Gemini requirement: 32,768 tokens)
 // ~22MB of video content
