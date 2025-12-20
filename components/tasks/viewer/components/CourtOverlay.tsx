@@ -4,12 +4,36 @@ import { useEffect, useRef, RefObject } from "react";
 
 type Sport = "padel" | "tennis" | "pickleball" | "all";
 
+interface BallBounce {
+  timestamp: number;
+  court_pos: [number, number]; // [X, Y] in meters - for padel: X: 0-10m, Y: 0-20m (net at 10m)
+  player_id: number;
+  type: string;
+}
+
+interface BallPosition {
+  timestamp: number;
+  X: number; // Normalized 0-1
+  Y: number; // Normalized 0-1
+}
+
+interface Swing {
+  start: { timestamp: number; frame_nr: number };
+  end: { timestamp: number; frame_nr: number };
+  ball_hit: { timestamp: number; frame_nr: number };
+  ball_hit_location?: [number, number]; // Court position [X, Y] in meters
+  player_id: number;
+}
+
 interface CourtOverlayProps {
   courtKeypoints: ([number, number] | [null, null])[];
   videoRef: RefObject<HTMLVideoElement | null>;
   isFullscreen?: boolean;
   isVideoReady?: boolean;
   sport?: Sport;
+  ballBounces?: BallBounce[]; // For ball zone prediction
+  ballPositions?: BallPosition[]; // For velocity calculation
+  swings?: Swing[]; // Swings as position anchors
 }
 
 // =============================================================================
@@ -158,12 +182,23 @@ function getCourtConfig(sport: Sport) {
   };
 }
 
+// Padel court dimensions in meters
+const PADEL_COURT_LENGTH = 20; // 20 meters total length
+const PADEL_NET_POSITION = 10; // Net is at 10m (middle)
+
+// Time constants for ball zone prediction
+const BALL_ZONE_FADE_DURATION = 2.0; // Fade out over 2 seconds
+const BALL_ZONE_MAX_OPACITY = 0.25; // Maximum opacity for the zone highlight
+
 export function CourtOverlay({
   courtKeypoints,
   videoRef,
   isFullscreen = false,
   isVideoReady = false,
   sport = "padel",
+  ballBounces = [],
+  ballPositions = [],
+  swings = [],
 }: CourtOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>(0);
@@ -180,6 +215,7 @@ export function CourtOverlay({
     const { lines: courtLines, colors: keypointColors } = getCourtConfig(sport);
 
     const draw = () => {
+      const currentTime = video.currentTime;
       // Get the actual video element dimensions
       const videoRect = video.getBoundingClientRect();
       const videoWidth = videoRect.width;
@@ -216,6 +252,271 @@ export function CourtOverlay({
 
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // =============================================================================
+      // BALL ZONE PREDICTION (Padel only for now)
+      // =============================================================================
+      // Spectrum bar: Near Side (left) ←→ Far Side (right)
+      // Uses bounces, swings, and ball velocity to predict position
+      if (sport === "padel") {
+        // Combine bounces and swings as position anchors
+        type PositionAnchor = {
+          timestamp: number;
+          courtY: number; // Y position in meters (0-20, net at 10)
+          type: "bounce" | "swing";
+        };
+        
+        const anchors: PositionAnchor[] = [];
+        
+        // Add bounces
+        for (const bounce of ballBounces) {
+          anchors.push({
+            timestamp: bounce.timestamp,
+            courtY: bounce.court_pos[1],
+            type: "bounce",
+          });
+        }
+        
+        // Add swings (if they have ball_hit_location)
+        for (const swing of swings) {
+          if (swing.ball_hit_location) {
+            anchors.push({
+              timestamp: swing.ball_hit.timestamp,
+              courtY: swing.ball_hit_location[1],
+              type: "swing",
+            });
+          }
+        }
+        
+        // Sort anchors by timestamp
+        anchors.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Find the most recent anchor before current time
+        const recentAnchor = [...anchors]
+          .filter(a => a.timestamp <= currentTime)
+          .pop();
+        
+        // Calculate ball velocity from recent positions
+        let velocityY = 0; // Positive = moving toward near side, Negative = moving toward far side
+        if (ballPositions.length >= 2) {
+          // Find positions near current time
+          const nearbyPositions = ballPositions
+            .filter(p => Math.abs(p.timestamp - currentTime) < 0.5)
+            .sort((a, b) => a.timestamp - b.timestamp);
+          
+          if (nearbyPositions.length >= 2) {
+            const recent = nearbyPositions[nearbyPositions.length - 1];
+            const previous = nearbyPositions[nearbyPositions.length - 2];
+            const dt = recent.timestamp - previous.timestamp;
+            if (dt > 0) {
+              // In pixel coords: higher Y = near side, lower Y = far side
+              // So positive velocity = moving toward near side
+              velocityY = (recent.Y - previous.Y) / dt;
+            }
+          }
+        }
+        
+        // Calculate estimated court Y position
+        let estimatedCourtY = PADEL_NET_POSITION; // Default to net (middle)
+        let certainty = 0;
+        let timeSinceAnchor = 0;
+        
+        if (recentAnchor) {
+          timeSinceAnchor = currentTime - recentAnchor.timestamp;
+          
+          // Start from anchor position
+          estimatedCourtY = recentAnchor.courtY;
+          
+          // Adjust based on velocity if we have it
+          // Map pixel velocity to court velocity (rough approximation)
+          // velocityY in pixels/sec, court is 20m, frame is roughly 0.5 of court height
+          const courtVelocity = -velocityY * 40; // Negative because pixel Y is inverted
+          
+          // Predict position based on velocity and time
+          const predictedY = recentAnchor.courtY + courtVelocity * timeSinceAnchor;
+          
+          // Blend between anchor position and velocity prediction based on time
+          const velocityWeight = Math.min(1, timeSinceAnchor * 2); // Full velocity weight after 0.5s
+          estimatedCourtY = recentAnchor.courtY * (1 - velocityWeight) + predictedY * velocityWeight;
+          
+          // Clamp to court bounds
+          estimatedCourtY = Math.max(0, Math.min(PADEL_COURT_LENGTH, estimatedCourtY));
+          
+          // Certainty decreases over time
+          certainty = Math.max(0, 1 - (timeSinceAnchor / BALL_ZONE_FADE_DURATION));
+        }
+        
+        // Always show the panel when we have any data
+        if (anchors.length > 0 || ballPositions.length > 0) {
+          // Highlight the appropriate zone
+          const ballOnFarSide = estimatedCourtY < PADEL_NET_POSITION;
+          const zoneOpacity = BALL_ZONE_MAX_OPACITY * certainty;
+          
+          if (zoneOpacity > 0.02) {
+            let zonePoints: ([number, number] | [null, null])[];
+            let zoneColor: string;
+            
+            if (ballOnFarSide) {
+              zonePoints = [
+                courtKeypoints[0], courtKeypoints[1],
+                courtKeypoints[7], courtKeypoints[6],
+              ];
+              zoneColor = "rgba(255, 150, 100, ";
+            } else {
+              zonePoints = [
+                courtKeypoints[6], courtKeypoints[7],
+                courtKeypoints[11], courtKeypoints[9],
+              ];
+              zoneColor = "rgba(100, 200, 255, ";
+            }
+            
+            const validPoints = zonePoints.filter(p => p && p[0] !== null);
+            if (validPoints.length === 4) {
+              ctx.beginPath();
+              ctx.moveTo(
+                offsetX + zonePoints[0]![0]! * displayWidth,
+                offsetY + zonePoints[0]![1]! * displayHeight
+              );
+              for (let i = 1; i < zonePoints.length; i++) {
+                ctx.lineTo(
+                  offsetX + zonePoints[i]![0]! * displayWidth,
+                  offsetY + zonePoints[i]![1]! * displayHeight
+                );
+              }
+              ctx.closePath();
+              ctx.fillStyle = zoneColor + zoneOpacity + ")";
+              ctx.fill();
+            }
+          }
+          
+          // Draw VERTICAL spectrum bar panel (positioned on left side)
+          const panelX = offsetX + 10;
+          const panelY = offsetY + 50; // Below the court keypoints legend
+          const panelWidth = isFullscreen ? 70 : 60;
+          const panelHeight = isFullscreen ? 320 : 260;
+          
+          // Panel background
+          ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+          ctx.strokeStyle = "rgba(100, 100, 100, 0.8)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+          
+          // Title (rotated or abbreviated)
+          ctx.font = `bold ${isFullscreen ? 10 : 8}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillStyle = "white";
+          ctx.fillText("🎾 Y-Pos", panelX + panelWidth / 2, panelY + 4);
+          
+          // Vertical spectrum bar
+          const barX = panelX + 10;
+          const barY = panelY + (isFullscreen ? 24 : 20);
+          const barWidth = isFullscreen ? 24 : 20;
+          const barHeight = panelHeight - (isFullscreen ? 70 : 58);
+          
+          // Gradient background: Orange (far/top) → Gray (net) → Blue (near/bottom)
+          const gradient = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+          gradient.addColorStop(0, "rgba(255, 150, 100, 0.8)");    // Far (top)
+          gradient.addColorStop(0.45, "rgba(150, 150, 150, 0.6)"); // Net area
+          gradient.addColorStop(0.55, "rgba(150, 150, 150, 0.6)"); // Net area
+          gradient.addColorStop(1, "rgba(100, 200, 255, 0.8)");    // Near (bottom)
+          
+          ctx.fillStyle = gradient;
+          ctx.fillRect(barX, barY, barWidth, barHeight);
+          
+          // Net line indicator (horizontal in middle)
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(barX, barY + barHeight / 2);
+          ctx.lineTo(barX + barWidth, barY + barHeight / 2);
+          ctx.stroke();
+          
+          // Bar border
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(barX, barY, barWidth, barHeight);
+          
+          // Position indicator (ball icon)
+          // courtY: 0 = far (top), 20 = near (bottom)
+          const positionRatio = estimatedCourtY / PADEL_COURT_LENGTH; // 0 = far (top), 1 = near (bottom)
+          const indicatorX = barX + barWidth / 2;
+          const indicatorY = barY + barHeight * positionRatio;
+          
+          // Certainty affects indicator size and opacity
+          const indicatorRadius = (isFullscreen ? 10 : 8) * (0.5 + certainty * 0.5);
+          const indicatorOpacity = 0.4 + certainty * 0.6;
+          
+          // Draw indicator glow
+          ctx.beginPath();
+          ctx.arc(indicatorX, indicatorY, indicatorRadius + 4, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${indicatorOpacity * 0.3})`;
+          ctx.fill();
+          
+          // Draw indicator
+          ctx.beginPath();
+          ctx.arc(indicatorX, indicatorY, indicatorRadius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 0, ${indicatorOpacity})`;
+          ctx.fill();
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Draw velocity arrow (vertical)
+          if (Math.abs(velocityY) > 0.05) {
+            const arrowLength = Math.min(25, Math.abs(velocityY) * 40) * (isFullscreen ? 1.2 : 1);
+            // velocityY > 0 means moving to near side (down in video), so arrow points down in bar
+            const arrowDirection = velocityY > 0 ? 1 : -1;
+            const arrowEndY = indicatorY + arrowLength * arrowDirection;
+            
+            ctx.strokeStyle = `rgba(255, 255, 255, ${indicatorOpacity})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(indicatorX, indicatorY);
+            ctx.lineTo(indicatorX, arrowEndY);
+            ctx.stroke();
+            
+            // Arrowhead
+            const headSize = 5;
+            ctx.beginPath();
+            ctx.moveTo(indicatorX, arrowEndY);
+            ctx.lineTo(indicatorX - headSize, arrowEndY - headSize * arrowDirection);
+            ctx.lineTo(indicatorX + headSize, arrowEndY - headSize * arrowDirection);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255, 255, 255, ${indicatorOpacity})`;
+            ctx.fill();
+          }
+          
+          // Labels to the right of the bar
+          ctx.font = `bold ${isFullscreen ? 9 : 7}px sans-serif`;
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          
+          // Far label (top)
+          ctx.fillStyle = "rgba(255, 150, 100, 1)";
+          ctx.fillText("FAR", barX + barWidth + 4, barY + 8);
+          
+          // Net label (middle)
+          ctx.fillStyle = "rgba(200, 200, 200, 0.8)";
+          ctx.fillText("NET", barX + barWidth + 4, barY + barHeight / 2);
+          
+          // Near label (bottom)
+          ctx.fillStyle = "rgba(100, 200, 255, 1)";
+          ctx.fillText("NEAR", barX + barWidth + 4, barY + barHeight - 8);
+          
+          // Info text at bottom of panel
+          ctx.font = `${isFullscreen ? 9 : 7}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillStyle = "rgba(180, 180, 180, 1)";
+          
+          const infoY = barY + barHeight + 4;
+          ctx.fillText(`${estimatedCourtY.toFixed(1)}m`, panelX + panelWidth / 2, infoY);
+          ctx.fillText(`${Math.round(certainty * 100)}%`, panelX + panelWidth / 2, infoY + 10);
+          ctx.fillText(`${timeSinceAnchor.toFixed(1)}s`, panelX + panelWidth / 2, infoY + 20);
+        }
+      }
 
       // Draw court lines first (behind points)
       ctx.lineWidth = isFullscreen ? 3 : 2;
@@ -313,7 +614,7 @@ export function CourtOverlay({
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [courtKeypoints, videoRef, isFullscreen, isVideoReady, sport]);
+  }, [courtKeypoints, videoRef, isFullscreen, isVideoReady, sport, ballBounces, ballPositions, swings]);
 
   return (
     <canvas

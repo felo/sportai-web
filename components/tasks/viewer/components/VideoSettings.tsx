@@ -25,6 +25,8 @@ interface VideoSettingsProps {
   showCourtKeypoints: boolean;
   onCourtKeypointsChange: (value: boolean) => void;
   hasCourtKeypoints?: boolean; // Whether court keypoint data is available
+  showFilterRadius: boolean;
+  onFilterRadiusChange: (value: boolean) => void;
   // Data enhancement
   inferSwingBounces: boolean;
   onInferSwingBouncesChange: (value: boolean) => void;
@@ -32,6 +34,8 @@ interface VideoSettingsProps {
   onInferTrajectoryBouncesChange: (value: boolean) => void;
   inferAudioBounces: boolean;
   onInferAudioBouncesChange: (value: boolean) => void;
+  filterBallPositions: boolean;
+  onFilterBallPositionsChange: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -55,12 +59,16 @@ export function VideoSettings({
   showCourtKeypoints,
   onCourtKeypointsChange,
   hasCourtKeypoints = false,
+  showFilterRadius,
+  onFilterRadiusChange,
   inferSwingBounces,
   onInferSwingBouncesChange,
   inferTrajectoryBounces,
   onInferTrajectoryBouncesChange,
   inferAudioBounces,
   onInferAudioBouncesChange,
+  filterBallPositions,
+  onFilterBallPositionsChange,
   onClose,
 }: VideoSettingsProps) {
   return (
@@ -168,6 +176,17 @@ export function VideoSettings({
           label="Infer bounces from trajectory"
         />
 
+        <Flex align="center" gap="2">
+          <ToggleSwitch
+            checked={filterBallPositions}
+            onCheckedChange={onFilterBallPositionsChange}
+            label="Filter ball trajectory"
+          />
+          <Tooltip content="Removes teleportation artifacts, interpolates gaps, and smooths the ball trajectory">
+            <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+          </Tooltip>
+        </Flex>
+
         {FEATURE_FLAGS.AUDIO_ANALYSIS_ENABLED && (
           <Flex align="center" gap="2">
             <ToggleSwitch
@@ -183,25 +202,34 @@ export function VideoSettings({
         )}
 
         {/* Debug Section */}
-        {hasCourtKeypoints && (
-          <>
-            <Box style={{ height: "1px", backgroundColor: "var(--gray-6)", marginTop: "var(--space-2)" }} />
-            
-            <Heading size="2" weight="medium" style={{ color: "var(--gray-11)" }}>
-              Debug Overlays
-            </Heading>
+        <Box style={{ height: "1px", backgroundColor: "var(--gray-6)", marginTop: "var(--space-2)" }} />
+        
+        <Heading size="2" weight="medium" style={{ color: "var(--gray-11)" }}>
+          Debug Overlays
+        </Heading>
 
-            <Flex align="center" gap="2">
-              <ToggleSwitch
-                checked={showCourtKeypoints}
-                onCheckedChange={onCourtKeypointsChange}
-                label="Court detection keypoints"
-              />
-              <Tooltip content="Shows the AI-detected court keypoints used for coordinate mapping">
-                <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
-              </Tooltip>
-            </Flex>
-          </>
+        <Flex align="center" gap="2">
+          <ToggleSwitch
+            checked={showFilterRadius}
+            onCheckedChange={onFilterRadiusChange}
+            label="Show filter radius"
+          />
+          <Tooltip content="Shows the maximum allowed distance the ball can move per frame before being filtered out (8% of frame)">
+            <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+          </Tooltip>
+        </Flex>
+
+        {hasCourtKeypoints && (
+          <Flex align="center" gap="2">
+            <ToggleSwitch
+              checked={showCourtKeypoints}
+              onCheckedChange={onCourtKeypointsChange}
+              label="Court detection keypoints"
+            />
+            <Tooltip content="Shows the AI-detected court keypoints used for coordinate mapping">
+              <InfoCircledIcon style={{ color: "var(--gray-9)", cursor: "help" }} />
+            </Tooltip>
+          </Flex>
         )}
       </Flex>
     </Box>

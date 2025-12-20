@@ -36,6 +36,7 @@ import {
   useEnhancedBounces,
   useAllSwings,
   useRallySelection,
+  useFilteredBallPositions,
 } from "./hooks";
 import { usePlayerPortraits } from "./usePlayerPortraits";
 import type { TimelineFilterState } from "./components";
@@ -95,6 +96,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [inferSwingBounces, setInferSwingBounces] = useState(true);
   const [inferTrajectoryBounces, setInferTrajectoryBounces] = useState(true);
   const [inferAudioBounces, setInferAudioBounces] = useState(false);
+  const [filterBallPositions, setFilterBallPositions] = useState(true);
   
   // Timeline filters
   const [timelineFilters, setTimelineFilters] = useState<TimelineFilterState>({
@@ -124,6 +126,33 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     inferSwingBounces,
     inferTrajectoryBounces,
   });
+
+  // Filter ball positions to remove teleportation artifacts, interpolate gaps, and smooth trajectory
+  // Always compute filtered positions so we can compare both
+  const { filteredPositions: filteredBallPositions, stats: ballFilterStats } = useFilteredBallPositions(
+    result?.ball_positions,
+    {
+      removeOutliers: true,
+      maxVelocity: 2.0, // Normalized units per second - tune if needed
+      interpolateGaps: true,
+      maxGapDuration: 0.5,
+      smoothTrajectory: true,
+      smoothingWindow: 3,
+      fps: result?.debug_data?.video_info?.fps ?? 30,
+    }
+  );
+
+  // Log filter stats for debugging (only when data changes)
+  useEffect(() => {
+    if (ballFilterStats.originalCount > 0 && ballFilterStats.removedOutliers > 0) {
+      console.log(
+        `[Ball Filter] Original: ${ballFilterStats.originalCount}, ` +
+        `Removed outliers: ${ballFilterStats.removedOutliers}, ` +
+        `Interpolated: ${ballFilterStats.interpolatedPoints}, ` +
+        `Final: ${ballFilterStats.finalCount}`
+      );
+    }
+  }, [ballFilterStats]);
 
   // Rally selection with auto-skip
   const { selectedRallyIndex: autoSelectedRallyIndex, setSelectedRallyIndex: setAutoSelectedRallyIndex } = useRallySelection({
@@ -284,12 +313,15 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
             onInferTrajectoryBouncesChange={setInferTrajectoryBounces}
             inferAudioBounces={inferAudioBounces}
             onInferAudioBouncesChange={setInferAudioBounces}
+            filterBallPositions={filterBallPositions}
+            onFilterBallPositionsChange={setFilterBallPositions}
             calibrationMatrix={calibrationMatrix}
             onCalibrationComplete={setCalibrationMatrix}
             playerDisplayNames={playerDisplayNames}
             enhancedBallBounces={enhancedBallBounces}
             allSwings={allSwings}
             onVideoError={setVideoError}
+            filteredBallPositions={filteredBallPositions}
           />
         </Box>
 

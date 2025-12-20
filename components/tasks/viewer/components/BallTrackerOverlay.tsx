@@ -59,6 +59,7 @@ interface SwingWithPlayer {
 
 interface BallTrackerOverlayProps {
   ballPositions: BallPosition[];
+  rawBallPositions?: BallPosition[]; // Original unfiltered positions for comparison (drawn in red)
   ballBounces: BallBounce[];
   swings: SwingWithPlayer[];
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -86,6 +87,8 @@ interface BallTrackerOverlayProps {
   isFullscreen?: boolean;
   /** Whether the video is ready to play (triggers overlay initialization) */
   isVideoReady?: boolean;
+  /** Show filter radius debug circle (max distance ball can move per frame) */
+  showFilterRadius?: boolean;
 }
 
 // Binary search to find index near a timestamp
@@ -163,6 +166,16 @@ function getTrailColor(age: number, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Interpolate between red and dark red for raw/unfiltered trail (comparison mode)
+function getRawTrailColor(age: number, alpha: number): string {
+  // Red: rgb(239, 68, 68) - Tailwind red-500
+  // Dark red: rgb(153, 27, 27) - Tailwind red-800
+  const r = Math.round(239 + (153 - 239) * age);
+  const g = Math.round(68 + (27 - 68) * age);
+  const b = Math.round(68 + (27 - 68) * age);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Helper to get bounce color - all bounces are yellow
 function getBounceColor(_type: string): { r: number; g: number; b: number } {
   // Yellow - var(--yellow-9) / #EAB308
@@ -172,6 +185,7 @@ function getBounceColor(_type: string): { r: number; g: number; b: number } {
 
 export function BallTrackerOverlay({
   ballPositions,
+  rawBallPositions,
   ballBounces,
   swings,
   videoRef,
@@ -187,6 +201,7 @@ export function BallTrackerOverlay({
   playerDisplayNames = {},
   isFullscreen = false,
   isVideoReady = false,
+  showFilterRadius = false,
 }: BallTrackerOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -321,7 +336,94 @@ export function BallTrackerOverlay({
       // Clear canvas
       ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-      // Draw ball trail (gradient from yellow to green)
+      // Draw raw/unfiltered ball trail first (underneath) - red color for comparison
+      if (showTrail && rawBallPositions && rawBallPositions.length > 0) {
+        const rawTrail = getTrailPositions(rawBallPositions, currentTime, TRAIL_DURATION);
+        
+        if (rawTrail.length >= 2) {
+          if (useSmoothing && rawTrail.length >= 3) {
+            // Draw smooth curve for raw trail
+            for (let i = 0; i < rawTrail.length - 1; i++) {
+              const p0 = rawTrail[Math.max(0, i - 1)];
+              const p1 = rawTrail[i];
+              const p2 = rawTrail[i + 1];
+              const p3 = rawTrail[Math.min(rawTrail.length - 1, i + 2)];
+              
+              const x1 = p1.X * logicalWidth;
+              const y1 = p1.Y * logicalHeight;
+              const x2 = p2.X * logicalWidth;
+              const y2 = p2.Y * logicalHeight;
+              
+              const tension = 0.5;
+              const cp1x = x1 + (p2.X * logicalWidth - p0.X * logicalWidth) * tension / 3;
+              const cp1y = y1 + (p2.Y * logicalHeight - p0.Y * logicalHeight) * tension / 3;
+              const cp2x = x2 - (p3.X * logicalWidth - p1.X * logicalWidth) * tension / 3;
+              const cp2y = y2 - (p3.Y * logicalHeight - p1.Y * logicalHeight) * tension / 3;
+              
+              const age1 = Math.max(0, Math.min(1, (currentTime - p1.timestamp) / TRAIL_DURATION));
+              const age2 = Math.max(0, Math.min(1, (currentTime - p2.timestamp) / TRAIL_DURATION));
+              
+              const alpha1 = 0.6 * (1 - age1 * 0.7); // Slightly more transparent than filtered
+              const alpha2 = 0.6 * (1 - age2 * 0.7);
+              
+              const avgY = (p1.Y + p2.Y) / 2;
+              const perspectiveScale = getPerspectiveScale(avgY);
+              const lineWidth = TRAIL_MIN_WIDTH + (TRAIL_MAX_WIDTH - TRAIL_MIN_WIDTH) * perspectiveScale;
+              
+              const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+              gradient.addColorStop(0, getRawTrailColor(age1, alpha1));
+              gradient.addColorStop(1, getRawTrailColor(age2, alpha2));
+              
+              ctx.strokeStyle = gradient;
+              ctx.lineWidth = lineWidth;
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+              
+              ctx.beginPath();
+              ctx.moveTo(x1, y1);
+              ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+              ctx.stroke();
+            }
+          } else {
+            // Draw straight line segments for raw trail (no smoothing)
+            for (let i = 0; i < rawTrail.length - 1; i++) {
+              const p1 = rawTrail[i];
+              const p2 = rawTrail[i + 1];
+              
+              const x1 = p1.X * logicalWidth;
+              const y1 = p1.Y * logicalHeight;
+              const x2 = p2.X * logicalWidth;
+              const y2 = p2.Y * logicalHeight;
+              
+              const age1 = Math.max(0, Math.min(1, (currentTime - p1.timestamp) / TRAIL_DURATION));
+              const age2 = Math.max(0, Math.min(1, (currentTime - p2.timestamp) / TRAIL_DURATION));
+              
+              const alpha1 = 0.6 * (1 - age1 * 0.7);
+              const alpha2 = 0.6 * (1 - age2 * 0.7);
+              
+              const avgY = (p1.Y + p2.Y) / 2;
+              const perspectiveScale = getPerspectiveScale(avgY);
+              const lineWidth = TRAIL_MIN_WIDTH + (TRAIL_MAX_WIDTH - TRAIL_MIN_WIDTH) * perspectiveScale;
+              
+              const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+              gradient.addColorStop(0, getRawTrailColor(age1, alpha1));
+              gradient.addColorStop(1, getRawTrailColor(age2, alpha2));
+              
+              ctx.strokeStyle = gradient;
+              ctx.lineWidth = lineWidth;
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+              
+              ctx.beginPath();
+              ctx.moveTo(x1, y1);
+              ctx.lineTo(x2, y2);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // Draw ball trail (gradient from yellow to green) - filtered positions on top
       if (showTrail && trail.length >= 2) {
         if (useSmoothing && trail.length >= 3) {
           // Draw smooth curve using quadratic bezier curves
@@ -960,6 +1062,125 @@ export function BallTrackerOverlay({
         ctx.stroke();
       }
 
+      // Draw filter radius circle (debug visualization)
+      // Shows the maximum distance the ball can move before being filtered out
+      // Velocity-based: larger radius when ball is moving fast, smaller when slow
+      if (showFilterRadius && position) {
+        const x = position.X * logicalWidth;
+        const y = position.Y * logicalHeight;
+        
+        // Calculate current velocity from recent positions
+        let currentVelocity = 0;
+        let avgVelX = 0;
+        let avgVelY = 0;
+        
+        if (trail.length >= 2) {
+          const numSamples = Math.min(5, trail.length - 1);
+          let totalVel = 0;
+          let validSamples = 0;
+          
+          for (let i = trail.length - numSamples; i < trail.length; i++) {
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            if (prev && curr) {
+              const dt = curr.timestamp - prev.timestamp;
+              if (dt > 0) {
+                const dx = curr.X - prev.X;
+                const dy = curr.Y - prev.Y;
+                const vel = Math.sqrt(dx * dx + dy * dy) / dt;
+                totalVel += vel;
+                avgVelX += dx / dt;
+                avgVelY += dy / dt;
+                validSamples++;
+              }
+            }
+          }
+          if (validSamples > 0) {
+            currentVelocity = totalVel / validSamples;
+            avgVelX /= validSamples;
+            avgVelY /= validSamples;
+          }
+        }
+        
+        // Velocity-based filter radius:
+        // - Minimum: 3% of frame (for stationary/slow ball like serve toss)
+        // - Maximum: 12% of frame (for fast shots)
+        // - Scales with velocity: base + velocity * scale_factor
+        const MIN_RADIUS = 0.03;
+        const MAX_RADIUS = 0.12;
+        const VELOCITY_SCALE = 0.08; // How much velocity affects radius
+        
+        const dynamicRadius = Math.min(MAX_RADIUS, MIN_RADIUS + currentVelocity * VELOCITY_SCALE);
+        const filterRadius = dynamicRadius * logicalWidth;
+        
+        // Draw dashed circle showing the filter boundary
+        ctx.setLineDash([8, 4]);
+        ctx.strokeStyle = "rgba(255, 100, 100, 0.7)"; // Red-ish
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, filterRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+        
+        // Draw label with current values
+        const radiusPercent = (dynamicRadius * 100).toFixed(1);
+        const velDisplay = (currentVelocity * 100).toFixed(0);
+        ctx.font = `${11 * scale}px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = "rgba(255, 100, 100, 0.9)";
+        ctx.textAlign = "center";
+        ctx.fillText(`Filter: ${radiusPercent}% (vel: ${velDisplay}%/s)`, x, y - filterRadius - 8 * scale);
+        
+        // Draw predicted direction arrow
+        const velMagnitude = Math.sqrt(avgVelX * avgVelX + avgVelY * avgVelY);
+        if (velMagnitude > 0.02) {
+          // Predict ~0.1 seconds ahead
+          const predictionTime = 0.1;
+          const arrowEndX = x + avgVelX * predictionTime * logicalWidth;
+          const arrowEndY = y + avgVelY * predictionTime * logicalHeight;
+          
+          // Clamp arrow length
+          const arrowDx = arrowEndX - x;
+          const arrowDy = arrowEndY - y;
+          const arrowLength = Math.sqrt(arrowDx * arrowDx + arrowDy * arrowDy);
+          const maxArrowLength = filterRadius * 2;
+          
+          let finalEndX = arrowEndX;
+          let finalEndY = arrowEndY;
+          if (arrowLength > maxArrowLength) {
+            const ratio = maxArrowLength / arrowLength;
+            finalEndX = x + arrowDx * ratio;
+            finalEndY = y + arrowDy * ratio;
+          }
+          
+          // Draw arrow line
+          ctx.strokeStyle = "rgba(100, 200, 255, 0.9)"; // Cyan/blue
+          ctx.lineWidth = 3 * scale;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(finalEndX, finalEndY);
+          ctx.stroke();
+          
+          // Draw arrowhead
+          const headLength = 10 * scale;
+          const angle = Math.atan2(finalEndY - y, finalEndX - x);
+          
+          ctx.fillStyle = "rgba(100, 200, 255, 0.9)";
+          ctx.beginPath();
+          ctx.moveTo(finalEndX, finalEndY);
+          ctx.lineTo(
+            finalEndX - headLength * Math.cos(angle - Math.PI / 6),
+            finalEndY - headLength * Math.sin(angle - Math.PI / 6)
+          );
+          ctx.lineTo(
+            finalEndX - headLength * Math.cos(angle + Math.PI / 6),
+            finalEndY - headLength * Math.sin(angle + Math.PI / 6)
+          );
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
       lastPausedRef.current = isPaused;
       animationRef.current = requestAnimationFrame(draw);
     };
@@ -969,7 +1190,7 @@ export function BallTrackerOverlay({
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [ballPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose, scale, isVideoReady, videoDimensions]);
+  }, [ballPositions, rawBallPositions, ballBounces, swings, videoRef, timeThreshold, usePerspective, showIndicator, showTrail, useSmoothing, showBounceRipples, showVelocity, showPlayerBoxes, showPose, scale, isVideoReady, videoDimensions, showFilterRadius]);
 
   return (
     <canvas

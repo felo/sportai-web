@@ -63,6 +63,7 @@ interface Rally {
 interface VidstackPlayerProps {
   videoUrl: string;
   ballPositions?: BallPosition[];
+  rawBallPositions?: BallPosition[]; // Original unfiltered positions for comparison
   ballBounces?: BallBounce[];
   swings?: SwingWithPlayer[];
   rallies?: [number, number][]; // Array of [startTime, endTime] tuples
@@ -75,6 +76,8 @@ interface VidstackPlayerProps {
   onInferTrajectoryBouncesChange?: (value: boolean) => void;
   inferAudioBounces?: boolean;
   onInferAudioBouncesChange?: (value: boolean) => void;
+  filterBallPositions?: boolean;
+  onFilterBallPositionsChange?: (value: boolean) => void;
   // Player display names (e.g., { 0: "Player 1", 3: "Player 2" })
   playerDisplayNames?: Record<number, string>;
   // Court calibration
@@ -136,7 +139,8 @@ function ralliesToChapters(rallies?: [number, number][], videoDuration?: number)
 export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
   ({ 
     videoUrl, 
-    ballPositions, 
+    ballPositions,
+    rawBallPositions, 
     ballBounces, 
     swings, 
     rallies,
@@ -148,6 +152,8 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     onInferTrajectoryBouncesChange, 
     inferAudioBounces = false, 
     onInferAudioBouncesChange, 
+    filterBallPositions = true,
+    onFilterBallPositionsChange,
     playerDisplayNames = {}, 
     showCalibrationButton = false, 
     isCalibrated = false, 
@@ -168,6 +174,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
     const [showPlayerBoxes, setShowPlayerBoxes] = useState(false);
     const [showPose, setShowPose] = useState(false);
     const [showCourtKeypoints, setShowCourtKeypoints] = useState(false);
+    const [showFilterRadius, setShowFilterRadius] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [showCalibration, setShowCalibration] = useState(false);
     const [videoDuration, setVideoDuration] = useState<number | undefined>();
@@ -420,6 +427,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             <div data-overlay style={{ position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none" }}>
               <BallTrackerOverlay
                 ballPositions={ballPositions || []}
+                rawBallPositions={rawBallPositions}
                 ballBounces={ballBounces || []}
                 swings={swings || []}
                 videoRef={internalVideoRef}
@@ -434,6 +442,7 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
                 playerDisplayNames={playerDisplayNames}
                 isFullscreen={isFullscreen}
                 isVideoReady={isVideoReady}
+                showFilterRadius={showFilterRadius}
               />
             </div>
           )}
@@ -447,6 +456,9 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
                 isFullscreen={isFullscreen}
                 isVideoReady={isVideoReady}
                 sport={sport}
+                ballBounces={ballBounces}
+                ballPositions={ballPositions}
+                swings={swings}
               />
             </div>
           )}
@@ -659,12 +671,16 @@ export const VidstackPlayer = forwardRef<HTMLVideoElement, VidstackPlayerProps>(
             showCourtKeypoints={showCourtKeypoints}
             onCourtKeypointsChange={setShowCourtKeypoints}
             hasCourtKeypoints={!!courtKeypoints && courtKeypoints.length > 0}
+            showFilterRadius={showFilterRadius}
+            onFilterRadiusChange={setShowFilterRadius}
             inferSwingBounces={inferSwingBounces}
             onInferSwingBouncesChange={onInferSwingBouncesChange || (() => {})}
             inferTrajectoryBounces={inferTrajectoryBounces}
             onInferTrajectoryBouncesChange={onInferTrajectoryBouncesChange || (() => {})}
             inferAudioBounces={inferAudioBounces}
             onInferAudioBouncesChange={onInferAudioBouncesChange || (() => {})}
+            filterBallPositions={filterBallPositions}
+            onFilterBallPositionsChange={onFilterBallPositionsChange || (() => {})}
             onClose={() => setShowVideoSettings(false)}
           />
         )}
