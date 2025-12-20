@@ -135,8 +135,21 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
             video_url: refreshedVideoUrl,
           } as Task);
           
-          // Fetch result if result_s3_key exists
-          if (sampleTask.result_s3_key) {
+          // Fetch result - prefer direct URL, fall back to S3 key
+          if (sampleTask.resultDataUrl) {
+            // Direct fetch from public bucket (faster, no presigned URL needed)
+            setLoadingPhase("result");
+            try {
+              const resultResponse = await fetch(sampleTask.resultDataUrl);
+              if (resultResponse.ok) {
+                const statisticsResult = await resultResponse.json();
+                setResult(statisticsResult);
+              }
+            } catch {
+              // Result fetch failed - continue without result
+            }
+          } else if (sampleTask.result_s3_key) {
+            // Fall back to presigned URL flow for private bucket
             setLoadingPhase("result");
             try {
               const resultUrlResponse = await fetch("/api/s3/download-url", {
