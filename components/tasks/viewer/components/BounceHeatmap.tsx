@@ -62,3 +62,4 @@ export function BounceHeatmap({ heatmap, totalBounces }: BounceHeatmapProps) {
 
 
 
+
