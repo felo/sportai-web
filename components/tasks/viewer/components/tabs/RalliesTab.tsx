@@ -3,6 +3,7 @@
 import { RefObject, Ref } from "react";
 import { Box, Flex } from "@radix-ui/themes";
 import { Task, StatisticsResult, BallBounce, SwingWithPlayer } from "../../types";
+import type { FilteredBallPosition } from "../../hooks";
 import type { TimelineFilterState } from "../TimelineFilter";
 // import { useVideoThumbnails } from "../../hooks";
 import {
@@ -33,12 +34,15 @@ interface RalliesTabProps {
   onInferTrajectoryBouncesChange: (value: boolean) => void;
   inferAudioBounces: boolean;
   onInferAudioBouncesChange: (value: boolean) => void;
+  filterBallPositions: boolean;
+  onFilterBallPositionsChange: (value: boolean) => void;
   calibrationMatrix: number[][] | null;
   onCalibrationComplete: (matrix: number[][] | null) => void;
   playerDisplayNames: Record<number, string>;
   enhancedBallBounces: BallBounce[];
   allSwings: SwingWithPlayer[];
   onVideoError?: (message: string) => void;
+  filteredBallPositions?: FilteredBallPosition[];
 }
 
 export function RalliesTab({
@@ -59,12 +63,15 @@ export function RalliesTab({
   onInferTrajectoryBouncesChange,
   inferAudioBounces,
   onInferAudioBouncesChange,
+  filterBallPositions,
+  onFilterBallPositionsChange,
   calibrationMatrix,
   onCalibrationComplete,
   playerDisplayNames,
   enhancedBallBounces,
   allSwings,
   onVideoError,
+  filteredBallPositions,
 }: RalliesTabProps) {
   // Video thumbnails for timeline preview (disabled - limited value, causes issues)
   // const { vttUrl: thumbnails } = useVideoThumbnails(task.video_url, {
@@ -95,7 +102,8 @@ export function RalliesTab({
           <VidstackPlayer
             ref={videoRef as Ref<HTMLVideoElement>}
             videoUrl={task.video_url}
-            ballPositions={result?.ball_positions}
+            ballPositions={filteredBallPositions}
+            rawBallPositions={filterBallPositions ? result?.ball_positions : undefined}
             ballBounces={enhancedBallBounces}
             swings={allSwings}
             rallies={result?.rallies}
@@ -107,6 +115,8 @@ export function RalliesTab({
             onInferTrajectoryBouncesChange={onInferTrajectoryBouncesChange}
             inferAudioBounces={inferAudioBounces}
             onInferAudioBouncesChange={onInferAudioBouncesChange}
+            filterBallPositions={filterBallPositions}
+            onFilterBallPositionsChange={onFilterBallPositionsChange}
             playerDisplayNames={playerDisplayNames}
             showCalibrationButton={false}
             isCalibrated={calibrationMatrix !== null}
