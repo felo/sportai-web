@@ -46,11 +46,12 @@ function getVersionInfo() {
 const versionInfo = getVersionInfo()
 
 const nextConfig: NextConfig = {
-  // Expose version info to client-side code
+  // Expose version info and environment to client-side code
   env: {
     NEXT_PUBLIC_APP_VERSION: versionInfo.version,
     NEXT_PUBLIC_GIT_SHA: versionInfo.shortSha,
     NEXT_PUBLIC_BUILD_DATE: versionInfo.buildDate,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || 'development',
   },
   // Externalize TensorFlow and MediaPipe packages on server side
   // These packages only work in the browser and cause issues with Turbopack bundling

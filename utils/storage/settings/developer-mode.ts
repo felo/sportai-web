@@ -3,10 +3,32 @@ import { DEVELOPER_MODE_KEY } from "../constants";
 import { isSSR } from "../helpers";
 
 /**
+ * Check if we're running in production environment
+ * Developer mode is always disabled and hidden in production
+ */
+function isProduction(): boolean {
+  return process.env.NEXT_PUBLIC_VERCEL_ENV === "production";
+}
+
+/**
+ * Check if developer mode should be available in the UI
+ * Returns false in production (developer mode is hidden entirely)
+ */
+export function isDeveloperModeAvailable(): boolean {
+  return !isProduction();
+}
+
+/**
  * Get developer mode setting from localStorage
  * @returns true if developer mode is enabled, false otherwise
+ * Always returns false in production environment
  */
 export function getDeveloperMode(): boolean {
+  // Developer mode is always disabled in production
+  if (isProduction()) {
+    return false;
+  }
+
   if (isSSR()) {
     return false;
   }

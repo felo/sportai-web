@@ -1,5 +1,5 @@
 // Developer mode
-export { getDeveloperMode, setDeveloperMode } from "./developer-mode";
+export { getDeveloperMode, setDeveloperMode, isDeveloperModeAvailable } from "./developer-mode";
 
 // Theatre mode
 export {

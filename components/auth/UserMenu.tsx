@@ -9,6 +9,7 @@ import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { AuthModal } from "./AuthModal";
 import type { HighlightingPreferences, TTSSettings, InsightLevel } from "@/utils/storage";
+import { isDeveloperModeAvailable } from "@/utils/storage/settings/developer-mode";
 import type { Appearance } from "@/components/sidebar/types";
 
 const authLogger = createLogger("Auth");
@@ -266,49 +267,52 @@ export function UserMenu({
                 </>
               )}
 
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger>
-                  <Text>Developer mode</Text>
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
-                  <DropdownMenu.Item onSelect={() => onDeveloperModeToggle?.(true)}>
-                    <Text>On</Text>
+              {/* Developer mode toggle - hidden in production */}
+              {isDeveloperModeAvailable() && (
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger>
+                    <Text>Developer mode</Text>
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent>
+                    <DropdownMenu.Item onSelect={() => onDeveloperModeToggle?.(true)}>
+                      <Text>On</Text>
+                      {developerMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onSelect={() => onDeveloperModeToggle?.(false)}>
+                      <Text>Off</Text>
+                      {!developerMode && (
+                        <Text ml="auto" size="1" color="gray">✓</Text>
+                      )}
+                    </DropdownMenu.Item>
                     {developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
+                      <>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Sub>
+                          <DropdownMenu.SubTrigger>
+                            <Text>Debug</Text>
+                          </DropdownMenu.SubTrigger>
+                          <DropdownMenu.SubContent>
+                            <DropdownMenu.Item onSelect={() => onOpenContextDebug?.()}>
+                              <Text>Context</Text>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
+                              <Text>Storage</Text>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item onSelect={() => onOpenRedisDebug?.()}>
+                              <Text>Redis / Rate Limit</Text>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item onSelect={() => onResetOnboardingTips?.()}>
+                              <Text>Reset Onboarding Tips</Text>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.SubContent>
+                        </DropdownMenu.Sub>
+                      </>
                     )}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item onSelect={() => onDeveloperModeToggle?.(false)}>
-                    <Text>Off</Text>
-                    {!developerMode && (
-                      <Text ml="auto" size="1" color="gray">✓</Text>
-                    )}
-                  </DropdownMenu.Item>
-                  {developerMode && (
-                    <>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Sub>
-                        <DropdownMenu.SubTrigger>
-                          <Text>Debug</Text>
-                        </DropdownMenu.SubTrigger>
-                        <DropdownMenu.SubContent>
-                          <DropdownMenu.Item onSelect={() => onOpenContextDebug?.()}>
-                            <Text>Context</Text>
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item onSelect={() => onOpenStorageDebug?.()}>
-                            <Text>Storage</Text>
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item onSelect={() => onOpenRedisDebug?.()}>
-                            <Text>Redis / Rate Limit</Text>
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item onSelect={() => onResetOnboardingTips?.()}>
-                            <Text>Reset Onboarding Tips</Text>
-                          </DropdownMenu.Item>
-                        </DropdownMenu.SubContent>
-                      </DropdownMenu.Sub>
-                    </>
-                  )}
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+              )}
 
               <DropdownMenu.Separator />
 
