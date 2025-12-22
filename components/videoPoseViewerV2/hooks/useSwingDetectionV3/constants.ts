@@ -62,3 +62,4 @@ export const DEFAULT_CONFIG_V3: SwingDetectionConfigV3 = {
 
 
 
+

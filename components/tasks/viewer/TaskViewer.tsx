@@ -96,7 +96,7 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
   const [inferSwingBounces, setInferSwingBounces] = useState(true);
   const [inferTrajectoryBounces, setInferTrajectoryBounces] = useState(true);
   const [inferAudioBounces, setInferAudioBounces] = useState(false);
-  const [filterBallPositions, setFilterBallPositions] = useState(true);
+  const [filterBallPositions, setFilterBallPositions] = useState(false);
   
   // Timeline filters
   const [timelineFilters, setTimelineFilters] = useState<TimelineFilterState>({
@@ -191,18 +191,53 @@ export function TaskViewer({ paramsPromise }: TaskViewerProps) {
     ) || 300;
   }, [task?.video_length, result?.rallies, enhancedBallBounces]);
 
-  // Tab definitions
-  const tabs: TabDefinition[] = useMemo(() => [
-    { id: "rallies", label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
-    { id: "summary", label: "Match Summary", icon: <BarChartIcon width={16} height={16} /> },
-    { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
-    { id: "players", label: "Player Stats", icon: <PersonIcon width={16} height={16} /> },
-    { id: "teams", label: "Team Stats", icon: <TeamIcon width={16} height={16} /> },
-    { id: "highlights", label: "Highlights", icon: <StarIcon width={16} height={16} /> },
-    { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
-    { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} />, disabled: true },
-    { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
-  ], []);
+  // Calculate minimum team swing count to determine if Teams tab should be shown
+  const minTeamSwings = useMemo(() => {
+    const sessions = result?.team_sessions || [];
+    if (sessions.length === 0) return 0;
+    
+    // Aggregate swing counts per team (same logic as TeamsTab)
+    const teamSwings = new Map<string, number>();
+    
+    sessions.forEach(session => {
+      [session.team_front, session.team_back].forEach(ids => {
+        if (!ids || ids.length !== 2) return;
+        const teamKey = [...ids].sort((a, b) => a - b).join("-");
+        
+        const swingsInSession = ids.reduce((sum, playerId) => {
+          const playerData = session.players.find(p => p.player_id === playerId);
+          return sum + (playerData?.swing_count || 0);
+        }, 0);
+        
+        teamSwings.set(teamKey, (teamSwings.get(teamKey) || 0) + swingsInSession);
+      });
+    });
+    
+    if (teamSwings.size === 0) return 0;
+    return Math.min(...teamSwings.values());
+  }, [result?.team_sessions]);
+
+  // Tab definitions - hide Team Stats tab when only 2 players or any team has < 20 swings
+  const tabs: TabDefinition[] = useMemo(() => {
+    const allTabs: TabDefinition[] = [
+      { id: "rallies", label: "Rallies", icon: <PlayIcon width={16} height={16} /> },
+      { id: "summary", label: "Match Summary", icon: <BarChartIcon width={16} height={16} /> },
+      { id: "profiles", label: "Player Profiles", icon: <ActivityLogIcon width={16} height={16} /> },
+      { id: "players", label: "Player Stats", icon: <PersonIcon width={16} height={16} /> },
+      { id: "teams", label: "Team Stats", icon: <TeamIcon width={16} height={16} /> },
+      { id: "highlights", label: "Highlights", icon: <StarIcon width={16} height={16} /> },
+      { id: "tactical", label: "Tactical", icon: <TargetIcon width={16} height={16} /> },
+      { id: "coaching", label: "Coaching", icon: <ChatBubbleIcon width={16} height={16} />, disabled: true },
+      { id: "technique", label: "Technique", icon: <MixIcon width={16} height={16} />, disabled: true },
+    ];
+    
+    // Hide Team Stats tab for singles matches (2 or fewer players) or if any team has < 20 swings
+    if (validPlayers.length <= 2 || minTeamSwings < 20) {
+      return allTabs.filter(tab => tab.id !== "teams");
+    }
+    
+    return allTabs;
+  }, [validPlayers.length, minTeamSwings]);
 
   // Pause video when switching away from rallies tab
   useEffect(() => {

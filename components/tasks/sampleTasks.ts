@@ -142,7 +142,7 @@ export const SAMPLE_TASKS: SampleTask[] = [
     video_s3_key: null,
     thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/tennis-analysis-match-sample-thumbnail.jpg",
     thumbnail_s3_key: null,
-    video_length: 600,
+    video_length: 1931,
     status: "completed",
     estimated_compute_time: null,
     request_params: null,
