@@ -133,7 +133,7 @@ export default function TaskViewerPage({
   // Technique tasks use TechniqueViewer
   // Sample tasks without result data also use TechniqueViewer
   const sampleTask = isSample ? getSampleTask(taskId) : null;
-  const sampleHasResult = sampleTask?.result_s3_key != null;
+  const sampleHasResult = sampleTask?.result_s3_key != null || sampleTask?.resultDataUrl != null;
   
   if (taskType === "technique" && videoUrl) {
     return (

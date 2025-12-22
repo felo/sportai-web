@@ -5,6 +5,26 @@ import type { LoadingPhase } from "../components/LoadingState";
 import { isSampleTask, getSampleTask } from "@/components/tasks/sampleTasks";
 import { isGuestTask, getGuestTask } from "@/utils/storage";
 
+/**
+ * Fetch JSON from a URL, automatically decompressing gzip if needed.
+ * Uses native DecompressionStream API for browser-based gzip handling.
+ */
+async function fetchJsonWithGzipSupport(url: string, isGzip: boolean): Promise<unknown> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to download result");
+  }
+
+  if (isGzip && response.body) {
+    // Use native DecompressionStream for gzip decompression
+    const decompressedStream = response.body.pipeThrough(new DecompressionStream("gzip"));
+    const decompressedResponse = new Response(decompressedStream);
+    return decompressedResponse.json();
+  }
+  
+  return response.json();
+}
+
 interface UseTaskFetchingResult {
   task: Task | null;
   result: StatisticsResult | null;
@@ -135,8 +155,19 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
             video_url: refreshedVideoUrl,
           } as Task);
           
-          // Fetch result if result_s3_key exists
-          if (sampleTask.result_s3_key) {
+          // Fetch result - prefer direct URL (public bucket) over S3 key (private bucket)
+          if (sampleTask.resultDataUrl) {
+            // Direct URL for public bucket - no presigned URL needed
+            setLoadingPhase("result");
+            try {
+              const isGzip = sampleTask.resultDataUrl.endsWith(".gz");
+              const statisticsResult = await fetchJsonWithGzipSupport(sampleTask.resultDataUrl, isGzip);
+              setResult(statisticsResult as StatisticsResult);
+            } catch {
+              // Result fetch failed - continue without result
+            }
+          } else if (sampleTask.result_s3_key) {
+            // Private bucket - need presigned URL
             setLoadingPhase("result");
             try {
               const resultUrlResponse = await fetch("/api/s3/download-url", {
@@ -151,11 +182,10 @@ export function useTaskFetching(taskId: string): UseTaskFetchingResult {
               if (resultUrlResponse.ok) {
                 const { downloadUrl } = await resultUrlResponse.json();
                 if (downloadUrl) {
-                  const resultResponse = await fetch(downloadUrl);
-                  if (resultResponse.ok) {
-                    const statisticsResult = await resultResponse.json();
-                    setResult(statisticsResult);
-                  }
+                  // Check if the file is gzipped based on the key
+                  const isGzip = sampleTask.result_s3_key.endsWith(".gz");
+                  const statisticsResult = await fetchJsonWithGzipSupport(downloadUrl, isGzip);
+                  setResult(statisticsResult as StatisticsResult);
                 }
               }
             } catch {

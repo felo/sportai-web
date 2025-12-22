@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import type { Task } from "./TaskTile/types";
 
 /**
- * Extended sample task with optional pose data URL for direct loading.
+ * Extended sample task with optional direct URLs for public bucket loading.
  */
 export interface SampleTask extends Task {
   /** Direct URL to pose data JSON for samples stored in public buckets */
   poseDataUrl?: string;
+  /** Direct URL to result data JSON/gzip for match samples stored in public buckets */
+  resultDataUrl?: string;
 }
 
 // =============================================================================
@@ -58,6 +60,14 @@ export const DEMO_VIDEOS: DemoVideoConfig[] = [
     premadeResponse: "Analyzing the Padel Match Demo video…",
     demoVideoUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample-micro.mp4",
     sampleTaskId: "sample-padel-match-one",
+    analysisType: "match",
+  },
+  {
+    id: "demo-tennis-match",
+    text: "Tennis Match (Back-Mounted Camera)",
+    premadeResponse: "Analyzing the Tennis Match Demo video…",
+    demoVideoUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/tennis-analysis-match-sample.mp4",
+    sampleTaskId: "sample-tennis-match-one",
     analysisType: "match",
   },
 ];
@@ -115,11 +125,34 @@ export const SAMPLE_TASKS: SampleTask[] = [
     status: "completed",
     estimated_compute_time: null,
     request_params: null,
-    result_s3_key: "task-results/dabba2e0-4a92-492e-9f36-08e6d1b5e06e.json",
+    result_s3_key: null,
     error_message: null,
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
     updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     completed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    // Direct URL for result data (public bucket, no presigned URL needed)
+    resultDataUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/padel-analysis-match-sample.json.gz",
+  },
+  {
+    id: "sample-tennis-match-one",
+    task_type: "statistics",
+    sport: "tennis",
+    sportai_task_id: null,
+    video_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/tennis-analysis-match-sample.mp4",
+    video_s3_key: null,
+    thumbnail_url: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/tennis-analysis-match-sample-thumbnail.jpg",
+    thumbnail_s3_key: null,
+    video_length: 600,
+    status: "completed",
+    estimated_compute_time: null,
+    request_params: null,
+    result_s3_key: null,
+    error_message: null,
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+    updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    completed_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    // Direct URL for result data (public bucket, no presigned URL needed)
+    resultDataUrl: "https://sportai-llm-uploads-public.s3.eu-north-1.amazonaws.com/samples/tennis-analysis-match-sample.json.gz",
   },
 ];
 
