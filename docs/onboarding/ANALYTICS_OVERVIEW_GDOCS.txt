@@ -1,0 +1,252 @@
+SPORTAI ANALYTICS & TRACKING OVERVIEW
+For Marketing Team — December 2025
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ANALYTICS PLATFORMS USED
+
+SportAI uses three analytics platforms that work together:
+
+1. POSTHOG (Primary)
+   • Purpose: Main analytics – user behavior, events, funnels
+   • Dashboard: eu.posthog.com
+
+2. GOOGLE ANALYTICS 4
+   • Purpose: Traffic analysis, acquisition, demographics
+   • Dashboard: analytics.google.com
+
+3. VERCEL ANALYTICS
+   • Purpose: Page performance & Core Web Vitals
+   • Dashboard: Vercel project dashboard
+
+All events are sent to all platforms simultaneously, so you'll see consistent data across dashboards.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+EVENTS WE TRACK
+
+───────────────────────────────────────────────────────────────────────────────
+VIDEO EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• video_uploaded
+  When: User successfully uploads a video
+  Properties: fileSizeMB, sport
+
+• video_upload_failed
+  When: Upload fails (too large, wrong format, etc.)
+  Properties: error, fileSizeMB
+
+• video_play_started
+  When: User plays a video
+  Properties: durationSeconds
+
+Marketing Use: Track video upload conversion funnel, identify drop-off points.
+
+───────────────────────────────────────────────────────────────────────────────
+ANALYSIS EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• pose_detection_started
+  When: AI pose detection begins
+  Properties: analysisType, processingTimeMs
+
+• tactical_analysis_requested
+  When: User requests tactical analysis
+  Properties: sport
+
+• frame_analysis_requested
+  When: User requests frame-by-frame analysis
+  Properties: sport, analysisType
+
+• analysis_completed
+  When: Any analysis finishes successfully
+  Properties: analysisType, sport, processingTimeMs
+
+• analysis_failed
+  When: Analysis encounters an error
+  Properties: analysisType, sport, errorMessage
+
+Marketing Use: Understand which analysis types are most popular, track AI feature engagement.
+
+───────────────────────────────────────────────────────────────────────────────
+CHAT & AI EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• chat_started
+  When: User starts a new conversation
+  Properties: messageType
+
+• chat_message_sent
+  When: User sends a message
+  Properties: hasVideo (true/false)
+
+Marketing Use: Measure AI coach engagement, video vs. text-only conversations.
+
+───────────────────────────────────────────────────────────────────────────────
+AUTHENTICATION EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• auth_started
+  When: User clicks sign-in button
+  Properties: method (google, email, etc.)
+
+• auth_completed
+  When: User successfully logs in
+  Properties: method, success
+
+• auth_failed
+  When: Login attempt fails
+  Properties: method, error
+
+• logout
+  When: User logs out
+  Properties: —
+
+Marketing Use: Track sign-up conversion rates, popular auth methods.
+
+───────────────────────────────────────────────────────────────────────────────
+CONVERSION EVENTS ⭐
+───────────────────────────────────────────────────────────────────────────────
+
+• pricing_page_viewed
+  When: User visits the pricing page
+  Properties: source
+  → Top of purchase funnel
+
+• waitlist_joined
+  When: User signs up for waitlist
+  Properties: plan, source
+  → Lead generation metric
+
+• feature_gated
+  When: User hits a premium feature limit
+  Properties: feature, source
+  → Identifies upgrade opportunities
+
+───────────────────────────────────────────────────────────────────────────────
+ERROR EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• error_displayed
+  When: An error occurs in the app
+  Properties: errorType, errorMessage, errorSource
+
+Marketing Use: Monitor user experience quality, identify problematic flows.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+USER IDENTIFICATION
+
+When a user logs in, we identify them across all platforms with:
+
+• userId — Unique user ID (from Supabase Auth)
+• email — User's email address
+• name — User's display name (from Google/social login)
+
+This allows you to:
+• Track the same user across devices
+• Build user segments (e.g., "users who uploaded 3+ videos")
+• Attribute conversions to specific users
+
+Note: Anonymous users are tracked with a device-based ID until they sign in.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PRIVACY & GDPR COMPLIANCE
+
+Cookie Consent
+
+SportAI shows a cookie consent banner to all new visitors. Users can:
+• Accept All — Enables analytics + marketing tracking
+• Customize — Choose which cookies to allow
+• Necessary Only — Blocks analytics and marketing tracking
+
+What Happens Based on Consent:
+
+Accept All:        Analytics ✓   Google Ads ✓   PostHog ✓
+Analytics Only:    Analytics ✓   Google Ads ✗   PostHog ✓
+Necessary Only:    Analytics ✗   Google Ads ✗   PostHog ✗
+
+Do Not Track: If a user has "Do Not Track" enabled in their browser, no analytics are collected regardless of consent.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY METRICS FOR MARKETING
+
+User Engagement Funnel:
+Page Visit → Video Upload → Analysis Run → Return Visit
+
+Track with:
+1. page_view (automatic)
+2. video_uploaded
+3. analysis_completed
+4. Returning user segments in PostHog
+
+Conversion Funnel:
+Page Visit → Pricing Page → Waitlist Signup
+
+Track with:
+1. page_view
+2. pricing_page_viewed
+3. waitlist_joined
+
+Feature Adoption:
+• Filter analysis_completed by "sport" property (tennis, padel, pickleball)
+• Filter by "analysisType" (technique, tactical, pose, frame)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHERE TO FIND THIS DATA
+
+PostHog (Primary Analytics)
+1. Go to eu.posthog.com
+2. Events — See all events in real-time
+3. Dashboards — Create custom marketing dashboards
+4. Funnels — Build conversion funnels
+5. Cohorts — Create user segments
+
+Google Analytics 4
+1. Go to analytics.google.com
+2. Reports → Engagement → Events — See all events
+3. Explore — Build custom reports
+4. Advertising — Connect to Google Ads for remarketing
+
+Vercel Analytics
+1. Go to your Vercel project dashboard
+2. Analytics tab — Page performance metrics
+3. Use for Core Web Vitals and page load times
+
+═══════════════════════════════════════════════════════════════════════════════
+
+EVENT PROPERTIES REFERENCE
+
+Common Properties (on most events):
+• userId (string) — Logged-in user's ID
+• timestamp (number) — Unix timestamp of the event
+• sport (string) — tennis, padel, or pickleball
+
+Video Properties:
+• fileSizeMB (number) — Video file size in megabytes
+• durationSeconds (number) — Video duration in seconds
+• videoId (string) — Unique video identifier
+
+Analysis Properties:
+• analysisType (string) — technique, tactical, pose, or frame
+• processingTimeMs (number) — How long the analysis took
+• success (boolean) — Whether analysis completed successfully
+
+Auth Properties:
+• method (string) — google, email, or anonymous
+• success (boolean) — Whether auth succeeded
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUESTIONS?
+
+For questions about analytics data or custom tracking needs, contact the development team.
+
+Useful Links:
+• PostHog Docs: posthog.com/docs
+• GA4 Docs: support.google.com/analytics
+

@@ -1,0 +1,426 @@
+SPORTAI ANALYTICS & TRACKING OVERVIEW
+For UX Team — December 2025
+
+═══════════════════════════════════════════════════════════════════════════════
+
+HOW TO USE THIS DATA FOR UX RESEARCH
+
+This document explains what user behavior data SportAI collects and how you 
+can use it to identify UX issues, measure feature adoption, and improve the 
+user experience.
+
+Key things you can do with this data:
+• Identify where users drop off in key flows
+• Find features causing confusion or errors
+• Measure how long tasks take users
+• Compare behavior across user segments
+• Track adoption of new features
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ANALYTICS TOOLS & ACCESS
+
+PostHog (Primary — Best for UX)
+• Dashboard: eu.posthog.com
+• Best for: Session recordings, heatmaps, funnels, user paths
+• UX Features: Watch real user sessions, see click patterns
+
+Google Analytics 4
+• Dashboard: analytics.google.com
+• Best for: Page flow analysis, bounce rates, user demographics
+
+Vercel Analytics
+• Dashboard: Vercel project dashboard
+• Best for: Page load times, Core Web Vitals (affects perceived UX)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+USER JOURNEY EVENTS
+
+These events help you understand how users move through the app.
+
+───────────────────────────────────────────────────────────────────────────────
+ONBOARDING & AUTHENTICATION FLOW
+───────────────────────────────────────────────────────────────────────────────
+
+Flow: Landing → Sign In Attempt → Success/Failure
+
+• auth_started
+  Trigger: User clicks any sign-in button
+  Properties: 
+    - method: "google", "email", or "anonymous"
+  UX Insight: Which auth methods do users prefer?
+
+• auth_completed
+  Trigger: User successfully authenticates
+  Properties:
+    - method: Which provider they used
+    - success: true
+  UX Insight: Track successful logins
+
+• auth_failed
+  Trigger: Authentication fails
+  Properties:
+    - method: Which provider failed
+    - error: What went wrong
+  UX Insight: Identify auth friction points. High failure rates = UX problem.
+
+• logout
+  Trigger: User logs out
+  UX Insight: Track session end points
+
+FUNNEL TO BUILD:
+auth_started → auth_completed
+Expected: 90%+ should complete. Lower = auth UX issues.
+
+───────────────────────────────────────────────────────────────────────────────
+VIDEO UPLOAD FLOW
+───────────────────────────────────────────────────────────────────────────────
+
+Flow: User selects video → Upload starts → Success/Failure
+
+• video_uploaded
+  Trigger: Video successfully uploads
+  Properties:
+    - fileSizeMB: Size of the video
+    - sport: Detected or selected sport
+  UX Insight: What video sizes do users typically upload?
+
+• video_upload_failed
+  Trigger: Upload fails
+  Properties:
+    - error: Why it failed (too_large, invalid_format, etc.)
+    - fileSizeMB: Size they tried to upload
+  UX Insight: Are users trying to upload videos that are too large? 
+              Do error messages help them understand the problem?
+
+THINGS TO WATCH:
+• High failure rate → Improve error messaging or increase limits
+• Large fileSizeMB on failures → Users don't understand size limits
+• Repeated failures by same user → Frustration indicator
+
+───────────────────────────────────────────────────────────────────────────────
+VIDEO PLAYBACK
+───────────────────────────────────────────────────────────────────────────────
+
+• video_play_started
+  Trigger: User plays a video in the viewer
+  Properties:
+    - durationSeconds: Length of the video
+  UX Insight: Are users engaging with video content?
+
+───────────────────────────────────────────────────────────────────────────────
+AI CHAT INTERACTION
+───────────────────────────────────────────────────────────────────────────────
+
+Flow: Start conversation → Send messages → Receive AI responses
+
+• chat_started
+  Trigger: User begins a new chat conversation
+  Properties:
+    - messageType: "user"
+  UX Insight: How often do users start new conversations?
+
+• chat_message_sent
+  Trigger: User sends a message to the AI
+  Properties:
+    - hasVideo: Did they include a video?
+  UX Insight: Video-included messages show deeper engagement.
+              Text-only may indicate quick questions or confusion.
+
+THINGS TO WATCH:
+• Low chat_started → Users may not discover the AI coach feature
+• hasVideo=false frequently → Users may not understand video is needed
+• Single message sessions → AI responses may not be satisfying needs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+AI ANALYSIS EVENTS (Core Feature)
+
+These track the main value proposition — AI sports analysis.
+
+───────────────────────────────────────────────────────────────────────────────
+ANALYSIS REQUEST → COMPLETION FLOW
+───────────────────────────────────────────────────────────────────────────────
+
+• pose_detection_started
+  Trigger: AI begins analyzing body positions in video
+  Properties:
+    - analysisType: "pose"
+    - processingTimeMs: How long it took to load
+  UX Insight: Track wait times. Long waits = poor UX.
+
+• tactical_analysis_requested
+  Trigger: User requests court/tactical analysis
+  Properties:
+    - sport: tennis, padel, or pickleball
+  UX Insight: Which analysis types are most wanted?
+
+• frame_analysis_requested
+  Trigger: User requests frame-by-frame analysis
+  Properties:
+    - sport: The sport being analyzed
+    - analysisType: Type of frame analysis
+  UX Insight: Frame analysis = users want detailed feedback
+
+• technique_analysis_requested
+  Trigger: User requests technique coaching
+  Properties:
+    - sport: The sport
+  UX Insight: Technique analysis = users want improvement tips
+
+• analysis_completed
+  Trigger: Any analysis finishes successfully
+  Properties:
+    - analysisType: Which type completed
+    - sport: The sport
+    - processingTimeMs: Total processing time
+    - success: true
+  UX Insight: Track success rates and wait times per analysis type.
+
+• analysis_failed
+  Trigger: Analysis encounters an error
+  Properties:
+    - analysisType: Which type failed
+    - sport: The sport
+    - errorMessage: What went wrong
+  UX Insight: Which analysis types fail most? Why?
+
+KEY FUNNELS TO BUILD:
+
+1. Pose Analysis Funnel:
+   pose_detection_started → analysis_completed (where analysisType="pose")
+   
+2. Any Analysis Funnel:
+   *_analysis_requested → analysis_completed
+
+THINGS TO WATCH:
+• processingTimeMs > 10000 (10 sec) → Users may abandon
+• High failure rates on specific sport → Model issues
+• Low completion rates → Investigate drop-off causes
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ERROR & FRUSTRATION TRACKING
+
+───────────────────────────────────────────────────────────────────────────────
+ERROR EVENTS
+───────────────────────────────────────────────────────────────────────────────
+
+• error_displayed
+  Trigger: Any error shown to user (crashes, API failures, etc.)
+  Properties:
+    - errorType: Category of error (e.g., "TypeError", "NetworkError")
+    - errorMessage: Human-readable error text
+    - errorSource: Where it originated
+        "global" = JavaScript error
+        "react" = React component crash
+        "promise" = Failed async operation
+    - errorFilename: Which file caused it
+    - errorLine: Line number
+    - url: Which page they were on
+    - userId: Who experienced it (if logged in)
+  
+  UX Insight: This is your #1 source for finding UX-breaking bugs.
+
+HOW TO USE ERROR DATA:
+1. In PostHog, filter events by "error_displayed"
+2. Group by errorMessage to find most common errors
+3. Group by url to find problematic pages
+4. Watch session recordings of users who hit errors
+
+COMMON UX-IMPACTING ERRORS TO WATCH:
+• Network errors during upload → Add better offline handling
+• Errors on specific pages → Investigate those flows
+• Errors after specific actions → Find the broken interaction
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CONVERSION & ENGAGEMENT GATES
+
+───────────────────────────────────────────────────────────────────────────────
+PAYWALL & FEATURE LIMITS
+───────────────────────────────────────────────────────────────────────────────
+
+• feature_gated
+  Trigger: User hits a premium feature limit
+  Properties:
+    - feature: Which feature they tried to access
+    - source: Where in the app
+  UX Insight: Where do free users hit walls? 
+              Is the limit frustrating or reasonable?
+
+• pricing_page_viewed
+  Trigger: User visits pricing page
+  Properties:
+    - source: How they got there
+  UX Insight: Are users curious about upgrading?
+              What drives them to check pricing?
+
+• waitlist_joined
+  Trigger: User signs up for waitlist
+  Properties:
+    - plan: Which plan interested them
+    - source: Where they signed up from
+  UX Insight: Validates interest level
+
+THINGS TO WATCH:
+• feature_gated followed by bounce → Limit may be too restrictive
+• feature_gated → pricing_page_viewed → Good conversion path
+• Multiple feature_gated by same user → Frustrated power user
+
+═══════════════════════════════════════════════════════════════════════════════
+
+USER IDENTIFICATION & SEGMENTATION
+
+When users log in, we capture:
+
+• userId — Unique identifier (track across sessions)
+• email — Contact info (for user research recruitment)
+• name — Display name from social login
+
+Useful Segments for UX Research:
+
+1. "Power Users"
+   - 5+ videos uploaded
+   - 10+ analysis_completed events
+   
+2. "New Users (First Week)"
+   - Created in last 7 days
+   - Good for onboarding research
+
+3. "Churned Users"
+   - No activity in 14+ days
+   - Good for exit interview candidates
+
+4. "Error-Prone Users"
+   - Multiple error_displayed events
+   - Investigate their flows
+
+5. "Single-Sport Users" vs "Multi-Sport"
+   - Filter by sport property
+   - Different needs/expectations
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY UX METRICS TO TRACK
+
+───────────────────────────────────────────────────────────────────────────────
+TASK COMPLETION RATES
+───────────────────────────────────────────────────────────────────────────────
+
+Video Upload Success Rate:
+  Formula: video_uploaded / (video_uploaded + video_upload_failed)
+  Target: > 90%
+  
+Analysis Success Rate:
+  Formula: analysis_completed / (analysis_completed + analysis_failed)
+  Target: > 95%
+
+Auth Success Rate:
+  Formula: auth_completed / auth_started
+  Target: > 95%
+
+───────────────────────────────────────────────────────────────────────────────
+TIME-BASED METRICS
+───────────────────────────────────────────────────────────────────────────────
+
+Analysis Processing Time:
+  Property: processingTimeMs on analysis_completed
+  Target: < 10,000ms (10 seconds)
+  Watch for: Values > 30,000ms indicate poor experience
+
+Time to First Analysis:
+  Measure: Time between first page_view and first analysis_completed
+  UX Insight: How long until users get value?
+
+───────────────────────────────────────────────────────────────────────────────
+ENGAGEMENT DEPTH
+───────────────────────────────────────────────────────────────────────────────
+
+Messages per Chat Session:
+  Count chat_message_sent events per chatId
+  Low count (1-2) → Users not getting value from AI
+  High count (5+) → Engaged users or confused users (check sentiment)
+
+Analysis Types Used:
+  Count distinct analysisType values per user
+  More variety = exploring features
+  Single type = found their use case (or confused by others)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+POSTHOG FEATURES FOR UX RESEARCH
+
+Session Recordings
+• Watch real users interact with the app
+• Filter by users who triggered specific events
+• Great for understanding "why" behind the data
+
+Heatmaps
+• See where users click on each page
+• Identify missed affordances
+• Find dead clicks (users clicking non-interactive elements)
+
+User Paths
+• Visualize common navigation patterns
+• Find unexpected journeys
+• Identify where users get lost
+
+Funnels
+• Build multi-step conversion funnels
+• See drop-off at each stage
+• Compare segments (new vs returning, by sport, etc.)
+
+Cohort Analysis
+• Track behavior over time
+• Measure retention
+• Compare feature adoption between groups
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUICK REFERENCE: ALL EVENTS
+
+Video:
+• video_uploaded (success)
+• video_upload_failed (failure)
+• video_play_started (engagement)
+
+Analysis:
+• pose_detection_started (initiation)
+• tactical_analysis_requested (request)
+• frame_analysis_requested (request)
+• technique_analysis_requested (request)
+• analysis_completed (success)
+• analysis_failed (failure)
+
+Chat:
+• chat_started (initiation)
+• chat_message_sent (engagement)
+
+Auth:
+• auth_started (initiation)
+• auth_completed (success)
+• auth_failed (failure)
+• logout (end)
+
+Conversion:
+• pricing_page_viewed (interest)
+• waitlist_joined (conversion)
+• feature_gated (friction point)
+
+Errors:
+• error_displayed (bug/UX issue)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUESTIONS?
+
+For questions about analytics data, custom tracking needs, or help setting up 
+specific funnels, contact the development team.
+
+Useful Resources:
+• PostHog Session Recordings: posthog.com/docs/session-replay
+• PostHog Funnels: posthog.com/docs/product-analytics/funnels
+• PostHog User Paths: posthog.com/docs/product-analytics/paths
+
