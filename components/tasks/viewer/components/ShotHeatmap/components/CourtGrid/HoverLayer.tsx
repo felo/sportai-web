@@ -93,17 +93,3 @@ export function HoverLayer({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

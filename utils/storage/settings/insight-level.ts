@@ -48,12 +48,3 @@ export function setInsightLevel(level: InsightLevel): void {
     storageLogger.error("Failed to save insight level to storage:", error);
   }
 }
-
-
-
-
-
-
-
-
-

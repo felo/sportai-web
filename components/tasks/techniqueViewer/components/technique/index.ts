@@ -16,16 +16,3 @@ export {
   type TechniqueRatingTier,
   TECHNIQUE_COLORS,
 } from "./techniqueUtils";
-
-
-
-
-
-
-
-
-
-
-
-
-

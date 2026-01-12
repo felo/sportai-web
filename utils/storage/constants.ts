@@ -68,17 +68,3 @@ export const MAX_STORAGE_SIZE_BYTES = 2 * 1024 * 1024;
  * Height breakpoint below which theatre mode is force-disabled
  */
 export const THEATRE_MODE_HEIGHT_BREAKPOINT = 768;
-
-
-
-
-
-
-
-
-
-
-
-
-
-

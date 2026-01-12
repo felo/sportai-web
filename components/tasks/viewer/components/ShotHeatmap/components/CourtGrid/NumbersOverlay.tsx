@@ -79,17 +79,3 @@ export function NumbersOverlay({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

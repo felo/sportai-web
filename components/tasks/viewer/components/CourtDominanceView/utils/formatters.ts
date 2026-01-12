@@ -9,17 +9,3 @@ export function formatDuration(seconds: number): string {
   const secs = Math.round(seconds % 60);
   return `${mins}m ${secs}s`;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

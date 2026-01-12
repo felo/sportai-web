@@ -29,17 +29,3 @@ export function clearUserDataFromStorage(): void {
     storageLogger.error("Failed to clear user data from storage:", error);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

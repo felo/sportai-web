@@ -47,17 +47,3 @@ export function useAutoScroll({
     setShowingVideoSizeError,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

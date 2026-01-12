@@ -112,19 +112,3 @@ export function useAnimatedNumber(
   const { progress } = useAnimatedProgress(options);
   return Math.round(targetValue * progress);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

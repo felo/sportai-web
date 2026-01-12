@@ -51,17 +51,3 @@ export function getSideLabel(col: number): string {
 export function getWidthLabel(row: number): string {
   return row < 2 ? "Left" : row > 3 ? "Right" : "Center";
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -144,17 +144,3 @@ export function StabilityStateOverlay({
     </Flex>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

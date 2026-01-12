@@ -9,11 +9,3 @@ export const metadata: Metadata = {
 export default function TermsRoute() {
   return <TermsPage />;
 }
-
-
-
-
-
-
-
-

@@ -24,17 +24,3 @@ export interface BallSequenceClickData {
   ballLabel: string;
   playerContext?: string;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

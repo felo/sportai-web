@@ -52,17 +52,3 @@ export function formatTimeAgo(dateStr: string): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

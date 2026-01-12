@@ -70,17 +70,3 @@ export interface CellTooltipProps {
   visible: boolean;
   originLabel: string;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -6,17 +6,3 @@ export { EmptyState } from "./EmptyState";
 export { AllShotsContent } from "./AllShotsContent";
 export { BallSequenceContent } from "./BallSequenceContent";
 export { BallTabNavigation } from "./BallTabNavigation";
-
-
-
-
-
-
-
-
-
-
-
-
-
-

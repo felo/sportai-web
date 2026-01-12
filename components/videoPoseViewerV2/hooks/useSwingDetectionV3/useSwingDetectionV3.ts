@@ -1504,12 +1504,3 @@ function markPhasesInFrameData(frameData: SwingFrameDataV3[], swings: DetectedSw
     }
   }
 }
-
-
-
-
-
-
-
-
-

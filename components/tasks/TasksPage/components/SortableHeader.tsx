@@ -51,12 +51,3 @@ export function SortableHeader({
     </Flex>
   );
 }
-
-
-
-
-
-
-
-
-

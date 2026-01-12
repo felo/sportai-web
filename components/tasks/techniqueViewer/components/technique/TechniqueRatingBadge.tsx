@@ -128,16 +128,3 @@ export function TechniqueRatingBadge({
     </Tooltip>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

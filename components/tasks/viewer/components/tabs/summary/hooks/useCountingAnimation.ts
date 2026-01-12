@@ -49,17 +49,3 @@ export function useCountingAnimation(options: UseCountingAnimationOptions = {}) 
 
   return progress;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

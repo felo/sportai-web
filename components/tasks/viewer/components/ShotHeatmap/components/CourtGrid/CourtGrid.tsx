@@ -129,17 +129,3 @@ export function CourtGrid({ data, originLabel }: CourtGridProps) {
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

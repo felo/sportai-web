@@ -67,11 +67,3 @@ else
   echo "❌ Failed to generate thumbnail"
   exit 1
 fi
-
-
-
-
-
-
-
-

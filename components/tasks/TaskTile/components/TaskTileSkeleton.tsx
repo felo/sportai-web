@@ -60,12 +60,3 @@ export function TaskTileSkeleton() {
     </Card>
   );
 }
-
-
-
-
-
-
-
-
-

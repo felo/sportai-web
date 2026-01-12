@@ -165,17 +165,3 @@ export function CellTooltip({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

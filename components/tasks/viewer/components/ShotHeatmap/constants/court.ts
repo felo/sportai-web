@@ -9,17 +9,3 @@ export const COURT = {
 // Grid dimensions (12x6 = 2:1 aspect ratio matching court)
 export const GRID_COLS = 12; // Along length (20m)
 export const GRID_ROWS = 6; // Along width (10m)
-
-
-
-
-
-
-
-
-
-
-
-
-
-

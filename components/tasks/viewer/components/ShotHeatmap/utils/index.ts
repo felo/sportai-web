@@ -5,17 +5,3 @@ export {
   getSideLabel,
   getWidthLabel,
 } from "./gridUtils";
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -32,12 +32,3 @@ export {
   calculateMetersPerPixel,
   convertVelocityToKmh,
 } from "./utils/velocityConversion";
-
-
-
-
-
-
-
-
-

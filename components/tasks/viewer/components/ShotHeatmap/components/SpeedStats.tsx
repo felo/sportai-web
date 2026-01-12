@@ -53,17 +53,3 @@ export function SpeedStats({ avgSpeed, topSpeed }: SpeedStatsProps) {
     </Flex>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

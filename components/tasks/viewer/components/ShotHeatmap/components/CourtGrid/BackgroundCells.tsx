@@ -98,17 +98,3 @@ export function BackgroundCells({
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

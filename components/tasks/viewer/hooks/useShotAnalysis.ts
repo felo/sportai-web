@@ -383,4 +383,3 @@ export function useAllShotsData({ result, playerDisplayNames = {} }: UseShotAnal
     return Object.values(dataMap);
   }, [result, playerDisplayNames]);
 }
-

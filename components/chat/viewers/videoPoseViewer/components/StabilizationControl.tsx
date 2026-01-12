@@ -101,17 +101,3 @@ export function StabilizationControl({
     </Popover.Root>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

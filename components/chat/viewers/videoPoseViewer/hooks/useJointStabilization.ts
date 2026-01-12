@@ -196,17 +196,3 @@ export function useJointStabilization({
     getJointVelocities,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

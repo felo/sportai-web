@@ -428,17 +428,3 @@ export function useHandednessDetection({
     config,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

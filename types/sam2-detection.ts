@@ -266,29 +266,3 @@ export function calculateMaskStats(mask: SAM2Mask): {
 
   return { area, centerX, centerY, coverage };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -63,12 +63,3 @@ export function StudioPromptCard({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-

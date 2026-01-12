@@ -55,17 +55,3 @@ export function getTrajectoryStagger(numTrajectories: number): number {
   const availableTime = TRAJECTORY_TOTAL_TIME - TRAJECTORY_ANIMATION_DURATION;
   return Math.max(30, availableTime / (numTrajectories - 1)); // minimum 30ms stagger
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

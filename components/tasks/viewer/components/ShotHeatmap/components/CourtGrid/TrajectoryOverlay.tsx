@@ -138,17 +138,3 @@ export function TrajectoryOverlay({
     </svg>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

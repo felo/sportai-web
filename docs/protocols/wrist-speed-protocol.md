@@ -283,21 +283,3 @@ if (result) {
 4. **Comparison mode**: Side-by-side velocity comparison between sessions
 5. **Export functionality**: CSV/JSON export of time-series data
 6. **3D velocity**: Use BlazePose 3D for true spatial velocity
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

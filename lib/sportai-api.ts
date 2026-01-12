@@ -53,16 +53,3 @@ export const SportAIConfig = {
   isStaging,
   getEnvironmentLabel,
 } as const;
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -120,17 +120,3 @@ export function setDomainExpertise(expertise: DomainExpertise): void {
     storageLogger.error("Failed to save domain expertise to storage:", error);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

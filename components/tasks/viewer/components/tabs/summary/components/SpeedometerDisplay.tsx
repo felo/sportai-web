@@ -282,17 +282,3 @@ function StatBox({
     </Flex>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

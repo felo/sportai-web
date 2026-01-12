@@ -289,21 +289,3 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 | `styles/buttons.module.css` | Action button classes |
 | `components/ui/` | Reusable UI components |
 | `docs/design/design-components.md` | Full component catalog |
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

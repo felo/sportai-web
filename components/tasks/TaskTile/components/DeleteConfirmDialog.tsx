@@ -50,17 +50,3 @@ export function DeleteConfirmDialog({
     </AlertDialog.Root>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

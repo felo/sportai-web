@@ -177,17 +177,3 @@ export function useVideoMetadata({
 
   return { metadata, isLoading, fetchMetadata };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -46,17 +46,3 @@ export function deserializeMessage(serialized: SerializableMessage): Message {
     videoPreview: null,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

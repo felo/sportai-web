@@ -266,17 +266,3 @@ export function clearChatsFromStorage(): void {
     storageLogger.error("Failed to clear chats from storage:", error);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

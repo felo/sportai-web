@@ -66,17 +66,3 @@ export interface AnalysisOptionsData {
  * Message update callback type
  */
 export type MessageUpdateCallback = (id: string, updates: Partial<Message>) => void;
-
-
-
-
-
-
-
-
-
-
-
-
-
-

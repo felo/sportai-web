@@ -69,17 +69,3 @@ export const BALL_TABS: BallTabConfig[] = [
     ballType: "fifth-ball" 
   },
 ];
-
-
-
-
-
-
-
-
-
-
-
-
-
-

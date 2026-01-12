@@ -27,17 +27,3 @@ export function stripStreamMetadata(text: string): string {
   }
   return text;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

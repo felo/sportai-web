@@ -233,16 +233,3 @@ export function SwingPhaseTimeline({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

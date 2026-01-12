@@ -1,16 +1,1 @@
 export { PricingPage } from "./PricingPage";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

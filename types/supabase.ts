@@ -570,6 +570,66 @@ export interface Database {
           }
         ];
       };
+      api_keys: {
+        Row: {
+          id: string;
+          key_hash: string;
+          key_prefix: string;
+          name: string;
+          owner_email: string | null;
+          description: string | null;
+          permissions: string[];
+          rate_limit_tier: string;
+          monthly_request_limit: number;
+          requests_this_month: number;
+          month_reset_at: string;
+          created_at: string;
+          expires_at: string | null;
+          is_active: boolean;
+          last_used_at: string | null;
+          total_requests: number;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          key_hash: string;
+          key_prefix: string;
+          name: string;
+          owner_email?: string | null;
+          description?: string | null;
+          permissions?: string[];
+          rate_limit_tier?: string;
+          monthly_request_limit?: number;
+          requests_this_month?: number;
+          month_reset_at?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          is_active?: boolean;
+          last_used_at?: string | null;
+          total_requests?: number;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          key_hash?: string;
+          key_prefix?: string;
+          name?: string;
+          owner_email?: string | null;
+          description?: string | null;
+          permissions?: string[];
+          rate_limit_tier?: string;
+          monthly_request_limit?: number;
+          requests_this_month?: number;
+          month_reset_at?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          is_active?: boolean;
+          last_used_at?: string | null;
+          total_requests?: number;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

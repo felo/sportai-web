@@ -164,17 +164,3 @@ export function clearMessagesFromStorage(): void {
     storageLogger.error("Failed to clear messages from storage:", error);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

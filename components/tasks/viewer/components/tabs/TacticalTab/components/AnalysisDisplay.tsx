@@ -48,17 +48,3 @@ export function AnalysisDisplay({
     </CollapsibleSection>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -9,18 +9,3 @@ export const metadata: Metadata = {
 export default function PricingRoute() {
   return <PricingPage />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

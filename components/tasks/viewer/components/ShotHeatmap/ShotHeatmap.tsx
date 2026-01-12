@@ -152,17 +152,3 @@ export function ShotHeatmap({
     </Flex>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

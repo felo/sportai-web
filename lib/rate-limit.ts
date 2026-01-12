@@ -47,6 +47,11 @@ export const RATE_LIMITS = {
     requests: 100,
     window: "10 s" as const, // 100 requests per 10 seconds
   },
+  // External developer API (per API key)
+  external_standard: {
+    requests: 30,
+    window: "1 m" as const, // 30 requests per minute per API key
+  },
 } as const;
 
 export type RateLimitTier = keyof typeof RATE_LIMITS;
@@ -281,4 +286,3 @@ export function withRateLimit<T extends (...args: unknown[]) => Promise<NextResp
     return addRateLimitHeaders(response, result);
   };
 }
-

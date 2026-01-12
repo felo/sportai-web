@@ -699,4 +699,3 @@ ALTER TABLE pricing_waitlist ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can join waitlist"
   ON pricing_waitlist FOR INSERT
   WITH CHECK (true);
-

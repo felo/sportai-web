@@ -302,13 +302,3 @@ export function OnboardingTooltip({
 }
 
 export default OnboardingTooltip;
-
-
-
-
-
-
-
-
-
-

@@ -341,12 +341,3 @@ export interface KeypointIndices {
   rightAnkle: number;
   nose: number;
 }
-
-
-
-
-
-
-
-
-

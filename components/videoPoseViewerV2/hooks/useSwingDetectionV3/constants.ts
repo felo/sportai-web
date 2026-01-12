@@ -57,12 +57,3 @@ export const DEFAULT_CONFIG_V3: SwingDetectionConfigV3 = {
   clipLeadTime: 2.0,
   clipTrailTime: 1.0,
 };
-
-
-
-
-
-
-
-
-

@@ -16,6 +16,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "eslint --fix",
       "bash -c 'tsc --noEmit --project tsconfig.lint.json'"
     ]
   },
@@ -73,13 +74,14 @@
     "three": "^0.181.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@next/bundle-analyzer": "^16.0.10",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
-    "eslint": "^9.17.0",
-    "eslint-config-next": "^16.0.10",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "postcss": "^8.4.49",

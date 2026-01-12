@@ -80,11 +80,3 @@ export interface SwingProfileState {
   isGenerating: boolean;
   error: string | null;
 }
-
-
-
-
-
-
-
-

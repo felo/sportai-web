@@ -128,13 +128,3 @@ export function FilterSelect({
 
   return select;
 }
-
-
-
-
-
-
-
-
-
-

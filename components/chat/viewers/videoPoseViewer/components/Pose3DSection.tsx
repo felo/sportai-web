@@ -85,17 +85,3 @@ export function Pose3DSection({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -106,17 +106,3 @@ export function CellLocationDialog({ selectedCell, onClose }: CellLocationDialog
     </Dialog.Root>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

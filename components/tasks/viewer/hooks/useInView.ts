@@ -50,19 +50,3 @@ export function useInView({
 
   return { ref, isInView };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,15 +1,1 @@
 export { TechniqueViewer } from "./TechniqueViewer";
-
-
-
-
-
-
-
-
-
-
-
-
-
-

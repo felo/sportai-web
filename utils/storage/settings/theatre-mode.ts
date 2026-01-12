@@ -91,17 +91,3 @@ export function initTheatreModeResizeListener(): void {
   window.addEventListener("resize", handleResize);
   theatreModeResizeListenerInitialized = true;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

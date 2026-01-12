@@ -64,17 +64,3 @@ export function updateHighlightingPreference(
   preferences[key] = value;
   setHighlightingPreferences(preferences);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

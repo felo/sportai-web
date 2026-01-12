@@ -184,16 +184,3 @@ export function SwingRadarChart({
     </Box>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
