@@ -1,6 +1,6 @@
 /**
  * Body Metrics Utilities
- * 
+ *
  * Pure functions for calculating body center and keypoint velocities.
  */
 
@@ -51,21 +51,21 @@ export function calculateKeypointVelocity(
 ): number | null {
   const currKeypoint = currPose.keypoints[keypointIdx];
   const prevKeypoint = prevPose.keypoints[keypointIdx];
-  
+
   if (!currKeypoint || !prevKeypoint) return null;
   if ((currKeypoint.score ?? 0) < minConfidence) return null;
   if ((prevKeypoint.score ?? 0) < minConfidence) return null;
-  
+
   // Relative positions
   const currRelX = currKeypoint.x - currCenter.x;
   const currRelY = currKeypoint.y - currCenter.y;
   const prevRelX = prevKeypoint.x - prevCenter.x;
   const prevRelY = prevKeypoint.y - prevCenter.y;
-  
+
   // Velocity
   const dx = currRelX - prevRelX;
   const dy = currRelY - prevRelY;
-  
+
   return Math.sqrt(dx * dx + dy * dy);
 }
 
@@ -82,24 +82,24 @@ export function calculateRadialVelocity(
 ): number | null {
   const currWrist = currPose.keypoints[wristIdx];
   const prevWrist = prevPose.keypoints[wristIdx];
-  
+
   if (!currWrist || !prevWrist) return null;
   if ((currWrist.score ?? 0) < minConfidence) return null;
   if ((prevWrist.score ?? 0) < minConfidence) return null;
-  
+
   const currRelX = currWrist.x - currCenter.x;
   const currRelY = currWrist.y - currCenter.y;
   const prevRelX = prevWrist.x - prevCenter.x;
   const prevRelY = prevWrist.y - prevCenter.y;
-  
+
   const velX = currRelX - prevRelX;
   const velY = currRelY - prevRelY;
-  
+
   const radialDist = Math.sqrt(currRelX * currRelX + currRelY * currRelY);
   if (radialDist < 1) return 0;
-  
+
   const radialX = currRelX / radialDist;
   const radialY = currRelY / radialDist;
-  
+
   return velX * radialX + velY * radialY;
 }

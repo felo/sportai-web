@@ -31,7 +31,10 @@ export interface VideoEventProperties extends BaseEventProperties {
   durationSeconds?: number;
   fileSizeMB?: number;
   videoId?: string;
-  source?: string;
+  /** Source of the upload: 'file_picker', 'drag_drop', 'url' */
+  source?: 'file_picker' | 'drag_drop' | 'url' | string;
+  /** File type/MIME type */
+  fileType?: string;
 }
 
 /**
@@ -94,8 +97,9 @@ export interface AnalyticsEventMap {
   'page_view': PageViewProperties;
   
   // Video Events
-  'video_uploaded': VideoEventProperties;
+  'video_upload_intent': VideoEventProperties;
   'video_upload_started': VideoEventProperties;
+  'video_uploaded': VideoEventProperties;
   'video_upload_failed': VideoEventProperties & { error?: string };
   'video_deleted': VideoEventProperties;
   'video_play_started': VideoEventProperties;
@@ -220,4 +224,3 @@ export interface AnalyticsConsent {
   analytics: boolean;
   marketing: boolean;
 }
-

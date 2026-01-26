@@ -71,33 +71,33 @@ interface VideoEligibilityIndicatorProps {
  * Displays video eligibility status with sport detection, camera angle, and PRO badges.
  * Uses mint glow styling consistent with selected chat states.
  */
-export function VideoEligibilityIndicator({ 
-  preAnalysis, 
-  fallbackText 
+export function VideoEligibilityIndicator({
+  preAnalysis,
+  fallbackText
 }: VideoEligibilityIndicatorProps) {
   if (!preAnalysis) return null;
 
-  const { 
-    isAnalyzing, 
-    sport, 
-    cameraAngle, 
-    isProEligible, 
-    isTechniqueLiteEligible 
+  const {
+    isAnalyzing,
+    sport,
+    cameraAngle,
+    isProEligible,
+    isTechniqueLiteEligible
   } = preAnalysis;
 
   const hasSport = sport && sport !== "other";
   const showCameraAngle = (isProEligible || isTechniqueLiteEligible) && shouldShowCameraAngle(cameraAngle);
 
   return (
-    <Flex 
-      align="center" 
-      gap="2" 
-      py="2" 
+    <Flex
+      align="center"
+      gap="2"
+      py="2"
       px="3"
       style={MINT_GLOW_STYLES}
     >
       <VideoIcon width="16" height="16" style={{ color: MINT_COLOR }} />
-      
+
       {/* Sport detection text */}
       <Text size="2" style={{ flex: 1, color: MINT_COLOR }}>
         {isAnalyzing ? (
@@ -120,14 +120,14 @@ export function VideoEligibilityIndicator({
 
       {/* PRO Tactical Analysis badge (elevated back court padel) */}
       {isProEligible && (
-        <Badge 
-          color="green" 
-          variant="solid" 
-          size="1" 
-          style={{ 
-            fontWeight: 600, 
-            backgroundColor: MINT_COLOR, 
-            color: MINT_TEXT_DARK 
+        <Badge
+          color="green"
+          variant="solid"
+          size="1"
+          style={{
+            fontWeight: 600,
+            backgroundColor: MINT_COLOR,
+            color: MINT_TEXT_DARK
           }}
         >
           PRO Tactical Analysis ✓
@@ -136,14 +136,14 @@ export function VideoEligibilityIndicator({
 
       {/* PRO Technique Analysis badge (ground-level camera, short video) */}
       {isTechniqueLiteEligible && !isProEligible && (
-        <Badge 
-          color="green" 
-          variant="solid" 
-          size="1" 
-          style={{ 
-            fontWeight: 600, 
-            backgroundColor: MINT_COLOR, 
-            color: MINT_TEXT_DARK 
+        <Badge
+          color="green"
+          variant="solid"
+          size="1"
+          style={{
+            fontWeight: 600,
+            backgroundColor: MINT_COLOR,
+            color: MINT_TEXT_DARK
           }}
         >
           PRO Technique Analysis ✓

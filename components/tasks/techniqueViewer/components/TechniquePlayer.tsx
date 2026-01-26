@@ -121,9 +121,9 @@ export const TechniquePlayer = forwardRef<HTMLVideoElement, TechniquePlayerProps
           }}
         >
           <MediaProvider />
-          
+
           {/* No overlays - clean slate for future technique overlays */}
-          
+
           <DefaultVideoLayout icons={defaultLayoutIcons} />
         </MediaPlayer>
 

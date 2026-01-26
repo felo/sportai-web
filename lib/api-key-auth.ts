@@ -1,9 +1,9 @@
 /**
  * API Key Authentication
- * 
+ *
  * Handles generation, validation, and usage tracking of API keys
  * for external developer access to SportAI APIs.
- * 
+ *
  * Security:
  * - Keys are stored as SHA-256 hashes (never plaintext)
  * - Keys use `sk_live_` prefix for easy identification
@@ -29,7 +29,7 @@ export function generateApiKey(): { rawKey: string; keyHash: string; keyPrefix: 
   const rawKey = `${KEY_PREFIX}${randomPart}`;
   const keyHash = hashApiKey(rawKey);
   const keyPrefix = rawKey.substring(0, 12); // "sk_live_xxxx"
-  
+
   return { rawKey, keyHash, keyPrefix };
 }
 
@@ -46,18 +46,18 @@ export function hashApiKey(key: string): string {
  */
 function extractApiKey(request: NextRequest): string | null {
   const authHeader = request.headers.get("Authorization");
-  
+
   if (!authHeader?.startsWith("Bearer ")) {
     return null;
   }
-  
+
   const token = authHeader.replace("Bearer ", "");
-  
+
   // Must be an API key (starts with sk_live_), not a Supabase JWT
   if (!token.startsWith(KEY_PREFIX)) {
     return null;
   }
-  
+
   return token;
 }
 
@@ -67,42 +67,42 @@ function extractApiKey(request: NextRequest): string | null {
  */
 export async function validateApiKey(request: NextRequest): Promise<ValidatedApiKey | null> {
   const rawKey = extractApiKey(request);
-  
+
   if (!rawKey) {
     return null;
   }
-  
+
   const keyHash = hashApiKey(rawKey);
-  
+
   try {
     const supabase = getSupabaseAdmin();
-    
+
     const { data, error } = await supabase
       .from("api_keys")
       .select("*")
       .eq("key_hash", keyHash)
       .eq("is_active", true)
       .single();
-    
+
     if (error || !data) {
       logger.debug("API key validation failed:", error?.message || "Key not found");
       return null;
     }
-    
+
     const keyRecord = data as ApiKeyRecord;
-    
+
     // Check expiration
     if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
       logger.debug("API key expired:", keyRecord.key_prefix);
       return null;
     }
-    
+
     // Check monthly limit
     if (keyRecord.requests_this_month >= keyRecord.monthly_request_limit) {
       logger.warn("API key monthly limit exceeded:", keyRecord.key_prefix);
       return null;
     }
-    
+
     return {
       id: keyRecord.id,
       name: keyRecord.name,
@@ -123,14 +123,14 @@ export async function validateApiKey(request: NextRequest): Promise<ValidatedApi
 export async function trackApiKeyUsage(keyId: string): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
-    
+
     // Get current values
     const { data } = await supabase
       .from("api_keys")
       .select("requests_this_month, total_requests")
       .eq("id", keyId)
       .single();
-    
+
     if (data) {
       // Increment and update
       await supabase
@@ -156,7 +156,7 @@ export function hasPermission(apiKey: ValidatedApiKey, permission: string): bool
   if (apiKey.permissions.includes("*")) {
     return true;
   }
-  
+
   return apiKey.permissions.includes(permission);
 }
 
@@ -185,7 +185,7 @@ export function apiKeyForbiddenResponse(message = "Insufficient permissions"): N
  */
 export function monthlyLimitExceededResponse(): NextResponse {
   return NextResponse.json(
-    { 
+    {
       error: "Monthly request limit exceeded",
       message: "Your API key has reached its monthly request limit. Contact support to increase your limit.",
     },

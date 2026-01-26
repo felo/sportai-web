@@ -1,6 +1,6 @@
 /**
  * External API Types
- * 
+ *
  * Type definitions for the external developer API endpoints.
  * These types define the contract between external apps (e.g., Pickleball app)
  * and the SportAI backend.
@@ -104,6 +104,14 @@ export interface SwingAnalysisContext {
 // ============================================================================
 
 /**
+ * AI Insight Level - controls complexity and depth of coaching responses
+ * - beginner: Simple, encouraging, no jargon, 1-2 tips max
+ * - developing: Moderate detail, 2-3 key areas, introduces terminology
+ * - advanced: Full technical analysis, all metrics, comprehensive breakdown
+ */
+export type InsightLevel = "beginner" | "developing" | "advanced";
+
+/**
  * Conversation message for multi-turn chats
  */
 export interface ConversationMessage {
@@ -118,13 +126,16 @@ export interface ConversationMessage {
 export interface TechniqueChatRequest {
   /** User's question about their swing (REQUIRED) */
   prompt: string;
-  
+
   /** Pre-analyzed swing data (REQUIRED - at minimum swing_type) */
   swingContext: SwingAnalysisContext;
-  
+
   /** Custom agent name (e.g., "Shark", "Ted") - defaults to "Coach" */
   agentName?: string;
-  
+
+  /** AI insight level - controls response complexity (defaults to "developing") */
+  insightLevel?: InsightLevel;
+
   /** Conversation history for multi-turn chats */
   conversationHistory?: ConversationMessage[];
 }

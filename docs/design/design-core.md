@@ -123,11 +123,11 @@ Hover: `translateY(-2px)` + glow shadow
   <Dialog.Content maxWidth="450px">
     <Dialog.Title>Title</Dialog.Title>
     <Dialog.Description size="2" mb="4">Description</Dialog.Description>
-    
+
     <Flex direction="column" gap="3" mt="4">
       {/* content */}
     </Flex>
-    
+
     <Flex gap="3" justify="end" mt="4">
       <Dialog.Close>
         <Button className={buttonStyles.actionButtonSquareSecondary}>Cancel</Button>

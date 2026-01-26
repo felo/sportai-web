@@ -30,10 +30,10 @@ export function SwingPhaseTimeline({
   const startTime = swingEvent.startTime;
   const endTime = swingEvent.endTime;
   const duration = endTime - startTime;
-  
+
   // Build phase markers from related events
   const markers: PhaseMarker[] = [];
-  
+
   // Loading/Preparation marker
   const loadingEvent = relatedEvents.find(e => e.protocolId === "loading-position");
   const prepEvent = relatedEvents.find(e => e.protocolId === "serve-preparation");
@@ -56,7 +56,7 @@ export function SwingPhaseTimeline({
       description: "Serve preparation",
     });
   }
-  
+
   // Contact point marker
   const contactEvent = relatedEvents.find(e => e.protocolId === "tennis-contact-point");
   if (contactEvent) {
@@ -69,7 +69,7 @@ export function SwingPhaseTimeline({
       description: "Ball contact point",
     });
   }
-  
+
   // Follow-through marker
   const followEvent = relatedEvents.find(e => e.protocolId === "serve-follow-through");
   if (followEvent) {
@@ -82,7 +82,7 @@ export function SwingPhaseTimeline({
       description: "Follow-through position",
     });
   }
-  
+
   // Calculate position as percentage within the swing duration
   const getPosition = (time: number) => {
     const relative = time - startTime;
@@ -103,7 +103,7 @@ export function SwingPhaseTimeline({
           End
         </Text>
       </Flex>
-      
+
       {/* Timeline Track */}
       <Box
         style={{
@@ -131,11 +131,11 @@ export function SwingPhaseTimeline({
             )`,
           }}
         />
-        
+
         {/* Phase markers */}
         {markers.map((marker) => {
           const position = getPosition(marker.time);
-          
+
           return (
             <Tooltip
               key={marker.id}
@@ -182,7 +182,7 @@ export function SwingPhaseTimeline({
             </Tooltip>
           );
         })}
-        
+
         {/* Start marker */}
         <Box
           style={{
@@ -196,7 +196,7 @@ export function SwingPhaseTimeline({
             borderRadius: 2,
           }}
         />
-        
+
         {/* End marker */}
         <Box
           style={{
@@ -211,7 +211,7 @@ export function SwingPhaseTimeline({
           }}
         />
       </Box>
-      
+
       {/* Marker legend */}
       {markers.length > 0 && (
         <Flex gap="3" justify="center" style={{ marginTop: 8 }}>

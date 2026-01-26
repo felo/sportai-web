@@ -45,7 +45,7 @@ export const INSIGHT_ONBOARDING_KEY = "insight-onboarding-completed";
 /**
  * Maximum number of messages to keep in history
  * This prevents localStorage from growing too large and maintains performance.
- * 
+ *
  * Rationale:
  * - Average message: ~1-5KB (user prompts + AI responses)
  * - 100 messages ≈ 100-500KB (well under localStorage 5-10MB limit)

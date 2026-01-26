@@ -244,7 +244,7 @@ export function calculateMaskStats(mask: SAM2Mask): {
   coverage: number; // Percentage of image covered
 } {
   const { data, width, height } = mask;
-  
+
   let area = 0;
   let sumX = 0;
   let sumY = 0;

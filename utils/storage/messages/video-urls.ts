@@ -7,7 +7,7 @@ import type { Message } from "@/types/chat";
  */
 export async function refreshVideoUrls(messages: Message[]): Promise<Message[]> {
   const messagesWithKeys = messages.filter((msg) => msg.videoS3Key && !msg.videoUrl);
-  
+
   if (messagesWithKeys.length === 0) {
     return messages;
   }

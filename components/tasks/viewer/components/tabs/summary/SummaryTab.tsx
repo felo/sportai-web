@@ -49,12 +49,12 @@ export function SummaryTab({ task, result, enhancedBallBounces }: SummaryTabProp
   // Trigger animations after mount
   useEffect(() => {
     if (!result) return;
-    
+
     const fadeTimer = setTimeout(() => setCardsVisible(true), 50);
     const countTimer = setTimeout(() => {
       setStartCounting(true);
     }, 50 + (TOTAL_ROWS - 1) * CARD_STAGGER_DELAY + CARD_FADE_DURATION + 100);
-    
+
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(countTimer);
@@ -78,7 +78,7 @@ export function SummaryTab({ task, result, enhancedBallBounces }: SummaryTabProp
   const getRowAnimation = (rowIndex: number) => ({
     opacity: 0,
     transform: "translateY(-20px)",
-    animation: cardsVisible 
+    animation: cardsVisible
       ? `cardFadeInFromTop ${CARD_FADE_DURATION}ms ease-out ${rowIndex * CARD_STAGGER_DELAY}ms forwards`
       : "none",
   });
@@ -87,7 +87,7 @@ export function SummaryTab({ task, result, enhancedBallBounces }: SummaryTabProp
     <CountingContext.Provider value={startCounting}>
       <Box style={{ animation: "fadeIn 0.2s ease-out" }}>
         <style dangerouslySetInnerHTML={{ __html: cardFadeKeyframes }} />
-        
+
         {/* Quick Stats Row 1 */}
         <Grid columns={{ initial: "2", sm: "3", md: "6" }} gap="3" mb="4" style={getRowAnimation(0)}>
           <QuickStatCard label="Teams" value={stats.teamCount} />

@@ -24,7 +24,7 @@ export function useCountingAnimation(options: UseCountingAnimationOptions = {}) 
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const rawProgress = Math.min(elapsed / duration, 1);
-        
+
         // Apply easing
         let eased: number;
         if (easing === "bounce") {
@@ -35,7 +35,7 @@ export function useCountingAnimation(options: UseCountingAnimationOptions = {}) 
           // easeOut cubic
           eased = 1 - Math.pow(1 - rawProgress, 3);
         }
-        
+
         setProgress(eased);
 
         if (rawProgress < 1) {

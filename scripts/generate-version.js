@@ -2,12 +2,12 @@
 
 /**
  * Version Generation Script
- * 
+ *
  * Generates version info from git at build time.
  * Run as part of the build process to set environment variables.
- * 
+ *
  * Usage: node scripts/generate-version.js
- * 
+ *
  * Outputs JSON with version info that can be used by next.config.ts
  */
 
@@ -51,13 +51,13 @@ function generateVersion() {
   // Check for Vercel environment variables first (available during Vercel builds)
   const vercelSha = process.env.VERCEL_GIT_COMMIT_SHA;
   const vercelBranch = process.env.VERCEL_GIT_COMMIT_REF;
-  
+
   // Base version (major.minor) - update these manually for breaking changes
   const MAJOR = 0;
   const MINOR = 6;
-  
+
   let commitCount, shortSha, branch;
-  
+
   if (vercelSha) {
     // Running on Vercel
     shortSha = vercelSha.substring(0, 7);
@@ -74,12 +74,12 @@ function generateVersion() {
     shortSha = gitInfo.shortSha;
     branch = gitInfo.branch;
   }
-  
+
   // Version format: v{major}.{minor}.{patch}
   const version = `v${MAJOR}.${MINOR}.${commitCount}`;
-  
+
   const buildDate = new Date().toISOString();
-  
+
   const versionInfo = {
     version,
     shortSha,
@@ -89,10 +89,10 @@ function generateVersion() {
     minor: MINOR,
     patch: commitCount,
   };
-  
+
   // Output JSON that can be parsed by build tools
   console.log(JSON.stringify(versionInfo, null, 2));
-  
+
   return versionInfo;
 }
 

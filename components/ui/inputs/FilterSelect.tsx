@@ -54,7 +54,7 @@ export function FilterSelect({
   // Render the icon
   const renderIcon = () => {
     if (!icon) return null;
-    
+
     if (icon === "filter") {
       return (
         <MixerHorizontalIcon

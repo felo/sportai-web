@@ -96,11 +96,11 @@ export class BallTracker {
   ): TrackedBall | null {
     // For simplicity, track only one ball (most common case)
     // Can be extended for multi-ball tracking if needed
-    
+
     if (detections.length === 0) return null;
 
     // Pick highest confidence detection
-    const detection = detections.reduce((best, current) => 
+    const detection = detections.reduce((best, current) =>
       current.confidence > best.confidence ? current : best
     );
 
@@ -297,7 +297,7 @@ export class BallTracker {
 
     for (let i = 1; i <= framesToPredict; i++) {
       const t = i * frameTime;
-      
+
       // Simple linear prediction (can be enhanced with parabolic motion)
       // For parabolic: add gravity acceleration
       const predictedX = lastPos.x + velocity.x * t;
@@ -327,7 +327,7 @@ export class BallTracker {
 
     const detectionConfidence = track.current.confidence;
     const trackLengthFactor = Math.min(track.framesTracked / this.minDetectionsForTrack, 1);
-    
+
     // Motion consistency (velocity should be relatively stable)
     let motionConsistency = 1.0;
     if (track.trajectory.velocity) {
@@ -336,7 +336,7 @@ export class BallTracker {
         // Check if velocity is consistent
         const recentPositions = positions.slice(-5);
         const velocities: number[] = [];
-        
+
         for (let i = 1; i < recentPositions.length; i++) {
           const p1 = recentPositions[i - 1];
           const p2 = recentPositions[i];

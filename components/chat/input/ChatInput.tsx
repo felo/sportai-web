@@ -1,5 +1,6 @@
 "use client";
 import { chatLogger } from "@/lib/logger";
+import { track } from "@/lib/analytics";
 
 import { useRef, useEffect, useState } from "react";
 import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
@@ -631,6 +632,12 @@ export function ChatInput({
                     textTransform: "uppercase",
                     fontWeight: 600,
                   }}
+                  onClick={() => {
+                    // Track upload intent when user clicks the file picker button
+                    track('video_upload_intent', {
+                      source: 'file_picker',
+                    });
+                  }}
                   onMouseEnter={(e: React.MouseEvent<HTMLLabelElement>) => {
                     e.currentTarget.style.backgroundColor = "#95E5A6";
                     e.currentTarget.style.transform = "translateY(-2px)";
@@ -976,4 +983,3 @@ export function ChatInput({
     </Box>
   );
 }
-

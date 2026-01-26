@@ -1,6 +1,6 @@
 /**
  * Swing Detection V3 Hook
- * 
+ *
  * Enhanced swing detection using body orientation + wrist velocity.
  * Key improvements over V2:
  * - Correlates body rotation with wrist velocity for better swing detection
@@ -95,7 +95,7 @@ export function useSwingDetectionV3({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<SwingDetectionResultV3 | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const config = useMemo(() => ({
     ...DEFAULT_CONFIG_V3,
     ...userConfig,
@@ -119,11 +119,11 @@ export function useSwingDetectionV3({
       const frames = Array.from(preprocessedPoses.keys()).sort((a, b) => a - b);
       const totalFrames = frames.length;
       const frameData: SwingFrameDataV3[] = [];
-      
+
       // Track torso heights for velocity normalization
       let totalTorsoHeight = 0;
       let torsoHeightCount = 0;
-      
+
       // ========================================================================
       // PASS 1: Calculate per-frame metrics
       // ========================================================================
@@ -131,25 +131,25 @@ export function useSwingDetectionV3({
         const frame = frames[i];
         const poses = preprocessedPoses.get(frame);
         const pose = poses?.[selectedPoseIndex];
-        
+
         const timestamp = frame / videoFPS;
         const dataPoint: SwingFrameDataV3 = createEmptyFrameData(frame, timestamp);
-        
+
         if (!pose) {
           frameData.push(dataPoint);
           continue;
         }
-        
+
         // Track keypoint confidence scores
         populateConfidenceScores(dataPoint, pose, indices);
-        
+
         // Track torso height for velocity normalization
         const torsoHeight = calculateTorsoHeight(pose, indices, config.minConfidence);
         if (torsoHeight !== null) {
           totalTorsoHeight += torsoHeight;
           torsoHeightCount++;
         }
-        
+
         // Calculate body orientation
         const orientation = calculateBodyOrientation(
           pose.keypoints,
@@ -157,19 +157,19 @@ export function useSwingDetectionV3({
           config.minConfidence
         );
         dataPoint.bodyOrientation = orientation?.angle ?? null;
-        
+
         // Calculate segment line angles
         calculateSegmentAngles(dataPoint, pose, indices, config.minConfidence);
-        
+
         // Calculate joint angles
         calculateAllJointAngles(dataPoint, pose, indices, config.minConfidence);
-        
+
         // Calculate velocities (need previous frame)
         if (i > 0) {
           const prevFrame = frames[i - 1];
           const prevPoses = preprocessedPoses.get(prevFrame);
           const prevPose = prevPoses?.[selectedPoseIndex];
-          
+
           if (prevPose) {
             calculateAllVelocities(
               dataPoint, pose, prevPose, indices, config,
@@ -177,49 +177,49 @@ export function useSwingDetectionV3({
             );
           }
         }
-        
+
         // Calculate swing score
         if (dataPoint.wristVelocity !== null && dataPoint.orientationVelocity !== null) {
           const velocityComponent = dataPoint.wristVelocity;
           const rotationComponent = Math.abs(dataPoint.orientationVelocity);
-          dataPoint.swingScore = velocityComponent * (1 - config.rotationWeight) + 
+          dataPoint.swingScore = velocityComponent * (1 - config.rotationWeight) +
                                   velocityComponent * rotationComponent * config.rotationWeight;
         }
-        
+
         frameData.push(dataPoint);
       }
-      
+
       // ========================================================================
       // PASS 2: Convert to km/h, apply processing, and detect swings
       // ========================================================================
       const avgTorsoHeight = torsoHeightCount > 0 ? totalTorsoHeight / torsoHeightCount : 100;
       const metersPerPixel = calculateMetersPerPixel(avgTorsoHeight);
-      
+
       // Calculate raw km/h values
       calculateRawKmhValues(frameData, metersPerPixel, videoFPS);
-      
+
       // Apply drop filling and smoothing
       const processedData = applyDataProcessing(frameData, config.smoothingWindow);
-      
+
       // Update frameData with processed values
       updateFrameDataWithProcessed(frameData, processedData, metersPerPixel, videoFPS, config);
-      
+
       // Calculate accelerations
       calculateAccelerations(frameData, processedData, metersPerPixel, videoFPS);
-      
+
       // Find peaks and build swing objects
       const swings = detectAndBuildSwings(
         frameData, config, videoFPS, totalFrames, metersPerPixel,
         preprocessedPoses, selectedPoseIndex, indices, frames
       );
-      
+
       // Mark phases in frame data
       markPhasesInFrameData(frameData, swings);
-      
+
       // Calculate summary stats
       const velocities = swings.map(s => s.peakVelocity);
       const rotations = swings.map(s => s.rotationRange);
-      
+
       const analysisResult: SwingDetectionResultV3 = {
         swings,
         frameData,
@@ -227,8 +227,8 @@ export function useSwingDetectionV3({
         forehandCount: swings.filter(s => s.swingType === "forehand").length,
         backhandCount: swings.filter(s => s.swingType === "backhand").length,
         serveCount: swings.filter(s => s.swingType === "serve").length,
-        averageVelocity: velocities.length > 0 
-          ? velocities.reduce((a, b) => a + b, 0) / velocities.length 
+        averageVelocity: velocities.length > 0
+          ? velocities.reduce((a, b) => a + b, 0) / velocities.length
           : 0,
         maxVelocity: velocities.length > 0 ? Math.max(...velocities) : 0,
         averageRotation: rotations.length > 0
@@ -238,10 +238,10 @@ export function useSwingDetectionV3({
         videoDuration: totalFrames / videoFPS,
         analysisTimestamp: new Date().toISOString(),
       };
-      
+
       setResult(analysisResult);
       return analysisResult;
-      
+
     } catch (err) {
       const message = err instanceof Error ? err.message : "Analysis failed";
       setError(message);
@@ -429,7 +429,7 @@ function calculateTorsoHeight(
   const rightShoulder = pose.keypoints[indices.rightShoulder];
   const leftHip = pose.keypoints[indices.leftHip];
   const rightHip = pose.keypoints[indices.rightHip];
-  
+
   if (leftShoulder && rightShoulder && leftHip && rightHip &&
       (leftShoulder.score ?? 0) >= minConfidence &&
       (rightShoulder.score ?? 0) >= minConfidence &&
@@ -458,27 +458,27 @@ function calculateSegmentAngles(
   const rightHipKp = pose.keypoints[indices.rightHip];
   const leftShoulderKp = pose.keypoints[indices.leftShoulder];
   const rightShoulderKp = pose.keypoints[indices.rightShoulder];
-  
+
   // Hip line angle
-  if (leftHipKp && rightHipKp && 
-      (leftHipKp.score ?? 0) >= minConfidence && 
+  if (leftHipKp && rightHipKp &&
+      (leftHipKp.score ?? 0) >= minConfidence &&
       (rightHipKp.score ?? 0) >= minConfidence) {
     dataPoint.hipLineAngle = Math.atan2(
       rightHipKp.y - leftHipKp.y,
       rightHipKp.x - leftHipKp.x
     ) * (180 / Math.PI);
   }
-  
+
   // Shoulder line angle
-  if (leftShoulderKp && rightShoulderKp && 
-      (leftShoulderKp.score ?? 0) >= minConfidence && 
+  if (leftShoulderKp && rightShoulderKp &&
+      (leftShoulderKp.score ?? 0) >= minConfidence &&
       (rightShoulderKp.score ?? 0) >= minConfidence) {
     dataPoint.shoulderLineAngle = Math.atan2(
       rightShoulderKp.y - leftShoulderKp.y,
       rightShoulderKp.x - leftShoulderKp.x
     ) * (180 / Math.PI);
   }
-  
+
   // X-Factor
   if (dataPoint.hipLineAngle !== null && dataPoint.shoulderLineAngle !== null) {
     let xFactor = dataPoint.shoulderLineAngle - dataPoint.hipLineAngle;
@@ -506,11 +506,11 @@ function calculateAllJointAngles(
   );
   if (dataPoint.rawLeftKneeBend !== null || dataPoint.rawRightKneeBend !== null) {
     dataPoint.rawMaxKneeBend = Math.min(
-      dataPoint.rawLeftKneeBend ?? 180, 
+      dataPoint.rawLeftKneeBend ?? 180,
       dataPoint.rawRightKneeBend ?? 180
     );
   }
-  
+
   // Shoulder angles
   dataPoint.rawLeftShoulderAngle = calculateShoulderAngle(
     pose, indices.leftHip, indices.leftShoulder, indices.leftElbow, minConfidence
@@ -518,7 +518,7 @@ function calculateAllJointAngles(
   dataPoint.rawRightShoulderAngle = calculateShoulderAngle(
     pose, indices.rightHip, indices.rightShoulder, indices.rightElbow, minConfidence
   );
-  
+
   // Elbow angles
   dataPoint.rawLeftElbowAngle = calculateElbowAngle(
     pose, indices.leftShoulder, indices.leftElbow, indices.leftWrist, minConfidence
@@ -526,7 +526,7 @@ function calculateAllJointAngles(
   dataPoint.rawRightElbowAngle = calculateElbowAngle(
     pose, indices.rightShoulder, indices.rightElbow, indices.rightWrist, minConfidence
   );
-  
+
   // Hip angles
   dataPoint.rawLeftHipAngle = calculateHipAngle(
     pose, indices.leftShoulder, indices.leftHip, indices.leftKnee, minConfidence
@@ -551,7 +551,7 @@ function calculateAllVelocities(
 ): void {
   const currCenter = getBodyCenter(pose, indices, config.minConfidence);
   const prevCenter = getBodyCenter(prevPose, indices, config.minConfidence);
-  
+
   if (currCenter && prevCenter) {
     // Wrist velocities
     const leftWristVel = calculateKeypointVelocity(
@@ -560,10 +560,10 @@ function calculateAllVelocities(
     const rightWristVel = calculateKeypointVelocity(
       pose, prevPose, indices.rightWrist, currCenter, prevCenter, config.minConfidence
     );
-    
+
     dataPoint.leftWristVelocity = leftWristVel;
     dataPoint.rightWristVelocity = rightWristVel;
-    
+
     // Combined wrist velocity based on mode
     if (leftWristVel !== null || rightWristVel !== null) {
       switch (config.wristMode) {
@@ -574,15 +574,15 @@ function calculateAllVelocities(
           dataPoint.wristVelocity = Math.max(leftWristVel ?? 0, rightWristVel ?? 0);
           break;
         case "dominant":
-          dataPoint.wristVelocity = config.handedness === "right" 
-            ? (rightWristVel ?? 0) 
+          dataPoint.wristVelocity = config.handedness === "right"
+            ? (rightWristVel ?? 0)
             : (leftWristVel ?? 0);
           break;
         default:
           dataPoint.wristVelocity = (leftWristVel ?? 0) + (rightWristVel ?? 0);
       }
     }
-    
+
     // Other body part velocities
     dataPoint.rawLeftAnkleVelocity = calculateKeypointVelocity(
       pose, prevPose, indices.leftAnkle, currCenter, prevCenter, config.minConfidence
@@ -614,7 +614,7 @@ function calculateAllVelocities(
     dataPoint.rawRightElbowVelocity = calculateKeypointVelocity(
       pose, prevPose, indices.rightElbow, currCenter, prevCenter, config.minConfidence
     );
-    
+
     // Radial velocity
     const radialLeft = calculateRadialVelocity(
       pose, prevPose, indices.leftWrist, currCenter, prevCenter, config.minConfidence
@@ -624,21 +624,21 @@ function calculateAllVelocities(
     );
     dataPoint.radialVelocity = Math.max(radialLeft ?? 0, radialRight ?? 0);
   }
-  
+
   // Orientation velocity
   const prevOrientation = calculateBodyOrientation(
     prevPose.keypoints,
     selectedModel === "BlazePose" ? "BlazePose" : "MoveNet",
     config.minConfidence
   );
-  
+
   if (orientation && prevOrientation) {
     let orientDiff = orientation.angle - prevOrientation.angle;
     if (orientDiff > 180) orientDiff -= 360;
     if (orientDiff < -180) orientDiff += 360;
     dataPoint.orientationVelocity = orientDiff;
   }
-  
+
   // Angular velocities
   calculateAngularVelocities(dataPoint, pose, prevPose, indices, config.minConfidence, videoFPS);
 }
@@ -665,13 +665,13 @@ function calculateAngularVelocities(
       prevRightHipKp.y - prevLeftHipKp.y,
       prevRightHipKp.x - prevLeftHipKp.x
     ) * (180 / Math.PI);
-    
+
     let hipAngleDiff = dataPoint.hipLineAngle - prevHipLineAngle;
     if (hipAngleDiff > 180) hipAngleDiff -= 360;
     if (hipAngleDiff < -180) hipAngleDiff += 360;
     dataPoint.hipAngularVelocity = hipAngleDiff * videoFPS;
   }
-  
+
   // Shoulder angular velocity
   const prevLeftShoulderKp = prevPose.keypoints[indices.leftShoulder];
   const prevRightShoulderKp = prevPose.keypoints[indices.rightShoulder];
@@ -683,7 +683,7 @@ function calculateAngularVelocities(
       prevRightShoulderKp.y - prevLeftShoulderKp.y,
       prevRightShoulderKp.x - prevLeftShoulderKp.x
     ) * (180 / Math.PI);
-    
+
     let shoulderAngleDiff = dataPoint.shoulderLineAngle - prevShoulderLineAngle;
     if (shoulderAngleDiff > 180) shoulderAngleDiff -= 360;
     if (shoulderAngleDiff < -180) shoulderAngleDiff += 360;
@@ -810,21 +810,21 @@ function applyDataProcessing(
   const dropFilledRightShoulderVel = fillDrops(frameData.map(d => d.rawRightShoulderVelocity), 0.5);
   const dropFilledLeftElbowVel = fillDrops(frameData.map(d => d.rawLeftElbowVelocity), 0.5);
   const dropFilledRightElbowVel = fillDrops(frameData.map(d => d.rawRightElbowVelocity), 0.5);
-  
+
   // Calculate max from drop-filled individual wrists
   const dropFilledMax = dropFilledLeft.map((left, i) => {
     const right = dropFilledRight[i];
     if (left === null && right === null) return null;
     return Math.max(left ?? 0, right ?? 0);
   });
-  
+
   // Calculate max knee bend
   const dropFilledMaxKnee = dropFilledLeftKnee.map((left, i) => {
     const right = dropFilledRightKnee[i];
     if (left === null && right === null) return null;
     return Math.min(left ?? 180, right ?? 180);
   });
-  
+
   // Smoothing
   return {
     smoothedCombined: smoothData(dropFilledCombined, smoothingWindow),
@@ -867,7 +867,7 @@ function updateFrameDataWithProcessed(
 ): void {
   for (let i = 0; i < frameData.length; i++) {
     const fd = frameData[i];
-    
+
     // Wrist velocities
     if (processed.smoothedCombined[i] !== null) {
       fd.wristVelocity = processed.smoothedCombined[i];
@@ -890,12 +890,12 @@ function updateFrameDataWithProcessed(
     if (processed.smoothedOrientation[i] !== null) {
       fd.bodyOrientation = processed.smoothedOrientation[i];
     }
-    
+
     // Knee bend
     if (processed.smoothedLeftKnee[i] !== null) fd.leftKneeBend = processed.smoothedLeftKnee[i];
     if (processed.smoothedRightKnee[i] !== null) fd.rightKneeBend = processed.smoothedRightKnee[i];
     if (processed.smoothedMaxKnee[i] !== null) fd.maxKneeBend = processed.smoothedMaxKnee[i];
-    
+
     // Joint angles
     if (processed.smoothedLeftShoulder[i] !== null) fd.leftShoulderAngle = processed.smoothedLeftShoulder[i];
     if (processed.smoothedRightShoulder[i] !== null) fd.rightShoulderAngle = processed.smoothedRightShoulder[i];
@@ -903,7 +903,7 @@ function updateFrameDataWithProcessed(
     if (processed.smoothedRightElbow[i] !== null) fd.rightElbowAngle = processed.smoothedRightElbow[i];
     if (processed.smoothedLeftHipAngle[i] !== null) fd.leftHipAngle = processed.smoothedLeftHipAngle[i];
     if (processed.smoothedRightHipAngle[i] !== null) fd.rightHipAngle = processed.smoothedRightHipAngle[i];
-    
+
     // Body part velocities
     if (processed.smoothedLeftAnkleVel[i] !== null) {
       fd.leftAnkleVelocity = processed.smoothedLeftAnkleVel[i];
@@ -958,18 +958,18 @@ function calculateAccelerations(
   videoFPS: number
 ): void {
   const dt = 1 / videoFPS;
-  
+
   for (let i = 1; i < frameData.length - 1; i++) {
     const fd = frameData[i];
     const prev = frameData[i - 1];
-    
+
     // Helper to calculate acceleration
     const calcAccel = (prevV: number | null, nextSmoothed: number | null): number | null => {
       if (prevV === null || nextSmoothed === null) return null;
       const nextV = convertVelocityToKmh(nextSmoothed, metersPerPixel, videoFPS);
       return (nextV - prevV) / (2 * dt);
     };
-    
+
     // Helper to get max acceleration
     const maxAccel = (left: number | null, right: number | null): number | null => {
       if (left === null && right === null) return null;
@@ -977,32 +977,32 @@ function calculateAccelerations(
       const rightAbs = Math.abs(right ?? 0);
       return leftAbs >= rightAbs ? left : right;
     };
-    
+
     // Wrist acceleration
     fd.leftWristAcceleration = calcAccel(prev.leftWristVelocityKmh, processed.smoothedLeft[i + 1]);
     fd.rightWristAcceleration = calcAccel(prev.rightWristVelocityKmh, processed.smoothedRight[i + 1]);
     fd.maxWristAcceleration = maxAccel(fd.leftWristAcceleration, fd.rightWristAcceleration);
-    
+
     // Ankle acceleration
     fd.leftAnkleAcceleration = calcAccel(prev.leftAnkleVelocityKmh, processed.smoothedLeftAnkleVel[i + 1]);
     fd.rightAnkleAcceleration = calcAccel(prev.rightAnkleVelocityKmh, processed.smoothedRightAnkleVel[i + 1]);
     fd.maxAnkleAcceleration = maxAccel(fd.leftAnkleAcceleration, fd.rightAnkleAcceleration);
-    
+
     // Knee acceleration
     fd.leftKneeAcceleration = calcAccel(prev.leftKneeVelocityKmh, processed.smoothedLeftKneeVel[i + 1]);
     fd.rightKneeAcceleration = calcAccel(prev.rightKneeVelocityKmh, processed.smoothedRightKneeVel[i + 1]);
     fd.maxKneeAcceleration = maxAccel(fd.leftKneeAcceleration, fd.rightKneeAcceleration);
-    
+
     // Hip acceleration
     fd.leftHipAcceleration = calcAccel(prev.leftHipVelocityKmh, processed.smoothedLeftHipVel[i + 1]);
     fd.rightHipAcceleration = calcAccel(prev.rightHipVelocityKmh, processed.smoothedRightHipVel[i + 1]);
     fd.maxHipAcceleration = maxAccel(fd.leftHipAcceleration, fd.rightHipAcceleration);
-    
+
     // Shoulder acceleration
     fd.leftShoulderAcceleration = calcAccel(prev.leftShoulderVelocityKmh, processed.smoothedLeftShoulderVel[i + 1]);
     fd.rightShoulderAcceleration = calcAccel(prev.rightShoulderVelocityKmh, processed.smoothedRightShoulderVel[i + 1]);
     fd.maxShoulderAcceleration = maxAccel(fd.leftShoulderAcceleration, fd.rightShoulderAcceleration);
-    
+
     // Elbow acceleration
     fd.leftElbowAcceleration = calcAccel(prev.leftElbowVelocityKmh, processed.smoothedLeftElbowVel[i + 1]);
     fd.rightElbowAcceleration = calcAccel(prev.rightElbowVelocityKmh, processed.smoothedRightElbowVel[i + 1]);
@@ -1029,11 +1029,11 @@ function detectAndBuildSwings(
     .map(d => d.swingScore)
     .filter((s): s is number => s !== null)
     .sort((a, b) => a - b);
-  
+
   const percentileIdx = Math.floor(validScores.length * config.velocityPercentile / 100);
   const adaptiveThreshold = validScores[percentileIdx] ?? config.minVelocityThreshold;
   const threshold = Math.max(adaptiveThreshold, config.minVelocityThreshold);
-  
+
   // Find peaks
   const minDistanceFrames = Math.floor(config.minTimeBetweenSwings * videoFPS);
   const peakFrameIndices = findPeaks(
@@ -1041,16 +1041,16 @@ function detectAndBuildSwings(
     threshold,
     minDistanceFrames
   );
-  
+
   // Build swing objects
   const swings: DetectedSwingV3[] = [];
   const orientationVelocities = frameData.map(d => d.orientationVelocity);
   let previousSwingFollowEndIdx = 0;
-  
+
   for (const peakIdx of peakFrameIndices) {
     const peakData = frameData[peakIdx];
     if (!peakData || peakData.swingScore === null) continue;
-    
+
     // Filter by rotation requirement
     if (config.requireRotation) {
       const rotVel = peakData.orientationVelocity;
@@ -1058,13 +1058,13 @@ function detectAndBuildSwings(
         continue;
       }
     }
-    
+
     // Detect phases
     const phases = detectPhases(frameData, peakIdx, config, previousSwingFollowEndIdx);
-    
+
     // Calculate rotation metrics
     const { rotationRange, peakRotationVel } = calculateRotationMetrics(frameData, phases);
-    
+
     // Classify swing type
     const swingType = config.classifySwingType
       ? classifySwingType(
@@ -1072,25 +1072,25 @@ function detectAndBuildSwings(
           preprocessedPoses, selectedPoseIndex, indices
         )
       : "unknown";
-    
+
     // Determine dominant side
     const dominantSide = determineDominantSide(peakData);
-    
+
     // Calculate velocity in km/h
     const velocityKmh = convertVelocityToKmh(peakData.wristVelocity ?? 0, metersPerPixel, videoFPS);
     if (velocityKmh < config.minVelocityKmh) continue;
-    
+
     // Calculate clip boundaries
     const clipBounds = calculateClipBoundaries(
       frameData, phases, peakData, config, videoFPS, totalFrames
     );
-    
+
     // Find key positions (loading peak for groundstrokes, trophy/contact for serves)
     const keyPositions = findKeyPositions(
       swingType, phases, peakIdx, peakData, frameData, config,
       clipBounds, preprocessedPoses, selectedPoseIndex, indices, frames, videoFPS
     );
-    
+
     swings.push({
       id: `swing-${peakData.frame}`,
       frame: peakData.frame,
@@ -1111,10 +1111,10 @@ function detectAndBuildSwings(
       ...clipBounds,
       swingScore: peakData.swingScore!,
     });
-    
+
     previousSwingFollowEndIdx = phases.followEnd;
   }
-  
+
   // Merge overlapping swings
   return mergeOverlappingSwings(swings);
 }
@@ -1129,7 +1129,7 @@ function calculateRotationMetrics(
   let minOrientation = Infinity;
   let maxOrientation = -Infinity;
   let peakRotationVel = 0;
-  
+
   for (let i = phases.loadingStart; i <= phases.followEnd; i++) {
     const orient = frameData[i]?.bodyOrientation;
     const rotVel = frameData[i]?.orientationVelocity;
@@ -1141,7 +1141,7 @@ function calculateRotationMetrics(
       peakRotationVel = Math.max(peakRotationVel, Math.abs(rotVel));
     }
   }
-  
+
   return {
     rotationRange: maxOrientation !== -Infinity ? maxOrientation - minOrientation : 0,
     peakRotationVel,
@@ -1182,13 +1182,13 @@ function calculateClipBoundaries(
   const followEndFrame = frameData[phases.followEnd]?.frame ?? peakData.frame;
   const followEndTime = followEndFrame / videoFPS;
   const videoDuration = totalFrames / videoFPS;
-  
+
   const clipStartTime = Math.max(0, followEndTime - config.clipLeadTime);
   const clipStartFrame = Math.floor(clipStartTime * videoFPS);
   const clipEndTime = Math.min(videoDuration, followEndTime + config.clipTrailTime);
   const clipEndFrame = Math.floor(clipEndTime * videoFPS);
   const clipDuration = clipEndTime - clipStartTime;
-  
+
   return { followEndFrame, clipStartTime, clipEndTime, clipStartFrame, clipEndFrame, clipDuration };
 }
 
@@ -1232,7 +1232,7 @@ function findKeyPositions(
   let contactPointHeight: number | null = null;
   let landingFrame: number | null = null;
   let landingTimestamp: number | null = null;
-  
+
   if (swingType === "serve") {
     // Find serve key positions
     const servePositions = findServeKeyPositions(
@@ -1250,15 +1250,15 @@ function findKeyPositions(
     // Find loading peak for groundstrokes
     const contactOrientation = peakData.bodyOrientation ?? 0;
     let maxOrientationDiff = 0;
-    
+
     for (let i = phases.loadingStart; i < peakIdx; i++) {
       const fd = frameData[i];
       if (!fd || fd.bodyOrientation === null) continue;
-      
+
       let orientDiff = fd.bodyOrientation - contactOrientation;
       if (orientDiff > 180) orientDiff -= 360;
       if (orientDiff < -180) orientDiff += 360;
-      
+
       const absDiff = Math.abs(orientDiff);
       if (absDiff > maxOrientationDiff) {
         maxOrientationDiff = absDiff;
@@ -1268,7 +1268,7 @@ function findKeyPositions(
       }
     }
   }
-  
+
   return {
     loadingPeakFrame,
     loadingPeakTimestamp,
@@ -1316,37 +1316,37 @@ function findServeKeyPositions(
   let trophyArmHeight: number | null = null;
   let landingFrame: number | null = null;
   let landingTimestamp: number | null = null;
-  
+
   const shoulderIdx = config.handedness === "right" ? indices.rightShoulder : indices.leftShoulder;
   const wristIdx = config.handedness === "right" ? indices.rightWrist : indices.leftWrist;
   const hipIdx = config.handedness === "right" ? indices.rightHip : indices.leftHip;
   const frontAnkleIdx = config.handedness === "right" ? indices.leftAnkle : indices.rightAnkle;
-  
+
   // Find contact point (highest wrist)
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
     if (frame < clipBounds.clipStartFrame || frame > clipBounds.clipEndFrame) continue;
-    
+
     const poses = preprocessedPoses.get(frame);
     const pose = poses?.[selectedPoseIndex];
     if (!pose) continue;
-    
+
     const keypoints = pose.keypoints;
     const shoulder = keypoints[shoulderIdx];
     const wrist = keypoints[wristIdx];
     const hip = keypoints[hipIdx];
-    
+
     if (!shoulder || !wrist || !hip) continue;
     if ((shoulder.score ?? 0) < config.minConfidence) continue;
     if ((wrist.score ?? 0) < config.minConfidence) continue;
     if ((hip.score ?? 0) < config.minConfidence) continue;
-    
+
     const torsoHeight = Math.abs(hip.y - shoulder.y);
     if (torsoHeight < 10) continue;
-    
+
     const heightAboveShoulder = shoulder.y - wrist.y;
     const heightRatio = heightAboveShoulder / torsoHeight;
-    
+
     if (heightRatio > maxWristHeight) {
       maxWristHeight = heightRatio;
       contactPointFrame = frame;
@@ -1354,25 +1354,25 @@ function findServeKeyPositions(
       contactPointHeight = heightRatio;
     }
   }
-  
+
   // Find trophy position (fixed offset before contact)
   if (contactPointTimestamp !== null && contactPointFrame !== null) {
     const trophyTargetTime = contactPointTimestamp - TROPHY_OFFSET_SECONDS;
     let closestDiff = Infinity;
-    
+
     for (let i = 0; i < frames.length; i++) {
       const frame = frames[i];
       if (frame >= contactPointFrame) continue;
-      
+
       const fd = frameData[i];
       if (!fd) continue;
-      
+
       const timeDiff = Math.abs(fd.timestamp - trophyTargetTime);
       if (timeDiff < closestDiff) {
         closestDiff = timeDiff;
         trophyFrame = fd.frame;
         trophyTimestamp = fd.timestamp;
-        
+
         const poses = preprocessedPoses.get(frame);
         const pose = poses?.[selectedPoseIndex];
         if (pose) {
@@ -1390,27 +1390,27 @@ function findServeKeyPositions(
       }
     }
   }
-  
+
   // Find landing (lowest front ankle after contact)
   const searchStart = contactPointFrame ?? clipBounds.clipStartFrame + (clipBounds.clipEndFrame - clipBounds.clipStartFrame) / 2;
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
     if (frame < searchStart || frame > clipBounds.clipEndFrame) continue;
-    
+
     const poses = preprocessedPoses.get(frame);
     const pose = poses?.[selectedPoseIndex];
     if (!pose) continue;
-    
+
     const frontAnkle = pose.keypoints[frontAnkleIdx];
     if (!frontAnkle || (frontAnkle.score ?? 0) < config.minConfidence) continue;
-    
+
     if (frontAnkle.y > lowestAnkleY) {
       lowestAnkleY = frontAnkle.y;
       landingFrame = frame;
       landingTimestamp = frameData[i]?.timestamp ?? frame / videoFPS;
     }
   }
-  
+
   return {
     trophyFrame,
     trophyTimestamp,
@@ -1428,31 +1428,31 @@ function findServeKeyPositions(
  */
 function mergeOverlappingSwings(swings: DetectedSwingV3[]): DetectedSwingV3[] {
   const mergedSwings: DetectedSwingV3[] = [];
-  
+
   for (const swing of swings) {
     let shouldMerge = false;
     let mergeTargetIdx = -1;
-    
+
     for (let i = 0; i < mergedSwings.length; i++) {
       const existing = mergedSwings[i];
-      
+
       const overlapStart = Math.max(swing.clipStartFrame, existing.clipStartFrame);
       const overlapEnd = Math.min(swing.clipEndFrame, existing.clipEndFrame);
       const overlapFrames = Math.max(0, overlapEnd - overlapStart);
-      
+
       const swingDuration = swing.clipEndFrame - swing.clipStartFrame;
       const existingDuration = existing.clipEndFrame - existing.clipStartFrame;
-      
+
       const swingCoverage = swingDuration > 0 ? overlapFrames / swingDuration : 0;
       const existingCoverage = existingDuration > 0 ? overlapFrames / existingDuration : 0;
-      
+
       if (swingCoverage >= OVERLAP_THRESHOLD || existingCoverage >= OVERLAP_THRESHOLD) {
         shouldMerge = true;
         mergeTargetIdx = i;
         break;
       }
     }
-    
+
     if (shouldMerge && mergeTargetIdx >= 0) {
       const existing = mergedSwings[mergeTargetIdx];
       if (swing.swingScore > existing.swingScore) {
@@ -1482,7 +1482,7 @@ function mergeOverlappingSwings(swings: DetectedSwingV3[]): DetectedSwingV3[] {
       mergedSwings.push(swing);
     }
   }
-  
+
   return mergedSwings;
 }
 

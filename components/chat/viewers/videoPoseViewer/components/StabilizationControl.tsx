@@ -50,7 +50,7 @@ export function StabilizationControl({
             <Text size="2" weight="medium" style={{ color: "var(--gray-12)" }}>
               Joint Stabilization
             </Text>
-            
+
             <Text size="1" color="gray">
               Reduces noise/shakiness by locking stationary joints in place.
             </Text>

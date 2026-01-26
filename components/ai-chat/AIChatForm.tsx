@@ -183,7 +183,7 @@ export function AIChatForm() {
    * If there's already a video attachment or existing user messages,
    * creates a new chat first to ensure fresh context.
    */
-  const handleVideoUploadWithNewChat = useCallback(async (file: File) => {
+  const handleVideoUploadWithNewChat = useCallback(async (file: File, source: 'file_picker' | 'drag_drop' = 'file_picker') => {
     // Check if we need a new chat: either we have a video OR we have user messages
     const hasExistingVideo = !!videoFile;
     const hasUserMessages = messages.some(m => m.role === "user");
@@ -199,7 +199,7 @@ export function AIChatForm() {
     }
     
     // Process the video in the (possibly new) chat
-    processVideoFile(file);
+    processVideoFile(file, source);
   }, [videoFile, messages, processVideoFile, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise]);
 
   /**
@@ -208,7 +208,7 @@ export function AIChatForm() {
   const handleVideoChangeWithNewChat = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      await handleVideoUploadWithNewChat(file);
+      await handleVideoUploadWithNewChat(file, 'file_picker');
     }
     // Reset the input value so the same file can be selected again
     e.target.value = '';
@@ -216,7 +216,7 @@ export function AIChatForm() {
 
   // Drag and drop hook
   const { isDragging, hasJustDropped, handlers: dragHandlers } = useDragAndDrop({
-    onFileDrop: (file) => handleVideoUploadWithNewChat(file),
+    onFileDrop: (file, source) => handleVideoUploadWithNewChat(file, source),
     onError: (error) => setVideoError(error),
   });
 

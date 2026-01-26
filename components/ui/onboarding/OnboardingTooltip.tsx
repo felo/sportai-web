@@ -35,17 +35,17 @@ export interface OnboardingTooltipProps {
 
 /**
  * OnboardingTooltip - A reusable tooltip for first-time user experience
- * 
+ *
  * Features:
  * - Automatically tracks if the tooltip has been shown via localStorage
  * - Positions itself relative to a target element with a pointer
  * - Matches the app's design system (green accents, rounded corners)
  * - Dismissable with X button or auto-dismiss
- * 
+ *
  * @example
  * ```tsx
  * const buttonRef = useRef<HTMLButtonElement>(null);
- * 
+ *
  * <OnboardingTooltip
  *   tooltipId="floating-video-button"
  *   targetRef={buttonRef}
@@ -73,7 +73,7 @@ export function OnboardingTooltip({
   // Check if we should show the tooltip
   useEffect(() => {
     setMounted(true);
-    
+
     if (!forceShow && hasSeenOnboardingTooltip(tooltipId)) {
       return;
     }
@@ -129,11 +129,11 @@ export function OnboardingTooltip({
     if (isVisible) {
       // Initial position update
       const timer = setTimeout(updatePosition, 50);
-      
+
       // Update on scroll/resize
       window.addEventListener("resize", updatePosition);
       window.addEventListener("scroll", updatePosition, true);
-      
+
       return () => {
         clearTimeout(timer);
         window.removeEventListener("resize", updatePosition);
@@ -239,9 +239,9 @@ export function OnboardingTooltip({
         }}
       >
         <Flex align="start" gap="3">
-          <Text 
-            size="2" 
-            style={{ 
+          <Text
+            size="2"
+            style={{
               color: "#FFFFFF",
               lineHeight: 1.5,
               flex: 1,
@@ -278,7 +278,7 @@ export function OnboardingTooltip({
             <Cross2Icon width={14} height={14} />
           </button>
         </Flex>
-        
+
         {/* Accent bar */}
         <div
           style={{

@@ -36,9 +36,9 @@ export function SpeedometerDisplay({
   const startAngle = -140;
   const endAngle = 140;
   const angleRange = endAngle - startAngle;
-  
+
   // Different max values for shot vs sprint
-  const maxValue = colorScheme === "sprint" 
+  const maxValue = colorScheme === "sprint"
     ? 30
     : Math.max(150, Math.ceil(maxSpeed / 10) * 10 + 10);
 
@@ -64,7 +64,7 @@ export function SpeedometerDisplay({
   };
 
   // Different tick marks for sprint vs shot
-  const ticks = colorScheme === "sprint" 
+  const ticks = colorScheme === "sprint"
     ? [0, 10, 20, 30]
     : [0, 30, 60, 90, 120, 150];
 
@@ -240,11 +240,11 @@ function StatBox({
   color: string;
 }) {
   return (
-    <Flex 
-      direction="column" 
-      align="center" 
+    <Flex
+      direction="column"
+      align="center"
       gap="1"
-      style={{ 
+      style={{
         flex: 1,
         padding: "12px",
         background: "var(--gray-a2)",
@@ -268,8 +268,8 @@ function StatBox({
       <Flex align="baseline" gap="1">
         <Text
           weight="bold"
-          style={{ 
-            color, 
+          style={{
+            color,
             fontSize: 32,
             fontVariantNumeric: "tabular-nums",
             lineHeight: 1,

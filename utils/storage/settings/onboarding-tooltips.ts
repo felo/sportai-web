@@ -8,7 +8,7 @@ const ONBOARDING_TOOLTIP_PREFIX = "onboarding-tooltip-";
  * Available onboarding tooltip IDs
  * Add new tooltips here as you create them
  */
-export type OnboardingTooltipId = 
+export type OnboardingTooltipId =
   | "floating-video-button"
   | "scroll-to-video"
   | "chat-input-tip";
@@ -43,8 +43,8 @@ export function markOnboardingTooltipSeen(tooltipId: OnboardingTooltipId): void 
   try {
     localStorage.setItem(`${ONBOARDING_TOOLTIP_PREFIX}${tooltipId}`, "true");
     // Dispatch event so other components can react if needed
-    window.dispatchEvent(new CustomEvent("onboarding-tooltip-dismissed", { 
-      detail: { tooltipId } 
+    window.dispatchEvent(new CustomEvent("onboarding-tooltip-dismissed", {
+      detail: { tooltipId }
     }));
   } catch (error) {
     storageLogger.error(`Failed to mark onboarding tooltip ${tooltipId} as seen:`, error);

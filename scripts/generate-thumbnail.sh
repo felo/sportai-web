@@ -53,7 +53,7 @@ ffmpeg -ss "$TIMESTAMP" -i "$VIDEO_URL" -vframes 1 -q:v 2 -vf "scale=640:-1" "$O
 if [ $? -eq 0 ] && [ -f "$OUTPUT_PATH" ]; then
   FILE_SIZE=$(ls -lh "$OUTPUT_PATH" | awk '{print $5}')
   DIMENSIONS=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$OUTPUT_PATH" 2>/dev/null)
-  
+
   echo ""
   echo "✅ Thumbnail generated successfully!"
   echo "   File: $OUTPUT_PATH"

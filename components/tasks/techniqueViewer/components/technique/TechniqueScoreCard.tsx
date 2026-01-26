@@ -7,8 +7,8 @@ import type { ProtocolEvent } from "@/components/videoPoseViewerV2";
 import { TechniqueRatingBadge } from "./TechniqueRatingBadge";
 import { SwingRadarChart } from "./SwingRadarChart";
 import { SwingPhaseTimeline } from "./SwingPhaseTimeline";
-import { 
-  calculateTechniqueScore, 
+import {
+  calculateTechniqueScore,
   getTechniqueRatingTier,
   getSwingTypeInfo,
   formatSpeed,
@@ -44,35 +44,35 @@ export function TechniqueScoreCard({
 }: TechniqueScoreCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), delay);
     return () => clearTimeout(timer);
   }, [delay]);
-  
+
   // Extract metadata
   const metadata = swingEvent.metadata as Record<string, unknown> | undefined;
   const swingType = metadata?.swingType as string | undefined;
   const velocityKmh = metadata?.velocityKmh as number | undefined;
   const confidence = metadata?.confidence as number | undefined;
   const clipDuration = metadata?.clipDuration as number | undefined;
-  
+
   // Calculate technique metrics
-  const metrics = useMemo(() => 
+  const metrics = useMemo(() =>
     calculateTechniqueScore(swingEvent, allEvents, videoFPS),
     [swingEvent, allEvents, videoFPS]
   );
-  
+
   // Get related events for this swing
-  const relatedEvents = useMemo(() => 
+  const relatedEvents = useMemo(() =>
     allEvents.filter(e => {
-      const timeWindow = e.startTime >= swingEvent.startTime - 0.5 && 
+      const timeWindow = e.startTime >= swingEvent.startTime - 0.5 &&
                          e.startTime <= swingEvent.endTime + 0.5;
       return timeWindow && e.protocolId !== "swing-detection-v3";
     }),
     [allEvents, swingEvent]
   );
-  
+
   // Get swing type info
   const swingTypeInfo = getSwingTypeInfo(swingType);
   const tier = getTechniqueRatingTier(metrics.overall);
@@ -84,8 +84,8 @@ export function TechniqueScoreCard({
       onMouseLeave={() => setIsHovered(false)}
       style={{
         opacity: isVisible ? 1 : 0,
-        transform: isVisible 
-          ? (isHovered ? "translateY(-4px)" : "translateY(0)") 
+        transform: isVisible
+          ? (isHovered ? "translateY(-4px)" : "translateY(0)")
           : "translateY(20px)",
         transition: "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
         cursor: onSelect ? "pointer" : "default",
@@ -95,24 +95,24 @@ export function TechniqueScoreCard({
     >
       <Card
         style={{
-          border: isSelected 
-            ? `2px solid ${color.primary}` 
+          border: isSelected
+            ? `2px solid ${color.primary}`
             : "1px solid var(--gray-6)",
-          boxShadow: isHovered 
-            ? `0 8px 32px ${color.glow}` 
+          boxShadow: isHovered
+            ? `0 8px 32px ${color.glow}`
             : "0 2px 8px rgba(0,0,0,0.1)",
           transition: "all 0.3s ease",
           overflow: "hidden",
-          background: isSelected 
+          background: isSelected
             ? `linear-gradient(135deg, ${color.fill} 0%, var(--gray-1) 100%)`
             : "var(--gray-1)",
         }}
       >
         <Flex direction="column" gap="0">
           {/* Header */}
-          <Flex 
-            align="center" 
-            justify="between" 
+          <Flex
+            align="center"
+            justify="between"
             p="4"
             style={{
               background: `linear-gradient(135deg, ${tier.gradient[0]}15, ${tier.gradient[1]}25)`,
@@ -137,7 +137,7 @@ export function TechniqueScoreCard({
                   #{swingIndex + 1}
                 </Text>
               </Box>
-              
+
               <Box>
                 <Flex align="center" gap="2">
                   <Text style={{ fontSize: 16 }}>{swingTypeInfo.icon}</Text>
@@ -150,22 +150,22 @@ export function TechniqueScoreCard({
                 </Text>
               </Box>
             </Flex>
-            
+
             {/* Technique Rating Badge */}
             <TechniqueRatingBadge score={metrics.overall} size="default" showLabel />
           </Flex>
-          
+
           {/* Radar Chart */}
           <Box p="3">
-            <SwingRadarChart 
-              metrics={metrics} 
+            <SwingRadarChart
+              metrics={metrics}
               height={200}
               color={color.primary}
             />
           </Box>
-          
+
           <Separator size="4" style={{ opacity: 0.3 }} />
-          
+
           {/* Phase Timeline */}
           <Box p="3">
             <Text size="1" weight="bold" color="gray" style={{ marginBottom: 8, display: "block" }}>
@@ -177,9 +177,9 @@ export function TechniqueScoreCard({
               totalDuration={swingEvent.endTime - swingEvent.startTime}
             />
           </Box>
-          
+
           <Separator size="4" style={{ opacity: 0.3 }} />
-          
+
           {/* Key Metrics */}
           <Flex p="3" gap="3" justify="between">
             {/* Speed */}
@@ -189,7 +189,7 @@ export function TechniqueScoreCard({
               icon="⚡"
               color={velocityKmh && velocityKmh >= 20 ? color.primary : "var(--gray-8)"}
             />
-            
+
             {/* Duration */}
             <MetricBox
               label="Duration"
@@ -197,7 +197,7 @@ export function TechniqueScoreCard({
               icon="⏱️"
               color="var(--gray-11)"
             />
-            
+
             {/* Confidence */}
             <MetricBox
               label="Detection"
@@ -206,7 +206,7 @@ export function TechniqueScoreCard({
               color={confidence && confidence >= 0.7 ? "#10B981" : "var(--gray-8)"}
             />
           </Flex>
-          
+
           {/* Scores breakdown */}
           <Box px="3" pb="3">
             <Flex gap="2" wrap="wrap">
@@ -217,7 +217,7 @@ export function TechniqueScoreCard({
               <ScorePill label="🚀 Prep" score={metrics.preparation} />
             </Flex>
           </Box>
-          
+
           {/* Play Button */}
           {onPlaySwing && (
             <>
@@ -254,15 +254,15 @@ export function TechniqueScoreCard({
 }
 
 // Metric display box
-function MetricBox({ 
-  label, 
-  value, 
-  icon, 
-  color 
-}: { 
-  label: string; 
-  value: string; 
-  icon: string; 
+function MetricBox({
+  label,
+  value,
+  icon,
+  color
+}: {
+  label: string;
+  value: string;
+  icon: string;
   color: string;
 }) {
   return (
@@ -286,9 +286,9 @@ function ScorePill({ label, score }: { label: string; score: number }) {
     if (s >= 40) return { bg: "rgba(245, 158, 11, 0.15)", text: "#F59E0B" };
     return { bg: "rgba(239, 68, 68, 0.15)", text: "#EF4444" };
   };
-  
+
   const colors = getScoreColor(score);
-  
+
   return (
     <Flex
       align="center"

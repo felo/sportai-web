@@ -128,7 +128,7 @@ interface WristSpeedAnalysisResult {
   // Dominant hand info
   dominantHand: "left" | "right";
   handednessConfidence: number;  // 0-1
-  
+
   // Time-series data (for graphing)
   speedData: Array<{
     frame: number;
@@ -138,7 +138,7 @@ interface WristSpeedAnalysisResult {
     position: { x: number; y: number };
     confidence: number;    // keypoint confidence
   }>;
-  
+
   // Peak velocity metrics
   peakVelocity: {
     speedKmh: number;
@@ -146,13 +146,13 @@ interface WristSpeedAnalysisResult {
     frame: number;
     timestamp: number;
   };
-  
+
   // Average velocity (active motion only)
   averageVelocity: {
     speedKmh: number;
     speedMs: number;
   };
-  
+
   // Metadata
   totalFramesAnalyzed: number;
   videoDuration: number;
@@ -221,7 +221,7 @@ if (result) {
     x: d.timestamp,
     y: d.speedKmh,
   }));
-  
+
   // Get peak info
   console.log(`Peak: ${result.peakVelocity.speedKmh} km/h at ${result.peakVelocity.timestamp}s`);
 }

@@ -1,6 +1,6 @@
 /**
  * DEPRECATED: Global settings
- * 
+ *
  * These global settings are deprecated in favor of per-chat settings.
  * They are kept for backward compatibility but should not be used in new code.
  * Use chat.thinkingMode, chat.mediaResolution, chat.domainExpertise instead.
@@ -95,8 +95,8 @@ export function getDomainExpertise(): DomainExpertise {
 
   try {
     const stored = localStorage.getItem(DOMAIN_EXPERTISE_KEY);
-    return (stored === "all-sports" || stored === "tennis" || stored === "pickleball" || stored === "padel") 
-      ? stored 
+    return (stored === "all-sports" || stored === "tennis" || stored === "pickleball" || stored === "padel")
+      ? stored
       : "all-sports";
   } catch (error) {
     storageLogger.error("Failed to load domain expertise from storage:", error);

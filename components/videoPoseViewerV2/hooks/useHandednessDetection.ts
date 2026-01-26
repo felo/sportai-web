@@ -1,6 +1,6 @@
 /**
  * Handedness Detection
- * 
+ *
  * Automatically detects whether a player is left or right-handed
  * by analyzing wrist velocity patterns throughout the video.
  */
@@ -170,11 +170,11 @@ export function useHandednessDetection({
   ): number | null => {
     const leftShoulder = pose.keypoints[indices.leftShoulder];
     const rightShoulder = pose.keypoints[indices.rightShoulder];
-    
+
     if (!leftShoulder || !rightShoulder) return null;
     if ((leftShoulder.score ?? 0) < minConfidence) return null;
     if ((rightShoulder.score ?? 0) < minConfidence) return null;
-    
+
     return (leftShoulder.x + rightShoulder.x) / 2;
   }, [indices]);
 
@@ -214,7 +214,7 @@ export function useHandednessDetection({
         const frame = frames[i];
         const poses = preprocessedPoses.get(frame);
         const pose = poses?.[selectedPoseIndex];
-        
+
         if (!pose) continue;
 
         const center = getBodyCenter(pose, config.minConfidence);
@@ -229,7 +229,7 @@ export function useHandednessDetection({
           const dx = leftWrist.x - center.x;
           const dy = leftWrist.y - center.y;
           leftExtensions.push(Math.sqrt(dx * dx + dy * dy));
-          
+
           // Cross-body detection (left wrist on right side of body)
           if (centerlineX !== null && leftWrist.x > centerlineX) {
             // Check if this is a new cross (wasn't crossed in previous frame)
@@ -244,7 +244,7 @@ export function useHandednessDetection({
           const dx = rightWrist.x - center.x;
           const dy = rightWrist.y - center.y;
           rightExtensions.push(Math.sqrt(dx * dx + dy * dy));
-          
+
           // Cross-body detection (right wrist on left side of body)
           if (centerlineX !== null && rightWrist.x < centerlineX) {
             if (prevRightWristX !== null && prevRightWristX >= centerlineX) {

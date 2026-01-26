@@ -1,6 +1,6 @@
 /**
  * Technique Assessment Components
- * 
+ *
  * Beautiful, professional technique scoring UI for swing analysis
  */
 
@@ -9,8 +9,8 @@ export { TechniqueScoreCard } from "./TechniqueScoreCard";
 export { TechniqueRatingBadge } from "./TechniqueRatingBadge";
 export { SwingRadarChart } from "./SwingRadarChart";
 export { SwingPhaseTimeline } from "./SwingPhaseTimeline";
-export { 
-  calculateTechniqueScore, 
+export {
+  calculateTechniqueScore,
   getTechniqueRatingTier,
   type TechniqueMetrics,
   type TechniqueRatingTier,

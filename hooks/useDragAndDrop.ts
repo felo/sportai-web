@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
+import { track } from "@/lib/analytics";
 
 interface UseDragAndDropOptions {
-  onFileDrop: (file: File) => void;
+  onFileDrop: (file: File, source: 'drag_drop') => void;
   onError?: (error: string) => void;
 }
 
@@ -58,7 +59,13 @@ export function useDragAndDrop({
     );
 
     if (mediaFile) {
-      onFileDrop(mediaFile);
+      // Track upload intent when file is dropped
+      track('video_upload_intent', {
+        fileSizeMB: Math.round(mediaFile.size / 1024 / 1024 * 100) / 100,
+        fileType: mediaFile.type,
+        source: 'drag_drop',
+      });
+      onFileDrop(mediaFile, 'drag_drop');
     } else if (files.length > 0) {
       onError?.("Please drop a valid video or image file");
     }
@@ -80,4 +87,3 @@ export function useDragAndDrop({
     },
   };
 }
-

@@ -1,6 +1,6 @@
 /**
  * SportAI API Configuration
- * 
+ *
  * Environment Variables:
  * - SPORTAI_API_URL: Base URL for the SportAI API (defaults to production)
  * - SPORTAI_API_KEY: API key for production
@@ -23,11 +23,11 @@ export function getSportAIApiUrl(): string {
  */
 export function getSportAIApiKey(): string | undefined {
   const apiUrl = getSportAIApiUrl();
-  
+
   if (apiUrl.includes("staging")) {
     return process.env.SPORTAI_API_KEY_STAGING;
   }
-  
+
   return process.env.SPORTAI_API_KEY;
 }
 

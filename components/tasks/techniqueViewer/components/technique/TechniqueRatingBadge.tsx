@@ -37,8 +37,8 @@ const SIZES = {
 /**
  * Hexagonal badge displaying technique score
  */
-export function TechniqueRatingBadge({ 
-  score, 
+export function TechniqueRatingBadge({
+  score,
   size = "default",
   showLabel = false,
 }: TechniqueRatingBadgeProps) {
@@ -65,7 +65,7 @@ export function TechniqueRatingBadge({
             animation: "pulse 2s ease-in-out infinite",
           }}
         />
-        
+
         {/* Hexagon shape */}
         <Box
           style={{
@@ -76,7 +76,7 @@ export function TechniqueRatingBadge({
             boxShadow: `${s.shadow} ${tier.glow}`,
           }}
         />
-        
+
         {/* Inner content */}
         <Box
           style={{
@@ -116,7 +116,7 @@ export function TechniqueRatingBadge({
             {score}
           </Text>
         </Box>
-        
+
         {/* Animations */}
         <style>{`
           @keyframes pulse {

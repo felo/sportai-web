@@ -141,7 +141,7 @@ export function CustomEventDialog({
       <Dialog.Content maxWidth="400px">
         <Dialog.Title>{isEditMode ? "Edit Marker" : "Add Custom Marker"}</Dialog.Title>
         <Dialog.Description size="2" color="gray" mb="4">
-          {isEditMode 
+          {isEditMode
             ? `Editing marker at ${displayTime.toFixed(2)}s (frame ${displayFrame})`
             : `Create a marker at ${displayTime.toFixed(2)}s (frame ${displayFrame})`
           }

@@ -24,7 +24,7 @@ export function useVideoUpload() {
   const previousPreviewRef = useRef<string | null>(null);
 
   // Internal function to actually set the video file
-  const setVideoInternal = useCallback((file: File, serverConversionNeeded = false) => {
+  const setVideoInternal = useCallback((file: File, serverConversionNeeded = false, source: 'file_picker' | 'drag_drop' = 'file_picker') => {
     // Clean up previous preview if exists
     if (previousPreviewRef.current) {
       revokeVideoPreview(previousPreviewRef.current);
@@ -40,13 +40,20 @@ export function useVideoUpload() {
     // Track successful video upload
     track('video_uploaded', {
       fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,
-      // Extract basic info from file
-      source: 'file_input',
+      fileType: file.type,
+      source,
     });
   }, []);
 
-  const processVideoFile = useCallback(async (file: File) => {
+  const processVideoFile = useCallback(async (file: File, source: 'file_picker' | 'drag_drop' = 'file_picker') => {
     videoLogger.debug('[useVideoUpload] Processing video file:', file.name, file.type);
+    
+    // Track upload started (before validation)
+    track('video_upload_started', {
+      fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,
+      fileType: file.type,
+      source,
+    });
     
     const validation = validateVideoFile(file);
     if (!validation.valid) {
@@ -56,6 +63,8 @@ export function useVideoUpload() {
       track('video_upload_failed', {
         error: validation.errorType || 'validation_failed',
         fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,
+        fileType: file.type,
+        source,
       });
       
       // Show modal for file size limit, callout for other errors
@@ -71,7 +80,7 @@ export function useVideoUpload() {
     // Skip compatibility check for images
     if (isImageFile(file)) {
       videoLogger.debug('[useVideoUpload] File is image, skipping compatibility check');
-      setVideoInternal(file, false);
+      setVideoInternal(file, false, source);
       return;
     }
 
@@ -83,7 +92,7 @@ export function useVideoUpload() {
     
     if (isMOVFile || isQuickTime) {
       videoLogger.debug('[useVideoUpload] MOV/QuickTime file detected, marking for server-side conversion');
-      setVideoInternal(file, true);
+      setVideoInternal(file, true, source);
       return;
     }
     
@@ -96,16 +105,16 @@ export function useVideoUpload() {
       // HEVC videos need server-side conversion for Gemini API compatibility
       if (result.isHEVC) {
         videoLogger.debug('[useVideoUpload] HEVC detected, marking for server-side conversion');
-        setVideoInternal(file, true);
+        setVideoInternal(file, true, source);
       } else {
         // Standard MP4/video - proceed normally
         videoLogger.debug('[useVideoUpload] Proceeding with file');
-        setVideoInternal(file, false);
+        setVideoInternal(file, false, source);
       }
     } catch (err) {
       // If compatibility check fails, proceed anyway
       videoLogger.warn("[useVideoUpload] Compatibility check failed, proceeding with file:", err);
-      setVideoInternal(file, false);
+      setVideoInternal(file, false, source);
     }
   }, [setVideoInternal]);
 
@@ -124,7 +133,7 @@ export function useVideoUpload() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        processVideoFile(file);
+        processVideoFile(file, 'file_picker');
       }
       // Reset the input value so the same file can be selected again
       e.target.value = '';
@@ -147,4 +156,3 @@ export function useVideoUpload() {
     setShowFileSizeLimitModal,
   };
 }
-

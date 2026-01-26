@@ -32,7 +32,7 @@ export function StabilityStateOverlay({
 
   const isRecovery = state === StabilityState.RECOVERY;
   const progress = isRecovery ? (stableCount / requiredStableFrames) * 100 : 100;
-  
+
   const fontSize = isPortraitVideo || isMobile ? "9px" : "10px";
   const padding = isPortraitVideo || isMobile ? "3px 6px" : "4px 8px";
 
@@ -53,8 +53,8 @@ export function StabilityStateOverlay({
         align="center"
         gap="2"
         style={{
-          backgroundColor: isRecovery 
-            ? "rgba(255, 152, 0, 0.9)" 
+          backgroundColor: isRecovery
+            ? "rgba(255, 152, 0, 0.9)"
             : "rgba(76, 175, 80, 0.85)",
           padding,
           borderRadius: "4px",
@@ -71,7 +71,7 @@ export function StabilityStateOverlay({
             animation: isRecovery ? "pulse 1s ease-in-out infinite" : "none",
           }}
         />
-        
+
         <Text
           size="1"
           weight="bold"

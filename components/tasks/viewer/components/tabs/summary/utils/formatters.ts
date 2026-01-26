@@ -11,8 +11,8 @@ export function formatDuration(seconds: number): string {
  * Format distance in km with 1 decimal
  */
 export function formatDistanceKm(meters: number): string {
-  return meters > 0 
-    ? `${(meters / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` 
+  return meters > 0
+    ? `${(meters / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
     : "-";
 }
 

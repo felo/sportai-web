@@ -8,7 +8,7 @@
  */
 
 import { useState, useRef } from "react";
-import { Box, Flex, Text, Heading, TextArea, Button, TextField, Card, Code, Badge } from "@radix-ui/themes";
+import { Box, Flex, Text, Heading, TextArea, Button, TextField, Card, Code, Badge, Select } from "@radix-ui/themes";
 
 // Sample swing context from samples/swing_coach_context.json
 const SAMPLE_SWING_CONTEXT = {
@@ -125,6 +125,7 @@ export default function ApiTestPage() {
   const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState("What should I focus on to improve my forehand?");
   const [agentName, setAgentName] = useState("Shark");
+  const [insightLevel, setInsightLevel] = useState<"beginner" | "developing" | "advanced">("developing");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +160,7 @@ export default function ApiTestPage() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           agentName: agentName.trim() || "Coach",
+          insightLevel,
           swingContext: SAMPLE_SWING_CONTEXT,
         }),
         signal: abortControllerRef.current.signal,
@@ -238,6 +240,17 @@ export default function ApiTestPage() {
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
                 />
+              </Flex>
+              <Flex direction="column" gap="1" style={{ flex: 1 }}>
+                <Text size="2" weight="medium">Insight Level</Text>
+                <Select.Root value={insightLevel} onValueChange={(v) => setInsightLevel(v as typeof insightLevel)}>
+                  <Select.Trigger placeholder="Select level..." />
+                  <Select.Content>
+                    <Select.Item value="beginner">Beginner (Simple, encouraging)</Select.Item>
+                    <Select.Item value="developing">Developing (Balanced)</Select.Item>
+                    <Select.Item value="advanced">Advanced (Technical)</Select.Item>
+                  </Select.Content>
+                </Select.Root>
               </Flex>
             </Flex>
 

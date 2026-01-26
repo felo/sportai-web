@@ -51,11 +51,11 @@ export function ContextDebugDialog({ open, onOpenChange }: ContextDebugDialogPro
       }
 
       const messages = chat.messages || [];
-      
+
       // Simulate what would be sent to the API with a sample prompt
       const samplePrompt = "What do you think?";
       const optimized = getOptimizedContext(messages, samplePrompt);
-      
+
       setContextInfo({
         chatId,
         messageCount: messages.length,
@@ -93,7 +93,7 @@ export function ContextDebugDialog({ open, onOpenChange }: ContextDebugDialogPro
   const formatMessageForDisplay = (msg: Message, index: number) => {
     const tokens = estimateTextTokens(msg.content || "");
     const hasVideo = !!(msg.videoUrl || msg.videoS3Key || msg.videoFile);
-    
+
     return (
       <Box
         key={msg.id || index}
@@ -154,7 +154,7 @@ export function ContextDebugDialog({ open, onOpenChange }: ContextDebugDialogPro
   ) => {
     const text = msg.parts[0]?.text || "";
     const tokens = estimateTextTokens(text);
-    
+
     return (
       <Box
         key={index}
@@ -305,8 +305,8 @@ export function ContextDebugDialog({ open, onOpenChange }: ContextDebugDialogPro
                             style={{
                               height: "100%",
                               width: `${Math.min((contextInfo.tokensUsed / contextInfo.maxTokens) * 100, 100)}%`,
-                              backgroundColor: contextInfo.tokensUsed > contextInfo.maxTokens * 0.8 
-                                ? "var(--orange-9)" 
+                              backgroundColor: contextInfo.tokensUsed > contextInfo.maxTokens * 0.8
+                                ? "var(--orange-9)"
                                 : "var(--green-9)",
                               transition: "width 0.3s ease",
                             }}

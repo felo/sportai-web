@@ -30,11 +30,11 @@ export function useAutoScroll({
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const isVideoSizeLimitError = lastMessage?.isVideoSizeLimitError;
-    
+
     if (shouldAutoScroll && !isVideoSizeLimitError) {
       scrollToBottom();
     }
-    
+
     if (isVideoSizeLimitError !== showingVideoSizeError) {
       setShowingVideoSizeError(!!isVideoSizeLimitError);
     }

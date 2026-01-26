@@ -23,7 +23,7 @@ type EmploymentTypeType = "full-time" | "part-time" | "freelance";
 type ClientCountType = "1-10" | "11-25" | "26-50" | "50-100" | "100-plus";
 type CompanySizeType = "1-10" | "11-50" | "51-200" | "200-plus";
 type BusinessRoleType = "owner" | "coach" | "marketing" | "technology" | "content" | "operations" | "other";
-type BusinessTypeType = 
+type BusinessTypeType =
   | "tennis-club" | "padel-club" | "pickleball-club" | "multi-sport-academy"
   | "private-coaching" | "federation" | "broadcast-media" | "streaming-platform"
   | "equipment-brand" | "retail-proshop" | "app-developer" | "content-creator"

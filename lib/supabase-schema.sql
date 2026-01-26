@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS player_sports (
   goals TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Ensure a player can only have one entry per sport
   UNIQUE(profile_id, sport)
 );
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS coach_sports (
   sport TEXT NOT NULL CHECK (sport IN ('tennis', 'padel', 'pickleball')),
   certifications TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Ensure a coach can only have one entry per sport
   UNIQUE(coach_profile_id, sport)
 );
@@ -370,7 +370,7 @@ CREATE TABLE IF NOT EXISTS messages (
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   sequence_number INTEGER NOT NULL DEFAULT 0, -- Preserves message order within a chat
-  
+
   -- Video-related fields
   video_url TEXT,
   video_s3_key TEXT,
@@ -378,24 +378,24 @@ CREATE TABLE IF NOT EXISTS messages (
   thumbnail_s3_key TEXT,  -- S3 key for thumbnail
   video_playback_speed NUMERIC DEFAULT 1.0,
   is_video_size_limit_error BOOLEAN DEFAULT FALSE,
-  
+
   -- Streaming flag
   is_streaming BOOLEAN DEFAULT FALSE,
-  
+
   -- Token usage
   input_tokens INTEGER,
   output_tokens INTEGER,
   response_duration INTEGER, -- in milliseconds
-  
+
   -- Model settings (JSONB for flexibility)
   model_settings JSONB,
-  
+
   -- TTS usage data
   tts_usage JSONB,
-  
+
   -- Pose detection data
   pose_data JSONB,
-  
+
   -- Pose detection S3 storage (for preprocessed frame-by-frame data)
   pose_data_s3_key TEXT
 );
@@ -503,17 +503,17 @@ CREATE TABLE IF NOT EXISTS message_feedback (
   message_id TEXT NOT NULL, -- Store as TEXT since messages may be local-only
   user_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- NULL if anonymous
   feedback_type TEXT NOT NULL CHECK (feedback_type IN ('up', 'down')),
-  
+
   -- Preset reasons (stored as array for multiple selections)
   reasons TEXT[] DEFAULT '{}',
-  
+
   -- Free-form comment
   comment TEXT,
-  
+
   -- Context data
   chat_id TEXT, -- Store as TEXT since chats may be local-only
   message_content TEXT, -- Snapshot of message content at feedback time
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -552,7 +552,7 @@ CREATE POLICY "Users can delete their own feedback"
 -- =============================================
 
 -- Get all chats for a user with message count:
--- SELECT 
+-- SELECT
 --   c.*,
 --   COUNT(m.id) as message_count
 -- FROM chats c
@@ -562,7 +562,7 @@ CREATE POLICY "Users can delete their own feedback"
 -- ORDER BY c.updated_at DESC;
 
 -- Get a chat with all its messages:
--- SELECT 
+-- SELECT
 --   c.*,
 --   json_agg(
 --     json_build_object(
@@ -589,13 +589,13 @@ CREATE POLICY "Users can delete their own feedback"
 CREATE TABLE IF NOT EXISTS sportai_tasks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  
+
   -- Task type (statistics, activity_detection, etc.)
   task_type TEXT NOT NULL,
-  
+
   -- Sport type ('all' is valid only for technique tasks)
   sport TEXT NOT NULL DEFAULT 'padel' CHECK (sport IN ('tennis', 'padel', 'pickleball', 'all')),
-  
+
   -- SportAI API fields
   sportai_task_id UUID, -- Task ID returned from SportAI API
   video_url TEXT NOT NULL,
@@ -603,18 +603,18 @@ CREATE TABLE IF NOT EXISTS sportai_tasks (
   thumbnail_url TEXT,  -- S3 URL for video thumbnail (first frame)
   thumbnail_s3_key TEXT,  -- S3 key for thumbnail
   video_length NUMERIC, -- Video length in seconds
-  
+
   -- Task status
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   estimated_compute_time NUMERIC, -- From API response
-  
+
   -- Request parameters (flexible JSONB for different task types)
   request_params JSONB,
-  
+
   -- Results (S3 key for the result JSON file)
   result_s3_key TEXT,
   error_message TEXT,
-  
+
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -683,7 +683,7 @@ CREATE TABLE IF NOT EXISTS pricing_waitlist (
   email TEXT NOT NULL,
   plan_interest TEXT NOT NULL CHECK (plan_interest IN ('pro-player', 'pro-coach')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   -- Prevent duplicate signups per plan
   UNIQUE(email, plan_interest)
 );

@@ -1,6 +1,6 @@
 /**
  * Swing Detection V3
- * 
+ *
  * Enhanced swing detection using body orientation + wrist velocity.
  */
 

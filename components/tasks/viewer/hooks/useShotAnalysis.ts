@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import { StatisticsResult, SwingWithPlayer, BallBounce } from "../types";
 import { getDynamicSwingsThreshold } from "../constants";
-import { 
-  PlayerShotData, 
+import {
+  PlayerShotData,
   CellShotInfo,
-  createEmptyGrid, 
+  createEmptyGrid,
   createEmptyDetailsGrid,
-  courtPosToGrid, 
-  COURT, 
-  GRID_COLS, 
-  GRID_ROWS 
+  courtPosToGrid,
+  COURT,
+  GRID_COLS,
+  GRID_ROWS
 } from "../components/ShotHeatmap";
 
 interface UseShotAnalysisOptions {
@@ -67,36 +67,36 @@ function processSwingLanding(
   if (nextBounce && nextBounce.court_pos) {
     const landingX = nextBounce.court_pos[0];
     const landingY = nextBounce.court_pos[1];
-    
+
     let landing = courtPosToGrid(landingX, landingY);
     let origin: { col: number; row: number };
-    
+
     // Use ball_hit_location from swing (player's court position when hitting)
     // This is the exact position from the API: [X, Y] in meters
     if (swing.ball_hit_location) {
       const [hitX, hitY] = swing.ball_hit_location;
-      
+
       // Only filter extreme anomalies (positions outside court bounds)
       if (!isValidOriginPosition(hitX, hitY)) {
         return; // Skip shots with invalid positions
       }
-      
+
       origin = courtPosToGrid(hitX, hitY);
     } else {
       // Fallback to inference if ball_hit_location not available
       origin = inferOriginFromLanding(landingX, landingY);
     }
-    
+
     const normalized = normalizeShotPair(origin, landing);
     origin = normalized.origin;
     landing = normalized.landing;
-    
+
     const swingType = swing.swing_type || "unknown";
     const speed = swing.ball_speed || 0;
-    
+
     playerData.origins[origin.row][origin.col]++;
     playerData.landings[landing.row][landing.col]++;
-    
+
     // Add cell details for tooltips
     playerData.originDetails[origin.row][origin.col].push({
       swingType,
@@ -108,7 +108,7 @@ function processSwingLanding(
       speed,
       isOrigin: false,
     });
-    
+
     playerData.pairs.push({
       originCol: origin.col,
       originRow: origin.row,
@@ -118,7 +118,7 @@ function processSwingLanding(
       speed,
     });
     playerData.totalShots++;
-    
+
     if (speed > 0) {
       playerData.topSpeed = Math.max(playerData.topSpeed, speed);
     }
@@ -131,7 +131,7 @@ function initializePlayerDataMap(
   playerDisplayNames: Record<number, string>
 ): Record<number, PlayerShotData> {
   const dataMap: Record<number, PlayerShotData> = {};
-  
+
   validPlayers.forEach((player, idx) => {
     const playerIndex = idx + 1;
     const displayName = playerDisplayNames[player.player_id] || `Player ${playerIndex}`;
@@ -150,7 +150,7 @@ function initializePlayerDataMap(
       totalShots: 0,
     };
   });
-  
+
   return dataMap;
 }
 
@@ -176,7 +176,7 @@ function calculateAverageSpeeds(
 export function useServeData({ result, playerDisplayNames = {} }: UseShotAnalysisOptions): PlayerShotData[] {
   return useMemo(() => {
     if (!result) return [];
-    
+
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
@@ -195,7 +195,7 @@ export function useServeData({ result, playerDisplayNames = {} }: UseShotAnalysi
       const playerServes = (player.swings || [])
         .filter(s => s.serve)
         .map(s => ({ ...s, player_id: player.player_id }));
-      
+
       playerServes.forEach(serve => {
         const playerData = dataMap[serve.player_id];
         if (playerData) {
@@ -217,7 +217,7 @@ export function useServeData({ result, playerDisplayNames = {} }: UseShotAnalysi
 export function useReturnData({ result, playerDisplayNames = {} }: UseShotAnalysisOptions): PlayerShotData[] {
   return useMemo(() => {
     if (!result) return [];
-    
+
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
@@ -240,7 +240,7 @@ export function useReturnData({ result, playerDisplayNames = {} }: UseShotAnalys
     for (let i = 0; i < allSwings.length - 1; i++) {
       const serve = allSwings[i];
       if (!serve.serve) continue;
-      
+
       for (let j = i + 1; j < allSwings.length; j++) {
         const nextSwing = allSwings[j];
         if (nextSwing.player_id !== serve.player_id) {
@@ -270,7 +270,7 @@ function useNthBallData(
 ): PlayerShotData[] {
   return useMemo(() => {
     if (!result || ballNumber < 1) return [];
-    
+
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
@@ -292,11 +292,11 @@ function useNthBallData(
     for (let i = 0; i < allSwings.length; i++) {
       const serve = allSwings[i];
       if (!serve.serve) continue;
-      
+
       // Build the rally sequence starting from serve
       const rallySequence: SwingWithPlayer[] = [serve];
       let lastPlayerId = serve.player_id;
-      
+
       for (let j = i + 1; j < allSwings.length && rallySequence.length < ballNumber; j++) {
         const nextSwing = allSwings[j];
         // Next swing must be by different player (alternating)
@@ -305,7 +305,7 @@ function useNthBallData(
           lastPlayerId = nextSwing.player_id;
         }
       }
-      
+
       // If we have enough swings, extract the Nth ball
       if (rallySequence.length >= ballNumber) {
         const nthBall = rallySequence[ballNumber - 1];
@@ -350,7 +350,7 @@ export function useFifthBallData({ result, playerDisplayNames = {} }: UseShotAna
 export function useAllShotsData({ result, playerDisplayNames = {} }: UseShotAnalysisOptions): PlayerShotData[] {
   return useMemo(() => {
     if (!result) return [];
-    
+
     const players = result.players || [];
     const ballBounces = result.ball_bounces || [];
 
@@ -368,7 +368,7 @@ export function useAllShotsData({ result, playerDisplayNames = {} }: UseShotAnal
     validPlayers.forEach(player => {
       const playerSwings = (player.swings || [])
         .map(s => ({ ...s, player_id: player.player_id }));
-      
+
       playerSwings.forEach(swing => {
         const playerData = dataMap[swing.player_id];
         if (playerData) {

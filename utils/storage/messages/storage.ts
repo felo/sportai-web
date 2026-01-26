@@ -51,10 +51,10 @@ export async function loadMessagesFromStorage(): Promise<Message[]> {
     }
 
     const parsed = JSON.parse(stored) as SerializableMessage[];
-    
+
     // Trim messages if they exceed the limit (cleanup old data)
     const trimmed = trimMessages(parsed);
-    
+
     // If we trimmed, save the trimmed version back
     if (trimmed.length < parsed.length) {
       try {
@@ -64,7 +64,7 @@ export async function loadMessagesFromStorage(): Promise<Message[]> {
         storageLogger.warn("Failed to save trimmed messages back to storage:", error);
       }
     }
-    
+
     // Convert back to Message[] format (without videoFile/videoPreview)
     const messages: Message[] = trimmed.map((msg) => ({
       ...msg,
@@ -106,7 +106,7 @@ export function saveMessagesToStorage(messages: Message[]): void {
         MAX_STORAGE_SIZE_BYTES / ESTIMATED_BYTES_PER_MESSAGE
       );
       const targetLimit = Math.min(maxMessagesBySize, MAX_MESSAGE_HISTORY);
-      
+
       if (serializable.length > targetLimit) {
         serializable = serializable.slice(-targetLimit);
         storageLogger.warn(
@@ -122,7 +122,7 @@ export function saveMessagesToStorage(messages: Message[]): void {
     // Handle quota exceeded error gracefully
     if (error instanceof DOMException && error.name === "QuotaExceededError") {
       storageLogger.warn("LocalStorage quota exceeded. Attempting to trim messages...");
-      
+
       try {
         // Try to save with fewer messages
         const serializable: SerializableMessage[] = messages
@@ -131,7 +131,7 @@ export function saveMessagesToStorage(messages: Message[]): void {
             const { videoFile, videoPreview, ...rest } = msg;
             return rest;
           });
-        
+
         const serialized = JSON.stringify(serializable);
         localStorage.setItem(STORAGE_KEY, serialized);
         storageLogger.info(

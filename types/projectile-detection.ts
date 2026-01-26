@@ -33,11 +33,11 @@ export function drawProjectile(
 
     ctx.beginPath();
     ctx.moveTo(trajectory[0].x, trajectory[0].y);
-    
+
     for (let i = 1; i < trajectory.length; i++) {
       ctx.lineTo(trajectory[i].x, trajectory[i].y);
     }
-    
+
     ctx.stroke();
 
     // Draw trajectory points
@@ -58,11 +58,11 @@ export function drawProjectile(
 
     ctx.beginPath();
     ctx.moveTo(position.x, position.y);
-    
+
     for (const point of predictedPath) {
       ctx.lineTo(point.x, point.y);
     }
-    
+
     ctx.stroke();
     ctx.setLineDash([]); // Reset dash
   }
@@ -103,13 +103,13 @@ export function drawProjectile(
   if (showVelocity && velocity && velocity.magnitude > 0) {
     const velocityKmh = velocity.magnitude * 3.6; // Convert m/s to km/h (placeholder conversion)
     const label = `${velocityKmh.toFixed(1)} km/h`;
-    
+
     ctx.font = "12px monospace";
     ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
     const textMetrics = ctx.measureText(label);
     const textWidth = textMetrics.width;
     const padding = 4;
-    
+
     // Draw background
     ctx.fillRect(
       position.x - textWidth / 2 - padding,
@@ -117,7 +117,7 @@ export function drawProjectile(
       textWidth + padding * 2,
       16 + padding * 2
     );
-    
+
     // Draw text
     ctx.fillStyle = velocityColor;
     ctx.textAlign = "center";
@@ -131,14 +131,14 @@ export function drawProjectile(
     ctx.font = "10px sans-serif";
     ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
     const textMetrics = ctx.measureText(confidenceLabel);
-    
+
     ctx.fillRect(
       position.x - textMetrics.width / 2 - 2,
       position.y + ballRadius + 4,
       textMetrics.width + 4,
       14
     );
-    
+
     ctx.fillStyle = confidence > 0.7 ? "#00FF00" : confidence > 0.5 ? "#FFEB3B" : "#FF5252";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -171,7 +171,7 @@ export function drawTrajectoryHeatmap(
   heatmap.forEach((count, key) => {
     const [cellX, cellY] = key.split(",").map(Number);
     const intensity = Math.min(count / maxIntensity, 1);
-    
+
     // Parse color and add alpha
     ctx.fillStyle = `rgba(255, 235, 59, ${intensity * 0.3})`;
     ctx.fillRect(cellX * cellSize, cellY * cellSize, cellSize, cellSize);

@@ -80,7 +80,7 @@ export function initTheatreModeResizeListener(): void {
 
   const handleResize = () => {
     const nowShortScreen = isShortScreen();
-    
+
     // If we crossed the breakpoint, dispatch the theatre mode change event
     if (wasShortScreen !== nowShortScreen) {
       wasShortScreen = nowShortScreen;

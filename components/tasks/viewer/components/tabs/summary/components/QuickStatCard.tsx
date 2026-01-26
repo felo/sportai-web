@@ -43,10 +43,10 @@ export function QuickStatCard({
   );
 }
 
-function AnimatedNumber({ 
-  value, 
-  formatValue 
-}: { 
+function AnimatedNumber({
+  value,
+  formatValue
+}: {
   value: number;
   formatValue?: (value: number) => string;
 }) {

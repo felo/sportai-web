@@ -45,28 +45,28 @@ const CHART_THEME = {
 
 // Attribute configuration with icons and descriptions
 const METRIC_CONFIG: Record<string, { label: string; icon: string; description: string }> = {
-  timing: { 
-    label: "⏱️ Timing", 
+  timing: {
+    label: "⏱️ Timing",
     icon: "⏱️",
     description: "Rhythm and tempo throughout the swing phases"
   },
-  power: { 
-    label: "💪 Power", 
+  power: {
+    label: "💪 Power",
     icon: "💪",
     description: "Speed and force generation at contact"
   },
-  form: { 
-    label: "🎯 Form", 
+  form: {
+    label: "🎯 Form",
     icon: "🎯",
     description: "Body positioning and technical execution"
   },
-  recovery: { 
-    label: "🔄 Recovery", 
+  recovery: {
+    label: "🔄 Recovery",
     icon: "🔄",
     description: "Balance and readiness after the shot"
   },
-  preparation: { 
-    label: "🚀 Prep", 
+  preparation: {
+    label: "🚀 Prep",
     icon: "🚀",
     description: "Loading phase and racket preparation"
   },
@@ -75,15 +75,15 @@ const METRIC_CONFIG: Record<string, { label: string; icon: string; description: 
 /**
  * Radar chart for visualizing technique metrics
  */
-export function SwingRadarChart({ 
-  metrics, 
+export function SwingRadarChart({
+  metrics,
   height = 220,
   color,
   showLegend = false,
 }: SwingRadarChartProps) {
   const tier = getTechniqueRatingTier(metrics.overall);
   const chartColor = color || tier.gradient[0];
-  
+
   // Convert metrics to radar chart data
   const radarData = useMemo(() => {
     return [
@@ -126,7 +126,7 @@ export function SwingRadarChart({
             indexStr.includes(METRIC_CONFIG[key].label)
           );
           const config = metricKey ? METRIC_CONFIG[metricKey] : null;
-          
+
           return (
             <Box
               style={{
@@ -163,11 +163,11 @@ export function SwingRadarChart({
           );
         }}
       />
-      
+
       {showLegend && (
-        <Flex 
-          gap="3" 
-          wrap="wrap" 
+        <Flex
+          gap="3"
+          wrap="wrap"
           justify="center"
           style={{ marginTop: 8 }}
         >

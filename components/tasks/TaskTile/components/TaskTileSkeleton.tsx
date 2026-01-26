@@ -32,12 +32,12 @@ export function TaskTileSkeleton() {
             height: "100%",
           }}
         />
-        
+
         {/* Sport badge skeleton */}
         <Box style={{ position: "absolute", top: "8px", left: "8px" }}>
           <Skeleton width="60px" height="20px" style={{ borderRadius: "4px" }} />
         </Box>
-        
+
         {/* Duration badge skeleton */}
         <Box style={{ position: "absolute", bottom: "8px", right: "8px" }}>
           <Skeleton width="40px" height="18px" style={{ borderRadius: "4px" }} />

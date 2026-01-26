@@ -1,16 +1,16 @@
 /**
  * Data Processing Utilities
- * 
+ *
  * Pure functions for signal processing: filling drops, smoothing, and peak detection.
  */
 
 /**
  * Fill in dropped measurements (pose detection artifacts) and smooth.
- * 
+ *
  * Strategy:
  * 1. Fill ONLY obvious single-frame artifact drops (physically implausible sudden drops)
  * 2. Apply light Gaussian smoothing for a cleaner curve
- * 
+ *
  * IMPORTANT: We do NOT interpolate between peaks or fill valleys.
  * Real motion data has legitimate peaks AND valleys - we must preserve them.
  * Only single-frame drops that are physically impossible are filled.
@@ -20,9 +20,9 @@ export function fillDrops(
   _dropThreshold: number = 0.6  // Unused, kept for API compatibility
 ): (number | null)[] {
   if (data.length < 5) return [...data];
-  
+
   let result = [...data];
-  
+
   // Pass 1: Fill ONLY single-frame artifact drops
   // These are sudden single-frame decreases that are physically impossible
   // (e.g., wrist velocity can't drop 80% and recover in one frame)
@@ -30,39 +30,39 @@ export function fillDrops(
     const prev = result[i - 1];
     const curr = result[i];
     const next = result[i + 1];
-    
+
     if (prev === null || curr === null || next === null) continue;
-    
+
     // Only fill if:
     // 1. Current value is very low compared to BOTH neighbors (artifact, not real valley)
     // 2. Both neighbors are similar (ruling out transitions)
     // 3. The drop is severe (< 30% of neighbor average)
     const neighborAvg = (prev + next) / 2;
     const neighborDiff = Math.abs(prev - next);
-    const isSevereArtifact = curr < neighborAvg * 0.3 && 
+    const isSevereArtifact = curr < neighborAvg * 0.3 &&
                              neighborDiff < neighborAvg * 0.5 && // Neighbors are similar
                              neighborAvg > 5; // Only meaningful signals
-    
+
     if (isSevereArtifact) {
       result[i] = neighborAvg;
     }
   }
-  
+
   // Pass 2: Light Gaussian smoothing (single pass, smaller kernel)
   // This reduces noise without distorting the signal shape
   const smoothed: (number | null)[] = [];
   const weights = [0.1, 0.2, 0.4, 0.2, 0.1]; // 5-frame kernel (lighter than before)
   const halfKernel = Math.floor(weights.length / 2);
-  
+
   for (let i = 0; i < result.length; i++) {
     if (result[i] === null) {
       smoothed.push(null);
       continue;
     }
-    
+
     let sum = 0;
     let weightSum = 0;
-    
+
     for (let k = -halfKernel; k <= halfKernel; k++) {
       const idx = i + k;
       if (idx >= 0 && idx < result.length && result[idx] !== null) {
@@ -71,10 +71,10 @@ export function fillDrops(
         weightSum += weight;
       }
     }
-    
+
     smoothed.push(weightSum > 0 ? sum / weightSum : result[i]);
   }
-  
+
   return smoothed;
 }
 
@@ -117,16 +117,16 @@ export function findPeaks(
   minDistance: number
 ): number[] {
   const peaks: number[] = [];
-  
+
   for (let i = 1; i < data.length - 1; i++) {
     const curr = data[i];
     const prev = data[i - 1];
     const next = data[i + 1];
-    
+
     if (curr === null || prev === null || next === null) continue;
     if (curr < minValue) continue;
     if (curr <= prev || curr <= next) continue;
-    
+
     // Check distance from last peak
     if (peaks.length > 0) {
       const lastPeak = peaks[peaks.length - 1];
@@ -139,9 +139,9 @@ export function findPeaks(
         continue;
       }
     }
-    
+
     peaks.push(i);
   }
-  
+
   return peaks;
 }

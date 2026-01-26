@@ -7,13 +7,13 @@
 -- 1. FEEDBACK OVERVIEW DASHBOARD
 -- High-level stats for the UX team
 -- =============================================
-SELECT 
+SELECT
   COUNT(*) AS total_feedback,
   COUNT(CASE WHEN feedback_type = 'up' THEN 1 END) AS thumbs_up,
   COUNT(CASE WHEN feedback_type = 'down' THEN 1 END) AS thumbs_down,
   ROUND(
-    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric / 
-    NULLIF(COUNT(*), 0) * 100, 
+    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric /
+    NULLIF(COUNT(*), 0) * 100,
     1
   ) AS satisfaction_rate_percent,
   COUNT(CASE WHEN comment IS NOT NULL AND comment != '' THEN 1 END) AS feedback_with_comments,
@@ -31,7 +31,7 @@ SELECT
   reason,
   COUNT(*) AS occurrence_count,
   ROUND(
-    COUNT(*)::numeric / 
+    COUNT(*)::numeric /
     (SELECT COUNT(*) FROM message_feedback WHERE feedback_type = 'down') * 100,
     1
   ) AS percent_of_negative_feedback,
@@ -58,7 +58,7 @@ SELECT
   reason,
   COUNT(*) AS occurrence_count,
   ROUND(
-    COUNT(*)::numeric / 
+    COUNT(*)::numeric /
     (SELECT COUNT(*) FROM message_feedback WHERE feedback_type = 'up') * 100,
     1
   ) AS percent_of_positive_feedback,
@@ -83,9 +83,9 @@ ORDER BY occurrence_count DESC;
 SELECT
   mf.created_at,
   mf.feedback_type,
-  CASE mf.feedback_type 
-    WHEN 'up' THEN '👍 Positive' 
-    WHEN 'down' THEN '👎 Negative' 
+  CASE mf.feedback_type
+    WHEN 'up' THEN '👍 Positive'
+    WHEN 'down' THEN '👎 Negative'
   END AS feedback_label,
   mf.reasons,
   mf.comment,
@@ -111,7 +111,7 @@ SELECT
   COALESCE(p.full_name, 'Anonymous') AS user_name
 FROM message_feedback mf
 LEFT JOIN profiles p ON mf.user_id = p.id
-WHERE 
+WHERE
   mf.feedback_type = 'down'
   AND mf.created_at >= NOW() - INTERVAL '30 days'
 ORDER BY mf.created_at DESC;
@@ -127,8 +127,8 @@ SELECT
   COUNT(CASE WHEN feedback_type = 'up' THEN 1 END) AS thumbs_up,
   COUNT(CASE WHEN feedback_type = 'down' THEN 1 END) AS thumbs_down,
   ROUND(
-    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric / 
-    NULLIF(COUNT(*), 0) * 100, 
+    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric /
+    NULLIF(COUNT(*), 0) * 100,
     1
   ) AS satisfaction_rate
 FROM message_feedback
@@ -216,8 +216,8 @@ SELECT
   COUNT(CASE WHEN feedback_type = 'up' THEN 1 END) AS thumbs_up,
   COUNT(CASE WHEN feedback_type = 'down' THEN 1 END) AS thumbs_down,
   ROUND(
-    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric / 
-    NULLIF(COUNT(*), 0) * 100, 
+    COUNT(CASE WHEN feedback_type = 'up' THEN 1 END)::numeric /
+    NULLIF(COUNT(*), 0) * 100,
     1
   ) AS satisfaction_rate
 FROM message_feedback
@@ -236,4 +236,3 @@ SELECT
 FROM message_feedback
 GROUP BY TO_CHAR(created_at, 'YYYY-MM')
 ORDER BY month DESC;
-

@@ -69,12 +69,12 @@ export function useAnimatedProgress({
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const rawProgress = Math.min(elapsed / duration, 1);
-        
+
         // Gentle ease-out that starts early (mostly linear with soft landing)
         const eased = rawProgress < 0.7
           ? rawProgress * 1.1 // Slightly faster in first 70%
           : 0.77 + (1 - Math.pow(1 - (rawProgress - 0.7) / 0.3, 2)) * 0.23; // Ease out last 30%
-        
+
         setProgress(Math.min(eased, 1));
 
         if (rawProgress < 1) {

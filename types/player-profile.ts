@@ -1,6 +1,6 @@
 /**
  * Player Profile Types for Spider Graph visualization
- * 
+ *
  * Used for AI-powered player profile generation with radar chart attributes.
  */
 

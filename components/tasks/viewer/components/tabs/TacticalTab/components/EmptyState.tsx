@@ -10,9 +10,9 @@ interface EmptyStateProps {
   fullPage?: boolean;
 }
 
-export function EmptyState({ 
-  icon, 
-  title, 
+export function EmptyState({
+  icon,
+  title,
   description,
   fullPage = false,
 }: EmptyStateProps) {
@@ -37,11 +37,11 @@ export function EmptyState({
 
   return (
     <Card style={{ border: "1px solid var(--gray-5)" }}>
-      <Flex 
-        direction="column" 
-        gap="2" 
-        p="6" 
-        align="center" 
+      <Flex
+        direction="column"
+        gap="2"
+        p="6"
+        align="center"
         justify="center"
       >
         {iconElement}

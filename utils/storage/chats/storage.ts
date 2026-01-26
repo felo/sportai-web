@@ -69,7 +69,7 @@ export function saveChatsToStorage(chats: Chat[]): void {
  * @returns The created chat
  */
 export function createChat(
-  messages: Message[] = [], 
+  messages: Message[] = [],
   title?: string,
   settings?: {
     thinkingMode?: ThinkingMode;
@@ -119,10 +119,10 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
 
   // Only update updatedAt if content actually changed (not just refreshing URLs)
   // Compare message IDs and content, ignoring File objects and URLs
-  const hasContentChange = updates.messages && 
+  const hasContentChange = updates.messages &&
     (updates.messages.length !== chats[index].messages.length ||
-     updates.messages.some((msg, i) => 
-       msg.id !== chats[index].messages[i]?.id || 
+     updates.messages.some((msg, i) =>
+       msg.id !== chats[index].messages[i]?.id ||
        msg.content !== chats[index].messages[i]?.content ||
        msg.role !== chats[index].messages[i]?.role
      ));
@@ -148,7 +148,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
     // Include messages if provided
     ...(updates.messages && { messages: updates.messages }),
   };
-  
+
   storageLogger.debug(`Updating chat ${chatId}:`, {
     oldTitle: chats[index].title,
     newTitle: newTitle,
@@ -158,7 +158,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
 
   chats[index] = updatedChat;
   saveChatsToStorage(chats);
-  
+
   // Verify it was saved correctly
   const verifyChats = loadChatsFromStorage();
   const verifyChat = verifyChats.find(c => c.id === chatId);

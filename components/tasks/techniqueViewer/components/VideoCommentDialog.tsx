@@ -227,10 +227,10 @@ export function VideoCommentDialog({
                 </Text>
               </Flex>
               {description && (
-                <Text 
-                  size="1" 
-                  style={{ 
-                    color: "var(--gray-11)", 
+                <Text
+                  size="1"
+                  style={{
+                    color: "var(--gray-11)",
                     whiteSpace: "pre-wrap",
                     marginLeft: "30px",
                   }}
