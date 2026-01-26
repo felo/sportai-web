@@ -2,11 +2,45 @@
 
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { HamburgerMenuIcon } from "@radix-ui/react-icons";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { IconButton, BadgeWithTooltip, LogoNewChatButton } from "@/components/ui";
 import { getDisplayVersion, getFullVersion, getBuildInfo } from "@/lib/version";
 import type { ReactNode } from "react";
+
+type NavigationMode = "chat" | "studio";
+
+interface ModeToggleButtonProps {
+  mode: NavigationMode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+function ModeToggleButton({ label, isActive, onClick }: ModeToggleButtonProps) {
+  return (
+    <Box
+      onClick={onClick}
+      style={{
+        padding: "8px 16px",
+        borderRadius: "var(--radius-3)",
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+        background: isActive ? "var(--accent-9)" : "var(--gray-3)",
+        border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
+      }}
+    >
+      <Text
+        size="2"
+        weight="medium"
+        style={{ color: isActive ? "white" : "var(--gray-11)" }}
+      >
+        {label}
+      </Text>
+    </Box>
+  );
+}
 
 export interface PageHeaderProps {
   /** Page title to display (only shown on desktop when sidebar is expanded) */
@@ -29,7 +63,20 @@ export function PageHeader({
 }: PageHeaderProps) {
   const { isCollapsed, isInitialLoad, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
+  const pathname = usePathname();
+  const router = useRouter();
   const sidebarWidth = isCollapsed ? "64px" : "280px";
+
+  // Determine active mode based on current route
+  const activeMode: NavigationMode = pathname?.startsWith("/library") ? "studio" : "chat";
+
+  const handleModeChange = (mode: NavigationMode) => {
+    if (mode === "studio") {
+      router.push("/library");
+    } else {
+      router.push("/");
+    }
+  };
 
   // Mobile layout: Hamburger menu (left), centered logo (2/3 desktop size)
   if (isMobile) {
@@ -112,7 +159,7 @@ export function PageHeader({
       }}
     >
       {/* Left side: Logo (when collapsed) or Page Title */}
-      <Flex align="center" gap="3">
+      <Flex align="center" gap="3" style={{ minWidth: "180px" }}>
         {/* Logo with Morph to New Chat Button - Only visible when sidebar collapsed */}
         <Box
           style={{
@@ -133,8 +180,32 @@ export function PageHeader({
         )}
       </Flex>
 
+      {/* Center: Mode Toggle Buttons */}
+      <Flex 
+        align="center" 
+        gap="2"
+        style={{
+          position: "absolute",
+          left: "50%",
+          transform: "translateX(-50%)",
+        }}
+      >
+        <ModeToggleButton
+          mode="chat"
+          label="Chat"
+          isActive={activeMode === "chat"}
+          onClick={() => handleModeChange("chat")}
+        />
+        <ModeToggleButton
+          mode="studio"
+          label="Studio Playground"
+          isActive={activeMode === "studio"}
+          onClick={() => handleModeChange("studio")}
+        />
+      </Flex>
+
       {/* Right side: Actions and/or Version Badge */}
-      <Flex align="center" gap="3">
+      <Flex align="center" gap="3" style={{ minWidth: "180px", justifyContent: "flex-end" }}>
         {actions}
         
         {showVersionBadge && (
@@ -158,4 +229,3 @@ export function PageHeader({
     </Box>
   );
 }
-
