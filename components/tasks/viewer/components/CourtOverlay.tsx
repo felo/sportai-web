@@ -117,24 +117,23 @@ const TENNIS_COURT_LINES: [number, number][] = [
   [4, 6],
   [6, 9],
   
-  // Net line: 8 -- 12 (and post connections)
+  // Net line: 8 -- 12 -- 9 (and post connections)
   [8, 12],
-  [0, 4],   // Left net post to far baseline corner
-  [1, 9],   // Right net post to far baseline corner
+  [9, 12],   // Right side of net to center
+  [0, 4],    // Left net post to far baseline corner
+  [1, 9],    // Right net post to far baseline corner
+  [6, 1],    // Far baseline center to right net post
   
   // === VERTICAL/SIDELINES ===
-  // Left doubles sideline: 2 -> 10 -> 8 -> 14 -> 15 -> 4
-  [2, 10],
+  // Left doubles sideline: 2 -> 0 (net post) and 10 -> 8, 14 -> 16
+  [2, 0],    // Near baseline left to left net post
   [10, 8],
-  [8, 14],
-  [14, 15],
-  [15, 4],
+  [14, 16],  // Far left net level to far right net level
   
-  // Right doubles sideline: 3 -> 11 -> 16 -> 17 -> 9
-  [3, 11],
-  [11, 16],
+  // Right doubles sideline: 3 -> 1 (net post) and 11 -> 9, 16 -> 17
+  [3, 1],    // Near baseline right to right net post
+  [11, 9],   // Near service right to far baseline right
   [16, 17],
-  [17, 9],
   
   // Left singles line: 5 -> 10
   [5, 10],
@@ -630,4 +629,3 @@ export function CourtOverlay({
     />
   );
 }
-
