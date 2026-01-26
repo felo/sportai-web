@@ -7,9 +7,11 @@ import Image from "next/image";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { BadgeWithTooltip } from "@/components/ui";
 import { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "@/hooks/sidebar";
 import { updateExistingChat } from "@/utils/storage-unified";
 import { resetAllOnboardingTooltips } from "@/utils/storage/settings/onboarding-tooltips";
+import { getDisplayVersion, getFullVersion, getBuildInfo } from "@/lib/version";
 import { SidebarContent } from "./SidebarContent";
 import { SidebarDialogs } from "./SidebarDialogs";
 import type { SidebarProps } from "./types";
@@ -138,6 +140,23 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
             }}
           >
             <Flex direction="column" gap="3">
+              {/* Version Badge */}
+              <BadgeWithTooltip
+                text={getDisplayVersion()}
+                tooltip={`${getFullVersion()} • ${getBuildInfo()}`}
+                variant="soft"
+                color="gray"
+                radius="full"
+                size="1"
+                style={{
+                  fontFamily: "var(--font-mono, 'Courier New', monospace)",
+                  fontSize: "11px",
+                  fontWeight: "500",
+                  letterSpacing: "0.02em",
+                  padding: "3px 10px",
+                  alignSelf: "flex-start",
+                }}
+              />
               <UserMenu
                 appearance={settingsState.appearance}
                 theatreMode={settingsState.theatreMode}
@@ -304,57 +323,32 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
           ))}
       </Box>
 
-      {/* User Menu & Settings - Row 3: Fixed at bottom */}
-      <Box
-        style={{
-          padding: isCollapsed ? "var(--space-3)" : "var(--space-4)",
-          borderTop: isCollapsed ? "none" : "1px solid var(--gray-6)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: isCollapsed ? "center" : "stretch",
-          gap: "var(--space-3)",
-          justifyContent: isCollapsed ? "center" : "flex-start",
-          flexShrink: 0,
-        }}
-      >
-        <UserMenu
-          appearance={settingsState.appearance}
-          theatreMode={settingsState.theatreMode}
-          developerMode={settingsState.developerMode}
-          highlightingPrefs={settingsState.highlightingPrefs}
-          ttsSettings={settingsState.ttsSettings}
-          insightLevel={settingsState.insightLevel}
-          messageCount={messageCount}
-          isMobile={isMobile}
-          collapsed={isCollapsed}
-          onThemeSelect={settingsState.handleThemeSelect}
-          onTheatreModeToggle={settingsState.handleTheatreModeToggle}
-          onDeveloperModeToggle={settingsState.handleDeveloperModeToggle}
-          onHighlightingToggle={settingsState.handleHighlightingToggle}
-          onTTSSettingChange={settingsState.handleTTSSettingChange}
-          onInsightLevelChange={settingsState.handleInsightLevelChange}
-          onClearChat={onClearChat}
-          onOpenStorageDebug={() => {
-            dialogsState.setDropdownOpen(false);
-            dialogsState.setStorageDebugOpen(true);
+      {/* Footer - Row 3: Version Badge */}
+      {!isCollapsed && (
+        <Box
+          style={{
+            padding: "var(--space-4)",
+            borderTop: "1px solid var(--gray-6)",
+            flexShrink: 0,
           }}
-          onOpenContextDebug={() => {
-            dialogsState.setDropdownOpen(false);
-            dialogsState.setContextDebugOpen(true);
-          }}
-          onOpenRedisDebug={() => {
-            dialogsState.setDropdownOpen(false);
-            dialogsState.setRedisDebugOpen(true);
-          }}
-          onResetOnboardingTips={() => {
-            resetAllOnboardingTooltips();
-            dialogsState.setDropdownOpen(false);
-            // Force page reload to see the tooltips again
-            window.location.reload();
-          }}
-          onSetAlertOpen={dialogsState.setAlertOpen}
-        />
-      </Box>
+        >
+          <BadgeWithTooltip
+            text={getDisplayVersion()}
+            tooltip={`${getFullVersion()} • ${getBuildInfo()}`}
+            variant="soft"
+            color="gray"
+            radius="full"
+            size="1"
+            style={{
+              fontFamily: "var(--font-mono, 'Courier New', monospace)",
+              fontSize: "11px",
+              fontWeight: "500",
+              letterSpacing: "0.02em",
+              padding: "3px 10px",
+            }}
+          />
+        </Box>
+      )}
 
       {/* Dialogs */}
       <SidebarDialogs
@@ -380,4 +374,3 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
     </Box>
   );
 }
-
