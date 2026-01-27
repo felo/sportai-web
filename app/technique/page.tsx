@@ -68,8 +68,8 @@ function TechniquePageContent() {
   // Handle back navigation based on source
   const handleBack = useCallback(() => {
     if (fromSource === "chat") {
-      // Navigate back to chat (main page)
-      router.push("/");
+      // Navigate back to chat
+      router.push("/chat");
     } else if (fromSource === "library") {
       // Navigate back to library
       router.push("/library");
@@ -153,4 +153,3 @@ function TechniquePageContent() {
     </Box>
   );
 }
-

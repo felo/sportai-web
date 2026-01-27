@@ -571,7 +571,7 @@ export function PageHeader({
     if (mode === "studio") {
       router.push("/library");
     } else {
-      router.push("/");
+      router.push("/chat");
     }
   };
 

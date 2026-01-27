@@ -55,7 +55,7 @@ export function SidebarContent({
   // Check if we're on the Library page
   const isOnLibraryPage = pathname === "/library" || pathname?.startsWith("/library/");
   // Only show chat as selected when on the chat page
-  const isOnChatPage = pathname === "/";
+  const isOnChatPage = pathname === "/chat";
 
   return (
     <Flex direction="column" gap="3">

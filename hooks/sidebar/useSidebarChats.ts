@@ -33,8 +33,9 @@ export function useSidebarChats({
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Check if we're on the main chat page
-  const isOnChatPage = pathname === "/";
+  // Check if we're on the chat page or home page
+  const isOnChatPage = pathname === "/chat";
+  const isOnHomePage = pathname === "/";
 
   // Helper to load chats from the appropriate source
   const refreshChats = useCallback(async () => {
@@ -106,12 +107,12 @@ export function useSidebarChats({
     saveCurrentChatId(newChat.id);
     closeSidebar?.();
     
-    // Navigate to chat page if not already there
-    if (!isOnChatPage) {
+    // Navigate to home page if not already there
+    if (!isOnHomePage) {
       router.push("/");
     }
     // State will be updated via event handler
-  }, [onChatSwitchAttempt, closeSidebar, isOnChatPage, router]);
+  }, [onChatSwitchAttempt, closeSidebar, isOnHomePage, router]);
 
   // Switch to a different chat
   const handleSwitchChat = useCallback(
@@ -159,7 +160,7 @@ export function useSidebarChats({
       
       // Navigate to chat page if not already there
       if (!isOnChatPage) {
-        router.push("/");
+        router.push("/chat");
       }
       // State will be updated via event handler
     },
@@ -228,9 +229,3 @@ export function useSidebarChats({
     refreshChats,
   };
 }
-
-
-
-
-
-
