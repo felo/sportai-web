@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button, Text, DropdownMenu, Flex, Box, Separator } from "@radix-ui/themes";
 import { ExitIcon, PersonIcon, SunIcon, TrashIcon, GearIcon } from "@radix-ui/react-icons";
+import { UserMenuNavLinks } from "./UserMenuNavLinks";
 import { createLogger } from "@/lib/logger";
 import { useAuth } from "./AuthProvider";
 import { AuthModal } from "./AuthModal";
@@ -592,6 +593,11 @@ export function UserMenu({
             <PersonIcon width="16" height="16" />
             <Text ml="2">Profile</Text>
           </DropdownMenu.Item>
+
+          <DropdownMenu.Separator />
+
+          {/* Navigation Links */}
+          <UserMenuNavLinks />
 
           <DropdownMenu.Separator />
 

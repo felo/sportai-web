@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Flex, Separator } from "@radix-ui/themes";
+import { Flex } from "@radix-ui/themes";
 import { NewChatButton } from "./NewChatButton";
 import { LibraryButton } from "./LibraryButton";
 import { ChatList } from "./ChatList";
-import { SidebarNavigation } from "./SidebarNavigation";
 import type { Chat } from "@/types/chat";
 
 const CHATS_EXPANDED_KEY = "sportai-sidebar-chats-expanded";
@@ -76,16 +75,6 @@ export function SidebarContent({
         onChatEdit={onEditChat}
         onChatDelete={onDeleteChat}
       />
-
-      <Separator size="4" />
-
-      <SidebarNavigation onLinkClick={onLinkClick} onNavigationAttempt={onNavigationAttempt} />
     </Flex>
   );
 }
-
-
-
-
-
-

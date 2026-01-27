@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Box, Flex, Text, DropdownMenu, Button } from "@radix-ui/themes";
 import { HamburgerMenuIcon, PersonIcon, ExitIcon, GearIcon, SunIcon } from "@radix-ui/react-icons";
+import { UserMenuNavLinks } from "@/components/auth/UserMenuNavLinks";
 import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -510,6 +511,11 @@ function NavbarProfile() {
           <PersonIcon width="16" height="16" />
           <Text ml="2">Profile</Text>
         </DropdownMenu.Item>
+
+        <DropdownMenu.Separator />
+
+        {/* Navigation Links */}
+        <UserMenuNavLinks />
 
         <DropdownMenu.Separator />
 
