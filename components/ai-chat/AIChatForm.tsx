@@ -404,7 +404,10 @@ export function AIChatForm() {
     setThinkingMode(newChat.thinkingMode ?? "fast");
     setMediaResolution(newChat.mediaResolution ?? "medium");
     setDomainExpertise(newChat.domainExpertise ?? "all-sports");
-  }, [confirmNavigation, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise]);
+    
+    // Navigate to home page for new chat
+    router.push("/");
+  }, [confirmNavigation, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise, router]);
 
   // Handle candidate response selection (e.g., greeting options)
   const handleSelectCandidateResponse = useCallback(async (messageId: string, index: number, option: CandidateOption) => {
