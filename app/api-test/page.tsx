@@ -7,8 +7,23 @@
  * Access at: /api-test
  */
 
-import { useState, useRef } from "react";
-import { Box, Flex, Text, Heading, TextArea, Button, TextField, Card, Code, Badge, Select } from "@radix-ui/themes";
+import { useState, useRef, useCallback } from "react";
+import { Box, Flex, Text, Heading, TextArea, Button, TextField, Card, Code, Badge, Select, Checkbox, Tooltip } from "@radix-ui/themes";
+
+// Type for the racket recommendation from SSE
+interface RacketRecommendation {
+  racket: {
+    name: string;
+    price_usd: number;
+    focus: string;
+    target_players: string[];
+    characteristics: string[];
+    strengths: string[];
+    limitations: string[];
+  };
+  confidence: "high" | "medium" | "low";
+  primary_reasons: string[];
+}
 
 // Sample swing context from samples/swing_coach_context.json
 const SAMPLE_SWING_CONTEXT = {
@@ -121,16 +136,118 @@ const SAMPLE_SWING_CONTEXT = {
   ]
 };
 
+// Swing type options
+const SWING_TYPES = [
+  "forehand_drive",
+  "backhand_drive",
+  "forehand_volley",
+  "backhand_volley",
+  "serve",
+  "dink",
+  "lob",
+  "drop_shot",
+];
+
 export default function ApiTestPage() {
   const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState("What should I focus on to improve my forehand?");
   const [agentName, setAgentName] = useState("Shark");
   const [insightLevel, setInsightLevel] = useState<"beginner" | "developing" | "advanced">("developing");
+  const [racketRecommendation, setRacketRecommendation] = useState(false);
   const [response, setResponse] = useState("");
+  const [recommendedRacket, setRecommendedRacket] = useState<RacketRecommendation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestTime, setRequestTime] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Editable swing context fields (prefilled from sample)
+  const [playerLevel, setPlayerLevel] = useState<"beginner" | "intermediate" | "advanced">(
+    SAMPLE_SWING_CONTEXT.playerLevel as "beginner" | "intermediate" | "advanced"
+  );
+  const [swingType, setSwingType] = useState(SAMPLE_SWING_CONTEXT.swing_type);
+  const [dominantHand, setDominantHand] = useState<"right" | "left">(
+    SAMPLE_SWING_CONTEXT.dominant_hand as "right" | "left"
+  );
+  const [progress, setProgress] = useState(Math.round(SAMPLE_SWING_CONTEXT.progress));
+  const [sport, setSport] = useState(SAMPLE_SWING_CONTEXT.sport || "pickleball");
+
+  // Build the swing context with overridden values
+  const buildSwingContext = useCallback(() => {
+    return {
+      ...SAMPLE_SWING_CONTEXT,
+      playerLevel,
+      swing_type: swingType,
+      dominant_hand: dominantHand,
+      progress,
+      sport,
+    };
+  }, [playerLevel, swingType, dominantHand, progress, sport]);
+
+  /**
+   * Parse SSE stream for racket recommendation mode
+   */
+  const parseSSEStream = useCallback(async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+    let explanation = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (currentEvent === "recommendation") {
+            try {
+              const recommendation = JSON.parse(data) as RacketRecommendation;
+              setRecommendedRacket(recommendation);
+            } catch (e) {
+              console.error("Failed to parse recommendation:", e);
+            }
+          } else if (currentEvent === "text") {
+            explanation += data;
+            setResponse(explanation);
+          } else if (currentEvent === "error") {
+            try {
+              const errorData = JSON.parse(data);
+              throw new Error(errorData.error || "Unknown SSE error");
+            } catch (e) {
+              if (e instanceof SyntaxError) {
+                throw new Error(data);
+              }
+              throw e;
+            }
+          }
+        }
+      }
+    }
+  }, []);
+
+  /**
+   * Parse plain text stream for standard mode
+   */
+  const parsePlainTextStream = useCallback(async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+    const decoder = new TextDecoder();
+    let fullResponse = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      fullResponse += chunk;
+      setResponse(fullResponse);
+    }
+  }, []);
 
   const handleSubmit = async () => {
     if (!apiKey.trim()) {
@@ -145,6 +262,7 @@ export default function ApiTestPage() {
     setLoading(true);
     setError(null);
     setResponse("");
+    setRecommendedRacket(null);
     setRequestTime(null);
 
     const startTime = Date.now();
@@ -161,7 +279,8 @@ export default function ApiTestPage() {
           prompt: prompt.trim(),
           agentName: agentName.trim() || "Coach",
           insightLevel,
-          swingContext: SAMPLE_SWING_CONTEXT,
+          swingContext: buildSwingContext(),
+          racketRecommendation,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -171,22 +290,16 @@ export default function ApiTestPage() {
         throw new Error(errorData.error || `Request failed with status ${res.status}`);
       }
 
-      // Handle streaming response
       const reader = res.body?.getReader();
       if (!reader) {
         throw new Error("No response body");
       }
 
-      const decoder = new TextDecoder();
-      let fullResponse = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        fullResponse += chunk;
-        setResponse(fullResponse);
+      // Use appropriate parser based on mode
+      if (racketRecommendation) {
+        await parseSSEStream(reader);
+      } else {
+        await parsePlainTextStream(reader);
       }
 
       setRequestTime(Date.now() - startTime);
@@ -209,8 +322,16 @@ export default function ApiTestPage() {
   };
 
   return (
-    <Box p="6" style={{ maxWidth: 900, margin: "0 auto" }}>
-      <Flex direction="column" gap="4">
+    <Box
+      style={{
+        position: "fixed",
+        inset: 0,
+        overflow: "auto",
+        backgroundColor: "var(--gray-1)",
+      }}
+    >
+      <Box p="6" style={{ maxWidth: 900, margin: "0 auto", paddingBottom: 48 }}>
+        <Flex direction="column" gap="4">
         <Flex justify="between" align="center">
           <Heading size="6">External API Test</Heading>
           <Badge color="orange" variant="soft">Hidden Test Page</Badge>
@@ -254,6 +375,77 @@ export default function ApiTestPage() {
               </Flex>
             </Flex>
 
+            {/* Swing Context Controls */}
+            <Box
+              style={{
+                backgroundColor: "var(--gray-2)",
+                borderRadius: 8,
+                padding: 12,
+              }}
+            >
+              <Text size="2" weight="medium" style={{ marginBottom: 12, display: "block" }}>
+                Swing Context (editable)
+              </Text>
+              <Flex gap="3" wrap="wrap">
+                <Flex direction="column" gap="1" style={{ minWidth: 140 }}>
+                  <Text size="1" color="gray">Player Level</Text>
+                  <Select.Root value={playerLevel} onValueChange={(v) => setPlayerLevel(v as typeof playerLevel)}>
+                    <Select.Trigger placeholder="Level..." />
+                    <Select.Content>
+                      <Select.Item value="beginner">Beginner</Select.Item>
+                      <Select.Item value="intermediate">Intermediate</Select.Item>
+                      <Select.Item value="advanced">Advanced</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ minWidth: 140 }}>
+                  <Text size="1" color="gray">Swing Type</Text>
+                  <Select.Root value={swingType} onValueChange={setSwingType}>
+                    <Select.Trigger placeholder="Type..." />
+                    <Select.Content>
+                      {SWING_TYPES.map((type) => (
+                        <Select.Item key={type} value={type}>
+                          {type.replace(/_/g, " ")}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ minWidth: 100 }}>
+                  <Text size="1" color="gray">Dominant Hand</Text>
+                  <Select.Root value={dominantHand} onValueChange={(v) => setDominantHand(v as typeof dominantHand)}>
+                    <Select.Trigger placeholder="Hand..." />
+                    <Select.Content>
+                      <Select.Item value="right">Right</Select.Item>
+                      <Select.Item value="left">Left</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ minWidth: 100 }}>
+                  <Text size="1" color="gray">Sport</Text>
+                  <Select.Root value={sport} onValueChange={setSport}>
+                    <Select.Trigger placeholder="Sport..." />
+                    <Select.Content>
+                      <Select.Item value="pickleball">Pickleball</Select.Item>
+                      <Select.Item value="tennis">Tennis</Select.Item>
+                      <Select.Item value="padel">Padel</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ minWidth: 120 }}>
+                  <Text size="1" color="gray">Progress: {progress}%</Text>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={progress}
+                    onChange={(e) => setProgress(Number(e.target.value))}
+                    style={{ width: "100%", marginTop: 4 }}
+                  />
+                </Flex>
+              </Flex>
+            </Box>
+
             <Flex direction="column" gap="1">
               <Text size="2" weight="medium">Prompt</Text>
               <TextArea
@@ -262,6 +454,22 @@ export default function ApiTestPage() {
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
               />
+            </Flex>
+
+            <Flex align="center" gap="2">
+              <Checkbox
+                id="racket-recommendation"
+                checked={racketRecommendation}
+                onCheckedChange={(checked) => setRacketRecommendation(checked === true)}
+              />
+              <label htmlFor="racket-recommendation">
+                <Text size="2" weight="medium" style={{ cursor: "pointer" }}>
+                  Include Racket Recommendation
+                </Text>
+              </label>
+              {racketRecommendation && (
+                <Badge color="blue" variant="soft" size="1">SSE Mode</Badge>
+              )}
             </Flex>
 
             <Flex gap="2">
@@ -290,11 +498,68 @@ export default function ApiTestPage() {
           </Card>
         )}
 
+        {recommendedRacket && (
+          <Card style={{ borderColor: "var(--blue-6)", backgroundColor: "var(--blue-2)" }}>
+            <Flex direction="column" gap="3" p="3">
+              <Flex justify="between" align="center">
+                <Flex gap="2" align="center">
+                  <Text size="3" weight="bold">{recommendedRacket.racket.name}</Text>
+                  <Badge color="green" variant="soft">${recommendedRacket.racket.price_usd.toFixed(2)}</Badge>
+                </Flex>
+                <Badge
+                  color={
+                    recommendedRacket.confidence === "high" ? "green" :
+                    recommendedRacket.confidence === "medium" ? "yellow" : "orange"
+                  }
+                  variant="soft"
+                >
+                  {recommendedRacket.confidence} confidence
+                </Badge>
+              </Flex>
+
+              <Text size="2" color="gray">{recommendedRacket.racket.focus}</Text>
+
+              <Flex direction="column" gap="1">
+                <Text size="1" weight="medium" color="gray">Why this racket:</Text>
+                <Flex direction="column" gap="1">
+                  {recommendedRacket.primary_reasons.map((reason, i) => (
+                    <Text key={i} size="2">• {reason}</Text>
+                  ))}
+                </Flex>
+              </Flex>
+
+              <Flex gap="4" wrap="wrap">
+                <Flex direction="column" gap="1" style={{ flex: 1, minWidth: 150 }}>
+                  <Text size="1" weight="medium" color="gray">Target Players</Text>
+                  <Text size="1">{recommendedRacket.racket.target_players.join(", ")}</Text>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ flex: 1, minWidth: 150 }}>
+                  <Text size="1" weight="medium" color="gray">Characteristics</Text>
+                  <Text size="1">{recommendedRacket.racket.characteristics.join(", ")}</Text>
+                </Flex>
+              </Flex>
+
+              <Flex gap="4" wrap="wrap">
+                <Flex direction="column" gap="1" style={{ flex: 1, minWidth: 150 }}>
+                  <Text size="1" weight="medium" color="green">Strengths</Text>
+                  <Text size="1">{recommendedRacket.racket.strengths.join(", ")}</Text>
+                </Flex>
+                <Flex direction="column" gap="1" style={{ flex: 1, minWidth: 150 }}>
+                  <Text size="1" weight="medium" color="orange">Limitations</Text>
+                  <Text size="1">{recommendedRacket.racket.limitations.join(", ")}</Text>
+                </Flex>
+              </Flex>
+            </Flex>
+          </Card>
+        )}
+
         {(response || loading) && (
           <Card>
             <Flex direction="column" gap="2" p="3">
               <Flex justify="between" align="center">
-                <Text size="2" weight="medium">Response from {agentName || "Coach"}</Text>
+                <Text size="2" weight="medium">
+                  {recommendedRacket ? "Recommendation Explanation" : `Response from ${agentName || "Coach"}`}
+                </Text>
                 {requestTime && (
                   <Badge color="green" variant="soft">{requestTime}ms</Badge>
                 )}
@@ -316,7 +581,10 @@ export default function ApiTestPage() {
 
         <Card>
           <Flex direction="column" gap="2" p="3">
-            <Text size="2" weight="medium">Sample Swing Context (from samples/swing_coach_context.json)</Text>
+            <Flex justify="between" align="center">
+              <Text size="2" weight="medium">Swing Context Being Sent</Text>
+              <Badge color="gray" variant="soft" size="1">Based on sample + your edits</Badge>
+            </Flex>
             <Box
               style={{
                 maxHeight: 200,
@@ -329,12 +597,13 @@ export default function ApiTestPage() {
               }}
             >
               <pre style={{ margin: 0 }}>
-                {JSON.stringify(SAMPLE_SWING_CONTEXT, null, 2)}
+                {JSON.stringify(buildSwingContext(), null, 2)}
               </pre>
             </Box>
           </Flex>
         </Card>
       </Flex>
+      </Box>
     </Box>
   );
 }

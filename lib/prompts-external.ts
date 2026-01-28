@@ -10,6 +10,10 @@
 
 import { pickleballTerminology } from "../database/pickleball/terminology";
 import { pickleballSwings } from "../database/pickleball/swings";
+import {
+  formatRacketCatalogForLLM,
+  getAllRacketNames,
+} from "../database/pickleball/rackets";
 import type { InsightLevel } from "../types/external-api";
 
 // ============================================================================
@@ -48,7 +52,7 @@ const EXTERNAL_INSIGHT_LEVEL_PROMPTS: Record<InsightLevel, string> = {
 - Balance technical insight with accessibility
 - Focus on 2-3 key improvement areas
 - Introduce terminology but briefly explain it (e.g., "your kinetic chain - the way energy flows from legs to paddle")
-- Include some specific metrics when relevant
+- Reference observations and physical measurements (angles, positions) but NOT numerical scores
 - Suggest 2-3 actionable drills
 
 **TONE:** Encouraging but more technical. Treat them as someone growing their skills.`,
@@ -59,7 +63,8 @@ const EXTERNAL_INSIGHT_LEVEL_PROMPTS: Record<InsightLevel, string> = {
 **FORMAT:**
 - Provide comprehensive, technical analysis
 - Use full technical vocabulary without over-explaining
-- Reference all relevant metrics: angles, speeds, timing
+- Reference technical metrics: angles, speeds, timing, positions
+- Do NOT mention raw evaluation scores (0-100) - use qualitative assessments instead
 - Offer detailed breakdown of multiple technique aspects
 - Include advanced drills and training progressions
 - Compare to professional standards when relevant
@@ -145,11 +150,18 @@ export function buildExternalPickleballSystemPrompt(
 
 ## Response Guidelines
 - Start with encouragement or acknowledgment of what they're doing well
-- Reference specific scores, observations, and values from the swing data
+- Reference observations and suggestions from the swing data
 - Prioritize the "top_priorities" when giving improvement advice
 - Be honest but positive - frame issues as opportunities
 - Give one or two actionable tips they can try immediately
 - Don't overwhelm with too many suggestions at once
+
+## IMPORTANT: Scores Are Internal Only
+The swing data contains numerical scores (0-100) for internal analysis purposes.
+DO NOT mention specific scores, percentages, or numerical ratings to the player.
+- BAD: "Your stance score is only 2 out of 100" or "You scored 75% on body movement"
+- GOOD: "Your stance could use some work" or "Your body movement is looking solid"
+Use scores to understand severity and prioritize advice, but communicate in encouraging, qualitative terms.
 
 ## Pickleball Knowledge Base
 ${pickleballKnowledge}
@@ -181,4 +193,108 @@ The player is asking about their ${swingType.replace(/_/g, " ")}.
 Since detailed swing analysis data isn't available, provide general guidance and best practices. Be encouraging and offer actionable tips. Keep responses concise (2-3 paragraphs).
 
 Ask clarifying questions if you need more specific information to help them.`;
+}
+
+// ============================================================================
+// RACKET RECOMMENDATION PROMPTS
+// ============================================================================
+
+/**
+ * Build prompt for JSON-mode racket recommendation
+ * This prompt is used with Gemini's structured output mode to get a reliable JSON response
+ *
+ * @param swingContext - Formatted swing analysis text
+ * @param playerLevel - Player's skill level
+ */
+export function buildRacketRecommendationPrompt(
+  swingContext: string,
+  playerLevel?: string
+): string {
+  const racketCatalog = formatRacketCatalogForLLM();
+  const validRackets = getAllRacketNames();
+
+  return `You are a pickleball equipment expert. Based on the player's swing analysis data, recommend the most suitable paddle from our catalog.
+
+## Player Information
+${playerLevel ? `- Skill Level: ${playerLevel}` : "- Skill Level: Not specified (infer from swing data)"}
+
+## Swing Analysis Data
+${swingContext}
+
+## Available Paddles
+${racketCatalog}
+
+## Your Task
+Analyze the swing data and recommend ONE paddle that best matches this player's:
+1. Current skill level
+2. Playing style (power vs control, aggressive vs defensive)
+3. Areas they need help with (from top_priorities)
+4. Their strengths (to complement or enhance)
+
+## Response Format
+You MUST respond with a JSON object containing:
+- "recommended_racket": One of: ${validRackets.map((n) => `"${n}"`).join(", ")}
+- "confidence": "high" | "medium" | "low" (based on how well the data supports your recommendation)
+- "primary_reasons": Array of 2-3 brief reasons (each under 15 words)
+
+Consider:
+- Beginners benefit from forgiving paddles with larger sweet spots
+- Players with control issues need stability over power
+- Fast hands at the net suggests speed-focused paddle
+- Strong power metrics suggest they can handle power-oriented paddles
+- Balance issues suggest prioritizing stability`;
+}
+
+/**
+ * Build prompt for streaming racket recommendation explanation
+ * This prompt generates the human-readable explanation after the structured recommendation
+ *
+ * @param swingContext - Formatted swing analysis text
+ * @param recommendedRacket - The racket name that was recommended
+ * @param reasons - The primary reasons from the JSON recommendation
+ * @param agentName - Custom agent name
+ * @param insightLevel - Communication complexity level
+ */
+export function buildRacketExplanationPrompt(
+  swingContext: string,
+  recommendedRacket: string,
+  reasons: string[],
+  agentName = "Coach",
+  insightLevel: InsightLevel = "developing"
+): string {
+  const racketCatalog = formatRacketCatalogForLLM();
+  const insightPrompt =
+    EXTERNAL_INSIGHT_LEVEL_PROMPTS[insightLevel] ||
+    EXTERNAL_INSIGHT_LEVEL_PROMPTS.developing;
+
+  return `You are ${agentName}, a friendly pickleball coach helping a player choose the right paddle.
+
+## Your Recommendation
+You have already determined that the **${recommendedRacket}** is the best paddle for this player.
+Key reasons: ${reasons.join("; ")}
+
+## Player's Swing Data
+${swingContext}
+
+## Paddle Catalog (for reference)
+${racketCatalog}
+
+## Your Task
+Write a warm, personalized explanation of why you recommend the ${recommendedRacket} for this player.
+
+Guidelines:
+- Start by acknowledging something positive about their technique
+- Connect the paddle's features to SPECIFIC aspects of their swing data
+- Reference observations from their analysis (NOT numerical scores)
+- Explain how this paddle will help with their top priorities
+- Keep it conversational and encouraging
+- End with excitement about how this paddle will help their game
+- Length: 2-3 paragraphs
+
+${insightPrompt}
+
+IMPORTANT RULES:
+- Do NOT list other paddle options or alternatives. Focus only on why the ${recommendedRacket} is perfect for them.
+- Do NOT mention specific scores or percentages (e.g., "your stance score is 2" or "75% on power").
+  Use scores internally to understand the player's needs, but communicate in encouraging, qualitative terms.`;
 }

@@ -138,6 +138,15 @@ export interface TechniqueChatRequest {
 
   /** Conversation history for multi-turn chats */
   conversationHistory?: ConversationMessage[];
+
+  /**
+   * When true, includes a racket recommendation with the response.
+   * Response format changes to SSE (text/event-stream) with:
+   * - event: recommendation (structured racket data)
+   * - event: text (streamed explanation)
+   * - event: done (end of stream)
+   */
+  racketRecommendation?: boolean;
 }
 
 /**
@@ -194,4 +203,47 @@ export interface ValidatedApiKey {
   rateLimitTier: string;
   monthlyLimit: number;
   requestsThisMonth: number;
+}
+
+// ============================================================================
+// Racket Recommendation Types
+// ============================================================================
+
+/**
+ * LLM's structured recommendation response
+ * Returned from the JSON-mode LLM call
+ */
+export interface RacketRecommendationResult {
+  /** Name of the recommended racket (e.g., "Shark-Hunter") */
+  recommended_racket: string;
+  /** Confidence level in the recommendation */
+  confidence: "high" | "medium" | "low";
+  /** Top 2-3 reasons for this recommendation */
+  primary_reasons: string[];
+}
+
+/**
+ * SSE event types for racket recommendation responses
+ */
+export type SSEEventType = "recommendation" | "text" | "done" | "error";
+
+/**
+ * SSE recommendation event data
+ * Includes the full racket product details plus LLM's reasoning
+ */
+export interface SSERacketRecommendation {
+  /** Full racket product details */
+  racket: {
+    name: string;
+    price_usd: number;
+    focus: string;
+    target_players: string[];
+    characteristics: string[];
+    strengths: string[];
+    limitations: string[];
+  };
+  /** LLM's confidence in the recommendation */
+  confidence: "high" | "medium" | "low";
+  /** Brief reasons for the recommendation */
+  primary_reasons: string[];
 }
