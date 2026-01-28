@@ -468,7 +468,9 @@ export default function ApiTestPage() {
                 </Text>
               </label>
               {racketRecommendation && (
-                <Badge color="blue" variant="soft" size="1">SSE Mode</Badge>
+                <Tooltip content="Server-Sent Events: Returns structured racket data first, then streams the explanation text">
+                  <Badge color="blue" variant="soft" size="1" style={{ cursor: "help" }}>SSE Mode</Badge>
+                </Tooltip>
               )}
             </Flex>
 
