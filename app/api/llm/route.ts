@@ -334,26 +334,16 @@ export async function POST(request: NextRequest) {
       logger.debug(`[${requestId}] ${fileType} buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     }
     
-    // Warn about large video files that may cause API issues
+    // Log video size for monitoring
+    // Note: The actual size limit check and error response is handled in the streaming/non-streaming
+    // branches below to ensure proper response format (streaming vs JSON)
     if (videoData && videoData.mimeType.startsWith("video/")) {
       const sizeMB = videoData.data.length / (1024 * 1024);
-      // Gemini API tends to have issues with videos > 50MB, especially longer duration ones
-      const LARGE_VIDEO_WARNING_MB = 50;
       
       if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
-        logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds recommended limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
-        // Return a natural LLM-style response instead of an error
-        const naturalResponse = getVideoSizeErrorMessage(sizeMB);
-
-        logger.debug(`[${requestId}] Returning natural LLM response for oversized video`);
-        
-        // Mark this as a special "too_large" response type so client can handle it appropriately
-        return NextResponse.json(
-          { response: naturalResponse, videoTooLarge: true },
-          { status: 200 } // Return 200 so it's treated as a successful response
-        );
-      } else if (sizeMB > LARGE_VIDEO_WARNING_MB) {
-        logger.warn(`[${requestId}] Large video detected (${sizeMB.toFixed(2)} MB) - may cause API timeout or errors`);
+        logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
+      } else {
+        logger.debug(`[${requestId}] Video size: ${sizeMB.toFixed(2)} MB (limit: ${LARGE_VIDEO_LIMIT_MB} MB)`);
       }
     }
 
@@ -377,10 +367,11 @@ export async function POST(request: NextRequest) {
                 const naturalResponse = getVideoSizeErrorMessage(sizeMB);
                 
                 // Stream the response character by character for a natural typing effect
+                // Use for...of to properly handle multi-byte Unicode characters (emojis)
                 const encoder = new TextEncoder();
-                for (let i = 0; i < naturalResponse.length; i++) {
+                for (const char of naturalResponse) {
                   try {
-                    controller.enqueue(encoder.encode(naturalResponse[i]));
+                    controller.enqueue(encoder.encode(char));
                     // Small delay to simulate typing (optional)
                     await new Promise(resolve => setTimeout(resolve, 1));
                   } catch (enqueueError) {
@@ -506,6 +497,21 @@ export async function POST(request: NextRequest) {
       });
     }
     
+    // Non-streaming: Check video size limit and return JSON response if too large
+    if (videoData && videoData.mimeType.startsWith("video/")) {
+      const sizeMB = videoData.data.length / (1024 * 1024);
+      
+      if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
+        logger.debug(`[${requestId}] Returning JSON response for oversized video (non-streaming)`);
+        const naturalResponse = getVideoSizeErrorMessage(sizeMB);
+        
+        return NextResponse.json(
+          { response: naturalResponse, videoTooLarge: true },
+          { status: 200 }
+        );
+      }
+    }
+    
     logger.info(`[${requestId}] Calling queryLLM...`);
     const llmResponse = await queryLLM(
       prompt, 
@@ -557,4 +563,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

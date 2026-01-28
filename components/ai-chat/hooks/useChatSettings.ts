@@ -22,7 +22,7 @@ interface UseChatSettingsReturn extends ChatSettings {
   handleThinkingModeChange: (mode: ThinkingMode) => void;
   handleMediaResolutionChange: (resolution: MediaResolution) => void;
   handleDomainExpertiseChange: (expertise: DomainExpertise) => void;
-  ensureChatExists: () => Promise<void>;
+  ensureChatExists: () => Promise<string | undefined>;
   authKey: number;
   setAuthKey: React.Dispatch<React.SetStateAction<number>>;
 }
@@ -61,25 +61,26 @@ export function useChatSettings({ isHydrated }: UseChatSettingsOptions): UseChat
     }
   }, [isHydrated]);
 
-  // Ensure there's always a chat - create one on mount if none exists
+  // Function to ensure a chat exists - now only called when needed (e.g., before submission)
+  // No longer auto-creates chat on mount
   const ensureChatExists = useCallback(async () => {
     if (!isHydrated) return;
     
     const currentChatId = getCurrentChatId();
     if (!currentChatId) {
-      chatLogger.info("No chat exists, creating default chat");
+      chatLogger.info("No chat exists, creating new chat");
       const newChat = await createNewChat([], undefined);
       setCurrentChatId(newChat.id);
-      chatLogger.info("Created default chat:", newChat.id);
+      chatLogger.info("Created new chat:", newChat.id);
       setThinkingMode(newChat.thinkingMode ?? DEFAULT_SETTINGS.thinkingMode);
       setMediaResolution(newChat.mediaResolution ?? DEFAULT_SETTINGS.mediaResolution);
       setDomainExpertise(newChat.domainExpertise ?? DEFAULT_SETTINGS.domainExpertise);
+      return newChat.id;
     }
+    return currentChatId;
   }, [isHydrated]);
 
-  useEffect(() => {
-    ensureChatExists();
-  }, [ensureChatExists]);
+  // Note: Removed auto-call to ensureChatExists - chat is created lazily on first message
 
   // Restore settings when switching chats
   useEffect(() => {
@@ -105,6 +106,12 @@ export function useChatSettings({ isHydrated }: UseChatSettingsOptions): UseChat
           setMediaResolution(DEFAULT_SETTINGS.mediaResolution);
           setDomainExpertise(DEFAULT_SETTINGS.domainExpertise);
         }
+      } else {
+        // No current chat (new chat state) - reset to defaults
+        chatLogger.debug("No current chat, using defaults");
+        setThinkingMode(DEFAULT_SETTINGS.thinkingMode);
+        setMediaResolution(DEFAULT_SETTINGS.mediaResolution);
+        setDomainExpertise(DEFAULT_SETTINGS.domainExpertise);
       }
     };
 
@@ -162,4 +169,3 @@ export function useChatSettings({ isHydrated }: UseChatSettingsOptions): UseChat
     setAuthKey,
   };
 }
-

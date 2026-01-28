@@ -35,6 +35,8 @@ interface UseVideoPreAnalysisReturn {
   /** True when a pasted video URL exceeds the 100MB size limit */
   urlFileSizeTooLarge: boolean;
   setUrlFileSizeTooLarge: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Call this before setting video file to skip the next auto-analysis (for pending submissions) */
+  skipNextAnalysis: () => void;
 }
 
 export function useVideoPreAnalysis({
@@ -51,12 +53,20 @@ export function useVideoPreAnalysis({
   const lastDetectedVideoRef = useRef<File | null>(null);
   const lastAnalyzedUrlRef = useRef<string | null>(null);
   const isAnalyzingUrlRef = useRef(false);
+  // Ref to skip the next analysis (used for pending submissions where pre-analysis is already done)
+  const skipNextAnalysisRef = useRef(false);
 
   const resetAnalysis = useCallback(() => {
     setVideoPreAnalysis(null);
     setDetectedVideoUrl(null);
     lastAnalyzedUrlRef.current = null;
     isAnalyzingUrlRef.current = false;
+    skipNextAnalysisRef.current = false;
+  }, []);
+
+  // Function to skip the next auto-analysis (call before setting video file for pending submissions)
+  const skipNextAnalysis = useCallback(() => {
+    skipNextAnalysisRef.current = true;
   }, []);
 
   // Calculate Technique LITE eligibility
@@ -89,6 +99,22 @@ export function useVideoPreAnalysis({
     }
     
     if (isImageFile(videoFile)) {
+      return;
+    }
+    
+    // Skip analysis if explicitly requested (for pending submissions from home page)
+    if (skipNextAnalysisRef.current) {
+      videoLogger.info("Skipping analysis - skipNextAnalysis flag is set");
+      skipNextAnalysisRef.current = false;
+      lastDetectedVideoRef.current = videoFile;
+      return;
+    }
+    
+    // Skip analysis if we already have valid pre-analysis data (e.g., from pending submission)
+    // This prevents re-analyzing when navigating from home page with pre-analyzed video
+    if (videoPreAnalysis && !videoPreAnalysis.isAnalyzing) {
+      videoLogger.info("Skipping analysis - valid pre-analysis data already present");
+      lastDetectedVideoRef.current = videoFile;
       return;
     }
     
@@ -231,6 +257,21 @@ export function useVideoPreAnalysis({
     }
     
     if (detectedVideoUrl === lastAnalyzedUrlRef.current) {
+      return;
+    }
+    
+    // Skip analysis if explicitly requested (for pending submissions from home page)
+    if (skipNextAnalysisRef.current) {
+      videoLogger.info("Skipping URL analysis - skipNextAnalysis flag is set");
+      skipNextAnalysisRef.current = false;
+      lastAnalyzedUrlRef.current = detectedVideoUrl;
+      return;
+    }
+    
+    // Skip analysis if we already have valid pre-analysis data (e.g., from pending submission)
+    if (videoPreAnalysis && !videoPreAnalysis.isAnalyzing) {
+      videoLogger.info("Skipping URL analysis - valid pre-analysis data already present");
+      lastAnalyzedUrlRef.current = detectedVideoUrl;
       return;
     }
     
@@ -406,6 +447,6 @@ export function useVideoPreAnalysis({
     resetAnalysis,
     urlFileSizeTooLarge,
     setUrlFileSizeTooLarge,
+    skipNextAnalysis,
   };
 }
-

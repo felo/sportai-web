@@ -15,6 +15,7 @@ import { useAIApi } from "@/hooks/useAIApi";
 import { useNavigationWarning } from "@/hooks/useNavigationWarning";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { usePendingChat } from "@/components/PendingChatContext";
 import { MessageList } from "@/components/chat/messages/MessageList";
 import { ChatInput } from "@/components/chat/input/ChatInput";
 import { FileSizeLimitModal } from "@/components/chat/input/FileSizeLimitModal";
@@ -56,11 +57,15 @@ export function AIChatForm() {
 
   // Context & external hooks
   const { user, session, profile } = useAuth();
+  const { pendingSubmission, clearPendingSubmission } = usePendingChat();
   
   // Extract first name from profile for personalization
   const userFirstName = profile?.full_name?.split(" ")[0];
   const { refresh: refreshLibraryTasks } = useLibraryTasks();
   const router = useRouter();
+  
+  // Track if we've processed a pending submission to prevent re-processing
+  const pendingProcessedRef = useRef(false);
 
   // Local state
   const [prompt, setPrompt] = useState("");
@@ -152,6 +157,7 @@ export function AIChatForm() {
     resetAnalysis,
     urlFileSizeTooLarge,
     setUrlFileSizeTooLarge,
+    skipNextAnalysis,
   } = useVideoPreAnalysis({
     videoFile,
     domainExpertise,
@@ -303,6 +309,67 @@ export function AIChatForm() {
     sendVideoQuery,
   });
 
+  // Handle pending submission from home page
+  // This processes submissions that were started on the home page and need to be completed here
+  useEffect(() => {
+    // Only process once, when hydrated, and if there's a pending submission
+    if (!isHydrated || !pendingSubmission || pendingProcessedRef.current || loading) {
+      return;
+    }
+    
+    // Mark as processed immediately to prevent re-processing
+    pendingProcessedRef.current = true;
+    
+    const processPendingSubmission = async () => {
+      // Create a new chat for this submission
+      const newChat = await createNewChat();
+      setCurrentChatId(newChat.id);
+      
+      // Apply settings from pending submission if provided
+      // These need to be set before handleSubmit since it uses them from closure
+      if (pendingSubmission.settings) {
+        setThinkingMode(pendingSubmission.settings.thinkingMode);
+        setMediaResolution(pendingSubmission.settings.mediaResolution);
+        setDomainExpertise(pendingSubmission.settings.domainExpertise);
+      }
+      
+      // Set the pre-analysis data and skip next analysis
+      // This prevents re-analyzing video that was already analyzed on home page
+      if (pendingSubmission.videoPreAnalysis) {
+        setVideoPreAnalysis(pendingSubmission.videoPreAnalysis);
+        skipNextAnalysis();
+      }
+      
+      // NOTE: We intentionally do NOT call processVideoFile here.
+      // The video file is passed directly to handleSubmit via override parameter.
+      // Calling processVideoFile would cause a race condition where it completes
+      // AFTER handleSubmit clears the state, triggering the auto-populate effect
+      // and re-setting the prompt/video that should have been cleared.
+      
+      // Capture all pending data before clearing
+      const submissionPrompt = pendingSubmission.prompt;
+      const submissionVideoUrl = pendingSubmission.detectedVideoUrl;
+      const submissionVideoPreAnalysis = pendingSubmission.videoPreAnalysis;
+      const submissionVideoFile = pendingSubmission.videoFile;
+      const submissionSettings = pendingSubmission.settings;
+      clearPendingSubmission();
+      
+      // Trigger the submission directly - all data is passed via override parameters
+      // This avoids stale closure issues with async state updates (React best practice)
+      const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
+      handleSubmit(
+        fakeEvent, 
+        submissionPrompt, 
+        submissionVideoUrl || undefined, 
+        submissionVideoPreAnalysis || undefined,
+        submissionVideoFile,
+        submissionSettings // Pass settings override to avoid stale closure
+      );
+    };
+    
+    processPendingSubmission();
+  }, [isHydrated, pendingSubmission, loading, clearPendingSubmission, setThinkingMode, setMediaResolution, setDomainExpertise, setVideoPreAnalysis, skipNextAnalysis, handleSubmit]);
+
   // Image insight hook
   useImageInsight({
     loading,
@@ -376,38 +443,29 @@ export function AIChatForm() {
 
   const handleAskForHelp = useCallback((termName: string) => {
     const question = generateHelpQuestion(termName);
-    setPrompt(question);
-
-    setTimeout(() => {
-      const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
-      handleSubmit(fakeEvent, question);
-    }, 100);
+    // Submit directly with question as override - no need to wait for state
+    const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
+    handleSubmit(fakeEvent, question);
   }, [handleSubmit]);
 
   // Handle follow-up suggestion selection (after video analysis)
   const handleSelectFollowUp = useCallback((question: string) => {
-    setPrompt(question);
-
-    setTimeout(() => {
-      const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
-      handleSubmit(fakeEvent, question);
-    }, 100);
+    // Submit directly with question as override - no need to wait for state
+    const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
+    handleSubmit(fakeEvent, question);
   }, [handleSubmit]);
 
   const handleNewChat = useCallback(async () => {
     const result = await Promise.resolve(confirmNavigation());
     if (!result) return;
     
-    const newChat = await createNewChat();
-    setCurrentChatId(newChat.id);
+    // Clear current chat - new chat will be created when user submits first message
+    setCurrentChatId(undefined);
     setShowingVideoSizeError(false);
-    setThinkingMode(newChat.thinkingMode ?? "fast");
-    setMediaResolution(newChat.mediaResolution ?? "medium");
-    setDomainExpertise(newChat.domainExpertise ?? "all-sports");
     
     // Navigate to home page for new chat
     router.push("/");
-  }, [confirmNavigation, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise, router]);
+  }, [confirmNavigation, setShowingVideoSizeError, router]);
 
   // Handle candidate response selection (e.g., greeting options)
   const handleSelectCandidateResponse = useCallback(async (messageId: string, index: number, option: CandidateOption) => {

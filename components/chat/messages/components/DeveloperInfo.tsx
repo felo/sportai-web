@@ -3,6 +3,12 @@
 import { Box, Flex, Text } from "@radix-ui/themes";
 import { formatCost } from "@/lib/token-utils";
 
+// Shared style constants
+const mutedStyle = { color: "var(--gray-10)" } as const;
+const greenStyle = { color: "var(--green-11)" } as const;
+const blueStyle = { color: "var(--blue-11)" } as const;
+const amberStyle = { color: "var(--amber-11)" } as const;
+
 interface TokenUsage {
   input: number;
   output: number;
@@ -56,9 +62,6 @@ interface DeveloperInfoProps {
   hasVideo?: boolean;
 }
 
-/**
- * Developer mode information display showing token usage, costs, and performance metrics
- */
 // Helper to format model reason for display
 function formatModelReason(reason: string): string {
   const reasonMap: Record<string, string> = {
@@ -82,6 +85,182 @@ function getModelDisplayName(model: string): { name: string; isFlash: boolean } 
   return { name: model, isFlash: false };
 }
 
+// Helper to format token usage string
+function formatTokenUsage(tokens: TokenUsage, pricing: Pricing | null): string {
+  const parts: string[] = [];
+  if (tokens.input > 0) parts.push(`${tokens.input.toLocaleString()} input`);
+  if (tokens.output > 0) parts.push(`${tokens.output.toLocaleString()} output`);
+  const tokensStr = parts.join(" + ");
+  return pricing ? `${tokensStr} (${formatCost(pricing.totalCost)})` : tokensStr;
+}
+
+// --- Sub-components ---
+
+function TokenUsageDisplay({ 
+  messageTokens, 
+  cumulativeTokens, 
+  messagePricing, 
+  cumulativePricing 
+}: { 
+  messageTokens: TokenUsage; 
+  cumulativeTokens: TokenUsage; 
+  messagePricing: Pricing | null; 
+  cumulativePricing: Pricing | null;
+}) {
+  return (
+    <>
+      <Text size="1">
+        <strong>Token usage (this message):</strong>{" "}
+        {formatTokenUsage(messageTokens, messagePricing)}
+      </Text>
+      <Text size="1">
+        <strong>Token usage (total in chat):</strong>{" "}
+        {formatTokenUsage(cumulativeTokens, cumulativePricing)}
+      </Text>
+    </>
+  );
+}
+
+function TimingDisplay({ 
+  responseDuration, 
+  timeToFirstToken 
+}: { 
+  responseDuration: number; 
+  timeToFirstToken?: number;
+}) {
+  return (
+    <>
+      <Text size="1">
+        <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
+      </Text>
+      {timeToFirstToken !== undefined && (
+        <Text size="1">
+          <strong>Time to first token:</strong> {timeToFirstToken.toLocaleString()}ms ({(timeToFirstToken / 1000).toFixed(2)}s)
+          {responseDuration > 0 && (
+            <span style={mutedStyle}>
+              {" "}• Streaming: {(responseDuration - timeToFirstToken).toLocaleString()}ms
+            </span>
+          )}
+        </Text>
+      )}
+    </>
+  );
+}
+
+function ModelDisplay({ 
+  modelUsed, 
+  modelReason 
+}: { 
+  modelUsed: string; 
+  modelReason?: string;
+}) {
+  const { name, isFlash } = getModelDisplayName(modelUsed);
+  
+  return (
+    <Text size="1">
+      <strong>Model:</strong>{" "}
+      <span style={isFlash ? amberStyle : blueStyle}>
+        {name}
+      </span>
+      {modelReason && (
+        <span style={mutedStyle}> • {formatModelReason(modelReason)}</span>
+      )}
+    </Text>
+  );
+}
+
+function SettingsDisplay({ modelSettings }: { modelSettings: ModelSettings }) {
+  return (
+    <>
+      <Text size="1">
+        <strong>Settings:</strong> Thinking={modelSettings.thinkingMode}
+        {modelSettings.thinkingBudget && ` (budget: ${modelSettings.thinkingBudget} tokens)`}, Resolution={modelSettings.mediaResolution}
+      </Text>
+      {modelSettings.domainExpertise && (
+        <Text size="1">
+          <strong>Domain knowledge:</strong> {
+            modelSettings.domainExpertise === "all-sports" 
+              ? "All Sports (General coaching knowledge)" 
+              : `${modelSettings.domainExpertise.charAt(0).toUpperCase() + modelSettings.domainExpertise.slice(1)} (Specialized: courts, swings, terminology)`
+          }
+        </Text>
+      )}
+    </>
+  );
+}
+
+function ContextDisplay({ contextUsage }: { contextUsage: ContextUsage }) {
+  return (
+    <Text size="1">
+      <strong>Context:</strong> {contextUsage.messagesInContext} messages, {contextUsage.tokensUsed.toLocaleString()}/{contextUsage.maxTokens.toLocaleString()} tokens ({Math.round((contextUsage.tokensUsed / contextUsage.maxTokens) * 100)}%)
+      {contextUsage.complexity === "simple" && (
+        <span style={greenStyle}> • Simple query mode</span>
+      )}
+    </Text>
+  );
+}
+
+function CacheDisplay({ 
+  cacheUsed, 
+  cacheName 
+}: { 
+  cacheUsed: boolean; 
+  cacheName?: string;
+}) {
+  return (
+    <Text size="1">
+      <strong>LLM Cache:</strong>{" "}
+      {cacheUsed ? (
+        <span style={greenStyle}>
+          ✓ Cached content used
+          {cacheName && <span style={mutedStyle}> ({cacheName.split('/').pop()})</span>}
+        </span>
+      ) : (
+        <span style={mutedStyle}>Not cached (video &lt; 22MB or first request)</span>
+      )}
+    </Text>
+  );
+}
+
+function MediaDisplay({ hasVideo }: { hasVideo: boolean }) {
+  return (
+    <Text size="1">
+      <strong>Media:</strong>{" "}
+      {hasVideo ? (
+        <span style={blueStyle}>Video/image provided</span>
+      ) : (
+        <span style={mutedStyle}>Text-only query</span>
+      )}
+    </Text>
+  );
+}
+
+function TTSDisplay({ 
+  ttsUsage, 
+  totalTTSUsage 
+}: { 
+  ttsUsage: TTSUsage; 
+  totalTTSUsage: { characters: number; cost: number; requests: number };
+}) {
+  return (
+    <>
+      <Text size="1">
+        <strong>TTS usage (this message):</strong>{" "}
+        {ttsUsage.totalCharacters.toLocaleString()} characters, {ttsUsage.requestCount} request{ttsUsage.requestCount !== 1 ? 's' : ''} ({formatCost(ttsUsage.totalCost)})
+      </Text>
+      <Text size="1">
+        <strong>TTS usage (total in chat):</strong>{" "}
+        {totalTTSUsage.characters.toLocaleString()} characters, {totalTTSUsage.requests} request{totalTTSUsage.requests !== 1 ? 's' : ''} ({formatCost(totalTTSUsage.cost)})
+      </Text>
+    </>
+  );
+}
+
+/**
+ * Developer mode information display showing token usage, costs, and performance metrics
+ * 
+ * TODO: Consider wrapping with React.memo if re-renders become frequent
+ */
 export function DeveloperInfo({
   show,
   messageTokens,
@@ -151,124 +330,52 @@ export function DeveloperInfo({
         </Text>
         <Flex direction="column" gap="1" pl="2">
           {!hasAnyData && (
-            <Text size="1" style={{ color: "var(--gray-10)", fontStyle: "italic" }}>
+            <Text size="1" style={{ ...mutedStyle, fontStyle: "italic" }}>
               No telemetry data available for this message. This typically means the message was created before telemetry tracking was enabled, or the response is still streaming. New responses will capture: token usage, response time, model info, and cache status.
             </Text>
           )}
+          
           {hasTokenData && (
-            <>
-              <Text size="1">
-                <strong>Token usage (this message):</strong>{" "}
-                {messageTokens.input > 0 && `${messageTokens.input.toLocaleString()} input`}
-                {messageTokens.input > 0 && messageTokens.output > 0 && " + "}
-                {messageTokens.output > 0 && `${messageTokens.output.toLocaleString()} output`}
-                {messagePricing && ` (${formatCost(messagePricing.totalCost)})`}
-              </Text>
-              <Text size="1">
-                <strong>Token usage (total in chat):</strong>{" "}
-                {cumulativeTokens.input > 0 && `${cumulativeTokens.input.toLocaleString()} input`}
-                {cumulativeTokens.input > 0 && cumulativeTokens.output > 0 && " + "}
-                {cumulativeTokens.output > 0 && `${cumulativeTokens.output.toLocaleString()} output`}
-                {cumulativePricing && ` (${formatCost(cumulativePricing.totalCost)})`}
-              </Text>
-            </>
+            <TokenUsageDisplay 
+              messageTokens={messageTokens}
+              cumulativeTokens={cumulativeTokens}
+              messagePricing={messagePricing}
+              cumulativePricing={cumulativePricing}
+            />
           )}
-          {hasTimingData && (
-            <>
-              <Text size="1">
-                <strong>Response time (total):</strong> {responseDuration.toLocaleString()}ms ({(responseDuration / 1000).toFixed(2)}s)
-              </Text>
-              {timeToFirstToken !== undefined && (
-                <Text size="1">
-                  <strong>Time to first token:</strong> {timeToFirstToken.toLocaleString()}ms ({(timeToFirstToken / 1000).toFixed(2)}s)
-                  {responseDuration > 0 && (
-                    <span style={{ color: "var(--gray-10)" }}>
-                      {" "}• Streaming: {(responseDuration - timeToFirstToken).toLocaleString()}ms
-                    </span>
-                  )}
-                </Text>
-              )}
-            </>
+          
+          {hasTimingData && responseDuration !== undefined && (
+            <TimingDisplay 
+              responseDuration={responseDuration}
+              timeToFirstToken={timeToFirstToken}
+            />
           )}
-          {hasModelData && (
-            <Text size="1">
-              <strong>Model:</strong>{" "}
-              {(() => {
-                const { name, isFlash } = getModelDisplayName(modelUsed!);
-                return (
-                  <span style={{ color: isFlash ? "var(--amber-11)" : "var(--blue-11)" }}>
-                    {name}
-                  </span>
-                );
-              })()}
-              {modelReason && (
-                <span style={{ color: "var(--gray-10)" }}> • {formatModelReason(modelReason)}</span>
-              )}
-            </Text>
+          
+          {hasModelData && modelUsed && (
+            <ModelDisplay modelUsed={modelUsed} modelReason={modelReason} />
           )}
+          
           {hasModelSettings && modelSettings && (
-            <>
-              <Text size="1">
-                <strong>Settings:</strong> Thinking={modelSettings.thinkingMode}
-                {modelSettings.thinkingBudget && ` (budget: ${modelSettings.thinkingBudget} tokens)`}, Resolution={modelSettings.mediaResolution}
-              </Text>
-              {modelSettings.domainExpertise && (
-                <Text size="1">
-                  <strong>Domain knowledge:</strong> {
-                    modelSettings.domainExpertise === "all-sports" 
-                      ? "All Sports (General coaching knowledge)" 
-                      : `${modelSettings.domainExpertise.charAt(0).toUpperCase() + modelSettings.domainExpertise.slice(1)} (Specialized: courts, swings, terminology)`
-                  }
-                </Text>
-              )}
-            </>
+            <SettingsDisplay modelSettings={modelSettings} />
           )}
+          
           {hasContextUsage && contextUsage && (
-            <Text size="1">
-              <strong>Context:</strong> {contextUsage.messagesInContext} messages, {contextUsage.tokensUsed.toLocaleString()}/{contextUsage.maxTokens.toLocaleString()} tokens ({Math.round((contextUsage.tokensUsed / contextUsage.maxTokens) * 100)}%)
-              {contextUsage.complexity === "simple" && (
-                <span style={{ color: "var(--green-11)" }}> • Simple query mode</span>
-              )}
-            </Text>
+            <ContextDisplay contextUsage={contextUsage} />
           )}
-          {hasCacheInfo && (
-            <Text size="1">
-              <strong>LLM Cache:</strong>{" "}
-              {cacheUsed ? (
-                <span style={{ color: "var(--green-11)" }}>
-                  ✓ Cached content used
-                  {cacheName && <span style={{ color: "var(--gray-10)" }}> ({cacheName.split('/').pop()})</span>}
-                </span>
-              ) : (
-                <span style={{ color: "var(--gray-10)" }}>Not cached (video &lt; 22MB or first request)</span>
-              )}
-            </Text>
+          
+          {hasCacheInfo && cacheUsed !== undefined && (
+            <CacheDisplay cacheUsed={cacheUsed} cacheName={cacheName} />
           )}
-          {hasVideoInfo && (
-            <Text size="1">
-              <strong>Media:</strong>{" "}
-              {hasVideo ? (
-                <span style={{ color: "var(--blue-11)" }}>Video/image provided</span>
-              ) : (
-                <span style={{ color: "var(--gray-10)" }}>Text-only query</span>
-              )}
-            </Text>
+          
+          {hasVideoInfo && hasVideo !== undefined && (
+            <MediaDisplay hasVideo={hasVideo} />
           )}
+          
           {hasTTSData && (
-            <>
-              <Text size="1">
-                <strong>TTS usage (this message):</strong>{" "}
-                {ttsUsage.totalCharacters.toLocaleString()} characters, {ttsUsage.requestCount} request{ttsUsage.requestCount !== 1 ? 's' : ''} ({formatCost(ttsUsage.totalCost)})
-              </Text>
-              <Text size="1">
-                <strong>TTS usage (total in chat):</strong>{" "}
-                {totalTTSUsage.characters.toLocaleString()} characters, {totalTTSUsage.requests} request{totalTTSUsage.requests !== 1 ? 's' : ''} ({formatCost(totalTTSUsage.cost)})
-              </Text>
-            </>
+            <TTSDisplay ttsUsage={ttsUsage} totalTTSUsage={totalTTSUsage} />
           )}
         </Flex>
       </Flex>
     </Box>
   );
 }
-

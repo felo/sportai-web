@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { RadixThemeProvider } from "@/components/RadixThemeProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { LibraryTasksProvider } from "@/components/sidebar/LibraryTasksContext";
+import { PendingChatProvider } from "@/components/PendingChatContext";
 import { CookieConsent } from "@/components/consent";
 import { AnalyticsProvider } from "@/lib/analytics";
 import { ErrorTrackingProvider } from "@/components/ErrorTrackingProvider";
@@ -123,12 +124,14 @@ export default function RootLayout({
         <RadixThemeProvider>
           <AuthProvider>
             <LibraryTasksProvider>
-              <AnalyticsProvider>
-                <ErrorTrackingProvider>
-                  {children}
-                </ErrorTrackingProvider>
-              </AnalyticsProvider>
-              <CookieConsent />
+              <PendingChatProvider>
+                <AnalyticsProvider>
+                  <ErrorTrackingProvider>
+                    {children}
+                  </ErrorTrackingProvider>
+                </AnalyticsProvider>
+                <CookieConsent />
+              </PendingChatProvider>
             </LibraryTasksProvider>
 {process.env.NODE_ENV === 'production' && (
               <>
@@ -142,4 +145,3 @@ export default function RootLayout({
     </html>
   );
 }
-

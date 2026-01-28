@@ -4,7 +4,7 @@ import { track } from "@/lib/analytics";
 
 import { useRef, useEffect, useState } from "react";
 import { TextArea, Tooltip, Box, Flex, Callout, Text, Select } from "@radix-ui/themes";
-import { ArrowUpIcon, PlusIcon, StopIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { ArrowUpIcon, UploadIcon, StopIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { VideoPreview } from "../viewers/VideoPreview";
 import { VideoEligibilityIndicator } from "./VideoEligibilityIndicator";
 import { AttachedVideoChip } from "./AttachedVideoChip";
@@ -611,26 +611,25 @@ export function ChatInput({
                 flexWrap: isMobile ? "wrap" : "nowrap",
               }}
             >
-              {/* Plus button */}
+              {/* Upload button */}
               <Tooltip content="Upload video or image" open={disableTooltips ? false : undefined}>
                 <label
                   htmlFor="video"
                   style={{
-                    width: "36px",
                     height: "36px",
                     borderRadius: "9999px",
                     backgroundColor: "#7ADB8F",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    gap: "var(--space-2)",
                     cursor: "pointer",
                     transition: "all 0.3s ease-out",
                     border: "2px solid white",
                     flexShrink: 0,
                     marginRight: isMobile ? "0" : "var(--space-3)",
+                    padding: "0 var(--space-3)",
                     boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 10px rgba(122, 219, 143, 0.2)",
-                    textTransform: "uppercase",
-                    fontWeight: 600,
                   }}
                   onClick={() => {
                     // Track upload intent when user clicks the file picker button
@@ -657,132 +656,36 @@ export function ChatInput({
                     onChange={onVideoChange}
                     style={{ display: "none" }}
                   />
-                  <PlusIcon width="18" height="18" color="#1C1C1C" />
+                  <UploadIcon width="18" height="18" color="#1C1C1C" />
+                  {!isMobile && (
+                    <Text size="2" style={{ color: "#1C1C1C", whiteSpace: "nowrap", fontWeight: 500 }}>
+                      Upload something
+                    </Text>
+                  )}
                 </label>
               </Tooltip>
 
-              {/* Dropdowns container - centered on mobile */}
+              {/* Developer mode dropdowns - only shown in developer mode */}
               {/* Only render Select components after mount to prevent hydration mismatch */}
-              {isMounted && (
+              {isMounted && developerMode && (
                 <Flex
                   align="center"
                   gap={isMobile ? "1" : "2"}
-                  style={{
-                    flex: isMobile ? "1" : "0",
-                    justifyContent: isMobile ? "center" : "flex-start",
-                  }}
                 >
                   {/* Thinking mode selector - Developer Mode Only */}
-                  {developerMode && (
-                    <Tooltip 
-                      content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
-                      open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
-                    >
-                      <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
-                        <Select.Root
-                          value={thinkingMode}
-                          open={thinkingModeOpen}
-                          onOpenChange={setThinkingModeOpen}
-                          onValueChange={(value) => {
-                            const mode = value as ThinkingMode;
-                            setThinkingModeState(mode);
-                            onThinkingModeChange?.(mode);
-                          }}
-                        >
-                          <Select.Trigger
-                            className="select-no-border"
-                            style={{
-                              height: "28px",
-                              fontSize: isMobile ? "10px" : "11px",
-                              padding: "0 var(--space-2)",
-                              minWidth: isMobile ? "60px" : "70px",
-                              border: "none",
-                              borderWidth: 0,
-                              outline: "none",
-                              backgroundColor: "transparent",
-                              boxShadow: "none",
-                            }}
-                          />
-                          <Select.Content>
-                            <Select.Item value="fast">Fast</Select.Item>
-                            <Select.Item value="deep">Deep</Select.Item>
-                          </Select.Content>
-                        </Select.Root>
-                      </Box>
-                    </Tooltip>
-                  )}
-
-                  {/* Media resolution selector - Developer Mode Only */}
-                  {developerMode && (
-                    <Tooltip 
-                      content="Media resolution: Controls the quality and token usage for video/image analysis"
-                      open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
-                    >
-                      <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
-                        <Select.Root
-                          value={mediaResolution}
-                          open={mediaResolutionOpen}
-                          onOpenChange={setMediaResolutionOpen}
-                          onValueChange={(value) => {
-                            const resolution = value as MediaResolution;
-                            setMediaResolutionState(resolution);
-                            onMediaResolutionChange?.(resolution);
-                          }}
-                        >
-                          <Select.Trigger
-                            className="select-no-border"
-                            style={{
-                              height: "28px",
-                              fontSize: isMobile ? "10px" : "11px",
-                              padding: "0 var(--space-2)",
-                              minWidth: isMobile ? "60px" : "70px",
-                              border: "none",
-                              borderWidth: 0,
-                              outline: "none",
-                              backgroundColor: "transparent",
-                              boxShadow: "none",
-                            }}
-                          />
-                          <Select.Content>
-                            <Select.Item value="low">Low</Select.Item>
-                            <Select.Item value="medium">Medium</Select.Item>
-                            <Select.Item value="high">High</Select.Item>
-                          </Select.Content>
-                        </Select.Root>
-                      </Box>
-                    </Tooltip>
-                  )}
-
-                  {/* Domain expertise selector */}
                   <Tooltip 
-                    content="Domain expertise: Choose the sport for specialized analysis"
-                    open={disableTooltips ? false : (!domainExpertiseOpen ? undefined : false)}
+                    content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
+                    open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
                   >
-                    <Box
-                      style={{
-                        borderRadius: "var(--radius-2)",
-                        transition: "box-shadow 0.3s ease, filter 0.3s ease",
-                        boxShadow: isGlowing 
-                          ? "0 0 0 2px var(--mint-8), 0 0 16px var(--mint-6), 0 0 24px var(--mint-5)" 
-                          : "none",
-                        filter: isGlowing 
-                          ? "brightness(1.2)" 
-                          : "none",
-                      }}
-                    >
+                    <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
                       <Select.Root
-                        value={domainExpertise}
-                        open={domainExpertiseOpen}
-                        onOpenChange={setDomainExpertiseOpen}
+                        value={thinkingMode}
+                        open={thinkingModeOpen}
+                        onOpenChange={setThinkingModeOpen}
                         onValueChange={(value) => {
-                          const expertise = value as DomainExpertise;
-                          setDomainExpertiseState(expertise);
-                          onDomainExpertiseChange?.(expertise);
-                          // Clear glow effect when manually changed
-                          setIsGlowing(false);
-                          if (glowTimeoutRef.current) {
-                            clearTimeout(glowTimeoutRef.current);
-                          }
+                          const mode = value as ThinkingMode;
+                          setThinkingModeState(mode);
+                          onThinkingModeChange?.(mode);
                         }}
                       >
                         <Select.Trigger
@@ -791,7 +694,7 @@ export function ChatInput({
                             height: "28px",
                             fontSize: isMobile ? "10px" : "11px",
                             padding: "0 var(--space-2)",
-                            minWidth: isMobile ? "70px" : "90px",
+                            minWidth: isMobile ? "60px" : "70px",
                             border: "none",
                             borderWidth: 0,
                             outline: "none",
@@ -800,10 +703,47 @@ export function ChatInput({
                           }}
                         />
                         <Select.Content>
-                          <Select.Item value="all-sports">All Sports</Select.Item>
-                          <Select.Item value="tennis">Tennis</Select.Item>
-                          <Select.Item value="pickleball">Pickleball</Select.Item>
-                          <Select.Item value="padel">Padel</Select.Item>
+                          <Select.Item value="fast">Fast</Select.Item>
+                          <Select.Item value="deep">Deep</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </Box>
+                  </Tooltip>
+
+                  {/* Media resolution selector - Developer Mode Only */}
+                  <Tooltip 
+                    content="Media resolution: Controls the quality and token usage for video/image analysis"
+                    open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
+                  >
+                    <Box style={{ marginRight: isMobile ? "0" : "var(--space-3)" }}>
+                      <Select.Root
+                        value={mediaResolution}
+                        open={mediaResolutionOpen}
+                        onOpenChange={setMediaResolutionOpen}
+                        onValueChange={(value) => {
+                          const resolution = value as MediaResolution;
+                          setMediaResolutionState(resolution);
+                          onMediaResolutionChange?.(resolution);
+                        }}
+                      >
+                        <Select.Trigger
+                          className="select-no-border"
+                          style={{
+                            height: "28px",
+                            fontSize: isMobile ? "10px" : "11px",
+                            padding: "0 var(--space-2)",
+                            minWidth: isMobile ? "60px" : "70px",
+                            border: "none",
+                            borderWidth: 0,
+                            outline: "none",
+                            backgroundColor: "transparent",
+                            boxShadow: "none",
+                          }}
+                        />
+                        <Select.Content>
+                          <Select.Item value="low">Low</Select.Item>
+                          <Select.Item value="medium">Medium</Select.Item>
+                          <Select.Item value="high">High</Select.Item>
                         </Select.Content>
                       </Select.Root>
                     </Box>
@@ -811,8 +751,73 @@ export function ChatInput({
                 </Flex>
               )}
 
-              {/* Spacer to push submit button to the right */}
-              <Box style={{ flex: isMobile ? "0" : "1" }} />
+              {/* Spacer to push domain expertise and submit button to the right */}
+              <Box style={{ flex: 1 }} />
+
+              {/* Domain expertise selector with "Focus on:" prefix */}
+              {isMounted && (
+                <Tooltip 
+                  content="Choose the sport for specialized analysis"
+                  open={disableTooltips ? false : (!domainExpertiseOpen ? undefined : false)}
+                >
+                  <Flex
+                    align="center"
+                    gap="1"
+                    style={{
+                      borderRadius: "var(--radius-2)",
+                      transition: "box-shadow 0.3s ease, filter 0.3s ease",
+                      boxShadow: isGlowing 
+                        ? "0 0 0 2px var(--mint-8), 0 0 16px var(--mint-6), 0 0 24px var(--mint-5)" 
+                        : "none",
+                      filter: isGlowing 
+                        ? "brightness(1.2)" 
+                        : "none",
+                    }}
+                  >
+                    {!isMobile && (
+                      <span style={{ color: "var(--gray-12)", whiteSpace: "nowrap", fontSize: "12px" }}>
+                        Focus on:
+                      </span>
+                    )}
+                    <Select.Root
+                      value={domainExpertise}
+                      open={domainExpertiseOpen}
+                      onOpenChange={setDomainExpertiseOpen}
+                      onValueChange={(value) => {
+                        const expertise = value as DomainExpertise;
+                        setDomainExpertiseState(expertise);
+                        onDomainExpertiseChange?.(expertise);
+                        // Clear glow effect when manually changed
+                        setIsGlowing(false);
+                        if (glowTimeoutRef.current) {
+                          clearTimeout(glowTimeoutRef.current);
+                        }
+                      }}
+                    >
+                      <Select.Trigger
+                        className="select-no-border"
+                        style={{
+                          height: "28px",
+                          fontSize: isMobile ? "10px" : "12px",
+                          padding: "0 var(--space-2)",
+                          minWidth: isMobile ? "70px" : "auto",
+                          border: "none",
+                          borderWidth: 0,
+                          outline: "none",
+                          backgroundColor: "transparent",
+                          boxShadow: "none",
+                        }}
+                      />
+                      <Select.Content>
+                        <Select.Item value="all-sports">All Sports (beta)</Select.Item>
+                        <Select.Item value="tennis">Tennis</Select.Item>
+                        <Select.Item value="pickleball">Pickleball</Select.Item>
+                        <Select.Item value="padel">Padel</Select.Item>
+                      </Select.Content>
+                    </Select.Root>
+                  </Flex>
+                </Tooltip>
+              )}
 
               {/* Submit/Stop button */}
               {loading ? (

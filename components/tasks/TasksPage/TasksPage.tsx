@@ -16,7 +16,7 @@ import { Sidebar, useLibraryTasks } from "@/components/sidebar";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PageHeader } from "@/components/ui";
-import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
+import { setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode, getGuestTasks } from "@/utils/storage";
 import { TaskGridView } from "../TaskGridView";
 import { isSampleTask, useRefreshedSampleTasks } from "../sampleTasks";
@@ -152,10 +152,9 @@ export function TasksPage() {
     }
   };
 
-  // Handle new chat
-  const handleNewChat = useCallback(async () => {
-    const newChat = await createNewChat();
-    setCurrentChatId(newChat.id);
+  // Handle new chat - navigate to home, chat created on first message
+  const handleNewChat = useCallback(() => {
+    setCurrentChatId(undefined);
     router.push("/");
   }, [router]);
 
@@ -503,4 +502,3 @@ export function TasksPage() {
 }
 
 export default TasksPage;
-

@@ -189,7 +189,6 @@ export function useAnalysisOptions({
         updateMessage(assistantMessageId, {
           content: "Sorry, I encountered an error analyzing your video. Please try again.",
           isStreaming: false,
-          isIncomplete: true,
         });
       }
     } finally {
@@ -389,4 +388,3 @@ export function useAnalysisOptions({
     abortControllerRef,
   };
 }
-

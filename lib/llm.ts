@@ -19,6 +19,31 @@ const MODEL_NAME_FLASH = "gemini-2.5-flash";
 const MIN_TOKENS_FOR_CACHING = 32768;
 const CACHE_TTL_SECONDS = 3600; // 1 hour
 
+// Timeout for LLM API calls (2 minutes)
+const LLM_TIMEOUT_MS = 2 * 60 * 1000;
+
+/**
+ * Wraps a promise with a timeout. Rejects with a timeout error if the promise
+ * doesn't resolve within the specified time.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`${operation} timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+
+    promise
+      .then((result) => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 /**
  * Patterns that indicate an explicitly complex query needing the Pro model
  * These queries benefit from deeper reasoning capabilities
@@ -326,15 +351,23 @@ export async function queryLLM(
       const chat = model.startChat({
         history: conversationHistory,
       });
-      result = await chat.sendMessage(parts);
+      result = await withTimeout(
+        chat.sendMessage(parts),
+        LLM_TIMEOUT_MS,
+        "LLM chat response"
+      );
     } else {
       // Use generateContent() for single-turn queries
       logger.debug(`[${requestId}] Using single-turn mode`);
-      result = await model.generateContent(parts);
+      result = await withTimeout(
+        model.generateContent(parts),
+        LLM_TIMEOUT_MS,
+        "LLM content generation"
+      );
     }
     
     logger.debug(`[${requestId}] Sending request to LLM API...`);
-    const response = await result.response;
+    const response = result.response;
     const responseText = response.text();
     
     logger.timeEnd(`[${requestId}] API call duration`);
@@ -428,9 +461,17 @@ export async function queryLLM(
         let result: any;
         if (conversationHistory && conversationHistory.length > 0) {
           const chat = fallbackModel.startChat({ history: conversationHistory });
-          result = await chat.sendMessage(parts);
+          result = await withTimeout(
+            chat.sendMessage(parts),
+            LLM_TIMEOUT_MS,
+            "LLM fallback chat response"
+          );
         } else {
-          result = await fallbackModel.generateContent(parts);
+          result = await withTimeout(
+            fallbackModel.generateContent(parts),
+            LLM_TIMEOUT_MS,
+            "LLM fallback content generation"
+          );
         }
         
         const response = result.response;
@@ -695,11 +736,19 @@ export async function streamLLM(
       const chat = model.startChat({
         history: conversationHistory,
       });
-      result = await chat.sendMessageStream(parts);
+      result = await withTimeout(
+        chat.sendMessageStream(parts),
+        LLM_TIMEOUT_MS,
+        "LLM streaming chat response"
+      );
     } else {
       // Use generateContentStream() for single-turn queries
       logger.debug(`[${requestId}] Using single-turn streaming mode`);
-      result = await model.generateContentStream(parts);
+      result = await withTimeout(
+        model.generateContentStream(parts),
+        LLM_TIMEOUT_MS,
+        "LLM streaming content generation"
+      );
     }
     
     logger.debug(`[${requestId}] Streaming request to LLM API...`);
@@ -762,9 +811,17 @@ export async function streamLLM(
       let fallbackResult: any;
       if (conversationHistory && conversationHistory.length > 0) {
         const chat = fallbackModel.startChat({ history: conversationHistory });
-        fallbackResult = await chat.sendMessageStream(fallbackParts);
+        fallbackResult = await withTimeout(
+          chat.sendMessageStream(fallbackParts),
+          LLM_TIMEOUT_MS,
+          "LLM streaming fallback chat response"
+        );
       } else {
-        fallbackResult = await fallbackModel.generateContentStream(fallbackParts);
+        fallbackResult = await withTimeout(
+          fallbackModel.generateContentStream(fallbackParts),
+          LLM_TIMEOUT_MS,
+          "LLM streaming fallback content generation"
+        );
       }
       
       async function* fallbackGenerator(): AsyncGenerator<string, void, unknown> {
@@ -826,4 +883,3 @@ export async function streamLLM(
     throw error;
   }
 }
-

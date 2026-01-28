@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Box, Text, Button } from "@radix-ui/themes";
+import { Box, Text, Button, Spinner } from "@radix-ui/themes";
 import { chatLogger } from "@/lib/logger";
 import { VideoPoseViewer } from "../../viewers/VideoPoseViewer";
 import { useFloatingVideoContextOptional } from "../../viewers/FloatingVideoContext";
@@ -464,7 +464,6 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     }
   }, [hasVideo, isImage, message.videoFile, message.videoUrl, message.videoPlaybackSpeed]);
 
-
   return (
     <Box>
       {/* Show video if present */}
@@ -713,13 +712,12 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 width: "100%",
                 aspectRatio: String(videoAspectRatio),
                 maxHeight: videoAspectRatio < 1 ? "min(450px, 50vh)" : undefined,
-                backgroundColor: "var(--gray-3)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Text size="2" color="gray">Loading video...</Text>
+              <Spinner size="3" />
             </Box>
           )}
         </Box>

@@ -86,8 +86,15 @@ interface UseChatSubmissionOptions {
   ) => Promise<void>;
 }
 
+/** Optional settings overrides for pending submissions from home page */
+interface SettingsOverrides {
+  thinkingMode?: ThinkingMode;
+  mediaResolution?: MediaResolution;
+  domainExpertise?: DomainExpertise;
+}
+
 interface UseChatSubmissionReturn {
-  handleSubmit: (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string) => Promise<void>;
+  handleSubmit: (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string, overrideVideoPreAnalysis?: VideoPreAnalysis | null, overrideVideoFile?: File, overrideSettings?: SettingsOverrides) => Promise<void>;
   submitAbortRef: React.MutableRefObject<AbortController | null>;
 }
 
@@ -130,22 +137,29 @@ export function useChatSubmission({
  }: UseChatSubmissionOptions): UseChatSubmissionReturn {
    const submitAbortRef = useRef<AbortController | null>(null);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string, overrideVideoPreAnalysis?: VideoPreAnalysis | null, overrideVideoFile?: File, overrideSettings?: SettingsOverrides) => {
     e.preventDefault();
     
     const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
     const effectiveVideoUrl = overrideVideoUrl !== undefined ? overrideVideoUrl : detectedVideoUrl;
-    const hasValidInput = effectivePrompt.trim() || videoFile || effectiveVideoUrl;
+    // Use override if provided (for pending submissions from home page)
+    const effectiveVideoPreAnalysis = overrideVideoPreAnalysis !== undefined ? overrideVideoPreAnalysis : videoPreAnalysis;
+    const effectiveVideoFile = overrideVideoFile !== undefined ? overrideVideoFile : videoFile;
+    // Use settings overrides if provided (avoids stale closure issue with async state updates)
+    const effectiveThinkingMode = overrideSettings?.thinkingMode ?? thinkingMode;
+    const effectiveMediaResolution = overrideSettings?.mediaResolution ?? mediaResolution;
+    const effectiveDomainExpertise = overrideSettings?.domainExpertise ?? domainExpertise;
+    const hasValidInput = effectivePrompt.trim() || effectiveVideoFile || effectiveVideoUrl;
     if (!hasValidInput || loading) return;
 
     const currentVideoUrl = effectiveVideoUrl;
      let currentPrompt = effectivePrompt.trim();
-     if (!currentPrompt && (videoFile || currentVideoUrl)) {
+     if (!currentPrompt && (effectiveVideoFile || currentVideoUrl)) {
        currentPrompt = "Please analyse this video for me.";
        setPrompt(currentPrompt);
      }
      
-     const currentVideoFile = videoFile;
+     const currentVideoFile = effectiveVideoFile;
      const currentVideoPreview = videoPreview;
      const requestChatId = getCurrentChatId();
      
@@ -201,12 +215,12 @@ export function useChatSubmission({
         videoFile: currentVideoFile || null,
         videoPreview: currentVideoPreview,
         videoUrl: currentVideoUrl || undefined,
-        thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
-        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
+        thumbnailUrl: effectiveVideoPreAnalysis?.thumbnailUrl,
+        thumbnailS3Key: effectiveVideoPreAnalysis?.thumbnailS3Key,
         videoPlaybackSpeed,
         inputTokens: videoTokens,
         poseData,
-        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
+        isTechniqueLiteEligible: effectiveVideoPreAnalysis?.isTechniqueLiteEligible ?? false,
       };
       addMessage(videoMessage);
     } else if (currentVideoUrl && !currentVideoFile) {
@@ -228,10 +242,10 @@ export function useChatSubmission({
         role: "user",
         content: "",
         videoUrl: currentVideoUrl,
-        thumbnailUrl: videoPreAnalysis?.thumbnailUrl,
-        thumbnailS3Key: videoPreAnalysis?.thumbnailS3Key,
+        thumbnailUrl: effectiveVideoPreAnalysis?.thumbnailUrl,
+        thumbnailS3Key: effectiveVideoPreAnalysis?.thumbnailS3Key,
         inputTokens: 0,
-        isTechniqueLiteEligible: videoPreAnalysis?.isTechniqueLiteEligible ?? false,
+        isTechniqueLiteEligible: effectiveVideoPreAnalysis?.isTechniqueLiteEligible ?? false,
       };
       addMessage(videoMessage);
     } else {
@@ -244,12 +258,12 @@ export function useChatSubmission({
          content: currentPrompt,
          videoFile: currentVideoFile,
          videoPreview: currentVideoPreview,
-         thumbnailUrl: currentVideoFile ? videoPreAnalysis?.thumbnailUrl : undefined,
-         thumbnailS3Key: currentVideoFile ? videoPreAnalysis?.thumbnailS3Key : undefined,
+         thumbnailUrl: currentVideoFile ? effectiveVideoPreAnalysis?.thumbnailUrl : undefined,
+         thumbnailS3Key: currentVideoFile ? effectiveVideoPreAnalysis?.thumbnailS3Key : undefined,
          videoPlaybackSpeed: currentVideoFile ? videoPlaybackSpeed : undefined,
          inputTokens: calculateUserMessageTokens(currentPrompt, currentVideoFile),
          poseData: currentVideoFile ? poseData : undefined,
-         isTechniqueLiteEligible: currentVideoFile ? (videoPreAnalysis?.isTechniqueLiteEligible ?? false) : undefined,
+         isTechniqueLiteEligible: currentVideoFile ? (effectiveVideoPreAnalysis?.isTechniqueLiteEligible ?? false) : undefined,
        };
        addMessage(userMessage);
      }
@@ -294,12 +308,12 @@ export function useChatSubmission({
 
        if (currentVideoUrl && !currentVideoFile) {
          // Video URL analysis
-         if (videoPreAnalysis && (videoPreAnalysis.isProEligible || videoPreAnalysis.isTechniqueLiteEligible)) {
+         if (effectiveVideoPreAnalysis && (effectiveVideoPreAnalysis.isProEligible || effectiveVideoPreAnalysis.isTechniqueLiteEligible)) {
            updateMessage(assistantMessageId, {
              messageType: "analysis_options",
              content: "",
              analysisOptions: {
-               preAnalysis: videoPreAnalysis,
+               preAnalysis: effectiveVideoPreAnalysis,
                selectedOption: null,
                videoUrl: currentVideoUrl,
                userPrompt: currentPrompt,
@@ -313,7 +327,8 @@ export function useChatSubmission({
          
          await handleVideoUrlAnalysis(
            currentPrompt, currentVideoUrl, assistantMessageId, 
-           conversationHistory, abortController, requestChatId
+           conversationHistory, abortController, requestChatId,
+           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise }
          );
       } else if (!currentVideoFile) {
         // Text-only
@@ -326,9 +341,9 @@ export function useChatSubmission({
           },
           conversationHistory,
           abortController,
-          thinkingMode,
-          mediaResolution,
-          domainExpertise,
+          effectiveThinkingMode,
+          effectiveMediaResolution,
+          effectiveDomainExpertise,
           insightLevel,
           userFirstName
         );
@@ -336,7 +351,8 @@ export function useChatSubmission({
          // Video file upload
          await handleVideoFileUpload(
            currentPrompt, currentVideoFile, assistantMessageId, videoMessageId,
-           conversationHistory, abortController, requestChatId
+           conversationHistory, abortController, requestChatId, effectiveVideoPreAnalysis,
+           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise }
          );
        }
      } catch (err) {
@@ -366,16 +382,17 @@ export function useChatSubmission({
      assistantMessageId: string,
      conversationHistory: Message[],
      abortController: AbortController,
-     requestChatId: string
+     requestChatId: string,
+     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise }
    ) => {
     setProgressStage("analyzing");
     
     const formData = new FormData();
     formData.append("prompt", currentPrompt);
     formData.append("videoUrl", currentVideoUrl);
-    formData.append("thinkingMode", thinkingMode);
-    formData.append("mediaResolution", mediaResolution);
-    formData.append("domainExpertise", domainExpertise);
+    formData.append("thinkingMode", effectiveSettings.thinkingMode);
+    formData.append("mediaResolution", effectiveSettings.mediaResolution);
+    formData.append("domainExpertise", effectiveSettings.domainExpertise);
     formData.append("insightLevel", insightLevel);
     if (userFirstName) formData.append("userFirstName", userFirstName);
     
@@ -451,9 +468,11 @@ export function useChatSubmission({
      videoMessageId: string | null,
      conversationHistory: Message[],
      abortController: AbortController,
-     requestChatId: string
+     requestChatId: string,
+     effectiveVideoPreAnalysis: VideoPreAnalysis | null,
+     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise }
    ) => {
-     if (videoPreAnalysis && (videoPreAnalysis.isProEligible || videoPreAnalysis.isTechniqueLiteEligible)) {
+     if (effectiveVideoPreAnalysis && (effectiveVideoPreAnalysis.isProEligible || effectiveVideoPreAnalysis.isTechniqueLiteEligible)) {
        // PRO eligible - upload first then show options
        setProgressStage("uploading");
        setUploadProgress(0);
@@ -519,7 +538,7 @@ export function useChatSubmission({
            messageType: "analysis_options",
            content: "",
            analysisOptions: {
-             preAnalysis: videoPreAnalysis,
+             preAnalysis: effectiveVideoPreAnalysis,
              selectedOption: null,
              videoUrl: s3Url,
              userPrompt: currentPrompt,
@@ -552,9 +571,9 @@ export function useChatSubmission({
         }
       },
       abortController,
-      thinkingMode,
-      mediaResolution,
-      domainExpertise,
+      effectiveSettings.thinkingMode,
+      effectiveSettings.mediaResolution,
+      effectiveSettings.domainExpertise,
       needsServerConversion,
       insightLevel,
       userFirstName
@@ -595,4 +614,3 @@ export function useChatSubmission({
      submitAbortRef,
    };
  }
-

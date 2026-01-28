@@ -53,6 +53,5 @@ Here are a few ways to analyze your video now:
 
 ---
 
-I'm here to help you improve! Try again with a smaller file, or reach out about PRO for full video support. 🎾`;
+I'm here to help you improve! Try again with a smaller file, or reach out about PRO for full video support.`;
 }
-

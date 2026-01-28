@@ -104,32 +104,17 @@ export function useAIChat() {
           }
         }
         
-        // If we have a current chat but it's empty, start fresh (don't load legacy storage)
-        // Only fall back to legacy storage if there's no current chat at all
+        // If no messages to load, start fresh
         if (messagesToLoad.length === 0) {
           if (currentChatId) {
-            // New/empty chat - start with empty messages
+            // Empty chat - start with empty messages
             chatLogger.debug("Empty chat, starting fresh");
-            setMessages([]);
-            setIsHydrated(true);
           } else {
-            // No current chat - try old storage for backward compatibility
-            loadMessagesFromStorage().then((storedMessages) => {
-              // Track these as loaded from storage
-              storedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
-              setMessages(storedMessages);
-              setIsHydrated(true);
-              
-              // Refresh video URLs in the background
-              refreshVideoUrls(storedMessages).then((refreshed) => {
-                setMessages(refreshed);
-                // Save refreshed URLs back to storage
-                saveMessagesToStorage(refreshed);
-              }).catch((error) => {
-                chatLogger.error("Failed to refresh video URLs:", error);
-              });
-            });
+            // No current chat (new chat state) - start with empty messages
+            chatLogger.debug("No current chat (new chat state), starting fresh");
           }
+          setMessages([]);
+          setIsHydrated(true);
         } else {
           setMessages(messagesToLoad);
           setIsHydrated(true);
@@ -289,19 +274,11 @@ export function useAIChat() {
           clearMessagesFromStorage();
         }
       } else {
-        // No current chat, try old storage for backward compatibility
-        chatLogger.debug("No current chat, loading from old storage");
-        const storedMessages = await loadMessagesFromStorage();
-        if (storedMessages.length > 0) {
-          // Track these as loaded from storage
-          storedMessages.forEach(m => loadedMessageIdsRef.current.add(m.id));
-          const refreshed = await refreshVideoUrls(storedMessages);
-          setMessages(refreshed);
-          saveMessagesToStorage(refreshed);
-        } else {
-          setMessages([]);
-          clearMessagesFromStorage();
-        }
+        // No current chat - this is a "new chat" state
+        // Start with empty messages (chat will be created when user submits first message)
+        chatLogger.debug("No current chat (new chat state), starting with empty messages");
+        setMessages([]);
+        clearMessagesFromStorage();
       }
       // Reset flag after a short delay to allow messages to update
       setTimeout(() => {
@@ -506,4 +483,3 @@ export function useAIChat() {
     clearMessages,
   };
 }
-

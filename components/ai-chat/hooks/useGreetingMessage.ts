@@ -219,6 +219,10 @@ export function useGreetingMessage({
 
   // Effect to add the greeting when chat is empty
   useEffect(() => {
+    // TEMPORARILY DISABLED: Greeting message is disabled during lazy chat creation transition
+    // TODO: Re-enable once the new home page flow is finalized
+    return;
+    
     // Don't proceed if not ready - wait for both chat and auth to be ready
     if (!isHydrated || loading || authLoading || !currentChatId) {
       return;

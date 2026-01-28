@@ -11,7 +11,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { PageHeader } from "@/components/ui";
 import { track } from "@/lib/analytics";
-import { createNewChat, setCurrentChatId } from "@/utils/storage-unified";
+import { setCurrentChatId } from "@/utils/storage-unified";
 import buttonStyles from "@/styles/buttons.module.css";
 import { WaitlistModal } from "./WaitlistModal";
 
@@ -320,10 +320,9 @@ export function PricingPage() {
   
   const isSignedIn = !!user;
 
-  // Handle creating a new chat and navigating to it
-  const handleNewChat = useCallback(async () => {
-    const newChat = await createNewChat();
-    setCurrentChatId(newChat.id);
+  // Handle starting a new chat - navigate to home, chat created on first message
+  const handleNewChat = useCallback(() => {
+    setCurrentChatId(undefined);
     router.push("/");
   }, [router]);
 
@@ -471,4 +470,3 @@ export function PricingPage() {
     </>
   );
 }
-

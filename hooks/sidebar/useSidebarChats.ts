@@ -6,7 +6,6 @@ import { chatLogger } from "@/lib/logger";
 import {
   getCurrentChatId,
   setCurrentChatId as saveCurrentChatId,
-  createNewChat,
   deleteExistingChat,
   updateExistingChat,
   loadChats,
@@ -94,17 +93,19 @@ export function useSidebarChats({
     };
   }, [refreshChats]);
 
-  // Create a new chat
+  // Start a new chat - navigates to home page without creating a chat
+  // Chat will be created when user submits their first message
   const handleCreateChat = useCallback(async () => {
-    // Check if chat is thinking before creating new chat
+    // Check if chat is thinking before starting new chat
     if (onChatSwitchAttempt) {
       const result = await Promise.resolve(onChatSwitchAttempt());
       if (!result) {
         return; // User cancelled
       }
     }
-    const newChat = await createNewChat();
-    saveCurrentChatId(newChat.id);
+    
+    // Clear current chat ID - we're starting fresh
+    saveCurrentChatId(undefined);
     closeSidebar?.();
     
     // Navigate to home page if not already there
