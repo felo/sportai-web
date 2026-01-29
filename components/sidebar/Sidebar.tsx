@@ -2,12 +2,11 @@
 
 import { useCallback } from "react";
 import { Box, Flex, Button, Text } from "@radix-ui/themes";
-import { Cross2Icon, HamburgerMenuIcon } from "@radix-ui/react-icons";
-import Image from "next/image";
+import { Cross2Icon, ViewVerticalIcon, Pencil2Icon } from "@radix-ui/react-icons";
 import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { UserMenu } from "@/components/auth/UserMenu";
-import { BadgeWithTooltip } from "@/components/ui";
+import { BadgeWithTooltip, IconButton } from "@/components/ui";
 import { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "@/hooks/sidebar";
 import { updateExistingChat } from "@/utils/storage-unified";
 import { resetAllOnboardingTooltips } from "@/utils/storage/settings/onboarding-tooltips";
@@ -127,8 +126,6 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               onSwitchChat={chatsState.handleSwitchChat}
               onEditChat={handleEditChat}
               onDeleteChat={chatsState.handleDeleteChat}
-              onLinkClick={closeSidebar}
-              onNavigationAttempt={onChatSwitchAttempt}
             />
           </Box>
 
@@ -229,7 +226,7 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
       style={{
         position: "fixed",
         left: 0,
-        top: 0,
+        top: "57px",
         bottom: 0,
         width: isCollapsed ? "64px" : "280px",
         backgroundColor: "var(--gray-2)",
@@ -240,60 +237,78 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
         flexDirection: "column",
       }}
     >
-      {/* Toggle Button - Row 1: Aligned with header */}
-      <Box
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: isCollapsed ? "center" : "space-between",
-          padding: isCollapsed ? "0" : "0 var(--space-4)",
-          height: "57px",
-          flexShrink: 0,
-        }}
-      >
-        {/* Logo - fades in when sidebar expands */}
-        <Box
+      {/* Toggle Button - Row 1 */}
+      {isCollapsed ? (
+        <Flex
+          direction="column"
+          align="center"
+          gap="3"
           style={{
-            opacity: isCollapsed ? 0 : 1,
-            transition: "opacity 0.2s ease-in-out",
-            display: "flex",
-            alignItems: "center",
-            pointerEvents: isCollapsed ? "none" : "auto",
+            padding: "var(--space-4)",
+            paddingTop: "var(--space-6)",
+            flexShrink: 0,
           }}
         >
-          {!isCollapsed && (
-            <Image
-              src="https://res.cloudinary.com/djtxhrly7/image/upload/v1765579947/SportAI_Open_Horizontal_light_ajy8ld.svg"
-              alt="SportAI"
-              width={120*1.5}
-              height={38*1.5}
-              priority
-              style={{ objectFit: "contain", height: "auto", display: "block" }}
-            />
-          )}
-        </Box>
+          <IconButton
+            icon={<ViewVerticalIcon style={{ color: "var(--gray-12)" }} />}
+            onClick={toggleSidebar}
+            tooltip="Open sidebar"
+            tooltipDelay={1000}
+            ariaLabel="Open sidebar"
+            iconWidth={17}
+            iconHeight={17}
+          />
 
-        <Button
-          variant="ghost"
-          size="2"
-          onClick={toggleSidebar}
+          <IconButton
+            icon={<Pencil2Icon style={{ color: "var(--gray-12)" }} />}
+            onClick={chatsState.handleCreateChat}
+            tooltip="New chat"
+            tooltipDelay={1000}
+            ariaLabel="New chat"
+            iconWidth={19}
+            iconHeight={19}
+          />
+        </Flex>
+      ) : (
+        <Flex
+          direction="column"
+          gap="3"
           style={{
-            minWidth: "32px",
-            width: "32px",
-            height: "32px",
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            padding: "var(--space-4)",
+            paddingTop: "var(--space-6)",
+            flexShrink: 0,
           }}
         >
-          {isCollapsed ? (
-            <HamburgerMenuIcon width="20" height="20" />
-          ) : (
-            <Cross2Icon width="20" height="20" />
-          )}
-        </Button>
-      </Box>
+          <Button
+            variant="ghost"
+            size="2"
+            onClick={toggleSidebar}
+            style={{
+              justifyContent: "flex-start",
+              padding: "var(--space-2) var(--space-3)",
+            }}
+          >
+            <ViewVerticalIcon width="17" height="17" />
+            <Text size="2" ml="2">
+              Close sidebar
+            </Text>
+          </Button>
+          <Button
+            variant="ghost"
+            size="2"
+            onClick={chatsState.handleCreateChat}
+            style={{
+              justifyContent: "flex-start",
+              padding: "var(--space-2) var(--space-3)",
+            }}
+          >
+            <Pencil2Icon width="19" height="19" />
+            <Text size="2" ml="2">
+              New chat
+            </Text>
+          </Button>
+        </Flex>
+      )}
 
       {/* Sidebar Content - Row 2: Scrollable */}
       <Box
@@ -314,11 +329,9 @@ export function Sidebar({ children, onClearChat, messageCount = 0, onChatSwitchA
               isMobile={false}
               isLoading={chatsState.isLoading}
               onHoverChat={chatsState.setHoveredChatId}
-              onCreateChat={chatsState.handleCreateChat}
               onSwitchChat={chatsState.handleSwitchChat}
               onEditChat={handleEditChat}
               onDeleteChat={chatsState.handleDeleteChat}
-              onNavigationAttempt={onChatSwitchAttempt}
             />
           ))}
       </Box>

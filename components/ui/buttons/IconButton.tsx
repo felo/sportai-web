@@ -16,6 +16,8 @@ export interface IconButtonProps {
   disabled?: boolean;
   /** Tooltip text */
   tooltip?: string;
+  /** Tooltip delay in milliseconds (default 700ms) */
+  tooltipDelay?: number;
   /** Color theme */
   color?: "gray" | "red" | "blue" | "green" | "yellow" | "orange" | "mint";
   /** Aria label for accessibility */
@@ -32,14 +34,14 @@ export interface IconButtonProps {
 
 /**
  * IconButton - A consistent icon-only button component
- * 
+ *
  * Features:
  * - Square shape with equal width/height
  * - Centered icon
  * - Optional tooltip
  * - Consistent sizing based on size prop
  * - Accessibility support with aria-label
- * 
+ *
  * @example
  * ```tsx
  * <IconButton
@@ -57,6 +59,7 @@ export function IconButton({
   size = "2",
   disabled = false,
   tooltip,
+  tooltipDelay = 700,
   color = "gray",
   ariaLabel,
   className,
@@ -66,7 +69,7 @@ export function IconButton({
 }: IconButtonProps) {
   // Calculate button size based on size prop
   const buttonSize = size === "1" ? "24px" : size === "2" ? "32px" : size === "3" ? "40px" : "48px";
-  
+
   // Calculate icon size based on size prop (if not provided)
   const defaultIconSize = size === "1" ? 14 : size === "2" ? 20 : size === "3" ? 24 : 28;
   const finalIconWidth = iconWidth ?? defaultIconSize;
@@ -103,9 +106,8 @@ export function IconButton({
 
   // Wrap with tooltip if provided
   if (tooltip) {
-    return <Tooltip content={tooltip}>{button}</Tooltip>;
+    return <Tooltip content={tooltip} delayDuration={tooltipDelay}>{button}</Tooltip>;
   }
 
   return button;
 }
-

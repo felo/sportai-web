@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Text } from "@radix-ui/themes";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { Pencil2Icon } from "@radix-ui/react-icons";
 import { track } from "@/lib/analytics";
 import type { NewChatButtonProps } from "./types";
 
@@ -21,23 +21,10 @@ export function NewChatButton({ onClick }: NewChatButtonProps) {
         padding: "var(--space-2) var(--space-3)",
       }}
     >
-      <PlusIcon width="16" height="16" />
+      <Pencil2Icon width="19" height="19" />
       <Text size="2" ml="2">
         New chat
       </Text>
     </Button>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

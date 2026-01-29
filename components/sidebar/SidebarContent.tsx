@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Flex } from "@radix-ui/themes";
 import { NewChatButton } from "./NewChatButton";
-import { LibraryButton } from "./LibraryButton";
 import { ChatList } from "./ChatList";
 import type { Chat } from "@/types/chat";
 
@@ -17,12 +16,10 @@ interface SidebarContentProps {
   isMobile: boolean;
   isLoading?: boolean;
   onHoverChat: (chatId: string | null) => void;
-  onCreateChat: () => void;
+  onCreateChat?: () => void;
   onSwitchChat: (chatId: string) => void;
   onEditChat: (chat: Chat) => void;
   onDeleteChat: (chatId: string) => void;
-  onLinkClick?: () => void;
-  onNavigationAttempt?: () => Promise<boolean> | boolean;
 }
 
 export function SidebarContent({
@@ -36,8 +33,6 @@ export function SidebarContent({
   onSwitchChat,
   onEditChat,
   onDeleteChat,
-  onLinkClick,
-  onNavigationAttempt,
 }: SidebarContentProps) {
   // Load from localStorage, default to true if not set
   const [chatsExpanded, setChatsExpanded] = useState(() => {
@@ -51,16 +46,14 @@ export function SidebarContent({
   useEffect(() => {
     localStorage.setItem(CHATS_EXPANDED_KEY, String(chatsExpanded));
   }, [chatsExpanded]);
-  
-  // Check if we're on the Library page
-  const isOnLibraryPage = pathname === "/library" || pathname?.startsWith("/library/");
+
   // Only show chat as selected when on the chat page
   const isOnChatPage = pathname === "/chat";
 
   return (
     <Flex direction="column" gap="3">
-      <NewChatButton onClick={onCreateChat} />
-      <LibraryButton onClick={onLinkClick} isActive={isOnLibraryPage} onNavigationAttempt={onNavigationAttempt} />
+      {/* Only show NewChatButton on mobile (desktop has it in the header section) */}
+      {isMobile && onCreateChat && <NewChatButton onClick={onCreateChat} />}
 
       <ChatList
         chats={chats}

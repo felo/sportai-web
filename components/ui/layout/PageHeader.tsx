@@ -10,7 +10,7 @@ import { useSidebar } from "@/components/SidebarContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
-import { IconButton, LogoNewChatButton } from "@/components/ui";
+import { IconButton, LogoNewChatButton, ToggleButton } from "@/components/ui";
 import {
   getDeveloperMode,
   setDeveloperMode as saveDeveloperMode,
@@ -32,37 +32,6 @@ import type { ReactNode } from "react";
 type Appearance = "light" | "dark" | "green";
 
 type NavigationMode = "chat" | "studio";
-
-interface ModeToggleButtonProps {
-  mode: NavigationMode;
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-}
-
-function ModeToggleButton({ label, isActive, onClick }: ModeToggleButtonProps) {
-  return (
-    <Box
-      onClick={onClick}
-      style={{
-        padding: "8px 16px",
-        borderRadius: "var(--radius-3)",
-        cursor: "pointer",
-        transition: "all 0.15s ease",
-        background: isActive ? "var(--accent-9)" : "var(--gray-3)",
-        border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
-      }}
-    >
-      <Text
-        size="2"
-        weight="medium"
-        style={{ color: isActive ? "white" : "var(--gray-11)" }}
-      >
-        {label}
-      </Text>
-    </Box>
-  );
-}
 
 /**
  * NavbarProfile - Compact profile display for the navbar
@@ -223,7 +192,7 @@ function NavbarProfile() {
   // Get display name and avatar
   const displayName = profile?.full_name || "User";
   const avatarUrl = profile?.avatar_url;
-  
+
   // Generate initials from name (fallback to "U" for User)
   const initials = (profile?.full_name || "U")
     .split(/[\s.]+/)
@@ -248,11 +217,11 @@ function NavbarProfile() {
         />
       );
     }
-    
+
     return (
-      <div 
+      <div
         className="rounded-full flex items-center justify-center text-sm font-semibold"
-        style={{ 
+        style={{
           width: "36px",
           height: "36px",
           backgroundColor: "#7ADB8F",
@@ -281,10 +250,10 @@ function NavbarProfile() {
             <Text size="2" weight="medium" style={{ lineHeight: 1.2 }}>
               {displayName}
             </Text>
-            <Text 
-              size="1" 
-              weight="medium" 
-              style={{ 
+            <Text
+              size="1"
+              weight="medium"
+              style={{
                 color: "#7ADB8F",
                 lineHeight: 1.2,
               }}
@@ -520,7 +489,7 @@ function NavbarProfile() {
         <DropdownMenu.Separator />
 
         {/* Sign Out */}
-        <DropdownMenu.Item 
+        <DropdownMenu.Item
           color="red"
           onSelect={handleSignOut}
           disabled={isSigningOut}
@@ -553,25 +522,40 @@ export interface PageHeaderProps {
   messageCount?: number;
 }
 
-export function PageHeader({ 
-  title, 
-  actions, 
+export function PageHeader({
+  title,
+  actions,
   onNewChat,
 }: PageHeaderProps) {
-  const { isCollapsed, isInitialLoad, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const pathname = usePathname();
   const router = useRouter();
-  const sidebarWidth = isCollapsed ? "64px" : "280px";
+
+  // Calculate offset to center mode toggle relative to content area (accounting for sidebar)
+  const sidebarWidth = isCollapsed ? 64 : 280;
+  const centerOffset = sidebarWidth / 2;
 
   // Determine active mode based on current route
   const activeMode: NavigationMode = pathname?.startsWith("/library") ? "studio" : "chat";
+
+  // Track last chat location to restore when coming back from Studio (persist in sessionStorage)
+  const LAST_CHAT_PATH_KEY = "sportai-last-chat-path";
+
+  // Update last chat path when in chat mode
+  useEffect(() => {
+    if (activeMode === "chat" && pathname) {
+      sessionStorage.setItem(LAST_CHAT_PATH_KEY, pathname);
+    }
+  }, [activeMode, pathname]);
 
   const handleModeChange = (mode: NavigationMode) => {
     if (mode === "studio") {
       router.push("/library");
     } else {
-      router.push("/chat");
+      // Navigate back to the last chat location (/ or /chat with context)
+      const lastChatPath = sessionStorage.getItem(LAST_CHAT_PATH_KEY) || "/";
+      router.push(lastChatPath);
     }
   };
 
@@ -639,9 +623,8 @@ export function PageHeader({
   // Desktop layout
   return (
     <Box
-      className="fixed top-0 right-0 z-20"
+      className="fixed top-0 left-0 right-0 z-20"
       style={{
-        left: sidebarWidth,
         borderBottom: "1px solid var(--gray-6)",
         backgroundColor: "var(--color-background)",
         backdropFilter: "blur(8px)",
@@ -652,49 +635,37 @@ export function PageHeader({
         alignItems: "center",
         justifyContent: "space-between",
         boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
-        transition: isInitialLoad ? "none" : "left 0.2s ease-in-out",
       }}
     >
-      {/* Left side: Logo (when collapsed) or Page Title */}
+      {/* Left side: Logo and Page Title */}
       <Flex align="center" gap="3" style={{ minWidth: "180px" }}>
-        {/* Logo with Morph to New Chat Button - Only visible when sidebar collapsed */}
-        <Box
-          style={{
-            opacity: isCollapsed ? 1 : 0,
-            transition: "opacity 0.1s ease-in-out",
-            pointerEvents: isCollapsed ? "auto" : "none",
-            position: isCollapsed ? "relative" : "absolute",
-          }}
-        >
-          <LogoNewChatButton onNewChat={onNewChat} />
-        </Box>
+        {/* Logo with Morph to New Chat Button */}
+        <LogoNewChatButton onNewChat={onNewChat} />
 
-        {/* Page title - Always visible when provided and sidebar expanded */}
-        {title && !isCollapsed && (
+        {/* Page title - Always visible when provided */}
+        {title && (
           <Text size="5" weight="bold">
             {title}
           </Text>
         )}
       </Flex>
 
-      {/* Center: Mode Toggle Buttons */}
-      <Flex 
-        align="center" 
+      {/* Center: Mode Toggle Buttons - offset to center relative to content area */}
+      <Flex
+        align="center"
         gap="2"
         style={{
           position: "absolute",
-          left: "50%",
+          left: `calc(50% + ${centerOffset}px)`,
           transform: "translateX(-50%)",
         }}
       >
-        <ModeToggleButton
-          mode="chat"
+        <ToggleButton
           label="Chat"
           isActive={activeMode === "chat"}
           onClick={() => handleModeChange("chat")}
         />
-        <ModeToggleButton
-          mode="studio"
+        <ToggleButton
           label="Studio Playground"
           isActive={activeMode === "studio"}
           onClick={() => handleModeChange("studio")}

@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Flex } from "@radix-ui/themes";
+import { ToggleButton } from "@/components/ui";
 import { SUB_TABS } from "../constants";
 import type { TacticalSubTab } from "../types";
 
@@ -12,38 +13,15 @@ interface SubTabNavigationProps {
 export function SubTabNavigation({ activeSubTab, onTabChange }: SubTabNavigationProps) {
   return (
     <Flex gap="2" mb="4">
-      {SUB_TABS.map((tab) => {
-        const isActive = activeSubTab === tab.id;
-        return (
-          <Box
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              padding: "10px 16px",
-              borderRadius: "var(--radius-3)",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              background: isActive ? "var(--accent-9)" : "var(--gray-3)",
-              border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
-            }}
-          >
-            <Text
-              size="2"
-              weight="medium"
-              style={{ color: isActive ? "white" : "var(--gray-11)" }}
-            >
-              {tab.label}
-            </Text>
-          </Box>
-        );
-      })}
+      {SUB_TABS.map((tab) => (
+        <ToggleButton
+          key={tab.id}
+          label={tab.label}
+          isActive={activeSubTab === tab.id}
+          onClick={() => onTabChange(tab.id)}
+          size="3"
+        />
+      ))}
     </Flex>
   );
 }
-
-
-
-
-
-
-

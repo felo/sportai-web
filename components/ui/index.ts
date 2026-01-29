@@ -8,6 +8,9 @@ export type { CircularIconButtonProps } from "./buttons/CircularIconButton";
 export { PresetButtonGroup } from "./buttons/PresetButtonGroup";
 export type { PresetButtonGroupProps, PresetButton } from "./buttons/PresetButtonGroup";
 
+export { ToggleButton } from "./buttons/ToggleButton";
+export type { ToggleButtonProps } from "./buttons/ToggleButton";
+
 // Inputs
 export { ToggleSwitch } from "./inputs/ToggleSwitch";
 export type { ToggleSwitchProps } from "./inputs/ToggleSwitch";

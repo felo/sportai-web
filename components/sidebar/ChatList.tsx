@@ -42,7 +42,7 @@ export function ChatList({
           <ChevronRightIcon width="16" height="16" />
         )}
         <Text size="2" ml="2" weight="medium">
-          Chats
+          Your chats
         </Text>
       </Button>
       {chatsExpanded && (
@@ -89,6 +89,3 @@ export function ChatList({
     </Flex>
   );
 }
-
-
-

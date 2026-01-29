@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Box, Flex } from "@radix-ui/themes";
+import { ToggleButton } from "@/components/ui";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { BALL_TABS } from "../constants";
 import type { PlayerShotData } from "../../../ShotHeatmap";
@@ -11,10 +12,10 @@ interface BallTabNavigationProps {
   ballDataMap: Record<number, PlayerShotData[]>;
 }
 
-export function BallTabNavigation({ 
-  selectedBall, 
-  onBallChange, 
-  ballDataMap 
+export function BallTabNavigation({
+  selectedBall,
+  onBallChange,
+  ballDataMap
 }: BallTabNavigationProps) {
   const isMobile = useIsMobile();
 
@@ -49,8 +50,8 @@ export function BallTabNavigation({
           />
         </>
       )}
-      <Flex 
-        gap="1" 
+      <Flex
+        gap="1"
         style={{
           overflowX: isMobile ? "auto" : "visible",
           scrollbarWidth: "none",
@@ -59,36 +60,22 @@ export function BallTabNavigation({
         }}
       >
         {BALL_TABS.map((tab) => {
-          const isActive = selectedBall === tab.id;
           const hasData = (ballDataMap[tab.id] || []).some(d => d.totalShots > 0);
-          
+
           return (
-            <Box
+            <ToggleButton
               key={tab.id}
+              label={`${tab.label} ${tab.name}`}
+              isActive={selectedBall === tab.id}
               onClick={() => onBallChange(tab.id)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "var(--radius-2)",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                background: isActive ? "var(--accent-9)" : "var(--gray-3)",
-                border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
-                opacity: hasData ? 1 : 0.5,
-                flexShrink: 0,
-              }}
-            >
-              <Text
-                size="1"
-                weight="medium"
-                style={{ color: isActive ? "white" : "var(--gray-11)", whiteSpace: "nowrap" }}
-              >
-                {tab.label} {tab.name}
-              </Text>
-            </Box>
+              size="1"
+              inactiveOpacity={hasData ? 1 : 0.5}
+              noWrap
+              flexShrink={false}
+            />
           );
         })}
       </Flex>
     </Box>
   );
 }
-
