@@ -35,6 +35,7 @@ interface ChatInputProps {
   onDomainExpertiseChange?: (expertise: DomainExpertise) => void;
   disableTooltips?: boolean;
   hideDisclaimer?: boolean; // Hide the "contact us" disclaimer
+  noPadding?: boolean; // Remove side padding (for embedded contexts)
   // Video sport auto-detection - triggers glow effect when sport is detected from video
   videoSportDetected?: DomainExpertise | null;
   // Video URL detection - callback when a video URL is detected in the input
@@ -64,6 +65,7 @@ export function ChatInput({
   onDomainExpertiseChange,
   disableTooltips = false,
   hideDisclaimer = false,
+  noPadding = false,
   videoSportDetected = null,
   onVideoUrlDetected,
   videoPreAnalysis = null,
@@ -71,10 +73,10 @@ export function ChatInput({
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const isSignedIn = !!user;
-  
+
   // Video URL detection state
   const [detectedVideoUrls, setDetectedVideoUrls] = useState<string[]>([]);
-  
+
   // Debug logging
   useEffect(() => {
     if (loading) {
@@ -83,7 +85,7 @@ export function ChatInput({
   }, [loading, onStop, progressStage]);
   // Base height for textarea (in pixels) - single line height with padding
   const BASE_TEXTAREA_HEIGHT = isMobile ? 40 : 0;
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -97,29 +99,29 @@ export function ChatInput({
   const [isGlowing, setIsGlowing] = useState(false);
   const [sendButtonBounce, setSendButtonBounce] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
-  
+
   // Refs for debounced detection (to avoid stale closures)
   const sportDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const urlDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Track previous analyzing state to detect when analysis completes
   const wasAnalyzingRef = useRef(false);
-  
+
   // Prevent hydration mismatch with Radix UI Select components
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
   }, []);
   const glowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Load developer mode on mount and listen for changes
   useEffect(() => {
     setDeveloperMode(getDeveloperMode());
-    
+
     const handleDeveloperModeChange = () => {
       setDeveloperMode(getDeveloperMode());
     };
-    
+
     window.addEventListener("developer-mode-change", handleDeveloperModeChange);
     return () => window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
   }, []);
@@ -142,18 +144,18 @@ export function ChatInput({
   // Trigger bounce animation on send button when analysis completes
   useEffect(() => {
     const isCurrentlyAnalyzing = videoPreAnalysis?.isAnalyzing ?? false;
-    
+
     // Detect transition from analyzing to not analyzing
     if (wasAnalyzingRef.current && !isCurrentlyAnalyzing) {
       chatLogger.debug("[ChatInput] Analysis complete, triggering send button bounce");
       setSendButtonBounce(true);
-      
+
       // Reset bounce after animation completes
       setTimeout(() => {
         setSendButtonBounce(false);
       }, 600); // Animation duration
     }
-    
+
     wasAnalyzingRef.current = isCurrentlyAnalyzing;
   }, [videoPreAnalysis?.isAnalyzing]);
 
@@ -162,15 +164,15 @@ export function ChatInput({
   useEffect(() => {
     if (videoSportDetected) {
       chatLogger.debug("[ChatInput] Video sport auto-detected:", videoSportDetected);
-      
+
       // Trigger glow effect
       setIsGlowing(true);
-      
+
       // Clear existing timeout
       if (glowTimeoutRef.current) {
         clearTimeout(glowTimeoutRef.current);
       }
-      
+
       // Remove glow after 2 seconds
       glowTimeoutRef.current = setTimeout(() => {
         setIsGlowing(false);
@@ -246,7 +248,7 @@ export function ChatInput({
           // Temporarily set to auto to measure scrollHeight
           textarea.style.height = "auto";
           const scrollHeight = textarea.scrollHeight;
-          
+
           // Base height includes padding
           // Only resize if content actually exceeds this base height
           if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
@@ -305,7 +307,7 @@ export function ChatInput({
 
     // Convert text to lowercase for matching
     const lowerText = text.toLowerCase();
-    
+
     // First check primary sports (tennis, pickleball, padel)
     for (const [keyword, expertise] of Object.entries(primarySportKeywords)) {
       // Use word boundary regex to match whole words only
@@ -314,25 +316,25 @@ export function ChatInput({
         // Switch to detected sport
         setDomainExpertiseState(expertise);
         onDomainExpertiseChange?.(expertise);
-        
+
         // Trigger glow effect
         setIsGlowing(true);
-        
+
         // Clear existing timeout
         if (glowTimeoutRef.current) {
           clearTimeout(glowTimeoutRef.current);
         }
-        
+
         // Remove glow after 2 seconds
         glowTimeoutRef.current = setTimeout(() => {
           setIsGlowing(false);
         }, 2000);
-        
+
         // Only switch to the first detected sport
         return;
       }
     }
-    
+
     // Then check other sports (switch to "all-sports")
     for (const keyword of otherSportKeywords) {
       const regex = new RegExp(`\\b${keyword}\\b`, 'i');
@@ -340,20 +342,20 @@ export function ChatInput({
         // Switch to all-sports
         setDomainExpertiseState('all-sports');
         onDomainExpertiseChange?.('all-sports');
-        
+
         // Trigger glow effect
         setIsGlowing(true);
-        
+
         // Clear existing timeout
         if (glowTimeoutRef.current) {
           clearTimeout(glowTimeoutRef.current);
         }
-        
+
         // Remove glow after 2 seconds
         glowTimeoutRef.current = setTimeout(() => {
           setIsGlowing(false);
         }, 2000);
-        
+
         // Only switch to the first detected sport
         return;
       }
@@ -362,10 +364,10 @@ export function ChatInput({
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
-    
+
     // 1. Update prompt immediately - user sees typing instantly
     onPromptChange(newValue);
-    
+
     // 2. Debounce sport detection (200ms) - avoid regex on every keystroke
     if (sportDetectionTimeoutRef.current) {
       clearTimeout(sportDetectionTimeoutRef.current);
@@ -373,7 +375,7 @@ export function ChatInput({
     sportDetectionTimeoutRef.current = setTimeout(() => {
       detectAndSwitchSport(newValue);
     }, 200);
-    
+
     // 3. Debounce video URL detection (200ms) - avoid URL parsing on every keystroke
     if (urlDetectionTimeoutRef.current) {
       clearTimeout(urlDetectionTimeoutRef.current);
@@ -382,7 +384,7 @@ export function ChatInput({
       urlDetectionTimeoutRef.current = setTimeout(() => {
         const videoUrls = extractVideoUrls(newValue);
         setDetectedVideoUrls(videoUrls);
-        
+
         // Notify parent: only if exactly one video URL (ready for analysis)
         if (videoUrls.length === 1) {
           onVideoUrlDetected?.(videoUrls[0]);
@@ -395,22 +397,22 @@ export function ChatInput({
       setDetectedVideoUrls([]);
       onVideoUrlDetected?.(null);
     }
-    
+
     // 4. Resize textarea - use requestAnimationFrame (this is cheap, no debounce needed)
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         const textarea = textareaRef.current;
-        
+
         // If empty, keep at base height
         if (!newValue.trim()) {
           textarea.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
           return;
         }
-        
+
         // Temporarily set to auto to measure scrollHeight
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
-        
+
         // Base height includes padding
         // Only resize if content actually exceeds this base height
         if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
@@ -429,11 +431,11 @@ export function ChatInput({
     setTimeout(() => {
       if (textareaRef.current) {
         const textarea = textareaRef.current;
-        
+
         // Temporarily set to auto to measure scrollHeight
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
-        
+
         // Base height includes padding
         // Only resize if content actually exceeds this base height
         if (scrollHeight > BASE_TEXTAREA_HEIGHT) {
@@ -458,10 +460,10 @@ export function ChatInput({
       clearTimeout(urlDetectionTimeoutRef.current);
       urlDetectionTimeoutRef.current = null;
     }
-    
+
     // Run detection immediately with current prompt
     detectAndSwitchSport(prompt);
-    
+
     if (!videoFile) {
       const videoUrls = extractVideoUrls(prompt);
       setDetectedVideoUrls(videoUrls);
@@ -493,8 +495,8 @@ export function ChatInput({
       style={{
         backgroundColor: "var(--color-background)",
         paddingBottom: isMobile ? "calc(var(--space-4) + env(safe-area-inset-bottom))" : "var(--space-4)", // Safe area support
-        paddingLeft: isMobile ? "0" : "var(--space-4)",
-        paddingRight: isMobile ? "0" : "var(--space-4)",
+        paddingLeft: noPadding ? "0" : (isMobile ? "0" : "var(--space-4)"),
+        paddingRight: noPadding ? "0" : (isMobile ? "0" : "var(--space-4)"),
         boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -517,9 +519,9 @@ export function ChatInput({
 
           {/* Video file eligibility indicator */}
           {videoFile && videoPreAnalysis && (
-            <VideoEligibilityIndicator 
-              preAnalysis={videoPreAnalysis} 
-              fallbackText="Video uploaded" 
+            <VideoEligibilityIndicator
+              preAnalysis={videoPreAnalysis}
+              fallbackText="Video uploaded"
             />
           )}
 
@@ -527,7 +529,7 @@ export function ChatInput({
           {!videoFile && detectedVideoUrls.length === 1 && (
             <Flex direction="column" gap="2">
               {/* Attached video chip with hover to show full URL */}
-              <AttachedVideoChip 
+              <AttachedVideoChip
                 videoUrl={detectedVideoUrls[0]}
                 onRemove={() => {
                   // Remove the video URL from the prompt
@@ -539,9 +541,9 @@ export function ChatInput({
                 }}
               />
               {/* Eligibility indicator below the chip */}
-              <VideoEligibilityIndicator 
-                preAnalysis={videoPreAnalysis} 
-                fallbackText="Video URL detected" 
+              <VideoEligibilityIndicator
+                preAnalysis={videoPreAnalysis}
+                fallbackText="Video URL detected"
               />
             </Flex>
           )}
@@ -567,8 +569,8 @@ export function ChatInput({
               display: "flex",
               flexDirection: "column",
               overflow: "visible",
-              filter: isFocused 
-                ? "drop-shadow(0 2px 1px rgba(116, 188, 156, 0.3)) drop-shadow(0 2px 2px rgba(116, 188, 156, 0.4)) drop-shadow(0 8px 12px rgba(116, 188, 156, 0.2))" 
+              filter: isFocused
+                ? "drop-shadow(0 2px 1px rgba(116, 188, 156, 0.3)) drop-shadow(0 2px 2px rgba(116, 188, 156, 0.4)) drop-shadow(0 8px 12px rgba(116, 188, 156, 0.2))"
                 : "none",
               transition: "border-color 0.2s ease, filter 0.2s ease",
             }}
@@ -581,7 +583,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder={`Ask anything ${domainExpertise === 'all-sports' ? 'sports' : domainExpertise} related…`}
+              placeholder={isMobile ? "Ask anything sports-related." : "Upload a video or photo to get feedback, or ask anything sports-related."}
               aria-label="Chat input"
               resize="none"
               size="3"
@@ -601,7 +603,7 @@ export function ChatInput({
                 height: "auto",
               }}
             />
-            
+
             {/* Buttons row */}
             <Flex
               align="center"
@@ -657,11 +659,9 @@ export function ChatInput({
                     style={{ display: "none" }}
                   />
                   <UploadIcon width="18" height="18" color="#1C1C1C" />
-                  {!isMobile && (
-                    <Text size="2" style={{ color: "#1C1C1C", whiteSpace: "nowrap", fontWeight: 500 }}>
-                      Upload something
-                    </Text>
-                  )}
+                  <Text size="2" style={{ color: "#1C1C1C", whiteSpace: "nowrap", fontWeight: 500 }}>
+                    {isMobile ? "Upload" : "Upload something"}
+                  </Text>
                 </label>
               </Tooltip>
 
@@ -673,7 +673,7 @@ export function ChatInput({
                   gap={isMobile ? "1" : "2"}
                 >
                   {/* Thinking mode selector - Developer Mode Only */}
-                  <Tooltip 
+                  <Tooltip
                     content="Thinking mode: Fast for quick responses, Deep for more thorough analysis"
                     open={disableTooltips ? false : (!thinkingModeOpen ? undefined : false)}
                   >
@@ -711,7 +711,7 @@ export function ChatInput({
                   </Tooltip>
 
                   {/* Media resolution selector - Developer Mode Only */}
-                  <Tooltip 
+                  <Tooltip
                     content="Media resolution: Controls the quality and token usage for video/image analysis"
                     open={disableTooltips ? false : (!mediaResolutionOpen ? undefined : false)}
                   >
@@ -756,7 +756,7 @@ export function ChatInput({
 
               {/* Domain expertise selector with "Focus on:" prefix */}
               {isMounted && (
-                <Tooltip 
+                <Tooltip
                   content="Choose the sport for specialized analysis"
                   open={disableTooltips ? false : (!domainExpertiseOpen ? undefined : false)}
                 >
@@ -766,11 +766,11 @@ export function ChatInput({
                     style={{
                       borderRadius: "var(--radius-2)",
                       transition: "box-shadow 0.3s ease, filter 0.3s ease",
-                      boxShadow: isGlowing 
-                        ? "0 0 0 2px var(--mint-8), 0 0 16px var(--mint-6), 0 0 24px var(--mint-5)" 
+                      boxShadow: isGlowing
+                        ? "0 0 0 2px var(--mint-8), 0 0 16px var(--mint-6), 0 0 24px var(--mint-5)"
                         : "none",
-                      filter: isGlowing 
-                        ? "brightness(1.2)" 
+                      filter: isGlowing
+                        ? "brightness(1.2)"
                         : "none",
                     }}
                   >
@@ -871,8 +871,8 @@ export function ChatInput({
                   </Tooltip>
                 )
               ) : (
-                <Tooltip 
-                  content={videoPreAnalysis?.isAnalyzing ? "Analyzing video..." : "Send message"} 
+                <Tooltip
+                  content={videoPreAnalysis?.isAnalyzing ? "Analyzing video..." : "Send message"}
                   open={disableTooltips ? false : undefined}
                 >
                   {(() => {
@@ -882,7 +882,7 @@ export function ChatInput({
                     // Disable if multiple URLs detected OR if video is being analyzed for PRO eligibility
                     const isAnalyzing = videoPreAnalysis?.isAnalyzing ?? false;
                     const isDisabled = !canSubmit || detectedVideoUrls.length > 1 || isAnalyzing;
-                    
+
                     return (
                       <button
                         type="submit"
@@ -936,9 +936,9 @@ export function ChatInput({
                 isMobile ? (
                   <>
                     Enjoy the free BETA, for enterprise license{" "}
-                    <a 
-                      href="https://sportai.com/contact" 
-                      target="_blank" 
+                    <a
+                      href="https://sportai.com/contact"
+                      target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: "inherit", textDecoration: "underline" }}
                     >
@@ -948,9 +948,9 @@ export function ChatInput({
                 ) : (
                   <>
                     Enjoy the free BETA. For enterprise-level precision, performance, and dedicated support, please{" "}
-                    <a 
-                      href="https://sportai.com/contact" 
-                      target="_blank" 
+                    <a
+                      href="https://sportai.com/contact"
+                      target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: "inherit", textDecoration: "underline" }}
                     >
@@ -962,18 +962,18 @@ export function ChatInput({
                 // Guest users see Terms/Privacy links
                 <>
                   By using SportAI Open, you agree to our{" "}
-                  <a 
-                    href="/terms" 
-                    target="_blank" 
+                  <a
+                    href="/terms"
+                    target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "inherit", textDecoration: "underline" }}
                   >
                     Terms
                   </a>{" "}
                   and{" "}
-                  <a 
-                    href="/privacy" 
-                    target="_blank" 
+                  <a
+                    href="/privacy"
+                    target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "inherit", textDecoration: "underline" }}
                   >

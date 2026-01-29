@@ -4,14 +4,14 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Box, Flex, Text, Button } from "@radix-ui/themes";
-import { 
-  VideoIcon, 
-  BarChartIcon, 
-  CalendarIcon, 
-  ChatBubbleIcon, 
-  LightningBoltIcon, 
-  ReaderIcon, 
-  RocketIcon 
+import {
+  VideoIcon,
+  BarChartIcon,
+  CalendarIcon,
+  ChatBubbleIcon,
+  LightningBoltIcon,
+  ReaderIcon,
+  RocketIcon
 } from "@radix-ui/react-icons";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { usePendingChat } from "@/components/PendingChatContext";
@@ -107,12 +107,12 @@ function HomeContent() {
   // Handle form submission - set pending and navigate to /chat
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Check if there's valid input
     const videoUrls = extractVideoUrls(prompt);
     const hasValidVideoUrl = videoUrls.length === 1;
     const effectiveVideoUrl = detectedVideoUrl || (hasValidVideoUrl ? videoUrls[0] : undefined);
-    
+
     if (!prompt.trim() && !videoFile && !effectiveVideoUrl) {
       return; // Nothing to submit
     }
@@ -147,7 +147,7 @@ function HomeContent() {
     <main className="h-screen flex flex-col">
       <PageHeader onNewChat={handleNewChat} />
       <Sidebar />
-      
+
       {/* Main content area with drag and drop */}
       <Box
         {...dragHandlers}
@@ -192,7 +192,8 @@ function HomeContent() {
           justify="center"
           style={{
             flex: 1,
-            padding: "var(--space-4)",
+            paddingTop: "var(--space-4)",
+            paddingBottom: "var(--space-4)",
             maxWidth: "800px",
             margin: "0 auto",
             width: "100%",
@@ -217,7 +218,7 @@ function HomeContent() {
 
           {/* Greeting */}
           <Text
-            size={isMobile ? "6" : "8"}
+            size={isMobile ? "5" : "6"}
             weight="bold"
             align="center"
             style={{
@@ -258,6 +259,7 @@ function HomeContent() {
               onVideoUrlDetected={setDetectedVideoUrl}
               videoPreAnalysis={videoPreAnalysis}
               hideDisclaimer
+              noPadding
             />
           </Box>
 
@@ -266,7 +268,7 @@ function HomeContent() {
             <Text size="2" color="gray" style={{ marginBottom: "var(--space-2)" }}>
               Other prompts you can try
             </Text>
-            
+
             <Flex
               wrap="wrap"
               gap="2"
@@ -280,7 +282,7 @@ function HomeContent() {
                     key={item.id}
                     size="2"
                     variant="soft"
-                    className={buttonStyles.actionButton}
+                    className={`${buttonStyles.actionButtonSecondary} ${buttonStyles.borderless} ${buttonStyles.sentenceCase}`}
                     onClick={() => {
                       setPrompt(item.label);
                     }}

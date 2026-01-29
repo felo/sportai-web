@@ -6,7 +6,7 @@
   transition: all 0.3s ease-out !important;
   border: 2px solid white !important;
   text-transform: uppercase !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(122, 219, 143, 0.2) !important;
   background-color: #7ADB8F !important; /* Light green */
@@ -16,7 +16,7 @@
 .actionButton:hover:not(:disabled) {
   background-color: #95E5A6 !important; /* Lighter green on hover */
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(122, 219, 143, 0.6),
     0 0 40px rgba(122, 219, 143, 0.4),
     0 4px 16px rgba(122, 219, 143, 0.5) !important;
@@ -48,7 +48,7 @@
   animation: shimmer 2s ease-in-out infinite !important;
   color: #1C1C1C !important;
   cursor: wait !important;
-  box-shadow: 
+  box-shadow:
     0 0 15px rgba(122, 219, 143, 0.4),
     0 0 30px rgba(122, 219, 143, 0.2) !important;
 }
@@ -101,7 +101,7 @@
   text-transform: uppercase !important;
   background-color: #E54D2E !important;
   color: white !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(229, 77, 46, 0.2) !important;
 }
@@ -109,7 +109,7 @@
 .actionButtonRed:hover:not(:disabled) {
   background-color: #DD4425 !important;
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(229, 77, 46, 0.6),
     0 0 40px rgba(229, 77, 46, 0.4),
     0 4px 16px rgba(229, 77, 46, 0.5) !important;
@@ -122,7 +122,7 @@
   transition: all 0.3s ease-out !important;
   border: 2px solid white !important;
   text-transform: uppercase !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(122, 219, 143, 0.2);
   background-color: #7ADB8F !important; /* Light green */
@@ -132,7 +132,7 @@
 .actionButtonSquare:hover:not(:disabled) {
   background-color: #95E5A6 !important; /* Lighter green on hover */
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(122, 219, 143, 0.6),
     0 0 40px rgba(122, 219, 143, 0.4),
     0 4px 16px rgba(122, 219, 143, 0.5) !important;
@@ -154,7 +154,7 @@
   text-transform: uppercase !important;
   background-color: #E54D2E !important;
   color: white !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(229, 77, 46, 0.2) !important;
 }
@@ -162,7 +162,7 @@
 .actionButtonSquareRed:hover:not(:disabled) {
   background-color: #DD4425 !important;
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(229, 77, 46, 0.6),
     0 0 40px rgba(229, 77, 46, 0.4),
     0 4px 16px rgba(229, 77, 46, 0.5) !important;
@@ -171,11 +171,11 @@
 /* Secondary Button - Light/neutral for non-recommended actions */
 .actionButtonSecondary {
   border-radius: 9999px !important; /* Full rounded pill shape */
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   transition: all 0.3s ease-out !important;
   border: 2px solid white !important;
   text-transform: uppercase !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(200, 200, 200, 0.3) !important;
   background-color: #FAFAFA !important; /* Off-white */
@@ -185,7 +185,7 @@
 .actionButtonSecondary:hover:not(:disabled) {
   background-color: #FFFFFF !important;
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(200, 200, 200, 0.5),
     0 0 40px rgba(200, 200, 200, 0.3),
     0 4px 16px rgba(0, 0, 0, 0.1) !important;
@@ -198,14 +198,24 @@
   color: var(--gray-9) !important;
 }
 
+/* Modifier: Borderless - removes border from any action button */
+.borderless {
+  border: none !important;
+}
+
+/* Modifier: Sentence case - removes uppercase transform */
+.sentenceCase {
+  text-transform: none !important;
+}
+
 /* Secondary Square variant */
 .actionButtonSquareSecondary {
   border-radius: var(--radius-3) !important; /* Standard radius */
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   transition: all 0.3s ease-out !important;
   border: 2px solid white !important;
   text-transform: uppercase !important;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.1),
     0 0 10px rgba(200, 200, 200, 0.3) !important;
   background-color: #FAFAFA !important; /* Off-white */
@@ -215,7 +225,7 @@
 .actionButtonSquareSecondary:hover:not(:disabled) {
   background-color: #FFFFFF !important;
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 0 20px rgba(200, 200, 200, 0.5),
     0 0 40px rgba(200, 200, 200, 0.3),
     0 4px 16px rgba(0, 0, 0, 0.1) !important;
@@ -236,13 +246,13 @@
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 
+    box-shadow:
       0 0 6px rgba(122, 219, 143, 0.8),
       0 0 15px rgba(122, 219, 143, 0.5),
       0 0 25px rgba(122, 219, 143, 0.3);
   }
   50% {
-    box-shadow: 
+    box-shadow:
       0 0 10px rgba(122, 219, 143, 1),
       0 0 25px rgba(122, 219, 143, 0.9),
       0 0 45px rgba(122, 219, 143, 0.6),
@@ -281,4 +291,3 @@
 :global([data-radix-theme][data-radix-theme-appearance="dark"]) .actionButtonSquareSecondary:hover:not(:disabled) {
   background-color: #FFFFFF !important;
 }
-
