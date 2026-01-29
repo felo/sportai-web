@@ -139,7 +139,7 @@ export function useChatSubmission({
 
   const handleSubmit = useCallback(async (e: React.FormEvent, overridePrompt?: string, overrideVideoUrl?: string, overrideVideoPreAnalysis?: VideoPreAnalysis | null, overrideVideoFile?: File, overrideSettings?: SettingsOverrides) => {
     e.preventDefault();
-    
+
     const effectivePrompt = overridePrompt !== undefined ? overridePrompt : prompt;
     const effectiveVideoUrl = overrideVideoUrl !== undefined ? overrideVideoUrl : detectedVideoUrl;
     // Use override if provided (for pending submissions from home page)
@@ -158,11 +158,11 @@ export function useChatSubmission({
        currentPrompt = "Please analyse this video for me.";
        setPrompt(currentPrompt);
      }
-     
+
      const currentVideoFile = effectiveVideoFile;
      const currentVideoPreview = videoPreview;
      const requestChatId = getCurrentChatId();
-     
+
      if (!requestChatId) {
        chatLogger.error("No chat ID available!");
        return;
@@ -173,14 +173,14 @@ export function useChatSubmission({
      // React state can contain stale messages from previous chats during rapid switching.
      const currentChat = await loadChat(requestChatId);
      const storageMessages = currentChat?.messages ?? [];
-     
+
      // Use storage messages as the conversation history
      // This prevents context from previous chats leaking into new chats
      const conversationHistory: Message[] = storageMessages;
 
      setLoading(true);
      setUploadProgress(0);
-     
+
      if (currentVideoFile) {
        setProgressStage("uploading");
      } else if (currentVideoUrl) {
@@ -191,7 +191,7 @@ export function useChatSubmission({
 
      let videoMessageId: string | null = null;
      let lastUserMessageId: string | null = null;
-     
+
     // Create user messages
     if ((currentVideoFile || currentVideoUrl) && currentPrompt.trim()) {
       // Text message first (user's request)
@@ -203,7 +203,7 @@ export function useChatSubmission({
         inputTokens: calculateUserMessageTokens(currentPrompt, null),
       };
       addMessage(textMessage);
-      
+
       // Video message below
       videoMessageId = generateMessageId();
       lastUserMessageId = videoMessageId;
@@ -233,7 +233,7 @@ export function useChatSubmission({
         inputTokens: calculateUserMessageTokens(currentPrompt, null),
       };
       addMessage(textMessage);
-      
+
       // Video message below (empty content, just the video)
       videoMessageId = generateMessageId();
       lastUserMessageId = videoMessageId;
@@ -277,7 +277,7 @@ export function useChatSubmission({
      setVideoError(null);
      setApiError(null);
      setPoseData(undefined);
-     
+
      const abortController = new AbortController();
      submitAbortRef.current = abortController;
 
@@ -286,12 +286,12 @@ export function useChatSubmission({
      addMessage({ id: assistantMessageId, role: "assistant", content: "" });
 
      // Scroll handling
-     const willShowSizeLimitError = !!(currentVideoFile && 
-       currentVideoFile.type.startsWith("video/") && 
+     const willShowSizeLimitError = !!(currentVideoFile &&
+       currentVideoFile.type.startsWith("video/") &&
        (currentVideoFile.size / (1024 * 1024)) > 100);
-     
+
      setShowingVideoSizeError(willShowSizeLimitError);
-     
+
      requestAnimationFrame(() => {
        if (!willShowSizeLimitError && lastUserMessageId) {
          scrollMessageToTop(lastUserMessageId);
@@ -324,9 +324,9 @@ export function useChatSubmission({
            setProgressStage("idle");
            return;
          }
-         
+
          await handleVideoUrlAnalysis(
-           currentPrompt, currentVideoUrl, assistantMessageId, 
+           currentPrompt, currentVideoUrl, assistantMessageId,
            conversationHistory, abortController, requestChatId,
            { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise }
          );
@@ -386,7 +386,7 @@ export function useChatSubmission({
      effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise }
    ) => {
     setProgressStage("analyzing");
-    
+
     const formData = new FormData();
     formData.append("prompt", currentPrompt);
     formData.append("videoUrl", currentVideoUrl);
@@ -395,31 +395,31 @@ export function useChatSubmission({
     formData.append("domainExpertise", effectiveSettings.domainExpertise);
     formData.append("insightLevel", insightLevel);
     if (userFirstName) formData.append("userFirstName", userFirstName);
-    
+
     if (conversationHistory.length > 0) {
        const { getConversationContext } = await import("@/utils/context-utils");
        const context = getConversationContext(conversationHistory);
        if (context.length > 0) formData.append("history", JSON.stringify(context));
      }
-     
+
      const headers: Record<string, string> = { "x-stream": "true" };
      if (accessToken) {
        headers["Authorization"] = `Bearer ${accessToken}`;
      }
-     
+
      const response = await fetch("/api/llm", {
        method: "POST",
        headers,
        body: formData,
        signal: abortController.signal,
      });
-     
+
      if (!response.ok) throw new Error(await response.text() || "Failed to analyze video");
-     
+
      const reader = response.body?.getReader();
      const decoder = new TextDecoder();
      let accumulatedText = "";
-     
+
      if (reader) {
        while (true) {
          const { done, value } = await reader.read();
@@ -427,22 +427,22 @@ export function useChatSubmission({
          accumulatedText += decoder.decode(value, { stream: true });
          const chatId = getCurrentChatId();
          if (chatId === requestChatId) {
-           updateMessage(assistantMessageId, { 
-             content: stripStreamMetadata(accumulatedText), 
-             isStreaming: true 
+           updateMessage(assistantMessageId, {
+             content: stripStreamMetadata(accumulatedText),
+             isStreaming: true
            });
          }
        }
       const chatId = getCurrentChatId();
       if (chatId === requestChatId) {
         updateMessage(assistantMessageId, { isStreaming: false });
-        
+
         // Add Studio prompt after analysis completes
         await new Promise(resolve => setTimeout(resolve, 300));
-        
+
         // Look up demo video config to get sample task ID and analysis type
         const demoConfig = getDemoVideoByUrl(currentVideoUrl);
-        
+
         const studioPromptId = generateMessageId();
         const studioPromptMessage: Message = {
           id: studioPromptId,
@@ -476,9 +476,9 @@ export function useChatSubmission({
        // PRO eligible - upload first then show options
        setProgressStage("uploading");
        setUploadProgress(0);
-       
+
        let s3Url: string | undefined;
-       
+
        try {
          const urlResponse = await fetch("/api/s3/upload-url", {
            method: "POST",
@@ -493,9 +493,9 @@ export function useChatSubmission({
          let s3Key = originalS3Key;
 
          await uploadToS3(
-           presignedUrl, 
-           currentVideoFile, 
-           (progress) => setUploadProgress(progress * 100), 
+           presignedUrl,
+           currentVideoFile,
+           (progress) => setUploadProgress(progress * 100),
            abortController.signal
          );
 
@@ -503,7 +503,7 @@ export function useChatSubmission({
          if (needsServerConversion) {
            setProgressStage("processing");
            updateMessage(assistantMessageId, { content: "Converting video format for analysis...", isStreaming: true });
-           
+
            try {
              const convertResponse = await fetch("/api/convert-video", {
                method: "POST",
@@ -511,7 +511,7 @@ export function useChatSubmission({
                body: JSON.stringify({ key: s3Key }),
                signal: abortController.signal,
              });
-             
+
              if (convertResponse.ok) {
                const convertResult = await convertResponse.json();
                if (convertResult.success && convertResult.downloadUrl) {
@@ -522,7 +522,7 @@ export function useChatSubmission({
            } catch (convertError) {
              if ((convertError as Error).name === "AbortError") throw convertError;
            }
-           
+
            updateMessage(assistantMessageId, { content: "", isStreaming: true });
          }
 
@@ -532,7 +532,7 @@ export function useChatSubmission({
        } catch (uploadError) {
          chatLogger.error("Failed to upload video:", uploadError);
        }
-       
+
        if (s3Url) {
          updateMessage(assistantMessageId, {
            messageType: "analysis_options",

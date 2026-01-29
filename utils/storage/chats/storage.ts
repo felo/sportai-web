@@ -159,10 +159,7 @@ export function updateChat(chatId: string, updates: Partial<Chat>, silent: boole
   chats[index] = updatedChat;
   saveChatsToStorage(chats);
 
-  // Verify it was saved correctly
-  const verifyChats = loadChatsFromStorage();
-  const verifyChat = verifyChats.find(c => c.id === chatId);
-  storageLogger.debug(`Verification - saved title: "${verifyChat?.title}"`);
+  storageLogger.debug(`Chat ${chatId} updated with title: "${updatedChat.title}"`);
 
   // Dispatch custom event to notify components of chat update (unless silent)
   if (!silent && !isSSR()) {

@@ -10,9 +10,9 @@ import type { VideoPreAnalysis } from "@/types/chat";
 import type { DomainExpertise } from "@/utils/storage";
 import { updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId } from "@/utils/storage-unified";
-import { 
-  isImageFile, 
-  extractFirstFrameWithDuration, 
+import {
+  isImageFile,
+  extractFirstFrameWithDuration,
   extractFirstFrameFromUrl,
   uploadThumbnailToS3,
   validateVideoUrl,
@@ -49,7 +49,7 @@ export function useVideoPreAnalysis({
   const [videoSportDetected, setVideoSportDetected] = useState<DomainExpertise | null>(null);
   const [detectedVideoUrl, setDetectedVideoUrl] = useState<string | null>(null);
   const [urlFileSizeTooLarge, setUrlFileSizeTooLarge] = useState(false);
-  
+
   const lastDetectedVideoRef = useRef<File | null>(null);
   const lastAnalyzedUrlRef = useRef<string | null>(null);
   const isAnalyzingUrlRef = useRef(false);
@@ -76,7 +76,7 @@ export function useVideoPreAnalysis({
   ): { eligible: boolean; reason: string | undefined } => {
     const isGroundLevelCamera = ["side", "ground_behind", "diagonal"].includes(cameraAngle);
     const eligible = isGroundLevelCamera && durationSeconds !== null && durationSeconds < 20;
-    
+
     let reason: string | undefined;
     if (eligible) {
       reason = "Perfect for technique analysis! Ground-level camera with short clip.";
@@ -85,7 +85,7 @@ export function useVideoPreAnalysis({
     } else if (durationSeconds === null || durationSeconds >= 20) {
       reason = "Technique LITE requires videos under 20 seconds.";
     }
-    
+
     return { eligible, reason };
   }, []);
 
@@ -97,11 +97,11 @@ export function useVideoPreAnalysis({
       }
       return;
     }
-    
+
     if (isImageFile(videoFile)) {
       return;
     }
-    
+
     // Skip analysis if explicitly requested (for pending submissions from home page)
     if (skipNextAnalysisRef.current) {
       videoLogger.info("Skipping analysis - skipNextAnalysis flag is set");
@@ -109,7 +109,7 @@ export function useVideoPreAnalysis({
       lastDetectedVideoRef.current = videoFile;
       return;
     }
-    
+
     // Skip analysis if we already have valid pre-analysis data (e.g., from pending submission)
     // This prevents re-analyzing when navigating from home page with pre-analyzed video
     if (videoPreAnalysis && !videoPreAnalysis.isAnalyzing) {
@@ -117,13 +117,13 @@ export function useVideoPreAnalysis({
       lastDetectedVideoRef.current = videoFile;
       return;
     }
-    
+
     lastDetectedVideoRef.current = videoFile;
-    
+
     const analyzeVideoFile = async () => {
       setIsDetectingSport(true);
       setVideoSportDetected(null);
-      
+
       setVideoPreAnalysis({
         sport: "other",
         cameraAngle: "other",
@@ -132,11 +132,11 @@ export function useVideoPreAnalysis({
         isProEligible: false,
         isAnalyzing: true,
       });
-      
+
       try {
         videoLogger.info("Extracting first frame and duration...");
         const { frameBlob, durationSeconds } = await extractFirstFrameWithDuration(videoFile, 640, 0.7);
-        
+
         if (!frameBlob) {
           videoLogger.info("Failed to extract frame");
           setVideoPreAnalysis({
@@ -153,13 +153,13 @@ export function useVideoPreAnalysis({
           });
           return;
         }
-        
+
         videoLogger.info("Frame extracted, duration:", durationSeconds, "s");
-        
+
         // Upload thumbnail and analyze in parallel
         let thumbnailUrl: string | null = null;
         let thumbnailS3Key: string | null = null;
-        
+
         const uploadThumbnail = async () => {
           const result = await uploadThumbnailToS3(frameBlob);
           if (result) {
@@ -167,10 +167,10 @@ export function useVideoPreAnalysis({
             thumbnailS3Key = result.thumbnailS3Key;
           }
         };
-        
+
         const formData = new FormData();
         formData.append("image", frameBlob, "frame.jpg");
-        
+
         const [response] = await Promise.all([
           fetch("/api/analyze-video-eligibility", {
             method: "POST",
@@ -178,17 +178,17 @@ export function useVideoPreAnalysis({
           }),
           uploadThumbnail(),
         ]);
-        
+
         if (!response.ok) {
           throw new Error("Eligibility analysis API failed");
         }
-        
+
         const data = await response.json();
         videoLogger.info("Analysis result:", data);
-        
-        const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } = 
+
+        const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
-        
+
         setVideoPreAnalysis({
           sport: data.sport,
           cameraAngle: data.cameraAngle,
@@ -203,7 +203,7 @@ export function useVideoPreAnalysis({
           thumbnailUrl,
           thumbnailS3Key,
         });
-        
+
         // Update domain expertise if sport detected
         if (data.sport !== "other" && data.sport !== domainExpertise) {
           setDomainExpertise(data.sport);
@@ -211,11 +211,11 @@ export function useVideoPreAnalysis({
           if (currentChatId) {
             updateChatSettings(currentChatId, { domainExpertise: data.sport });
           }
-          
+
           setVideoSportDetected(data.sport);
           setTimeout(() => setVideoSportDetected(null), 2500);
         }
-        
+
       } catch (err) {
         videoLogger.error("Pre-analysis failed:", err);
         setVideoPreAnalysis({
@@ -233,7 +233,7 @@ export function useVideoPreAnalysis({
         setIsDetectingSport(false);
       }
     };
-    
+
     analyzeVideoFile();
   }, [videoFile, isDetectingSport, domainExpertise, videoPreAnalysis, detectedVideoUrl, setDomainExpertise, calculateTechniqueLiteEligibility]);
 
@@ -251,15 +251,15 @@ export function useVideoPreAnalysis({
       isAnalyzingUrlRef.current = false;
       return;
     }
-    
+
     if (isAnalyzingUrlRef.current) {
       return;
     }
-    
+
     if (detectedVideoUrl === lastAnalyzedUrlRef.current) {
       return;
     }
-    
+
     // Skip analysis if explicitly requested (for pending submissions from home page)
     if (skipNextAnalysisRef.current) {
       videoLogger.info("Skipping URL analysis - skipNextAnalysis flag is set");
@@ -267,17 +267,17 @@ export function useVideoPreAnalysis({
       lastAnalyzedUrlRef.current = detectedVideoUrl;
       return;
     }
-    
+
     // Skip analysis if we already have valid pre-analysis data (e.g., from pending submission)
     if (videoPreAnalysis && !videoPreAnalysis.isAnalyzing) {
       videoLogger.info("Skipping URL analysis - valid pre-analysis data already present");
       lastAnalyzedUrlRef.current = detectedVideoUrl;
       return;
     }
-    
+
     lastAnalyzedUrlRef.current = detectedVideoUrl;
     isAnalyzingUrlRef.current = true;
-    
+
     const analyzeVideoUrl = async () => {
       setVideoPreAnalysis({
         sport: "other",
@@ -287,12 +287,12 @@ export function useVideoPreAnalysis({
         isProEligible: false,
         isAnalyzing: true,
       });
-      
+
       try {
         // First, check the file size via HEAD request
         videoLogger.info("URL analysis - checking file size:", detectedVideoUrl);
         const urlValidation = await validateVideoUrl(detectedVideoUrl);
-        
+
         if (urlValidation.errorType === 'too-large') {
           videoLogger.info("URL analysis - file too large:", urlValidation.error);
           setUrlFileSizeTooLarge(true);
@@ -302,10 +302,10 @@ export function useVideoPreAnalysis({
           isAnalyzingUrlRef.current = false;
           return;
         }
-        
+
         videoLogger.info("URL analysis starting:", detectedVideoUrl);
         const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(detectedVideoUrl, 640, 0.7);
-        
+
         if (!frameBlob) {
           videoLogger.info("URL analysis - client-side extraction failed (CORS)");
           setVideoPreAnalysis({
@@ -322,15 +322,15 @@ export function useVideoPreAnalysis({
           });
           return;
         }
-        
+
         // Upload thumbnail and analyze in parallel
         let thumbnailUrl: string | null = null;
         let thumbnailS3Key: string | null = null;
-        
+
         const uploadThumbnail = async () => {
           try {
             const thumbnailFile = new File([frameBlob], `thumbnail_${Date.now()}.jpg`, { type: "image/jpeg" });
-            
+
             const urlResponse = await fetch("/api/s3/upload-url", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -339,11 +339,11 @@ export function useVideoPreAnalysis({
                 contentType: thumbnailFile.type,
               }),
             });
-            
+
             if (!urlResponse.ok) return;
-            
+
             const { url: presignedUrl, downloadUrl, key: s3Key } = await urlResponse.json();
-            
+
             await new Promise<void>((resolve, reject) => {
               const xhr = new XMLHttpRequest();
               xhr.addEventListener("load", () => {
@@ -358,17 +358,17 @@ export function useVideoPreAnalysis({
               xhr.setRequestHeader("Content-Type", thumbnailFile.type);
               xhr.send(thumbnailFile);
             });
-            
+
             thumbnailUrl = downloadUrl;
             thumbnailS3Key = s3Key;
           } catch (err) {
             videoLogger.warn("URL analysis - thumbnail upload failed:", err);
           }
         };
-        
+
         const formData = new FormData();
         formData.append("image", frameBlob, "frame.jpg");
-        
+
         const [response] = await Promise.all([
           fetch("/api/analyze-video-eligibility", {
             method: "POST",
@@ -376,17 +376,17 @@ export function useVideoPreAnalysis({
           }),
           uploadThumbnail(),
         ]);
-        
+
         if (!response.ok) {
           throw new Error("Eligibility analysis API failed");
         }
-        
+
         const data = await response.json();
         videoLogger.info("URL analysis result:", data);
-        
-        const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } = 
+
+        const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
-        
+
         setVideoPreAnalysis({
           sport: data.sport,
           cameraAngle: data.cameraAngle,
@@ -401,7 +401,7 @@ export function useVideoPreAnalysis({
           thumbnailUrl,
           thumbnailS3Key,
         });
-        
+
         // Update domain expertise if sport detected
         if (data.sport !== "other" && data.sport !== domainExpertise) {
           setDomainExpertise(data.sport);
@@ -409,13 +409,13 @@ export function useVideoPreAnalysis({
           if (currentChatId) {
             updateChatSettings(currentChatId, { domainExpertise: data.sport });
           }
-          
+
           setVideoSportDetected(data.sport);
           setTimeout(() => setVideoSportDetected(null), 2500);
         }
-        
+
         isAnalyzingUrlRef.current = false;
-        
+
       } catch (err) {
         videoLogger.error("URL analysis failed:", err);
         setVideoPreAnalysis({
@@ -432,7 +432,7 @@ export function useVideoPreAnalysis({
         isAnalyzingUrlRef.current = false;
       }
     };
-    
+
     analyzeVideoUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectedVideoUrl, videoFile]);

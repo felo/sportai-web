@@ -39,22 +39,22 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
   const isGreeting = poseData?.isGreeting;
   const candidateResponses = poseData?.candidateResponses;
   const isIncomplete = poseData?.isIncomplete;
-  
+
   // Remove special fields from poseData to keep it clean
   const cleanPoseData = poseData ? (() => {
-    const { 
-      isTechniqueLiteEligible: _, 
-      messageType: __, 
-      analysisOptions: ___, 
-      techniqueStudioPrompt: ____, 
+    const {
+      isTechniqueLiteEligible: _,
+      messageType: __,
+      analysisOptions: ___,
+      techniqueStudioPrompt: ____,
       isGreeting: _____,
       candidateResponses: ______,
       isIncomplete: _______,
-      ...rest 
+      ...rest
     } = poseData;
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
-  
+
   // Extract additional telemetry fields from model_settings
   const modelSettingsRaw = dbMsg.model_settings as any;
   const timeToFirstToken = modelSettingsRaw?.timeToFirstToken;
@@ -63,13 +63,13 @@ function dbMessageToMessage(dbMsg: DbMessage): Message {
   const cacheUsed = modelSettingsRaw?.cacheUsed;
   const modelUsed = modelSettingsRaw?.modelUsed;
   const modelReason = modelSettingsRaw?.modelReason;
-  
+
   // Clean model_settings by removing the extra telemetry fields
   const cleanModelSettings = modelSettingsRaw ? (() => {
     const { timeToFirstToken: _, contextUsage: __, cacheName: ___, cacheUsed: ____, modelUsed: _____, modelReason: ______, ...rest } = modelSettingsRaw;
     return Object.keys(rest).length > 0 ? rest : undefined;
   })() : undefined;
-  
+
   return {
     id: dbMsg.id,
     role: dbMsg.role as "user" | "assistant",
@@ -130,7 +130,7 @@ function chatToDbInsert(chat: Chat, userId: string): DbChatInsert {
  */
 function messageToDbInsert(message: Message, chatId: string, sequenceNumber: number): DbMessageInsert {
   // Include special fields in pose_data for persistence
-  const hasSpecialFields = message.poseData || 
+  const hasSpecialFields = message.poseData ||
     message.isTechniqueLiteEligible !== undefined ||
     message.messageType ||
     message.analysisOptions ||
@@ -138,7 +138,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
     message.isGreeting !== undefined ||
     message.candidateResponses ||
     message.isIncomplete !== undefined;
-    
+
   const poseDataWithExtras = hasSpecialFields
     ? {
         ...(message.poseData || {}),
@@ -151,10 +151,10 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
         ...(message.isIncomplete !== undefined ? { isIncomplete: message.isIncomplete } : {}),
       }
     : null;
-  
+
   // Expand model_settings to include additional telemetry fields
   // These are stored together since they're all model/performance related
-  const expandedModelSettings = message.modelSettings || 
+  const expandedModelSettings = message.modelSettings ||
     message.timeToFirstToken !== undefined ||
     message.contextUsage ||
     message.cacheName ||
@@ -172,7 +172,7 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
         ...(message.modelReason ? { modelReason: message.modelReason } : {}),
       }
     : null;
-    
+
   return {
     id: message.id,
     chat_id: chatId,
@@ -197,25 +197,72 @@ function messageToDbInsert(message: Message, chatId: string, sequenceNumber: num
 }
 
 /**
- * Load all chats for the current user from Supabase
+ * Load chat list (metadata only, no messages) for the current user from Supabase
+ * This is optimized for sidebar display - only 1 query instead of N+1
+ */
+export async function loadChatListFromSupabase(): Promise<Chat[]> {
+  try {
+    // First check if we have a valid session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      supabaseLogger.error("Session error:", sessionError);
+      return [];
+    }
+
+    if (!session) {
+      supabaseLogger.debug("No active session, skipping Supabase load");
+      return [];
+    }
+
+    supabaseLogger.debug("Loading chat list for user:", session.user.id);
+
+    const { data: chatsData, error: chatsError } = await supabase
+      .from("chats")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (chatsError) {
+      supabaseLogger.error("Error loading chats:", chatsError.message, chatsError.code, chatsError.details);
+      return [];
+    }
+
+    supabaseLogger.debug("Loaded", chatsData?.length || 0, "chats (metadata only)");
+
+    if (!chatsData || chatsData.length === 0) {
+      return [];
+    }
+
+    // Return chats with empty messages array (metadata only for sidebar)
+    return chatsData.map(chatData => dbChatToChat(chatData, []));
+  } catch (error) {
+    supabaseLogger.error("Failed to load chat list from Supabase:", error);
+    return [];
+  }
+}
+
+/**
+ * Load all chats with their messages for the current user from Supabase
+ * WARNING: This makes N+1 queries - use loadChatListFromSupabase() for sidebar
+ * @deprecated Use loadChatListFromSupabase() for sidebar, loadChatFromSupabase() for single chat
  */
 export async function loadChatsFromSupabase(): Promise<Chat[]> {
   try {
     // First check if we have a valid session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError) {
       supabaseLogger.error("Session error:", sessionError);
       return [];
     }
-    
+
     if (!session) {
       supabaseLogger.debug("No active session, skipping Supabase load");
       return [];
     }
-    
+
     supabaseLogger.debug("Loading chats for user:", session.user.id);
-    
+
     const { data: chatsData, error: chatsError } = await supabase
       .from("chats")
       .select("*")
@@ -277,7 +324,7 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
       supabaseLogger.error("Error loading chat from Supabase:", chatError.message || chatError);
       return null;
     }
-    
+
     if (!chatData) {
       return null;
     }
@@ -307,28 +354,28 @@ export async function loadChatFromSupabase(chatId: string): Promise<Chat | null>
 export async function saveChatToSupabase(chat: Chat, userId: string): Promise<boolean> {
   try {
     supabaseLogger.debug("Saving chat:", chat.id, "for user:", userId);
-    
+
     // Verify the session is valid and auth.uid() will match the userId
     // This prevents RLS violations when the session is stale
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError) {
       supabaseLogger.error("Session error while saving chat:", sessionError);
       return false;
     }
-    
+
     if (!session) {
       supabaseLogger.error("No active session, cannot save chat to Supabase");
       return false;
     }
-    
+
     // Verify the session user matches the userId we're trying to save
     if (session.user.id !== userId) {
       supabaseLogger.error("Session user mismatch! Session:", session.user.id, "Expected:", userId);
       supabaseLogger.error("This could indicate a stale session or auth state inconsistency");
       return false;
     }
-    
+
     // Check if the token might be expired (Supabase auto-refreshes, but let's be safe)
     const tokenExpiry = session.expires_at;
     if (tokenExpiry) {
@@ -344,7 +391,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         supabaseLogger.info("Session refreshed successfully");
       }
     }
-    
+
     // First, check if the chat already exists and belongs to a different user
     // This prevents RLS violations when trying to insert messages for a chat
     // that exists but is owned by another user
@@ -353,7 +400,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       .select("id, user_id")
       .eq("id", chat.id)
       .maybeSingle();
-    
+
     if (checkError) {
       supabaseLogger.error("Error checking existing chat:", checkError.message);
       // Continue anyway - the upsert will handle it
@@ -362,7 +409,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       supabaseLogger.error("Cannot update chat owned by another user. This could be a chat ID collision.");
       return false;
     }
-    
+
     // Use UPSERT to avoid race conditions
     // This handles both insert and update atomically
     const chatUpsert = {
@@ -375,7 +422,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
       media_resolution: chat.mediaResolution || "medium",
       domain_expertise: chat.domainExpertise || "all-sports",
     };
-    
+
     const { error: chatError } = await supabase
       .from("chats")
       .upsert(chatUpsert, {
@@ -385,20 +432,20 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
 
     if (chatError) {
       supabaseLogger.error("Error upserting chat:", chatError.message, chatError.code, chatError.details, chatError.hint);
-      
+
       // Check if it's a foreign key error (profile doesn't exist)
       if (chatError.code === "23503") {
         supabaseLogger.error("Foreign key error - profile does not exist for user:", userId);
         supabaseLogger.error("This usually happens if the sync happens too quickly after sign-in.");
         supabaseLogger.error("The profile should be created by a database trigger.");
       }
-      
+
       // Check if it's an RLS violation
       if (chatError.code === "42501") {
         supabaseLogger.error("RLS violation - user may not have permission to upsert this chat");
         supabaseLogger.error("This could indicate the chat belongs to another user");
       }
-      
+
       // Log detailed error information
       supabaseLogger.error("Chat save failed for:", {
         chatId: chat.id,
@@ -406,43 +453,43 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
         errorCode: chatError.code,
         errorMessage: chatError.message,
       });
-      
+
       return false;
     }
-    
+
     supabaseLogger.debug("Chat upserted successfully");
 
     // Upsert messages (insert or update if they already exist)
     // This is safer than delete + insert and handles race conditions
     if (chat.messages && chat.messages.length > 0) {
       supabaseLogger.debug("Upserting", chat.messages.length, "messages");
-      
+
       // Re-validate session before messages upsert to catch any token refresh issues
       // This is important because the RLS policy on messages checks auth.uid()
       const { data: { session: currentSession }, error: revalidateError } = await supabase.auth.getSession();
-      
+
       if (revalidateError || !currentSession) {
         supabaseLogger.error("Session invalidated before messages upsert:", revalidateError);
         return false;
       }
-      
+
       if (currentSession.user.id !== userId) {
         supabaseLogger.error("Session user changed during save operation! Original:", userId, "Current:", currentSession.user.id);
         return false;
       }
-      
+
       const messageInserts = chat.messages.map((msg, index) => messageToDbInsert(msg, chat.id, index));
-      
+
       const { error: messagesError } = await supabase
         .from("messages")
-        .upsert(messageInserts, { 
+        .upsert(messageInserts, {
           onConflict: "id",
           ignoreDuplicates: false // Update existing messages instead of ignoring
         });
 
       if (messagesError) {
         supabaseLogger.error("Error upserting messages:", messagesError.message, messagesError.code);
-        
+
         // Check if it's an RLS violation
         if (messagesError.code === "42501") {
           // Gather diagnostic info to help debug the issue
@@ -451,7 +498,7 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
             .select("id, user_id")
             .eq("id", chat.id)
             .maybeSingle();
-          
+
           supabaseLogger.error("RLS violation on messages table. Diagnostic info:");
           supabaseLogger.error("  Session user ID:", currentSession.user.id);
           supabaseLogger.error("  Expected user ID:", userId);
@@ -461,22 +508,22 @@ export async function saveChatToSupabase(chat: Chat, userId: string): Promise<bo
           supabaseLogger.error("  Chat owner matches session:", chatCheck?.user_id === currentSession.user.id);
           supabaseLogger.error("  Message count:", messageInserts.length);
           supabaseLogger.error("  Token expires at:", currentSession.expires_at ? new Date(currentSession.expires_at * 1000).toISOString() : "N/A");
-          
+
           // If the chat doesn't exist in the DB after we just upserted it, something is very wrong
           if (!chatCheck) {
             supabaseLogger.error("CRITICAL: Chat was upserted but not found in subsequent query!");
             supabaseLogger.error("This may indicate a transaction isolation issue or RLS policy preventing read.");
           }
         }
-        
+
         return false;
       }
       supabaseLogger.debug("Messages upserted successfully");
-      
+
       // Now delete any messages that are in the database but not in our current set
       // This handles the case where messages were removed from the chat
       const currentMessageIds = chat.messages.map(m => m.id);
-      
+
       // Only delete if we have message IDs to keep (prevent deleting all messages)
       if (currentMessageIds.length > 0) {
         const { error: deleteError } = await supabase
@@ -559,7 +606,7 @@ export async function updateChatInSupabase(
 ): Promise<boolean> {
   try {
     const dbUpdates: any = {};
-    
+
     if (updates.title !== undefined) dbUpdates.title = updates.title;
     if (updates.thinkingMode !== undefined) dbUpdates.thinking_mode = updates.thinkingMode;
     if (updates.mediaResolution !== undefined) dbUpdates.media_resolution = updates.mediaResolution;
@@ -596,7 +643,7 @@ export async function addMessageToSupabase(message: Message, chatId: string): Pr
       .order("sequence_number", { ascending: false })
       .limit(1)
       .single();
-    
+
     const nextSequence = (maxSeqData?.sequence_number ?? -1) + 1;
     const messageInsert = messageToDbInsert(message, chatId, nextSequence);
     const { error } = await supabase.from("messages").insert(messageInsert);
@@ -628,7 +675,7 @@ export async function updateMessageInSupabase(
 ): Promise<boolean> {
   try {
     const dbUpdates: any = {};
-    
+
     if (updates.content !== undefined) dbUpdates.content = updates.content;
     if (updates.videoUrl !== undefined) dbUpdates.video_url = updates.videoUrl;
     if (updates.videoS3Key !== undefined) dbUpdates.video_s3_key = updates.videoS3Key;
@@ -660,4 +707,3 @@ export async function updateMessageInSupabase(
     return false;
   }
 }
-

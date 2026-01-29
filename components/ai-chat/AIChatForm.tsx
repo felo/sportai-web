@@ -2,7 +2,7 @@
 
 /**
  * AI Chat Form - Main chat interface component
- * 
+ *
  * Orchestrates the chat experience by composing specialized hooks and components.
  */
 
@@ -35,10 +35,10 @@ import { FREE_TIER_MESSAGE_LIMIT } from "@/lib/limitations";
 import type { CandidateOption } from "@/types/chat";
 
 // Local imports
-import { 
-  useChatSettings, 
-  useVideoPreAnalysis, 
-  useImageInsight, 
+import {
+  useChatSettings,
+  useVideoPreAnalysis,
+  useImageInsight,
   useAnalysisOptions,
   useChatTitle,
   useAutoScroll,
@@ -58,12 +58,12 @@ export function AIChatForm() {
   // Context & external hooks
   const { user, session, profile } = useAuth();
   const { pendingSubmission, clearPendingSubmission } = usePendingChat();
-  
+
   // Extract first name from profile for personalization
   const userFirstName = profile?.full_name?.split(" ")[0];
   const { refresh: refreshLibraryTasks } = useLibraryTasks();
   const router = useRouter();
-  
+
   // Track if we've processed a pending submission to prevent re-processing
   const pendingProcessedRef = useRef(false);
 
@@ -77,11 +77,11 @@ export function AIChatForm() {
   // Load and listen for insight level changes
   useEffect(() => {
     setInsightLevel(getInsightLevel());
-    
+
     const handleInsightLevelChange = () => {
       setInsightLevel(getInsightLevel());
     };
-    
+
     window.addEventListener("insight-level-change", handleInsightLevelChange);
     return () => {
       window.removeEventListener("insight-level-change", handleInsightLevelChange);
@@ -193,7 +193,7 @@ export function AIChatForm() {
     // Check if we need a new chat: either we have a video OR we have user messages
     const hasExistingVideo = !!videoFile;
     const hasUserMessages = messages.some(m => m.role === "user");
-    
+
     if (hasExistingVideo || hasUserMessages) {
       // Create new chat for fresh context
       const newChat = await createNewChat();
@@ -203,7 +203,7 @@ export function AIChatForm() {
       setMediaResolution(newChat.mediaResolution ?? "medium");
       setDomainExpertise(newChat.domainExpertise ?? "all-sports");
     }
-    
+
     // Process the video in the (possibly new) chat
     processVideoFile(file, source);
   }, [videoFile, messages, processVideoFile, setShowingVideoSizeError, setThinkingMode, setMediaResolution, setDomainExpertise]);
@@ -316,15 +316,22 @@ export function AIChatForm() {
     if (!isHydrated || !pendingSubmission || pendingProcessedRef.current || loading) {
       return;
     }
-    
+
     // Mark as processed immediately to prevent re-processing
     pendingProcessedRef.current = true;
-    
+
     const processPendingSubmission = async () => {
       // Create a new chat for this submission
       const newChat = await createNewChat();
+
+      // CRITICAL: Set loading BEFORE setCurrentChatId to prevent race condition
+      // setCurrentChatId dispatches 'chat-storage-change' which triggers handleChatChange
+      // handleChatChange checks loadingRef to decide whether to clear messages
+      // If loading isn't set, handleChatChange will clear messages for the "empty" new chat
+      // before handleSubmit has a chance to add messages
+      setLoading(true);
       setCurrentChatId(newChat.id);
-      
+
       // Apply settings from pending submission if provided
       // These need to be set before handleSubmit since it uses them from closure
       if (pendingSubmission.settings) {
@@ -332,20 +339,20 @@ export function AIChatForm() {
         setMediaResolution(pendingSubmission.settings.mediaResolution);
         setDomainExpertise(pendingSubmission.settings.domainExpertise);
       }
-      
+
       // Set the pre-analysis data and skip next analysis
       // This prevents re-analyzing video that was already analyzed on home page
       if (pendingSubmission.videoPreAnalysis) {
         setVideoPreAnalysis(pendingSubmission.videoPreAnalysis);
         skipNextAnalysis();
       }
-      
+
       // NOTE: We intentionally do NOT call processVideoFile here.
       // The video file is passed directly to handleSubmit via override parameter.
       // Calling processVideoFile would cause a race condition where it completes
       // AFTER handleSubmit clears the state, triggering the auto-populate effect
       // and re-setting the prompt/video that should have been cleared.
-      
+
       // Capture all pending data before clearing
       const submissionPrompt = pendingSubmission.prompt;
       const submissionVideoUrl = pendingSubmission.detectedVideoUrl;
@@ -353,22 +360,22 @@ export function AIChatForm() {
       const submissionVideoFile = pendingSubmission.videoFile;
       const submissionSettings = pendingSubmission.settings;
       clearPendingSubmission();
-      
+
       // Trigger the submission directly - all data is passed via override parameters
       // This avoids stale closure issues with async state updates (React best practice)
       const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
       handleSubmit(
-        fakeEvent, 
-        submissionPrompt, 
-        submissionVideoUrl || undefined, 
+        fakeEvent,
+        submissionPrompt,
+        submissionVideoUrl || undefined,
         submissionVideoPreAnalysis || undefined,
         submissionVideoFile,
         submissionSettings // Pass settings override to avoid stale closure
       );
     };
-    
+
     processPendingSubmission();
-  }, [isHydrated, pendingSubmission, loading, clearPendingSubmission, setThinkingMode, setMediaResolution, setDomainExpertise, setVideoPreAnalysis, skipNextAnalysis, handleSubmit]);
+  }, [isHydrated, pendingSubmission, loading, clearPendingSubmission, setLoading, setThinkingMode, setMediaResolution, setDomainExpertise, setVideoPreAnalysis, skipNextAnalysis, handleSubmit]);
 
   // Image insight hook
   useImageInsight({
@@ -458,11 +465,11 @@ export function AIChatForm() {
   const handleNewChat = useCallback(async () => {
     const result = await Promise.resolve(confirmNavigation());
     if (!result) return;
-    
+
     // Clear current chat - new chat will be created when user submits first message
     setCurrentChatId(undefined);
     setShowingVideoSizeError(false);
-    
+
     // Navigate to home page for new chat
     router.push("/");
   }, [confirmNavigation, setShowingVideoSizeError, router]);
@@ -495,7 +502,7 @@ export function AIChatForm() {
     // If S3 key is provided, fetch a fresh presigned URL first
     if (option.demoVideoUrl || option.demoVideoS3Key) {
       let videoUrl = option.demoVideoUrl;
-      
+
       // Fetch presigned URL from S3 key if provided
       if (option.demoVideoS3Key) {
         try {
@@ -517,7 +524,7 @@ export function AIChatForm() {
           // Fall back to demoVideoUrl if refresh fails
         }
       }
-      
+
       if (videoUrl) {
         // Pass prompt and video URL directly to handleSubmit (no state timing issues)
         const fakeEvent = new Event('submit', { bubbles: true, cancelable: true }) as unknown as React.FormEvent;
@@ -541,7 +548,7 @@ export function AIChatForm() {
     const assistantMessageId = generateMessageId();
     const fullResponse = option.premadeResponse || "";
     const hasFollowUp = option.followUpOptions && option.followUpOptions.length > 0;
-    
+
     // Start with first character to avoid ThinkingIndicator
     addMessage({
       id: assistantMessageId,
@@ -553,7 +560,7 @@ export function AIChatForm() {
     // Typewriter effect
     let charIndex = 1;
     const typingSpeed = 15; // ms per character
-    
+
     const typeNextChar = () => {
       if (charIndex < fullResponse.length) {
         updateMessage(assistantMessageId, {
@@ -581,7 +588,7 @@ export function AIChatForm() {
         }, 300); // Small delay after typing completes
       }
     };
-    
+
     setTimeout(typeNextChar, typingSpeed);
   }, [updateMessage, addMessage, messages, scrollToBottom, handleSubmit]);
 
@@ -592,11 +599,11 @@ export function AIChatForm() {
         <div className={`hydration-spinner ${isHydrated ? 'hidden' : ''}`}>
           <div className="spinner" />
         </div>
-        
+
         <div className={`h-screen flex flex-col overflow-hidden hydration-guard ${isHydrated ? 'hydrated' : ''}`}>
           <PageHeader onNewChat={handleNewChat} />
-          
-          <Sidebar 
+
+          <Sidebar
             onClearChat={handleClearConversation}
             messageCount={messages.length}
             onChatSwitchAttempt={confirmNavigation}
@@ -661,16 +668,16 @@ export function AIChatForm() {
           </ChatLayout>
 
           <ErrorToast error={error} />
-          
-          <NavigationDialog 
-            open={dialogOpen} 
-            onConfirm={handleConfirm} 
-            onCancel={handleCancel} 
+
+          <NavigationDialog
+            open={dialogOpen}
+            onConfirm={handleConfirm}
+            onCancel={handleCancel}
           />
 
-          <AuthModal 
-            open={authModalOpen} 
-            onOpenChange={setAuthModalOpen} 
+          <AuthModal
+            open={authModalOpen}
+            onOpenChange={setAuthModalOpen}
           />
 
           <FileSizeLimitModal

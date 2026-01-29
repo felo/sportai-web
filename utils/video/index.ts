@@ -1,6 +1,6 @@
 /**
  * Video Utilities Module
- * 
+ *
  * Comprehensive utilities for video file handling:
  * - File validation and type checking
  * - URL detection and validation

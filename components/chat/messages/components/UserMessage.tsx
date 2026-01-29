@@ -34,34 +34,34 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   const videoSrc = message.videoPreview || message.videoUrl || null;
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
   const showPoseViewer = true; // Always show viewer so users can toggle AI overlay on/off
-  
+
   // Track video aspect ratio (width / height) - use stored dimensions if available
-  const storedAspectRatio = message.videoDimensions 
-    ? message.videoDimensions.width / message.videoDimensions.height 
+  const storedAspectRatio = message.videoDimensions
+    ? message.videoDimensions.width / message.videoDimensions.height
     : DEFAULT_ASPECT_RATIO;
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(storedAspectRatio);
-  
+
   // Track if video is ready to show (actual video has loaded, not just cached dimensions)
   const [isVideoReady, setIsVideoReady] = useState(false);
-  
+
   // Capture the exact dimensions when floating starts - never change while floating
   const [frozenDimensions, setFrozenDimensions] = useState<{ width: number; height: number } | null>(null);
-  
+
   // Track dimensions continuously when NOT floating (ref updates don't cause re-renders)
   const lastKnownDimensionsRef = useRef<{ width: number; height: number } | null>(null);
-  
+
   // Get stored dimensions for passing to VideoPoseViewer (prevents layout shift)
   const initialWidth = message.videoDimensions?.width;
   const initialHeight = message.videoDimensions?.height;
-  
+
   // Check if this is an image (not a video)
-  const isImage = message.videoFile?.type.startsWith("image/") || 
+  const isImage = message.videoFile?.type.startsWith("image/") ||
                   (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)) ||
                   (message.videoPreview && message.videoPreview.startsWith("data:image/"));
-  
+
   // Floating video context (optional - won't error if not in provider)
   const floatingContext = useFloatingVideoContextOptional();
-  
+
   // Callback to handle video metadata loaded - get actual aspect ratio and cache dimensions
   const handleVideoMetadataLoaded = useCallback((videoWidth: number, videoHeight: number) => {
     if (videoWidth && videoHeight) {
@@ -70,16 +70,16 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       setIsVideoReady(true);
       // Update the context with the actual aspect ratio
       floatingContext?.updateVideoAspectRatio(message.id, aspectRatio);
-      
+
       // Cache dimensions in message if not already stored (prevents future layout shifts)
       if (!message.videoDimensions && onUpdateMessage) {
-        onUpdateMessage(message.id, { 
-          videoDimensions: { width: videoWidth, height: videoHeight } 
+        onUpdateMessage(message.id, {
+          videoDimensions: { width: videoWidth, height: videoHeight }
         });
       }
     }
   }, [floatingContext, message.id, message.videoDimensions, onUpdateMessage]);
-  
+
   // Track if this video should be floating
   const isThisVideoFloating = floatingContext?.activeVideoId === message.id && floatingContext?.isFloating;
 
@@ -88,17 +88,17 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   const activeVideoIdRef = useRef<string | null>(null);
   const lastFloatChangeRef = useRef(0);
   const floatingContextRef = useRef(floatingContext);
-  
+
   // Track the scroll container element to re-setup observer when it changes
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLElement | null>(null);
-  
+
   // Keep refs in sync with context
   useEffect(() => {
     isFloatingRef.current = floatingContext?.isFloating ?? false;
     activeVideoIdRef.current = floatingContext?.activeVideoId ?? null;
     floatingContextRef.current = floatingContext;
   }, [floatingContext?.isFloating, floatingContext?.activeVideoId, floatingContext]);
-  
+
   // Track scroll container element changes - poll briefly to catch when ref is populated
   useEffect(() => {
     const checkScrollContainer = () => {
@@ -107,13 +107,13 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         setScrollContainerElement(element);
       }
     };
-    
+
     // Check immediately
     checkScrollContainer();
-    
+
     // Also check after a short delay in case ref is populated after mount
     const timeoutId = setTimeout(checkScrollContainer, 100);
-    
+
     return () => clearTimeout(timeoutId);
   }, [floatingContext?.scrollContainerRef, scrollContainerElement]);
 
@@ -130,7 +130,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       });
     }
   };
-  
+
   // Stable seekTo function that uses the ref
   const seekTo = useCallback((seconds: number) => {
     seekToRef.current?.(seconds);
@@ -145,7 +145,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       });
       return;
     }
-    
+
     const registerNow = () => {
       const container = videoContainerRef.current;
       if (!container) {
@@ -163,7 +163,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         });
         return;
       }
-      
+
       ctx.registerVideo(
         message.id,
         videoContainerRef as React.RefObject<HTMLElement>,
@@ -194,13 +194,13 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         videoSrc,
         hasContainer: !!container,
       });
-      
+
       return () => {
         videoLogger.debug("[UserMessage] Unregister video", { messageId: message.id });
         ctx.unregisterVideo(message.id);
       };
     };
-    
+
     // If container is not yet mounted, defer to next frame once.
     if (!videoContainerRef.current) {
       const rafId = requestAnimationFrame(() => {
@@ -208,32 +208,32 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       });
       return () => cancelAnimationFrame(rafId);
     }
-    
+
     return registerNow();
     // Only depend on message.id and videoSrc, not the full context
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.id, videoSrc, seekTo]);
-  
+
   // Keep seekTo callback updated in the context
   useEffect(() => {
     const ctx = floatingContextRef.current;
     if (!ctx || !videoSrc) return;
     ctx.updateVideoSeekTo(message.id, seekTo);
   }, [message.id, videoSrc, seekTo]);
-  
+
   // Continuously track dimensions when NOT floating using ResizeObserver
   // This ensures we always have the correct pre-float dimensions ready
   useEffect(() => {
     if (!videoContainerRef.current || isThisVideoFloating) return;
-    
+
     const element = videoContainerRef.current;
-    
+
     // Capture initial dimensions
     const rect = element.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
     }
-    
+
     // Use ResizeObserver to track dimension changes while not floating
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -243,11 +243,11 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         }
       }
     });
-    
+
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, [isThisVideoFloating, isVideoReady]);
-  
+
   // When floating starts, freeze the last known dimensions
   // When floating ends, clear frozen dimensions
   useEffect(() => {
@@ -264,14 +264,14 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   useEffect(() => {
     const ctx = floatingContextRef.current;
     if (!ctx || !videoContainerRef.current || !videoSrc || isImage) return;
-    
+
     // Wait for scroll container to be available before setting up observer
     // This ensures we use the correct root for intersection detection
     if (!scrollContainerElement) return;
-    
+
     const element = videoContainerRef.current;
     const DEBOUNCE_MS = 300; // Debounce rapid changes
-    
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         const now = Date.now();
@@ -279,25 +279,25 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         if (now - lastFloatChangeRef.current < DEBOUNCE_MS) {
           return;
         }
-        
+
         // Float when less than 30% visible
         const shouldFloat = !entry.isIntersecting || entry.intersectionRatio < 0.3;
-        
+
         // Use refs for current state to avoid stale closures
         const currentCtx = floatingContextRef.current;
         if (!currentCtx) return;
-        
+
         // Safety check: ensure this video is still registered (guards against stale closures after chat switch)
         const registration = currentCtx.registeredVideos?.get(message.id);
         if (!registration) return;
-        
+
         if (shouldFloat && !isFloatingRef.current) {
           // Capture dimensions RIGHT BEFORE floating starts (most accurate)
           const rect = element.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
             lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
           }
-          
+
           // Start floating this video
           lastFloatChangeRef.current = now;
           currentCtx.setActiveVideo(message.id);
@@ -310,10 +310,10 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           const elementTop = element.getBoundingClientRect().top;
           const containerTop = scrollContainer.getBoundingClientRect().top;
           const relativeTop = elementTop - containerTop + scrollTop;
-          
+
           lastFloatChangeRef.current = now;
           currentCtx.setFloating(false);
-          
+
           // After state update, restore scroll position to keep the video at the same visual position
           // Use requestAnimationFrame to ensure DOM has updated
           requestAnimationFrame(() => {
@@ -321,7 +321,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
             const newElementTop = element.getBoundingClientRect().top;
             const newContainerTop = scrollContainer.getBoundingClientRect().top;
             const newRelativeTop = newElementTop - newContainerTop + scrollContainer.scrollTop;
-            
+
             // If the element moved, adjust scroll to compensate
             const delta = newRelativeTop - relativeTop;
             if (Math.abs(delta) > 1) {
@@ -330,69 +330,69 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
           });
         }
       },
-      { 
+      {
         root: scrollContainerElement,
-        threshold: [0, 0.3, 0.5, 1] 
+        threshold: [0, 0.3, 0.5, 1]
       }
     );
 
     observer.observe(element);
-    
+
     // Delayed visibility check - runs after chat-change cooldown (500ms) to auto-float if video not visible
     // This handles the case when switching to a chat where the video is scrolled out of view
     // IMPORTANT: Cancel this if user scrolls - they're actively navigating, don't interrupt
     const COOLDOWN_CHECK_DELAY = 600; // Slightly longer than the 500ms cooldown
     let userHasScrolled = false;
-    
+
     const handleScroll = () => {
       userHasScrolled = true;
       // Remove listener after first scroll - we only need to know if ANY scroll happened
       scrollContainerElement.removeEventListener("scroll", handleScroll);
     };
     scrollContainerElement.addEventListener("scroll", handleScroll);
-    
+
     const delayedCheckTimeout = setTimeout(() => {
       // Clean up scroll listener
       scrollContainerElement.removeEventListener("scroll", handleScroll);
-      
+
       // If user has scrolled, they're actively navigating - don't auto-float
       if (userHasScrolled) return;
-      
+
       const currentCtx = floatingContextRef.current;
       // Check context state directly (not refs) to avoid race conditions with multiple videos
       // If ANY video is already floating or has been set as active, don't try to float this one
       if (!currentCtx || currentCtx.isFloating || currentCtx.activeVideoId) return;
-      
+
       // Safety check: ensure element is still in DOM (guards against fast chat switching)
       if (!element.isConnected) return;
-      
+
       // Additional check: ensure this video is still registered (guards against stale closures)
       const registration = currentCtx.registeredVideos?.get(message.id);
       if (!registration) return;
-      
+
       // Check if video is visible in the scroll container
       const containerRect = scrollContainerElement.getBoundingClientRect();
       const elementRect = element.getBoundingClientRect();
-      
+
       // Only auto-float if this is the TOPMOST video in the chat
       // This prevents the wrong video from floating when multiple videos are out of view
       const allVideoContainers = Array.from(scrollContainerElement.querySelectorAll('[data-video-container="true"]'));
-      
+
       // Sort by vertical position (top of element)
       const sortedByPosition = allVideoContainers.sort((a, b) => {
         return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
       });
-      
+
       // If this isn't the topmost video, don't auto-float it
       const topmostVideo = sortedByPosition[0];
       if (!topmostVideo || topmostVideo !== element) return;
-      
+
       // Calculate how much of the element is visible within the container
       const visibleTop = Math.max(elementRect.top, containerRect.top);
       const visibleBottom = Math.min(elementRect.bottom, containerRect.bottom);
       const visibleHeight = Math.max(0, visibleBottom - visibleTop);
       const visibilityRatio = elementRect.height > 0 ? visibleHeight / elementRect.height : 0;
-      
+
       // If less than 30% visible, start floating AND minimized
       if (visibilityRatio < 0.3) {
         // Capture dimensions before floating
@@ -400,14 +400,14 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
         if (rect.width > 0 && rect.height > 0) {
           lastKnownDimensionsRef.current = { width: rect.width, height: rect.height };
         }
-        
+
         lastFloatChangeRef.current = Date.now();
         currentCtx.setActiveVideo(message.id);
         currentCtx.setFloating(true);
         currentCtx.setIsMinimized(true); // Start minimized when auto-floating on chat switch
       }
     }, COOLDOWN_CHECK_DELAY);
-    
+
     return () => {
       observer.disconnect();
       clearTimeout(delayedCheckTimeout);
@@ -420,15 +420,15 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
   useEffect(() => {
     if (videoRef.current && hasVideo && !isImage) {
       const video = videoRef.current;
-      
+
       // Set muted explicitly for autoplay
       video.muted = true;
-      
+
       // Set playback speed if specified in the message
       if (message.videoPlaybackSpeed !== undefined) {
         video.playbackRate = message.videoPlaybackSpeed;
       }
-      
+
       const playVideo = async () => {
         try {
           if (video.readyState >= 3) {
@@ -451,7 +451,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
       // Add event listeners
       video.addEventListener("canplay", handleCanPlay);
       video.addEventListener("loadeddata", handleLoadedData);
-      
+
       // Try to play if video is already loaded
       if (video.readyState >= 3) {
         playVideo();
@@ -468,7 +468,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
     <Box>
       {/* Show video if present */}
       {hasVideo ? (
-        <Box 
+        <Box
           mb={message.content.trim() ? "2" : "0"}
           style={{
             overflow: "visible",
@@ -478,9 +478,9 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
             alignItems: "center",
           }}
         >
-          {isImage ? (
+          {isImage && videoSrc ? (
             <Image
-              src={videoSrc || ""}
+              src={videoSrc}
               alt="Uploaded image"
               width={800}
               height={600}
@@ -519,7 +519,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                     padding: "var(--space-6)",
                   }}
                 >
-                  <div 
+                  <div
                     style={{
                       width: "40px",
                       height: "40px",
@@ -559,7 +559,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 (() => {
                   const floatingContainer = floatingContext?.floatingContainerRef?.current;
                   const shouldPortal = isThisVideoFloating && floatingContainer;
-                  
+
                   // Use controlled pose state from context to persist across docked/floating transitions
                   // Portrait videos (aspect ratio < 1) ignore theatre mode entirely - no zoom, no toggle
                   const effectiveTheatreMode = isPortraitVideo ? false : (shouldPortal ? false : theatreMode);
@@ -606,18 +606,18 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                       allowPreprocessing={message.isTechniqueLiteEligible ?? false}
                     />
                   );
-                  
+
                   return (
                     <>
                       {/* Always render video in place - this maintains the container size */}
                       {/* Hide it visually when floating but keep in DOM for stable layout */}
-                      <Box style={{ 
+                      <Box style={{
                         visibility: isThisVideoFloating ? "hidden" : "visible",
                         // Keep the element in the layout flow even when hidden
                       }}>
                         {videoPoseViewer}
                       </Box>
-                      
+
                       {/* Overlay placeholder when floating - absolutely positioned on top */}
                       {isThisVideoFloating && (
                         <Box
@@ -657,7 +657,7 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                           </Button>
                         </Box>
                       )}
-                      
+
                       {/* Portal to floating container when floating */}
                       {shouldPortal && createPortal(videoPoseViewer, floatingContainer)}
                     </>
@@ -738,8 +738,8 @@ export function UserMessage({ message, videoContainerStyle, theatreMode, isMobil
                 }),
           }}
         >
-          <Text 
-            style={{ 
+          <Text
+            style={{
               whiteSpace: "pre-wrap",
               color: "inherit",
             }}

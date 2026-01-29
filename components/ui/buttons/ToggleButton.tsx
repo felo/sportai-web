@@ -82,7 +82,6 @@ export function ToggleButton({
         cursor: disabled ? "not-allowed" : "pointer",
         transition: "all 0.15s ease",
         background: isActive ? "var(--accent-9)" : "var(--gray-3)",
-        border: `1px solid ${isActive ? "var(--accent-9)" : "var(--gray-6)"}`,
         opacity: disabled ? 0.5 : (isActive ? 1 : inactiveOpacity),
         flexShrink: flexShrink ? undefined : 0,
         display: "flex",
