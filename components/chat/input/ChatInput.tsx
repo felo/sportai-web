@@ -764,6 +764,7 @@ export function ChatInput({
                     align="center"
                     gap="1"
                     style={{
+                      marginLeft: "var(--space-3)",
                       borderRadius: "var(--radius-2)",
                       transition: "box-shadow 0.3s ease, filter 0.3s ease",
                       boxShadow: isGlowing
@@ -775,7 +776,9 @@ export function ChatInput({
                     }}
                   >
                     {!isMobile && (
-                      <span style={{ color: "var(--gray-12)", whiteSpace: "nowrap", fontSize: "12px" }}>
+                      <span style={{
+                        marginLeft: "var(--space-2)",
+                        color: "var(--gray-12)", whiteSpace: "nowrap", fontSize: "12px" }}>
                         Focus on:
                       </span>
                     )}
