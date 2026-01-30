@@ -16,7 +16,7 @@ export { usePlayerNicknames } from "./usePlayerNicknames";
 export { usePlayerProfiles } from "./usePlayerProfiles";
 export { useSwingProfiles } from "./useSwingProfiles";
 export { useFFmpegClip, downloadBlob } from "./useFFmpegClip";
+export { useTypewriter } from "./useTypewriter";
 
 // Sidebar hooks
 export { useSidebarChats, useSidebarSettings, useSidebarDialogs } from "./sidebar";
-

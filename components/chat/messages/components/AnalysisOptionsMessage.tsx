@@ -1,164 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Box, Flex, Text, Button, Badge, Grid, Card, Heading } from "@radix-ui/themes";
-import { 
-  RocketIcon, 
-  LightningBoltIcon, 
-  ClockIcon,
-  BarChartIcon,
-  PersonIcon,
-  TargetIcon,
-  VideoIcon,
-  StarIcon,
-  ChatBubbleIcon,
-  EyeOpenIcon,
-  MagnifyingGlassIcon,
-} from "@radix-ui/react-icons";
+import { Box, Text, Button } from "@radix-ui/themes";
+import { LightningBoltIcon } from "@radix-ui/react-icons";
 import type { VideoPreAnalysis } from "@/types/chat";
 import { estimateProAnalysisTime } from "@/utils/video-utils";
-import { 
-  getCameraAngleLabel, 
-  MINT_GLOW_STYLES,
-  MINT_COLOR,
-} from "../../input/VideoEligibilityIndicator";
+import { getCameraAngleLabel } from "../../input/VideoEligibilityIndicator";
+import { useTypewriter } from "@/hooks/useTypewriter";
+import { SwingSelectionCard } from "./SwingSelectionCard";
+import { TacticalOptionsCard } from "./TacticalOptionsCard";
 import buttonStyles from "@/styles/buttons.module.css";
-
-// ============================================================================
-// Feature Definitions
-// ============================================================================
-
-interface FeatureInfo {
-  icon: React.ReactNode;
-  text: string;
-}
-
-const FREE_FEATURES: FeatureInfo[] = [
-  {
-    icon: <ChatBubbleIcon width={14} height={14} />,
-    text: "Textual analysis and coaching feedback",
-  },
-  {
-    icon: <EyeOpenIcon width={14} height={14} />,
-    text: "Study body angles, trophy position, contact points and more",
-  },
-  {
-    icon: <MagnifyingGlassIcon width={14} height={14} />,
-    text: "Dive deeper into any frame in your video and ask for further AI analysis",
-  },
-];
-
-const PRO_FEATURES: FeatureInfo[] = [
-  {
-    icon: <VideoIcon width={14} height={14} />,
-    text: "Advanced video player with rally detection & ball tracking",
-  },
-  {
-    icon: <PersonIcon width={14} height={14} />,
-    text: "Player performance & heatmap analysis",
-  },
-  {
-    icon: <BarChartIcon width={14} height={14} />,
-    text: "Comprehensive match statistics",
-  },
-  {
-    icon: <TargetIcon width={14} height={14} />,
-    text: "Shot placement & tactical breakdown",
-  },
-  {
-    icon: <StarIcon width={14} height={14} />,
-    text: "Auto-extracted highlights & key moments",
-  },
-  {
-    icon: <RocketIcon width={14} height={14} />,
-    text: "Powered by our most advanced AI models",
-  },
-];
-
-const TECHNIQUE_PRO_FEATURES: FeatureInfo[] = [
-  {
-    icon: <VideoIcon width={14} height={14} />,
-    text: "SportAI Technique Studio for deep analysis of your swing",
-  },
-  {
-    icon: <PersonIcon width={14} height={14} />,
-    text: "Compare your swing to previous swings and PRO's",
-  },
-  {
-    icon: <StarIcon width={14} height={14} />,
-    text: "Annotate the video and add events to your timeline",
-  },
-  {
-    icon: <BarChartIcon width={14} height={14} />,
-    text: "Comprehensive data analysis tools",
-  },
-  {
-    icon: <TargetIcon width={14} height={14} />,
-    text: "Export data",
-  },
-  {
-    icon: <RocketIcon width={14} height={14} />,
-    text: "Powered by more advanced AI models",
-  },
-];
-
-// ============================================================================
-// Typewriter Hook
-// ============================================================================
-
-function useTypewriter(text: string, speed: number = 30, enabled: boolean): string {
-  const [displayText, setDisplayText] = useState(enabled ? "" : text);
-  const [currentIndex, setCurrentIndex] = useState(enabled ? 0 : text.length);
-
-  useEffect(() => {
-    // Not enabled - show full text immediately
-    if (!enabled) {
-      setDisplayText(text);
-      setCurrentIndex(text.length);
-      return;
-    }
-
-    // Continue typing
-    if (currentIndex < text.length) {
-      const timer = setTimeout(() => {
-        setDisplayText(prev => prev + text[currentIndex]);
-        setCurrentIndex(prev => prev + 1);
-      }, speed);
-      return () => clearTimeout(timer);
-    }
-  }, [currentIndex, text, speed, enabled]);
-
-  return displayText;
-}
-
-// ============================================================================
-// Simple Feature List Item
-// ============================================================================
-
-interface SimpleFeatureProps {
-  icon: React.ReactNode;
-  text: string;
-  color?: string;
-}
-
-function SimpleFeature({ icon, text, color = "var(--gray-11)" }: SimpleFeatureProps) {
-  return (
-    <Flex gap="2" align="start">
-      <Box
-        style={{
-          color,
-          marginTop: "2px",
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </Box>
-      <Text size="2" style={{ color: "var(--gray-12)" }}>
-        {text}
-      </Text>
-    </Flex>
-  );
-}
 
 // ============================================================================
 // Main Component
@@ -175,7 +26,7 @@ interface AnalysisOptionsMessageProps {
 
 /**
  * Interactive message component for choosing analysis type
- * Shows when a video is PRO-eligible with beautiful animations
+ * Shows swing selection for technique videos, Free/PRO for tactical videos
  */
 export function AnalysisOptionsMessage({
   preAnalysis,
@@ -194,22 +45,32 @@ export function AnalysisOptionsMessage({
   const sportName = isRacketSport
     ? preAnalysis.sport!.charAt(0).toUpperCase() + preAnalysis.sport!.slice(1)
     : null;
-  
+
   // Get camera angle label
   const cameraAngle = preAnalysis.cameraAngle;
-  const cameraLabel = cameraAngle && cameraAngle !== "other" 
-    ? getCameraAngleLabel(cameraAngle) 
+  const cameraLabel = cameraAngle && cameraAngle !== "other"
+    ? getCameraAngleLabel(cameraAngle)
     : null;
-  
+
   // Get estimated processing time based on video duration
   const estimatedTime = estimateProAnalysisTime(preAnalysis.durationSeconds ?? null);
 
   // Determine analysis type
   const analysisType = preAnalysis.isProEligible ? "Tactical" : "Technique";
-  
-  // Build intro message
+  const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
+
+  // Build intro message - different for technique vs tactical
   const introMessage = useMemo(() => {
-    // For racket sports, mention sport name and camera angle
+    // For technique analysis, ask about the swing
+    if (isTechniqueAnalysis && sportName) {
+      let msg = `I see you have a ${sportName.toLowerCase()} video`;
+      if (cameraLabel) {
+        msg += ` with a ${cameraLabel.toLowerCase()} angle`;
+      }
+      msg += `. What swing did you first hit in the video?`;
+      return msg;
+    }
+    // For tactical analysis or other sports
     if (sportName) {
       let msg = `I see you have a ${sportName.toLowerCase()} video`;
       if (cameraLabel) {
@@ -220,7 +81,7 @@ export function AnalysisOptionsMessage({
     }
     // For other sports, use simpler message
     return `I see you have a video that qualifies for a PRO ${analysisType} Analysis!`;
-  }, [sportName, cameraLabel, analysisType]);
+  }, [sportName, cameraLabel, analysisType, isTechniqueAnalysis]);
 
   const introText = useTypewriter(introMessage, 18, shouldAnimate);
 
@@ -231,7 +92,7 @@ export function AnalysisOptionsMessage({
     const introDelay = introMessage.length * 18 + 300;
     const boxesTimer = setTimeout(() => setShowBoxes(true), introDelay);
     const buttonsTimer = setTimeout(() => setShowButtons(true), introDelay + 600);
-    
+
     return () => {
       clearTimeout(boxesTimer);
       clearTimeout(buttonsTimer);
@@ -239,7 +100,6 @@ export function AnalysisOptionsMessage({
   }, [introMessage, shouldAnimate]);
 
   const isEligible = preAnalysis.isProEligible || preAnalysis.isTechniqueLiteEligible;
-  const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
 
   return (
     <Box>
@@ -252,164 +112,27 @@ export function AnalysisOptionsMessage({
             </p>
           )}
 
-          {/* Estimated time note - only for tactical analysis */}
-          {!isTechniqueAnalysis && (
-            <p 
-              className="text-base leading-relaxed mb-4"
-              style={{
-                color: "var(--gray-12)",
-                opacity: showBoxes ? 1 : 0,
-                transition: "opacity 0.4s ease-out",
-              }}
-            >
-              <ClockIcon width={14} height={14} style={{ color: "var(--gray-10)", display: "inline", verticalAlign: "middle", marginRight: "8px" }} />
-              PRO takes <strong style={{ color: MINT_COLOR }}>{estimatedTime}</strong> — chat or analyze more videos while you wait.
-            </p>
+          {/* TECHNIQUE ANALYSIS: Swing selection UI */}
+          {isTechniqueAnalysis ? (
+            <SwingSelectionCard
+              sport={preAnalysis.sport}
+              isLoading={isLoading}
+              showCard={showBoxes}
+              showButton={showButtons}
+              onAnalyze={onSelectProPlusQuick}
+            />
+          ) : (
+            /* TACTICAL ANALYSIS: Free/PRO selection */
+            <TacticalOptionsCard
+              estimatedTime={estimatedTime}
+              isLoading={isLoading}
+              selectedOption={selectedOption}
+              showCards={showBoxes}
+              showButtons={showButtons}
+              onSelectProPlusQuick={onSelectProPlusQuick}
+              onSelectQuickOnly={onSelectQuickOnly}
+            />
           )}
-
-          {/* Side by side feature boxes */}
-          <Grid 
-            columns={{ initial: "1", sm: "2" }} 
-            gap="3" 
-            mb="4"
-            style={{
-              opacity: showBoxes ? 1 : 0,
-              transform: showBoxes ? "translateY(0)" : "translateY(10px)",
-              transition: "all 0.5s ease-out",
-            }}
-          >
-            {/* FREE card */}
-            <Card
-              style={{
-                border: "1px solid var(--gray-6)",
-                transition: "all 0.2s ease",
-              }}
-              className="analysis-option-card"
-            >
-              <Flex direction="column" gap="3" p="4">
-                <Flex direction="column" gap="2">
-                  <Heading size="4" weight="medium">
-                    Free
-                  </Heading>
-                  <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                    Instant AI coaching feedback
-                  </Text>
-                </Flex>
-                <Flex direction="column" gap="2">
-                  {FREE_FEATURES.map((feature, index) => (
-                    <SimpleFeature
-                      key={index}
-                      icon={feature.icon}
-                      text={feature.text}
-                      color="var(--gray-10)"
-                    />
-                  ))}
-                </Flex>
-              </Flex>
-            </Card>
-
-            {/* PRO card */}
-            <Card
-              style={{
-                border: `1px solid ${MINT_COLOR}`,
-                transition: "all 0.2s ease",
-              }}
-              className="analysis-option-card analysis-option-card-pro"
-            >
-              <Flex direction="column" gap="3" p="4">
-                <Flex direction="column" gap="2">
-                  <Flex align="center" gap="2">
-                    <Heading size="4" weight="medium">
-                      PRO
-                    </Heading>
-                    <Badge 
-                      color="green" 
-                      variant="solid" 
-                      size="1" 
-                      style={{ 
-                        fontWeight: 600, 
-                        backgroundColor: MINT_COLOR, 
-                        color: "#1C1C1C",
-                      }}
-                    >
-                      RECOMMENDED
-                    </Badge>
-                  </Flex>
-                  <Text size="2" color="gray" style={{ lineHeight: "1.5" }}>
-                    Includes everything in Free, plus:
-                  </Text>
-                </Flex>
-                <Flex direction="column" gap="2">
-                  {(isTechniqueAnalysis ? TECHNIQUE_PRO_FEATURES : PRO_FEATURES).map((feature, index) => (
-                    <SimpleFeature
-                      key={index}
-                      icon={feature.icon}
-                      text={feature.text}
-                      color={MINT_COLOR}
-                    />
-                  ))}
-                </Flex>
-              </Flex>
-            </Card>
-          </Grid>
-
-          {/* Card hover styles */}
-          <style jsx>{`
-            :global(.analysis-option-card) {
-              transition: all 0.2s ease;
-            }
-            :global(.analysis-option-card:hover) {
-              transform: translateY(-2px);
-              box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-            }
-            :global(.analysis-option-card-pro:hover) {
-              border-color: ${MINT_COLOR} !important;
-              box-shadow: 0 8px 16px rgba(116, 188, 156, 0.2);
-            }
-          `}</style>
-
-          {/* Action section - fades out after selection */}
-          {!selectedOption && (
-            <Box
-              style={{
-                opacity: showButtons ? 1 : 0,
-                transform: showButtons ? "translateY(0)" : "translateY(10px)",
-                transition: "all 0.5s ease-out",
-              }}
-            >
-              <p className="text-base leading-relaxed mb-3" style={{ color: "var(--gray-12)" }}>
-                How would you like to proceed?
-              </p>
-              
-              <Flex gap="3" wrap="wrap">
-                {/* Free button */}
-                <Button
-                  size="3"
-                  className={buttonStyles.actionButtonSquareSecondary}
-                  onClick={onSelectQuickOnly}
-                  disabled={isLoading}
-                  style={{ flex: "1", minWidth: "120px" }}
-                >
-                  <LightningBoltIcon width={18} height={18} />
-                  Free
-                </Button>
-
-                {/* PRO Analysis button */}
-                <Button
-                  size="3"
-                  className={`${buttonStyles.actionButtonSquare} ${buttonStyles.actionButtonPulse}`}
-                  onClick={onSelectProPlusQuick}
-                  disabled={isLoading}
-                  style={{ flex: "1", minWidth: "180px" }}
-                >
-                  <RocketIcon width={18} height={18} />
-                  PRO
-                </Button>
-              </Flex>
-            </Box>
-          )}
-
-
         </>
       ) : (
         <>
@@ -432,7 +155,7 @@ export function AnalysisOptionsMessage({
           <Text size="2" color="gray" mb="3" style={{ display: "block" }}>
             I can still provide quick technique and tactical feedback!
           </Text>
-          
+
           <Button
             size="3"
             className={buttonStyles.actionButtonSquare}
