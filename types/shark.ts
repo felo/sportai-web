@@ -106,3 +106,21 @@ export function getTotalFeatureCount(categories: Record<string, SharkFeatureCate
 export function getCategoryCount(categories: Record<string, SharkFeatureCategory>): number {
   return Object.values(categories).filter(c => c.feature_count > 0).length;
 }
+
+/**
+ * Calculate FPS from feature event data (frame_nr / timestamp)
+ * Returns the calculated FPS or a default of 30 if no valid data found
+ */
+export function calculateFpsFromFeatures(features: SharkFeature[]): number {
+  for (const f of features) {
+    // Need both timestamp > 0 and frame_nr to calculate FPS
+    if (f.event?.timestamp && f.event.timestamp > 0 && f.event?.frame_nr) {
+      const fps = f.event.frame_nr / f.event.timestamp;
+      // Sanity check: FPS should be reasonable (10-120)
+      if (fps >= 10 && fps <= 120) {
+        return Math.round(fps * 100) / 100; // Round to 2 decimal places
+      }
+    }
+  }
+  return 30; // Default fallback
+}

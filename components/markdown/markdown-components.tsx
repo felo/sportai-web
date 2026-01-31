@@ -365,7 +365,10 @@ function processTextWithTimestampsAndMetrics(
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
   onCourtZoneClick?: (zone: CourtZone) => void,
   onTimestampClick?: (timestamp: string) => void,
-  features?: SharkFeature[]
+  features?: SharkFeature[],
+  videoElement?: HTMLVideoElement | null,
+  fps?: number,
+  onFeatureThumbnailClick?: (timestamp: number) => void
 ): React.ReactNode[] {
   // Default to all enabled if not provided
   const prefs = highlightingPrefs || {
@@ -789,6 +792,9 @@ function processTextWithTimestampsAndMetrics(
           <TechniqueFeatureCard
             key={`feature-${matchItem.index}`}
             feature={matchItem.feature}
+            videoElement={videoElement}
+            fps={fps}
+            onThumbnailClick={onFeatureThumbnailClick}
           />
         );
       } else {
@@ -873,15 +879,18 @@ const TextWithTimestamps: React.FC<{
   onCourtZoneClick?: (zone: CourtZone) => void;
   onTimestampClick?: (timestamp: string) => void;
   features?: SharkFeature[];
-}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features }) => {
+  videoElement?: HTMLVideoElement | null;
+  fps?: number;
+  onFeatureThumbnailClick?: (timestamp: number) => void;
+}> = ({ children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features, videoElement, fps, onFeatureThumbnailClick }) => {
   if (typeof children === 'string') {
-    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features)}</>;
+    return <>{processTextWithTimestampsAndMetrics(children, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features, videoElement, fps, onFeatureThumbnailClick)}</>;
   }
 
   if (Array.isArray(children)) {
     return <>{children.map((child, index) => {
       if (typeof child === 'string') {
-        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features)}</React.Fragment>;
+        return <React.Fragment key={index}>{processTextWithTimestampsAndMetrics(child, onSwingClick, onMetricClick, highlightingPrefs, onCoordinateClick, onBallSequenceClick, onCourtZoneClick, onTimestampClick, features, videoElement, fps, onFeatureThumbnailClick)}</React.Fragment>;
       }
       return <React.Fragment key={index}>{child}</React.Fragment>;
     })}</>;
@@ -1088,7 +1097,10 @@ export const createMarkdownComponents = (
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void,
   onCourtZoneClick?: (zone: CourtZone) => void,
   onTimestampClick?: (timestamp: string) => void,
-  features?: SharkFeature[]
+  features?: SharkFeature[],
+  videoElement?: HTMLVideoElement | null,
+  fps?: number,
+  onFeatureThumbnailClick?: (timestamp: number) => void
 ) => ({
   h1: ({ node, ...props }: any) => (
     <h1
@@ -1118,7 +1130,7 @@ export const createMarkdownComponents = (
       if (featureName && features) {
         const feature = findFeatureByName(features, featureName);
         if (feature) {
-          return <TechniqueFeatureCard feature={feature} />;
+          return <TechniqueFeatureCard feature={feature} videoElement={videoElement} fps={fps} onThumbnailClick={onFeatureThumbnailClick} />;
         }
       }
     }
@@ -1128,7 +1140,7 @@ export const createMarkdownComponents = (
       if (featureName && features) {
         const feature = findFeatureByName(features, featureName);
         if (feature) {
-          return <TechniqueFeatureCard feature={feature} />;
+          return <TechniqueFeatureCard feature={feature} videoElement={videoElement} fps={fps} onThumbnailClick={onFeatureThumbnailClick} />;
         }
       }
     }
@@ -1139,7 +1151,7 @@ export const createMarkdownComponents = (
         style={{ color: "var(--gray-12)" }}
         {...props}
       >
-        <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features}>{children}</TextWithTimestamps>
+        <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
       </p>
     );
   },
@@ -1162,7 +1174,7 @@ export const createMarkdownComponents = (
       className="markdown-li"
       {...props}
     >
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
     </li>
   ),
   code: ({ node, inline, ...props }: any) =>
@@ -1191,12 +1203,12 @@ export const createMarkdownComponents = (
   ),
   strong: ({ node, children, ...props }: any) => (
     <strong className="font-semibold" style={{ color: "var(--gray-12)" }} {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
     </strong>
   ),
   em: ({ node, children, ...props }: any) => (
     <em className="italic" {...props}>
-      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features}>{children}</TextWithTimestamps>
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
     </em>
   ),
   a: ({ node, href, children, ...props }: any) => {

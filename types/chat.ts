@@ -36,6 +36,7 @@ export type Message = {
     featureCount: number;
     categories: Record<string, { average_score: number; feature_count: number }>;
     features?: SharkFeature[]; // Full feature data for rendering TechniqueFeatureCard components
+    fps?: number; // Video FPS derived from feature event data (frame_nr / timestamp)
   };
   // Candidate responses (for messageType === "candidate_responses")
   candidateResponses?: {

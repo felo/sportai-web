@@ -23,6 +23,7 @@ interface MarkdownWithSwingsProps {
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
   isStreaming?: boolean;
   features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
+  fps?: number; // Video FPS for thumbnail extraction (derived from Shark analysis)
 }
 
 /**
@@ -47,7 +48,7 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming, features }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming, features, fps }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -63,10 +64,25 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   });
   const [ttsEnabled, setTTSEnabled] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Video element for thumbnail extraction (found from DOM)
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   // Track when streaming just completed to trigger fade-in animation
   const wasStreamingRef = useRef(isStreaming);
   const [showSpeakerFadeIn, setShowSpeakerFadeIn] = useState(!isStreaming);
+  
+  // Find video element from DOM when features are present (for thumbnail extraction)
+  useEffect(() => {
+    if (features && features.length > 0 && !videoElement) {
+      // Find the video element in the DOM
+      const videos = document.querySelectorAll("video");
+      if (videos.length > 0) {
+        // Use the last video (most likely the relevant one for this chat)
+        setVideoElement(videos[videos.length - 1] as HTMLVideoElement);
+      }
+    }
+  }, [features, videoElement]);
 
   useEffect(() => {
     // When streaming changes from true to false, trigger the fade-in
@@ -154,12 +170,21 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     // Pass false for autoPlay - video should pause at the timestamp so user can press play
     ctx.showFloatingVideoAtTime(seconds, false);
   }, []);
+  
+  // Handle feature thumbnail clicks - seek floating video to timestamp
+  const handleFeatureThumbnailClick = useCallback((timestampSeconds: number) => {
+    const ctx = floatingCtxRef.current;
+    if (!ctx) return;
+    
+    // Show floating video and seek to the timestamp (paused)
+    ctx.showFloatingVideoAtTime(timestampSeconds, false);
+  }, []);
 
   // Memoize markdown components to prevent recreating them on every render
   // This prevents flickering when hovering over links/collapsible sections during streaming
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features),
-    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features]
+    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features, videoElement, fps, handleFeatureThumbnailClick),
+    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features, videoElement, fps, handleFeatureThumbnailClick]
   );
 
   // Filter out Context & Environment Analysis section when not in developer mode

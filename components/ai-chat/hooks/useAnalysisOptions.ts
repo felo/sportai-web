@@ -15,7 +15,7 @@ import { estimateProAnalysisTime } from "@/utils/video-utils";
 import { generateMessageId, stripStreamMetadata } from "../utils";
 import type { ProgressStage } from "../types";
 import type { SharkAnalysisResult, SharkMetadata } from "@/types/shark";
-import { calculateAverageScore, getCategoryCount, getTotalFeatureCount } from "@/types/shark";
+import { calculateAverageScore, getCategoryCount, getTotalFeatureCount, calculateFpsFromFeatures } from "@/types/shark";
 
 /**
  * Format category name for display
@@ -92,6 +92,7 @@ YOUR TASK:
 4. For features you discuss in detail, you can embed an interactive card using: [[FEATURE:feature_name]]
    Example: [[FEATURE:stance_open_closed]]
    Only use EXACT feature names from the list above (the part before the quotes)
+5. DO NOT use collapsible sections, groups, or <details> tags - write your analysis as flowing prose with embedded feature cards
 
 REMEMBER: This data is for the FIRST swing only. If there are multiple swings, mention that additional swings weren't analyzed by the computer vision system.
 
@@ -681,6 +682,9 @@ export function useAnalysisOptions({
         const averageScore = calculateAverageScore(categories);
         const categoryCount = getCategoryCount(categories);
         const featureCount = getTotalFeatureCount(categories);
+        // Calculate FPS from feature event data (wicked smart approach!)
+        const features = sharkResult.result.features || [];
+        const fps = calculateFpsFromFeatures(features);
 
         // Update message with shark_result type and data for visual display
         updateMessage(assistantMessageId, {
@@ -696,7 +700,8 @@ export function useAnalysisOptions({
                 { average_score: cat.average_score, feature_count: cat.feature_count }
               ])
             ),
-            features: sharkResult.result.features, // Full feature data for TechniqueFeatureCard rendering
+            features, // Full feature data for TechniqueFeatureCard rendering
+            fps, // Video FPS derived from feature event data
           },
           isStreaming: false,
         });

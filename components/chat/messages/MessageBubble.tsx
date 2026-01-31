@@ -633,6 +633,16 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                       }
                       return undefined;
                     })()}
+                    fps={(() => {
+                      // Find fps from a previous shark_result message
+                      for (let i = messageIndex - 1; i >= 0; i--) {
+                        const prevMessage = allMessages[i];
+                        if (prevMessage.messageType === "shark_result" && prevMessage.sharkResult?.fps) {
+                          return prevMessage.sharkResult.fps;
+                        }
+                      }
+                      return undefined;
+                    })()}
                     thinkingMessage={(() => {
                       // Show upload progress during uploading
                       if (progressStage === "uploading") {

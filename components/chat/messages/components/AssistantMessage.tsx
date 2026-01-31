@@ -28,6 +28,7 @@ interface AssistantMessageProps {
   onRetry?: () => void;
   isRetrying?: boolean;
   features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
+  fps?: number; // Video FPS for thumbnail extraction (derived from Shark analysis)
 }
 
 /**
@@ -50,6 +51,7 @@ export function AssistantMessage({
   onRetry,
   isRetrying,
   features,
+  fps,
 }: AssistantMessageProps) {
   const floatingCtx = useFloatingVideoContextOptional();
   const floatingCtxRef = useRef(floatingCtx);
@@ -137,6 +139,7 @@ export function AssistantMessage({
             onTTSUsage={onTTSUsage}
             isStreaming={isStreaming}
             features={features}
+            fps={fps}
             feedbackButtons={!isStreaming && !isIncomplete && !isGreeting ? (
               <FeedbackButtons
                 messageId={messageId}
