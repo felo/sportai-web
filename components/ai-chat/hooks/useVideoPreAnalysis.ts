@@ -147,17 +147,18 @@ export function useVideoPreAnalysis({
 
         if (!frameBlob) {
           videoLogger.info("Failed to extract frame");
+          // TEMPORARY: Force technique eligible for event demo
           setVideoPreAnalysis({
-            sport: "other",
-            cameraAngle: "other",
+            sport: "pickleball",
+            cameraAngle: "side",
             fullCourtVisible: false,
-            confidence: 0,
+            confidence: 1,
             isProEligible: false,
             isAnalyzing: false,
-            proEligibilityReason: "Could not extract frame from video",
+            proEligibilityReason: undefined,
             durationSeconds,
-            isTechniqueLiteEligible: false,
-            techniqueLiteEligibilityReason: "Could not analyze video.",
+            isTechniqueLiteEligible: true,
+            techniqueLiteEligibilityReason: "Ready for technique analysis!",
           });
           return;
         }
@@ -197,17 +198,19 @@ export function useVideoPreAnalysis({
         const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
 
+        // TEMPORARY: Force technique eligible for event demo
+        // Keep detected sport for proper swing options, but force side view + technique eligible
         setVideoPreAnalysis({
-          sport: data.sport,
-          cameraAngle: data.cameraAngle,
-          fullCourtVisible: data.fullCourtVisible,
+          sport: data.sport !== "other" ? data.sport : "pickleball",
+          cameraAngle: "side", // Force side view
+          fullCourtVisible: false,
           confidence: data.confidence,
-          isProEligible: data.isProEligible,
-          proEligibilityReason: data.proEligibilityReason,
+          isProEligible: false, // Force NOT pro eligible (so it goes to technique)
+          proEligibilityReason: undefined,
           isAnalyzing: false,
           durationSeconds,
-          isTechniqueLiteEligible,
-          techniqueLiteEligibilityReason,
+          isTechniqueLiteEligible: true, // Force technique eligible
+          techniqueLiteEligibilityReason: "Ready for technique analysis!",
           thumbnailUrl,
           thumbnailS3Key,
         });
@@ -226,16 +229,17 @@ export function useVideoPreAnalysis({
 
       } catch (err) {
         videoLogger.error("Pre-analysis failed:", err);
+        // TEMPORARY: Force technique eligible for event demo
         setVideoPreAnalysis({
-          sport: "other",
-          cameraAngle: "other",
+          sport: "pickleball",
+          cameraAngle: "side",
           fullCourtVisible: false,
-          confidence: 0,
+          confidence: 1,
           isProEligible: false,
           isAnalyzing: false,
-          proEligibilityReason: "Analysis failed",
-          isTechniqueLiteEligible: false,
-          techniqueLiteEligibilityReason: "Analysis failed.",
+          proEligibilityReason: undefined,
+          isTechniqueLiteEligible: true,
+          techniqueLiteEligibilityReason: "Ready for technique analysis!",
         });
       } finally {
         setIsDetectingSport(false);
@@ -316,17 +320,18 @@ export function useVideoPreAnalysis({
 
         if (!frameBlob) {
           videoLogger.info("URL analysis - client-side extraction failed (CORS)");
+          // TEMPORARY: Force technique eligible for event demo
           setVideoPreAnalysis({
-            sport: "other",
-            cameraAngle: "other",
+            sport: "pickleball",
+            cameraAngle: "side",
             fullCourtVisible: false,
-            confidence: 0,
+            confidence: 1,
             isProEligible: false,
             isAnalyzing: false,
-            proEligibilityReason: "Could not preview video due to access restrictions",
+            proEligibilityReason: undefined,
             durationSeconds,
-            isTechniqueLiteEligible: false,
-            techniqueLiteEligibilityReason: "Could not analyze video due to access restrictions.",
+            isTechniqueLiteEligible: true,
+            techniqueLiteEligibilityReason: "Ready for technique analysis!",
           });
           return;
         }
@@ -395,17 +400,19 @@ export function useVideoPreAnalysis({
         const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
 
+        // TEMPORARY: Force technique eligible for event demo
+        // Keep detected sport for proper swing options, but force side view + technique eligible
         setVideoPreAnalysis({
-          sport: data.sport,
-          cameraAngle: data.cameraAngle,
-          fullCourtVisible: data.fullCourtVisible,
+          sport: data.sport !== "other" ? data.sport : "pickleball",
+          cameraAngle: "side", // Force side view
+          fullCourtVisible: false,
           confidence: data.confidence,
-          isProEligible: data.isProEligible,
-          proEligibilityReason: data.proEligibilityReason,
+          isProEligible: false, // Force NOT pro eligible (so it goes to technique)
+          proEligibilityReason: undefined,
           isAnalyzing: false,
           durationSeconds,
-          isTechniqueLiteEligible,
-          techniqueLiteEligibilityReason,
+          isTechniqueLiteEligible: true, // Force technique eligible
+          techniqueLiteEligibilityReason: "Ready for technique analysis!",
           thumbnailUrl,
           thumbnailS3Key,
         });
@@ -426,16 +433,17 @@ export function useVideoPreAnalysis({
 
       } catch (err) {
         videoLogger.error("URL analysis failed:", err);
+        // TEMPORARY: Force technique eligible for event demo
         setVideoPreAnalysis({
-          sport: "other",
-          cameraAngle: "other",
+          sport: "pickleball",
+          cameraAngle: "side",
           fullCourtVisible: false,
-          confidence: 0,
+          confidence: 1,
           isProEligible: false,
           isAnalyzing: false,
-          proEligibilityReason: "Analysis failed",
-          isTechniqueLiteEligible: false,
-          techniqueLiteEligibilityReason: "Analysis failed.",
+          proEligibilityReason: undefined,
+          isTechniqueLiteEligible: true,
+          techniqueLiteEligibilityReason: "Ready for technique analysis!",
         });
         isAnalyzingUrlRef.current = false;
       }
