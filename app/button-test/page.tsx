@@ -177,7 +177,7 @@ export default function ButtonTestPage() {
                 onClick={() => setActiveToggle("chat")}
               />
               <ToggleButton
-                label="Studio Playground"
+                label="Studio"
                 isActive={activeToggle === "studio"}
                 onClick={() => setActiveToggle("studio")}
               />

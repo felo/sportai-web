@@ -21,6 +21,16 @@ interface SwingSelectionCardProps {
   onAnalyze: (swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
 }
 
+// Swing types that are currently enabled for analysis
+const ENABLED_SWING_TYPES = ["forehand_drive", "backhand_drive"];
+
+/**
+ * Check if a swing type is enabled for selection
+ */
+function isSwingEnabled(swingValue: string): boolean {
+  return ENABLED_SWING_TYPES.includes(swingValue);
+}
+
 /**
  * Card component for selecting swing type and dominant hand
  * Used in technique video analysis flow
@@ -74,18 +84,29 @@ export function SwingSelectionCard({
               <Select.Content>
                 <Select.Group>
                   <Select.Label>Common Shots</Select.Label>
-                  {COMMON_SWINGS.map((swing) => (
-                    <Select.Item key={swing.value} value={swing.value}>
-                      {swing.label}
-                    </Select.Item>
-                  ))}
+                  {COMMON_SWINGS.map((swing) => {
+                    const enabled = isSwingEnabled(swing.value);
+                    return (
+                      <Select.Item
+                        key={swing.value}
+                        value={swing.value}
+                        disabled={!enabled}
+                      >
+                        {swing.label}{!enabled && " (coming soon)"}
+                      </Select.Item>
+                    );
+                  })}
                 </Select.Group>
                 {sport === "tennis" && TENNIS_SWINGS.length > 0 && (
                   <Select.Group>
                     <Select.Label>Tennis Specific</Select.Label>
                     {TENNIS_SWINGS.map((swing) => (
-                      <Select.Item key={swing.value} value={swing.value}>
-                        {swing.label}
+                      <Select.Item
+                        key={swing.value}
+                        value={swing.value}
+                        disabled
+                      >
+                        {swing.label} (coming soon)
                       </Select.Item>
                     ))}
                   </Select.Group>
@@ -94,8 +115,12 @@ export function SwingSelectionCard({
                   <Select.Group>
                     <Select.Label>Padel Specific</Select.Label>
                     {PADEL_SWINGS.map((swing) => (
-                      <Select.Item key={swing.value} value={swing.value}>
-                        {swing.label}
+                      <Select.Item
+                        key={swing.value}
+                        value={swing.value}
+                        disabled
+                      >
+                        {swing.label} (coming soon)
                       </Select.Item>
                     ))}
                   </Select.Group>
@@ -104,8 +129,12 @@ export function SwingSelectionCard({
                   <Select.Group>
                     <Select.Label>Pickleball Specific</Select.Label>
                     {PICKLEBALL_SWINGS.map((swing) => (
-                      <Select.Item key={swing.value} value={swing.value}>
-                        {swing.label}
+                      <Select.Item
+                        key={swing.value}
+                        value={swing.value}
+                        disabled
+                      >
+                        {swing.label} (coming soon)
                       </Select.Item>
                     ))}
                   </Select.Group>

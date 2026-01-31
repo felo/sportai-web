@@ -666,7 +666,7 @@ export function PageHeader({
           onClick={() => handleModeChange("chat")}
         />
         <ToggleButton
-          label="Studio Playground"
+          label="Studio"
           isActive={activeMode === "studio"}
           onClick={() => handleModeChange("studio")}
         />

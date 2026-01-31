@@ -722,9 +722,66 @@ export function useAnalysisOptions({
           sharkFeatureCount: sharkResult?.result?.features?.length || 0,
           sharkCategoryCount: Object.keys(sharkResult?.result?.feature_categories || {}).length,
         });
+
+        // Create library task for technique analysis (silently, without typing message)
+        let createdTaskId: string | undefined;
+        const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
+
+        if (user && accessToken && videoUrl) {
+          try {
+            analysisLogger.info("Creating technique task for Shark analysis, URL:", videoUrl);
+
+            const response = await fetch("/api/tasks", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                taskType: "technique",
+                sport: taskSport,
+                videoUrl: videoUrl,
+                thumbnailUrl: preAnalysis.thumbnailUrl || null,
+                thumbnailS3Key: preAnalysis.thumbnailS3Key || null,
+                videoLength: preAnalysis.durationSeconds || null,
+              }),
+            });
+
+            if (response.ok) {
+              const { task } = await response.json();
+              analysisLogger.info("Technique task created:", task.id);
+              createdTaskId = task.id;
+              refreshLibraryTasks();
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              analysisLogger.error("Failed to create technique task:", errorData);
+            }
+          } catch (err) {
+            analysisLogger.error("Error creating technique task:", err);
+          }
+        } else if (videoUrl) {
+          // Create guest task for technique analysis (stored in localStorage)
+          try {
+            analysisLogger.info("Creating guest technique task for URL:", videoUrl);
+            const guestTask = createGuestTechniqueTask({
+              videoUrl,
+              sport: taskSport,
+              thumbnailUrl: preAnalysis.thumbnailUrl,
+              videoLength: preAnalysis.durationSeconds,
+            });
+            createdTaskId = guestTask.id;
+            refreshLibraryTasks();
+            analysisLogger.info("Guest technique task created:", guestTask.id);
+          } catch (err) {
+            analysisLogger.error("Error creating guest technique task:", err);
+          }
+        }
+
         if (videoUrl) {
           await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, userPrompt, {
             sharkContext: sharkResult,
+            showTechniqueStudioPrompt: true,
+            taskId: createdTaskId,
           });
         }
       } else {
@@ -753,7 +810,7 @@ export function useAnalysisOptions({
       setProgressStage("idle");
       abortControllerRef.current = null;
     }
-  }, [messages, addMessage, updateMessage, scrollToBottom, setLoading, setProgressStage, startQuickAnalysis]);
+  }, [messages, user, accessToken, addMessage, updateMessage, scrollToBottom, setLoading, setProgressStage, startQuickAnalysis, refreshLibraryTasks]);
 
   return {
     handleSelectProPlusQuick,

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Card, Flex, Text, Badge, Spinner } from "@radix-ui/themes";
+import { Box, Card, Flex, Text, Badge, Spinner, IconButton, Tooltip } from "@radix-ui/themes";
 import { PlayIcon } from "@radix-ui/react-icons";
 import type { SharkFeature } from "@/types/shark";
 import { MINT_COLOR } from "../../input/VideoEligibilityIndicator";
 import { useThumbnailByFrame } from "@/components/shared/hooks";
+import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 
 /**
  * Get level badge color
@@ -69,6 +70,19 @@ export function TechniqueFeatureCard({ feature, videoElement: propsVideoElement,
     feature.human_name ||
     feature.feature_name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
+  // Get floating video context directly for the play button
+  const floatingCtx = useFloatingVideoContextOptional();
+
+  // Handle play button click - open floating video at timestamp
+  const handlePlayClick = () => {
+    const timestamp = feature.event?.timestamp ?? 0;
+    if (onThumbnailClick) {
+      onThumbnailClick(timestamp);
+    } else if (floatingCtx) {
+      floatingCtx.showFloatingVideoAtTime(timestamp, false);
+    }
+  };
+
   // Find video element from DOM if not provided via props
   const [localVideoElement, setLocalVideoElement] = useState<HTMLVideoElement | null>(null);
 
@@ -120,8 +134,9 @@ export function TechniqueFeatureCard({ feature, videoElement: propsVideoElement,
       hasVideoElement: !!videoElement,
       videoReadyState: videoElement?.readyState,
       fps,
+      hasOnThumbnailClick: !!onThumbnailClick,
     });
-  }, [feature.feature_name, feature.event, frameNr, timestamp, videoElement, fps]);
+  }, [feature.feature_name, feature.event, frameNr, timestamp, videoElement, fps, onThumbnailClick]);
 
   const [thumbnailUrl, isLoadingThumbnail] = useThumbnailByFrame(
     videoElement ?? null,
@@ -234,14 +249,28 @@ export function TechniqueFeatureCard({ feature, videoElement: propsVideoElement,
 
         {/* Content on the right */}
         <Flex direction="column" gap="3" style={{ flex: 1, minWidth: 0 }}>
-          {/* Header: Name, Level Badge */}
-          <Flex gap="2" align="center" wrap="wrap">
-            <Text size="3" weight="bold" style={{ color: "var(--gray-12)" }}>
-              {displayName}
-            </Text>
-            <Badge color={getLevelColor(feature.level)} variant="soft" size="1">
-              {feature.level} tip
-            </Badge>
+          {/* Header: Name, Level Badge, Play Button */}
+          <Flex gap="2" align="center" justify="between" wrap="wrap">
+            <Flex gap="2" align="center" wrap="wrap" style={{ flex: 1 }}>
+              <Text size="3" weight="bold" style={{ color: "var(--gray-12)" }}>
+                {displayName}
+              </Text>
+              <Badge color={getLevelColor(feature.level)} variant="soft" size="1">
+                {feature.level} tip
+              </Badge>
+            </Flex>
+            {/* Video player button - always visible */}
+            <Tooltip content={feature.event?.timestamp !== undefined ? `View at ${feature.event.timestamp.toFixed(1)}s` : "View in video"}>
+              <IconButton
+                size="2"
+                variant="soft"
+                color="mint"
+                onClick={handlePlayClick}
+                style={{ flexShrink: 0 }}
+              >
+                <PlayIcon width={16} height={16} />
+              </IconButton>
+            </Tooltip>
           </Flex>
 
           {/* Suggestion (in highlighted box) */}
