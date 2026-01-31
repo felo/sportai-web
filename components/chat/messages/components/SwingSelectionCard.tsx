@@ -8,6 +8,7 @@ import {
   TENNIS_SWINGS,
   PADEL_SWINGS,
   PICKLEBALL_SWINGS,
+  getSwingLabel,
 } from "@/components/shared/swingTypes";
 import { MINT_COLOR } from "../../input/VideoEligibilityIndicator";
 import buttonStyles from "@/styles/buttons.module.css";
@@ -17,7 +18,7 @@ interface SwingSelectionCardProps {
   isLoading?: boolean;
   showCard?: boolean;
   showButton?: boolean;
-  onAnalyze: () => void;
+  onAnalyze: (swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
 }
 
 /**
@@ -38,10 +39,9 @@ export function SwingSelectionCard({
 
   const handleSubmit = () => {
     if (canSubmit) {
-      // Log the selection for debugging (data integration comes later)
-      console.log("Swing selection:", { selectedSwing, dominantHand, level: "intermediate" });
-      // Trigger PRO analysis
-      onAnalyze();
+      // Pass swing selection to parent for analysis
+      const label = getSwingLabel(selectedSwing, sport) || selectedSwing;
+      onAnalyze(selectedSwing, label, dominantHand);
     }
   };
 
@@ -169,7 +169,7 @@ export function SwingSelectionCard({
           onClick={handleSubmit}
         >
           <RocketIcon width={18} height={18} />
-          Analyze My Swing
+          Analyse Swing
         </Button>
       </Box>
     </>

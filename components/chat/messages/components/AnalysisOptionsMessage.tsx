@@ -19,6 +19,8 @@ interface AnalysisOptionsMessageProps {
   preAnalysis: VideoPreAnalysis;
   onSelectProPlusQuick: () => void;
   onSelectQuickOnly: () => void;
+  /** Handler for swing analysis (pickleball uses Shark API) */
+  onSwingAnalyze?: (swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
   isLoading?: boolean;
   selectedOption?: "pro_plus_quick" | "quick_only" | null;
   isLoadedFromServer?: boolean; // If true, skip typewriter animation
@@ -32,6 +34,7 @@ export function AnalysisOptionsMessage({
   preAnalysis,
   onSelectProPlusQuick,
   onSelectQuickOnly,
+  onSwingAnalyze,
   isLoading = false,
   selectedOption = null,
   isLoadedFromServer = false,
@@ -119,7 +122,14 @@ export function AnalysisOptionsMessage({
               isLoading={isLoading}
               showCard={showBoxes}
               showButton={showButtons}
-              onAnalyze={onSelectProPlusQuick}
+              onAnalyze={(swingType, swingLabel, dominantHand) => {
+                // Use Shark API handler if provided, otherwise fall back to PRO analysis
+                if (onSwingAnalyze) {
+                  onSwingAnalyze(swingType, swingLabel, dominantHand);
+                } else {
+                  onSelectProPlusQuick();
+                }
+              }}
             />
           ) : (
             /* TACTICAL ANALYSIS: Free/PRO selection */

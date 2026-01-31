@@ -26,7 +26,14 @@ export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  messageType?: "standard" | "analysis_options" | "technique_studio_prompt" | "candidate_responses" | "profile_completion_prompt"; // Type of message (default is standard)
+  messageType?: "standard" | "analysis_options" | "technique_studio_prompt" | "candidate_responses" | "profile_completion_prompt" | "shark_result"; // Type of message (default is standard)
+  // Shark technique analysis result (for messageType === "shark_result")
+  sharkResult?: {
+    score: number; // Overall score 0-100
+    categoryCount: number;
+    featureCount: number;
+    categories: Record<string, { average_score: number; feature_count: number }>;
+  };
   // Candidate responses (for messageType === "candidate_responses")
   candidateResponses?: {
     options: CandidateOption[];
@@ -139,4 +146,3 @@ export type VideoPreAnalysis = {
   thumbnailUrl?: string | null;
   thumbnailS3Key?: string | null;
 };
-

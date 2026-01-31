@@ -7,12 +7,13 @@ export { UserMessage } from "./UserMessage";
 export { AssistantMessage } from "./AssistantMessage";
 export { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 export { AnalysisOptionsMessage } from "./AnalysisOptionsMessage";
+export { SharkResultDisplay } from "./SharkResultDisplay";
 export { TechniqueStudioPrompt } from "./TechniqueStudioPrompt";
 export { StudioPromptCard } from "./StudioPromptCard";
 export { ProfileCompletionPrompt } from "./ProfileCompletionPrompt";
 export { MatchReportPrompt } from "./MatchReportPrompt";
 export { CandidateResponsesMessage } from "./CandidateResponsesMessage";
-export { 
+export {
   FollowUpSuggestions,
   TENNIS_TECHNIQUE_QUESTIONS,
   TENNIS_TACTICS_QUESTIONS,

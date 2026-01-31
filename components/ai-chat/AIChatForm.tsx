@@ -230,6 +230,7 @@ export function AIChatForm() {
   const {
     handleSelectProPlusQuick,
     handleSelectQuickOnly,
+    handleSharkAnalysis,
     abortControllerRef: analysisAbortRef,
   } = useAnalysisOptions({
     messages,
@@ -659,6 +660,7 @@ export function AIChatForm() {
               retryingMessageId={retryingMessageId}
               onSelectProPlusQuick={handleSelectProPlusQuick}
               onSelectQuickOnly={handleSelectQuickOnly}
+              onSwingAnalyze={handleSharkAnalysis}
               onOpenTechniqueStudio={handleOpenTechniqueStudio}
               onSelectCandidateResponse={handleSelectCandidateResponse}
               onSelectFollowUp={handleSelectFollowUp}

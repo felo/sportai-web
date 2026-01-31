@@ -8,7 +8,7 @@ import { calculatePricing } from "@/lib/token-utils";
 import { SHOW_PRO_UPSELL_BANNER } from "@/lib/limitations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions, ProfileCompletionPrompt } from "./components";
+import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, SharkResultDisplay, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions, ProfileCompletionPrompt } from "./components";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -22,13 +22,13 @@ const avatarPokeKeyframes = `
     75% { transform: translateY(-1px) scale(1.02); }
     90% { transform: translateY(0) scale(1); }
   }
-  
+
   @keyframes avatarBubblePop {
     0% { opacity: 0; transform: scale(0.5) translateX(-50%) translateY(5px); }
     50% { opacity: 1; transform: scale(1.1) translateX(-50%) translateY(-2px); }
     100% { opacity: 1; transform: scale(1) translateX(-50%) translateY(0); }
   }
-  
+
   @keyframes avatarBubbleFade {
     0% { opacity: 1; transform: scale(1) translateX(-50%); }
     100% { opacity: 0; transform: scale(0.8) translateX(-50%); }
@@ -47,6 +47,8 @@ interface MessageBubbleProps {
   // Analysis options handlers
   onSelectProPlusQuick?: (messageId: string) => void;
   onSelectQuickOnly?: (messageId: string) => void;
+  /** Handler for swing analysis (pickleball uses Shark API) */
+  onSwingAnalyze?: (messageId: string, swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
   // Technique Studio handler
   onOpenTechniqueStudio?: (videoUrl: string, taskId?: string) => void;
   // Candidate responses handler
@@ -60,7 +62,7 @@ interface MessageBubbleProps {
   isLoadedFromServer?: boolean;
 }
 
-export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onOpenTechniqueStudio, onSelectCandidateResponse, onSelectFollowUp, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
+export function MessageBubble({ message, allMessages = [], messageIndex = 0, scrollContainerRef, onAskForHelp, onUpdateMessage, onRetryMessage, isRetrying, onSelectProPlusQuick, onSelectQuickOnly, onSwingAnalyze, onOpenTechniqueStudio, onSelectCandidateResponse, onSelectFollowUp, progressStage = "idle", uploadProgress = 0, isLoadedFromServer = false }: MessageBubbleProps) {
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const [developerMode, setDeveloperMode] = useState(false);
   const [theatreMode, setTheatreMode] = useState(true);
@@ -74,29 +76,29 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     voiceQuality: '',
   });
   const isMobile = useIsMobile();
-  
+
   // Avatar poke interaction state
   const [isPoked, setIsPoked] = useState(false);
   const [showPokeBubble, setShowPokeBubble] = useState(false);
   const [pokeBubbleFading, setPokeBubbleFading] = useState(false);
-  
+
   const handleAvatarPoke = useCallback(() => {
     if (isPoked) return;
-    
+
     setIsPoked(true);
     setShowPokeBubble(true);
     setPokeBubbleFading(false);
-    
+
     // Reset bounce after animation completes
     setTimeout(() => {
       setIsPoked(false);
     }, 500);
-    
+
     // Start fading the bubble
     setTimeout(() => {
       setPokeBubbleFading(true);
     }, 1500);
-    
+
     // Hide bubble completely
     setTimeout(() => {
       setShowPokeBubble(false);
@@ -125,21 +127,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   useEffect(() => {
     setDeveloperMode(getDeveloperMode());
     setTheatreMode(getTheatreMode());
-    
+
     // Listen for developer mode changes
     const handleDeveloperModeChange = () => {
       setDeveloperMode(getDeveloperMode());
     };
-    
+
     // Listen for theatre mode changes
     const handleTheatreModeChange = () => {
       setTheatreMode(getTheatreMode());
     };
-    
+
     window.addEventListener("storage", handleDeveloperModeChange);
     window.addEventListener("developer-mode-change", handleDeveloperModeChange);
     window.addEventListener("theatre-mode-change", handleTheatreModeChange);
-    
+
     return () => {
       window.removeEventListener("storage", handleDeveloperModeChange);
       window.removeEventListener("developer-mode-change", handleDeveloperModeChange);
@@ -149,7 +151,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
 
   // Show video if we have a video URL, preview, file, or S3 key (for persisted videos)
   const hasVideo = !!(message.videoUrl || message.videoPreview || message.videoFile || message.videoS3Key);
-  
+
   // Check if this is an image-only message (not a video) - used for styling
   // Images get border but no padding, taking full space within the bubble
   const isImageOnly = (
@@ -162,21 +164,21 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     // File type is image
     (message.videoFile?.type.startsWith("image/"))
   );
-  
+
   // Check if this conversation involves a video (for showing video-style thinking messages & follow-ups)
   // Also extracts the detected sport for follow-up suggestions
   const { isVideoConversation, isRecentVideoAnalysis, detectedSport } = (() => {
     if (message.role !== "assistant" || messageIndex === 0) {
       return { isVideoConversation: false, isRecentVideoAnalysis: false, detectedSport: "other" as const };
     }
-    
+
     // Find the most recent video or analysis_options message
     let lastVideoIndex = -1;
     let sport: "tennis" | "pickleball" | "padel" | "other" = "other";
-    
+
     for (let i = messageIndex - 1; i >= 0; i--) {
       const prevMessage = allMessages[i];
-      
+
       // If there's an analysis_options message, this is a video conversation
       // and we can get the detected sport from preAnalysis
       if (prevMessage.messageType === "analysis_options") {
@@ -184,7 +186,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
         sport = prevMessage.analysisOptions?.preAnalysis?.sport || "other";
         break;
       }
-      
+
       // Check if any user message has a video
       if (prevMessage.role === "user") {
         const hasVideo = !!(prevMessage.videoUrl || prevMessage.videoPreview || prevMessage.videoFile || prevMessage.videoS3Key);
@@ -194,17 +196,17 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
         }
       }
     }
-    
+
     if (lastVideoIndex === -1) {
       return { isVideoConversation: false, isRecentVideoAnalysis: false, detectedSport: "other" as const };
     }
-    
+
     // Count user messages after the video
     const userMessagesAfterVideo = allMessages
       .slice(lastVideoIndex + 1, messageIndex)
       .filter(m => m.role === "user").length;
-    
-    return { 
+
+    return {
       // True if there's a video anywhere in this conversation
       isVideoConversation: true,
       // True if this is within the first couple responses after video (for thinking messages)
@@ -212,7 +214,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       detectedSport: sport,
     };
   })();
-  
+
   // Check if this is the first assistant message in the conversation
   const isFirstAssistantMessage = (() => {
     if (message.role !== "assistant") return false;
@@ -222,7 +224,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       .filter(m => m.role === "assistant").length;
     return previousAssistantCount === 0;
   })();
-  
+
   // Check if this appears to be a complex query (for thinking message display)
   // Look at the most recent user message
   const isComplexQuery = (() => {
@@ -232,11 +234,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       const prevMessage = allMessages[i];
       if (prevMessage.role === "user" && prevMessage.content) {
         const content = prevMessage.content.toLowerCase();
-        
+
         // Short messages (< 50 chars) are not considered complex
         // This prevents simple questions like "why?" from showing deep thinking
         if (content.length < 50) return false;
-        
+
         // Complex query indicators - require more specific patterns
         const complexPatterns = [
           /\b(compare|versus|vs\.?|difference between)\b/,
@@ -251,7 +253,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     }
     return false;
   })();
-  
+
   // Calculate cumulative tokens up to this message
   const cumulativeTokens = allMessages.slice(0, messageIndex + 1).reduce(
     (acc, msg) => {
@@ -297,7 +299,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   const cumulativePricing = cumulativeTokens.input > 0 || cumulativeTokens.output > 0
     ? calculatePricing(cumulativeTokens.input, cumulativeTokens.output)
     : null;
-  
+
   // Rotate thinking messages every 3 seconds
   // Use different rotation speeds: faster for simple queries, slower for video/complex
   useEffect(() => {
@@ -305,19 +307,19 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       // Only video or complex queries get deep thinking treatment
       // First message without video → quick response expected
       const useDeepThinking = isRecentVideoAnalysis || isComplexQuery;
-      
+
       // Determine message set length based on context
-      const messageCount = isRecentVideoAnalysis 
-        ? THINKING_MESSAGES_VIDEO.length 
+      const messageCount = isRecentVideoAnalysis
+        ? THINKING_MESSAGES_VIDEO.length
         : isComplexQuery ? 7 : 3; // DEEP vs QUICK counts
-      
+
       // Rotate faster for simple queries (2s), slower for video/complex (3-4s)
       const rotationSpeed = isRecentVideoAnalysis ? 3000 : isComplexQuery ? 4000 : 2000;
-      
+
       const interval = setInterval(() => {
         setThinkingMessageIndex((prev) => (prev + 1) % messageCount);
       }, rotationSpeed);
-      
+
       return () => clearInterval(interval);
     }
   }, [message.content, message.role, isRecentVideoAnalysis, isComplexQuery]);
@@ -339,39 +341,39 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       setShowProUpsell(false);
       return;
     }
-    
+
     if (message.role === "assistant" && message.content) {
       const chatId = getCurrentChatId();
-      
+
       // Don't show PRO upsell for video size limit errors or greeting messages
       if (message.isVideoSizeLimitError || message.isGreeting) {
         setShowProUpsell(false);
         return;
       }
-      
+
       // Don't show PRO upsell until there have been at least 7 assistant messages
       const assistantMessageCount = allMessages.filter(m => m.role === "assistant").length;
       if (assistantMessageCount < 7) {
         setShowProUpsell(false);
         return;
       }
-      
+
       // Don't show PRO upsell if this chat has PRO-eligible video analysis
-      const hasProEligibleAnalysis = allMessages.some(m => 
-        m.analysisOptions?.preAnalysis?.isProEligible || 
+      const hasProEligibleAnalysis = allMessages.some(m =>
+        m.analysisOptions?.preAnalysis?.isProEligible ||
         m.analysisOptions?.preAnalysis?.isTechniqueLiteEligible
       );
       if (hasProEligibleAnalysis) {
         setShowProUpsell(false);
         return;
       }
-      
+
       // Check if we've already shown the upsell for this chat
       if (hasShownProUpsell(chatId)) {
         setShowProUpsell(false);
         return;
       }
-      
+
       // Reset first in case message is being re-rendered
       setShowProUpsell(false);
       // Add a delay for natural appearance (1 second after content appears)
@@ -380,7 +382,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
         // Mark as shown for this chat
         markProUpsellShown(chatId);
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     } else {
       setShowProUpsell(false);
@@ -390,10 +392,10 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
   // Set video container style - simplified, let VideoPoseViewer handle its own sizing
   useEffect(() => {
     if (!hasVideo) return;
-    
-    const isImage = message.videoFile?.type.startsWith("image/") || 
+
+    const isImage = message.videoFile?.type.startsWith("image/") ||
                     (message.videoUrl && message.videoUrl.match(/\.(jpg|jpeg|png|gif|webp)/i));
-    
+
     if (isImage) return;
 
     // Simple container style - the video viewer handles aspect ratio internally
@@ -425,13 +427,13 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
     <>
       {/* Inject keyframes for avatar poke animation */}
       <style>{avatarPokeKeyframes}</style>
-      
+
       <Flex
         gap={isMobile && message.role === "assistant" ? "0" : "4"}
         justify={
           // Follow-up options (candidate_responses without intro text) should be right-aligned like user messages
           message.role === "user" || (message.messageType === "candidate_responses" && !message.content?.trim())
-            ? "end" 
+            ? "end"
             : "start"
         }
         role="article"
@@ -459,7 +461,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                 }}
               />
             </Box>
-            
+
             {/* "Stop poking me!" speech bubble - hidden for now */}
             {false && showPokeBubble && (
               <Box
@@ -474,8 +476,8 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                   whiteSpace: "nowrap",
                   boxShadow: "0 4px 12px rgba(34, 197, 94, 0.25)",
                   zIndex: 100,
-                  animation: pokeBubbleFading 
-                    ? "avatarBubbleFade 0.3s ease-out forwards" 
+                  animation: pokeBubbleFading
+                    ? "avatarBubbleFade 0.3s ease-out forwards"
                     : "avatarBubblePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
                 }}
               >
@@ -506,9 +508,9 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     borderBottom: "6px solid var(--color-background)",
                   }}
                 />
-                <Text 
-                  size="1" 
-                  style={{ 
+                <Text
+                  size="1"
+                  style={{
                     color: "var(--mint-11)",
                     fontWeight: 600,
                     fontSize: "12px",
@@ -527,7 +529,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
             // Candidate responses without intro text (follow-up options) should span full width
             maxWidth: (message.messageType === "candidate_responses" && !message.content?.trim())
               ? "100%"
-              : isMobile 
+              : isMobile
               ? "100%"
               : theatreMode && hasVideo && !isImageOnly
               ? "100%"
@@ -540,7 +542,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
               : "0",
             // Text messages: asymmetric bubble corners, Videos & Images: slightly rounded
             borderRadius: message.role === "user" && !hasVideo && !isImageOnly
-              ? "24px 8px 24px 24px" 
+              ? "24px 8px 24px 24px"
               : "var(--radius-3)",
             // Images: no padding (image fills to border), Videos: no padding, Text: padding
             padding: message.role === "user" && (hasVideo || isImageOnly) ? "0" : "var(--space-3) var(--space-4)",
@@ -583,10 +585,18 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     selectedOption={message.analysisOptions.selectedOption}
                     onSelectProPlusQuick={() => onSelectProPlusQuick?.(message.id)}
                     onSelectQuickOnly={() => onSelectQuickOnly?.(message.id)}
+                    onSwingAnalyze={(swingType, swingLabel, dominantHand) => onSwingAnalyze?.(message.id, swingType, swingLabel, dominantHand)}
                     isLoading={message.isStreaming}
                     isLoadedFromServer={isLoadedFromServer}
                   />
                 </>
+              ) : message.messageType === "shark_result" && message.sharkResult ? (
+                <SharkResultDisplay
+                  score={message.sharkResult.score}
+                  categoryCount={message.sharkResult.categoryCount}
+                  featureCount={message.sharkResult.featureCount}
+                  categories={message.sharkResult.categories}
+                />
               ) : message.messageType === "technique_studio_prompt" && message.techniqueStudioPrompt ? (
                 <>
                   <TechniqueStudioPrompt
@@ -619,7 +629,7 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                         return "Uploading video...";
                       }
                       // For processing/analyzing/generating, use the rotating thinking messages
-                      // Note: During actual video CONVERSION, useAIApi sets message.content to 
+                      // Note: During actual video CONVERSION, useAIApi sets message.content to
                       // "Converting video format for analysis..." which will be shown instead of thinkingMessage
                       return getThinkingMessage(thinkingMessageIndex, {
                         hasVideo: isRecentVideoAnalysis,
@@ -635,12 +645,12 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
                     isRetrying={isRetrying}
                   />
-                  
+
                   {/* PRO Membership Upsell */}
                   <ProUpsellBanner show={showProUpsell} />
                 </>
               )}
-              
+
               {/* Developer mode token information */}
               <DeveloperInfo
                 show={developerMode && (!!message.content || message.messageType === "analysis_options" || message.messageType === "technique_studio_prompt")}
@@ -663,9 +673,9 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
             </Box>
           )}
         </Box>
-        
+
         {/* Feedback Toast */}
-        <FeedbackToast 
+        <FeedbackToast
           open={showFeedbackToast}
           onOpenChange={setShowFeedbackToast}
         />
@@ -678,11 +688,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
        !message.isStreaming &&
        !message.isIncomplete &&
        !message.isGreeting &&
-       (isVideoConversation || 
+       (isVideoConversation ||
         message.messageType === "analysis_options" && message.analysisOptions?.selectedOption ||
         message.messageType === "technique_studio_prompt") && (
-        <FollowUpSuggestions 
-          onSelect={onSelectFollowUp} 
+        <FollowUpSuggestions
+          onSelect={onSelectFollowUp}
           sport={detectedSport}
         />
       )}

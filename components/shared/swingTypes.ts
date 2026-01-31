@@ -9,13 +9,13 @@ export interface SwingOption {
 }
 
 // Common swings shared across all racket sports
+// Values must match Shark API expected formats (e.g., "forehand_drive" not "forehand")
 export const COMMON_SWINGS: SwingOption[] = [
-  { value: "forehand", label: "Forehand" },
-  { value: "backhand", label: "Backhand" },
+  { value: "forehand_drive", label: "Forehand" },
+  { value: "backhand_drive", label: "Backhand" },
+  { value: "forehand_volley", label: "Forehand Volley" },
+  { value: "backhand_volley", label: "Backhand Volley" },
   { value: "serve", label: "Serve" },
-  { value: "volley", label: "Volley" },
-  { value: "overhead", label: "Overhead / Smash" },
-  { value: "slice", label: "Slice" },
   { value: "drop_shot", label: "Drop Shot" },
   { value: "lob", label: "Lob" },
 ];
@@ -36,10 +36,9 @@ export const PADEL_SWINGS: SwingOption[] = [
 ];
 
 // Pickleball-specific swings
+// Note: Values must match Shark API expected formats
 export const PICKLEBALL_SWINGS: SwingOption[] = [
   { value: "dink", label: "Dink" },
-  { value: "erne", label: "Erne" },
-  { value: "third_shot_drive", label: "Third Shot Drive" },
 ];
 
 /**
