@@ -30,30 +30,74 @@ function formatCategoryName(name: string): string {
 /**
  * Format Shark analysis result as context for the LLM
  * This provides structured technique analysis data to inform the LLM's video review
+ * Also includes syntax for embedding feature cards in the response
  */
 function formatSharkContextForLLM(sharkResult: SharkAnalysisResult): string {
   const categories = sharkResult.result?.feature_categories;
+  const features = sharkResult.result?.features;
   if (!categories) return "";
+
+  // Convert score to qualitative descriptor (defined here for categories)
+  const getCategoryLevel = (score: number): string => {
+    if (score <= 30) return "needs significant work";
+    if (score <= 50) return "needs improvement";
+    if (score <= 70) return "developing well";
+    if (score <= 85) return "strong";
+    return "excellent";
+  };
 
   const categoryScores = Object.entries(categories)
     .filter(([, cat]) => cat.average_score > 0)
-    .map(([name, cat]) => `- ${formatCategoryName(name)}: ${Math.round(cat.average_score)}/100`)
+    .map(([name, cat]) => `- ${formatCategoryName(name)}: ${getCategoryLevel(cat.average_score)}`)
     .join("\n");
 
-  const overallScore = Math.round(calculateAverageScore(categories));
+  // Convert score to qualitative descriptor
+  const getImprovementLevel = (score: number): string => {
+    if (score <= 30) return "significant room for improvement";
+    if (score <= 50) return "moderate room for improvement";
+    if (score <= 70) return "some refinement possible";
+    if (score <= 85) return "good, minor adjustments";
+    return "excellent";
+  };
 
-  return `[TECHNIQUE ANALYSIS CONTEXT - FIRST SWING ONLY]
-The following analysis was performed on the FIRST swing in the video using computer vision:
+  // List available features that can be embedded
+  const featureList = features
+    ?.map((f) => {
+      const displayName = f.feature_human_readable_name || f.human_name || formatCategoryName(f.feature_name);
+      return `- ${f.feature_name} "${displayName}" (${getImprovementLevel(f.score)}, Level: ${f.level})`;
+    })
+    .join("\n") || "";
 
-Overall Score: ${overallScore}/100
+  return `[MANDATORY TECHNIQUE DATA - YOU MUST USE THIS IN YOUR ANALYSIS]
 
-Category Breakdown:
+IMPORTANT INSTRUCTION: Computer vision has already analyzed the FIRST swing in this video. You MUST incorporate these specific findings into your analysis. Do not provide generic advice - reference the actual observations below.
+
+CATEGORY BREAKDOWN (for your reference only):
 ${categoryScores}
 
-Please use this analysis as context when reviewing the video. Note that this analysis only covers the first swing - if there are multiple swings, you may see additional technique elements not captured above.
-[END CONTEXT]
+DETAILED FEATURE ANALYSIS (Reference these in your response):
+${featureList}
 
-`;
+SCORING INTERPRETATION (DO NOT show raw scores to user):
+- Score 0-30: Significant room for improvement
+- Score 31-50: Moderate room for improvement
+- Score 51-70: Some refinement possible
+- Score 71-85: Good technique, minor adjustments
+- Score 86-100: Excellent technique
+
+YOUR TASK:
+1. Incorporate the computer vision findings into your analysis naturally
+2. NEVER mention specific scores (like "53/100" or "score of 38") - instead describe room for improvement qualitatively
+3. Focus your feedback on features with significant or moderate room for improvement
+4. For features you discuss in detail, you can embed an interactive card using: [[FEATURE:feature_name]]
+   Example: [[FEATURE:stance_open_closed]]
+   Only use EXACT feature names from the list above (the part before the quotes)
+
+REMEMBER: This data is for the FIRST swing only. If there are multiple swings, mention that additional swings weren't analyzed by the computer vision system.
+
+[END MANDATORY CONTEXT]
+
+User request: `;
 }
 
 interface UseAnalysisOptionsOptions {
@@ -151,7 +195,18 @@ export function useAnalysisOptions({
     if (options?.sharkContext?.result?.feature_categories) {
       const sharkContextStr = formatSharkContextForLLM(options.sharkContext);
       userPrompt = sharkContextStr + userPrompt;
-      analysisLogger.info("Added Shark context to LLM prompt");
+      analysisLogger.info("Added Shark context to LLM prompt", {
+        contextLength: sharkContextStr.length,
+        featureCount: options.sharkContext.result?.features?.length || 0,
+        categoryCount: Object.keys(options.sharkContext.result?.feature_categories || {}).length,
+        promptPreview: userPrompt.substring(0, 200) + "...",
+      });
+    } else {
+      analysisLogger.warn("No Shark context available for LLM prompt", {
+        hasSharkContext: !!options?.sharkContext,
+        hasResult: !!options?.sharkContext?.result,
+        hasCategories: !!options?.sharkContext?.result?.feature_categories,
+      });
     }
 
     // Create assistant message for analysis
@@ -171,6 +226,10 @@ export function useAnalysisOptions({
     abortControllerRef.current = abortController;
 
     try {
+      // Debug: Log the full prompt being sent to LLM
+      console.log("[DEBUG] Full prompt being sent to LLM:", userPrompt);
+      console.log("[DEBUG] Prompt length:", userPrompt.length);
+
       const formData = new FormData();
       formData.append("prompt", userPrompt);
       formData.append("videoUrl", videoUrl);
@@ -637,6 +696,7 @@ export function useAnalysisOptions({
                 { average_score: cat.average_score, feature_count: cat.feature_count }
               ])
             ),
+            features: sharkResult.result.features, // Full feature data for TechniqueFeatureCard rendering
           },
           isStreaming: false,
         });
@@ -650,6 +710,13 @@ export function useAnalysisOptions({
 
         // Trigger LLM analysis for additional feedback, passing Shark context
         const { preAnalysis, videoUrl, userPrompt } = optionsMessage.analysisOptions;
+        analysisLogger.info("Triggering LLM analysis with Shark context:", {
+          hasVideoUrl: !!videoUrl,
+          userPrompt: userPrompt?.substring(0, 100) || "(empty)",
+          sharkResultStatus: sharkResult?.status,
+          sharkFeatureCount: sharkResult?.result?.features?.length || 0,
+          sharkCategoryCount: Object.keys(sharkResult?.result?.feature_categories || {}).length,
+        });
         if (videoUrl) {
           await startQuickAnalysis(messageId, preAnalysis.sport, videoUrl, userPrompt, {
             sharkContext: sharkResult,

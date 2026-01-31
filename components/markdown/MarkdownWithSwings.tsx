@@ -12,6 +12,7 @@ import { SectionSpeaker } from "./SectionSpeaker";
 import { useFloatingVideoContextOptional } from "@/components/chat/viewers/FloatingVideoContext";
 import type { SwingExplanation } from "@/database";
 import { getHighlightingPreferences, getTTSSettings, getDeveloperMode, type HighlightingPreferences } from "@/utils/storage";
+import type { SharkFeature } from "@/types/shark";
 
 interface MarkdownWithSwingsProps {
   children: string;
@@ -21,6 +22,7 @@ interface MarkdownWithSwingsProps {
   onTTSUsage?: (characters: number, cost: number, quality: string) => void;
   onBallSequenceClick?: (ballSequence: BallSequenceClick) => void;
   isStreaming?: boolean;
+  features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
 }
 
 /**
@@ -45,7 +47,7 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming, features }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -61,11 +63,11 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   });
   const [ttsEnabled, setTTSEnabled] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
-  
+
   // Track when streaming just completed to trigger fade-in animation
   const wasStreamingRef = useRef(isStreaming);
   const [showSpeakerFadeIn, setShowSpeakerFadeIn] = useState(!isStreaming);
-  
+
   useEffect(() => {
     // When streaming changes from true to false, trigger the fade-in
     if (wasStreamingRef.current && !isStreaming) {
@@ -77,10 +79,10 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   useEffect(() => {
     // Load highlighting preferences from localStorage
     setHighlightingPrefs(getHighlightingPreferences());
-    
+
     // Load TTS enabled state from localStorage
     setTTSEnabled(getTTSSettings().enabled);
-    
+
     // Load developer mode state
     setDeveloperMode(getDeveloperMode());
 
@@ -138,7 +140,7 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
 
   // Floating video context for timestamp clicks
   const floatingCtx = useFloatingVideoContextOptional();
-  
+
   // Store floatingCtx in a ref so we always have the latest value
   const floatingCtxRef = useRef(floatingCtx);
   floatingCtxRef.current = floatingCtx;
@@ -147,7 +149,7 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   const handleTimestampClick = useCallback((timestamp: string) => {
     const ctx = floatingCtxRef.current;
     if (!ctx) return;
-    
+
     const seconds = timestampToSeconds(timestamp);
     // Pass false for autoPlay - video should pause at the timestamp so user can press play
     ctx.showFloatingVideoAtTime(seconds, false);
@@ -156,8 +158,8 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   // Memoize markdown components to prevent recreating them on every render
   // This prevents flickering when hovering over links/collapsible sections during streaming
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick),
-    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick]
+    () => createMarkdownComponents(handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features),
+    [handleTermClick, handleMetricClick, highlightingPrefs, handleCoordinateClick, onBallSequenceClick, handleCourtZoneClick, handleTimestampClick, features]
   );
 
   // Filter out Context & Environment Analysis section when not in developer mode
@@ -195,7 +197,7 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
           >
             {section.content}
           </ReactMarkdown>
-          
+
           {/* Add separator between sections (except after last section) */}
           {index < sections.length - 1 && (
             <div style={{ position: 'relative' }}>
@@ -206,12 +208,12 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
                 </span>
                 <div className="markdown-divider-line" />
               </div>
-              
+
               {/* Section speaker button - positioned on the separator line */}
               {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
-                <div 
+                <div
                   className="speaker-fade-in"
-                  style={{ 
+                  style={{
                     position: 'absolute',
                     right: '0px',
                     top: '0%',
@@ -228,11 +230,11 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
               )}
             </div>
           )}
-          
+
           {/* Last section: speaker button and feedback buttons in same row */}
           {index === sections.length - 1 && (
-            <div style={{ 
-              display: 'flex', 
+            <div style={{
+              display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               marginTop: '16px',
@@ -241,7 +243,7 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
               <div>
                 {feedbackButtons}
               </div>
-              
+
               {/* Speaker button on the right */}
               {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
                 <div className="speaker-fade-in">
@@ -257,27 +259,27 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
           )}
         </div>
       ))}
-      
-      <SwingExplanationModal 
+
+      <SwingExplanationModal
         open={swingModalOpen}
         onOpenChange={setSwingModalOpen}
         swing={selectedSwing}
         onAskForHelp={onAskForHelp}
       />
-      
-      <MetricConversionModal 
+
+      <MetricConversionModal
         open={metricModalOpen}
         onOpenChange={setMetricModalOpen}
         metric={selectedMetric}
       />
-      
-      <CourtCoordinateModal 
+
+      <CourtCoordinateModal
         open={coordinateModalOpen}
         onOpenChange={setCoordinateModalOpen}
         coordinate={selectedCoordinate}
         zone={selectedZone}
       />
-      
+
       {/* Fade-in animation for speaker buttons */}
       <style jsx global>{`
         .speaker-fade-in {
@@ -295,4 +297,3 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     </>
   );
 }
-

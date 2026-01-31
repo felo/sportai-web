@@ -1,3 +1,5 @@
+import type { SharkFeature } from "./shark";
+
 /**
  * Candidate option for interactive response selection
  */
@@ -33,6 +35,7 @@ export type Message = {
     categoryCount: number;
     featureCount: number;
     categories: Record<string, { average_score: number; feature_count: number }>;
+    features?: SharkFeature[]; // Full feature data for rendering TechniqueFeatureCard components
   };
   // Candidate responses (for messageType === "candidate_responses")
   candidateResponses?: {

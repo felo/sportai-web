@@ -8,6 +8,7 @@ export { AssistantMessage } from "./AssistantMessage";
 export { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 export { AnalysisOptionsMessage } from "./AnalysisOptionsMessage";
 export { SharkResultDisplay } from "./SharkResultDisplay";
+export { TechniqueFeatureCard } from "./TechniqueFeatureCard";
 export { TechniqueStudioPrompt } from "./TechniqueStudioPrompt";
 export { StudioPromptCard } from "./StudioPromptCard";
 export { ProfileCompletionPrompt } from "./ProfileCompletionPrompt";

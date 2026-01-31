@@ -9,6 +9,7 @@ import { FeedbackButtons } from "../../feedback/FeedbackButtons";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 import { useEffect, useRef } from "react";
+import type { SharkFeature } from "@/types/shark";
 
 interface AssistantMessageProps {
   messageId: string;
@@ -26,6 +27,7 @@ interface AssistantMessageProps {
   onFeedbackSubmitted?: () => void;
   onRetry?: () => void;
   isRetrying?: boolean;
+  features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
 }
 
 /**
@@ -47,13 +49,14 @@ export function AssistantMessage({
   onFeedbackSubmitted,
   onRetry,
   isRetrying,
+  features,
 }: AssistantMessageProps) {
   const floatingCtx = useFloatingVideoContextOptional();
   const floatingCtxRef = useRef(floatingCtx);
   useEffect(() => {
     floatingCtxRef.current = floatingCtx;
   }, [floatingCtx]);
-  
+
   // Register any assistant-rendered videos via MarkdownWithSwings callbacks
   // Note: MarkdownWithSwings already wires timestamp clicks; we add video registration here
   const handleRegisterVideo = (id: string, videoRef: React.RefObject<HTMLElement>, videoSrc: string) => {
@@ -123,18 +126,19 @@ export function AssistantMessage({
 
   // Show recovery UI if message is incomplete and not currently streaming
   const showRecovery = isIncomplete && !isStreaming && onRetry;
-  
+
   return (
     <Box className="prose dark:prose-invert" style={{ maxWidth: "none" }}>
       {content ? (
         <>
-          <MarkdownWithSwings 
-            messageId={messageId} 
+          <MarkdownWithSwings
+            messageId={messageId}
             onAskForHelp={onAskForHelp}
             onTTSUsage={onTTSUsage}
             isStreaming={isStreaming}
+            features={features}
             feedbackButtons={!isStreaming && !isIncomplete && !isGreeting ? (
-              <FeedbackButtons 
+              <FeedbackButtons
                 messageId={messageId}
                 chatId={chatId}
                 messageContent={content}
@@ -170,4 +174,3 @@ export function AssistantMessage({
     </Box>
   );
 }
-

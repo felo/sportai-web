@@ -623,6 +623,16 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     isStreaming={message.isStreaming}
                     isIncomplete={message.isIncomplete}
                     isGreeting={message.isGreeting}
+                    features={(() => {
+                      // Find features from a previous shark_result message
+                      for (let i = messageIndex - 1; i >= 0; i--) {
+                        const prevMessage = allMessages[i];
+                        if (prevMessage.messageType === "shark_result" && prevMessage.sharkResult?.features) {
+                          return prevMessage.sharkResult.features;
+                        }
+                      }
+                      return undefined;
+                    })()}
                     thinkingMessage={(() => {
                       // Show upload progress during uploading
                       if (progressStage === "uploading") {
