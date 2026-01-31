@@ -74,6 +74,13 @@ export function useVideoPreAnalysis({
     cameraAngle: string,
     durationSeconds: number | null
   ): { eligible: boolean; reason: string | undefined } => {
+    // TEMPORARY: Force all videos to be technique eligible for event demo
+    // To revert, uncomment the original logic below and remove the hardcoded return
+    const eligible = true;
+    const reason = "Ready for technique analysis!";
+    return { eligible, reason };
+
+    /* ORIGINAL LOGIC - uncomment to restore normal behavior:
     const isGroundLevelCamera = ["side", "ground_behind", "diagonal"].includes(cameraAngle);
     const eligible = isGroundLevelCamera && durationSeconds !== null && durationSeconds < 20;
 
@@ -87,6 +94,7 @@ export function useVideoPreAnalysis({
     }
 
     return { eligible, reason };
+    */
   }, []);
 
   // Auto-detect sport and eligibility from video file
