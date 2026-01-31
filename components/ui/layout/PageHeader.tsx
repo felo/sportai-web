@@ -559,7 +559,7 @@ export function PageHeader({
     }
   };
 
-  // Mobile layout: Hamburger menu (left), centered logo (2/3 desktop size)
+  // Mobile layout: Hamburger menu (left), centered Chat/Studio toggle buttons
   if (isMobile) {
     return (
       <Box
@@ -595,13 +595,19 @@ export function PageHeader({
           />
         </Box>
 
-        {/* Centered Logo - Tap to create new chat if handler provided (2/3 desktop size) */}
-        <LogoNewChatButton
-          onNewChat={onNewChat}
-          directTapAction={!!onNewChat}
-          width={120}
-          height={38}
-        />
+        {/* Center: Chat/Studio Mode Toggle Buttons */}
+        <Flex align="center" gap="2">
+          <ToggleButton
+            label="Chat"
+            isActive={activeMode === "chat"}
+            onClick={() => handleModeChange("chat")}
+          />
+          <ToggleButton
+            label="Studio"
+            isActive={activeMode === "studio"}
+            onClick={() => handleModeChange("studio")}
+          />
+        </Flex>
 
         {/* Actions on the right */}
         {actions && (

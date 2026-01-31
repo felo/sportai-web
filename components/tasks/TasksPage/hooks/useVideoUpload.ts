@@ -24,6 +24,8 @@ interface UseVideoUploadReturn {
   handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   clearSelectedFile: () => void;
   handleFileUploadSubmit: (taskType: string, sport: string) => Promise<void>;
+  /** Upload a file directly (for use with modals that manage their own file state) */
+  uploadFileAndCreateTask: (file: File, taskType: string, sport: string) => Promise<void>;
 }
 
 /**
@@ -66,10 +68,10 @@ export function useVideoUpload({
     }
   }, []);
 
-  // Submit file upload
-  const handleFileUploadSubmit = useCallback(
-    async (taskType: string, sport: string) => {
-      if (!accessToken || !selectedFile) return;
+  // Core upload logic - shared between handleFileUploadSubmit and uploadFileAndCreateTask
+  const uploadFile = useCallback(
+    async (file: File, taskType: string, sport: string) => {
+      if (!accessToken) throw new Error("Not authenticated");
 
       setUploadingVideo(true);
       setUploadProgress(0);
@@ -80,8 +82,8 @@ export function useVideoUpload({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fileName: selectedFile.name,
-            contentType: selectedFile.type,
+            fileName: file.name,
+            contentType: file.type,
           }),
         });
 
@@ -94,7 +96,7 @@ export function useVideoUpload({
         const videoUrl = downloadUrl || publicUrl;
 
         // Step 2: Upload file to S3
-        await uploadToS3(presignedUrl, selectedFile, (progress) => {
+        await uploadToS3(presignedUrl, file, (progress) => {
           setUploadProgress(progress);
         });
 
@@ -106,7 +108,7 @@ export function useVideoUpload({
         try {
           logger.debug("[useVideoUpload] Extracting thumbnail from uploaded file...");
           const { frameBlob, durationSeconds } = await extractFirstFrameWithDuration(
-            selectedFile,
+            file,
             640,
             0.7
           );
@@ -147,15 +149,41 @@ export function useVideoUpload({
 
         const { task } = await response.json();
         onTaskCreated(task);
-        clearSelectedFile();
-      } catch (err) {
-        onError(err instanceof Error ? err.message : "Failed to upload video");
+        return task;
       } finally {
         setUploadingVideo(false);
         setUploadProgress(0);
       }
     },
-    [accessToken, selectedFile, onTaskCreated, onError, clearSelectedFile]
+    [accessToken, onTaskCreated]
+  );
+
+  // Submit file upload using selectedFile state
+  const handleFileUploadSubmit = useCallback(
+    async (taskType: string, sport: string) => {
+      if (!selectedFile) return;
+
+      try {
+        await uploadFile(selectedFile, taskType, sport);
+        clearSelectedFile();
+      } catch (err) {
+        onError(err instanceof Error ? err.message : "Failed to upload video");
+      }
+    },
+    [selectedFile, uploadFile, clearSelectedFile, onError]
+  );
+
+  // Upload a file directly (for modals that manage their own file state)
+  const uploadFileAndCreateTask = useCallback(
+    async (file: File, taskType: string, sport: string) => {
+      try {
+        await uploadFile(file, taskType, sport);
+      } catch (err) {
+        onError(err instanceof Error ? err.message : "Failed to upload video");
+        throw err; // Re-throw so modal can handle it
+      }
+    },
+    [uploadFile, onError]
   );
 
   return {
@@ -166,7 +194,6 @@ export function useVideoUpload({
     handleFileSelect,
     clearSelectedFile,
     handleFileUploadSubmit,
+    uploadFileAndCreateTask,
   };
 }
-
-

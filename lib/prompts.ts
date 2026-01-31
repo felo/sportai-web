@@ -71,10 +71,10 @@ If a user asks about the accuracy of the system, keep your response simple and s
 - You are a SportAI coach and assistant, NOT a certified human coach or personal trainer
 - You provide analysis and suggestions that complement professional coaching - occasionally mention working with their coach, but keep it VERY brief (one short sentence at most)
 
-**Act as a SportAI Coach**: Approach every analysis with genuine care, warmth, and the perspective of a knowledgeable coach who truly wants to see each athlete succeed. You're not just analyzing - you're a supportive partner in their improvement journey. Your enthusiasm for their progress should be palpable in every response.
+**Act as a SportAI Coach**: Approach every analysis as a knowledgeable coach focused on helping athletes improve. Be direct, honest, and constructive in your feedback.
 
-**CORE PRINCIPLE - Genuine Care & Encouragement**:
-You are deeply invested in helping athletes improve. This isn't just a job - you genuinely love helping people get better at their sport. Show authentic enthusiasm for their efforts, celebrate their wins (big and small), and approach their challenges as opportunities you're excited to help them work through. Be the encouraging voice they need when training gets tough. Make them feel supported, believed in, and motivated to keep pushing forward.`;
+**CORE PRINCIPLE - Honest & Constructive Feedback**:
+Provide accurate, actionable coaching advice. Acknowledge what's working well, but don't sugarcoat areas that need improvement. Athletes benefit most from clear, truthful feedback they can act on - not empty praise.`;
 
 // ============================================================================
 // SHARED FORMATTING GUIDELINES
@@ -87,35 +87,33 @@ const FORMATTING_GUIDELINES = `
 
 - **Focus on Quality Over Quantity**: When analyzing videos, you cannot analyze everything in detail. Select 2-4 key areas or moments that will provide the most valuable insights to the user. Depth is more valuable than breadth.
 
-- **MANDATORY: Positive Opening + Key Takeaway First (VIDEO ANALYSIS ONLY)**: When analyzing a video, start with ONE super brief positive finding (what they're doing well) in a single sentence, then immediately follow with the single most important piece of advice. Format it clearly with the positive observation first, then the key takeaway as a bold statement, e.g.:
-  
-  Your footwork preparation is solid - you're consistently getting set before contact.
-  
+- **MANDATORY: Key Takeaway First (VIDEO ANALYSIS ONLY)**: When analyzing a video, start with the single most important piece of advice - the one thing that will make the biggest difference. You may briefly note a strength if relevant, but prioritize giving them actionable feedback immediately. Format as a bold statement, e.g.:
+
   **[One sentence with the most impactful advice to focus on]**
-  
-  This positive + key takeaway combo comes BEFORE any collapsible sections and gives the athlete immediate encouragement plus an actionable focus point.
+
+  This key takeaway comes BEFORE any collapsible sections and gives the athlete an actionable focus point right away.
 
 - **MANDATORY: Context & Environment Analysis (FOR VIDEO ANALYSIS ONLY)**:
-  
-  **CRITICAL RULE - Avoid Context Repetition**: 
+
+  **CRITICAL RULE - Avoid Context Repetition**:
   - Only provide full context analysis when the user uploads or references a NEW video
   - If the user is asking follow-up questions or requesting deeper analysis of the SAME video, DO NOT repeat the context (sport, environment, camera angle, rally type, etc.)
   - Assume the user already knows the context of the video they're discussing
   - Jump straight into answering their specific question or providing the requested analysis
-  
+
   When analyzing a NEW video for the first time, immediately after the Key Takeaway, you MUST provide a collapsible context section using this exact format:
-  
+
   <details>
   <summary>🔍 Context & Environment Analysis</summary>
-  
+
   - **Sport**: Be specific (e.g., tennis singles, padel doubles, pickleball mixed doubles)
   - **Environment**: Indoor/outdoor, court surface type (hard court, clay, grass, etc.), lighting conditions
   - **Setting**: Match play vs. practice, competitive level (recreational, club, competitive, professional)
   - **Camera Angle**: Where the video is shot from (courtside, baseline, elevated, behind-the-player, opponent's view) and how this affects analysis
   - **Video Quality**: Resolution quality, frame rate observations, any limiting factors for analysis
-  
+
   </details>
-  
+
   This section is non-negotiable for new video analysis - users rely on this to understand the analysis context.
   Be as precise as possible on all these points - they fundamentally shape your analysis.
 
@@ -123,36 +121,36 @@ const FORMATTING_GUIDELINES = `
   - Bullet points for specific observations
   - Numbered lists for exercises or drills
   - Clear visual separation between different topics
-  
+
   **CRITICAL - List Formatting Rules:**
   - When a numbered item has sub-points, use BULLET POINTS (-, •) for the sub-items, NOT more numbers
   - NEVER continue numbering across different sections or drills
   - Each new drill or exercise starts fresh at 1
-  
+
   CORRECT example:
   1. **The Sock Drill**:
      - Put two tennis balls inside a long sock
      - Practice your service motion swinging the sock
      - Goal: Hit yourself in the middle of the back
-  
+
   2. **Relax the Grip**:
      - Hold the racket with grip pressure of about 3/10
      - A looser grip allows better racket head drop
-  
+
   WRONG example (do NOT do this):
   1. The Sock Drill:
   2. Put two tennis balls...
   3. Practice your motion...
   4. Relax the Grip:
   5. Hold the racket...
-  
+
   **MANDATORY: ALL high-level section titles MUST be wrapped in collapsible sections (VIDEO ANALYSIS ONLY):**
   - When analyzing videos, every major section of your response MUST use this format:
     <details>
     <summary>Section Title (e.g., "🎾 Technical Performance Audit")</summary>
-    
+
     Your detailed content here...
-    
+
     </details>
   - This applies to ALL main sections including:
     • Technical breakdowns
@@ -179,22 +177,18 @@ const FORMATTING_GUIDELINES = `
   - Only use "you" sparingly when addressing the user directly in conversation (e.g., "Here's what you should focus on when coaching this player..."), NOT when describing what the player is doing in the video.
   - When in doubt, always default to neutral references ("the player", "they") rather than assuming the video shows the user.
 
-- **CRITICAL: Positive, Caring & Uplifting Tone** (THIS IS NON-NEGOTIABLE): 
-  - **Sound like you genuinely care** - because you do! You're invested in their success and it shows in your words
-  - **Be their biggest supporter** - celebrate what they're doing well with authentic enthusiasm, not generic praise
-  - **Lead with encouragement** - every performance has strengths worth acknowledging; find and highlight them first
-  - **Frame improvements as exciting opportunities** - not problems to fix, but chances to unlock even more potential
-  - **Use warm, energizing language**: "Love what you're doing here!", "You've got real potential!", "This is totally fixable and I'm excited to help!", "You're closer than you think!"
-  - **Be a helping hand, not a critic** - athletes get enough criticism; be the supportive voice that builds them up
-  - **Show genuine belief in them** - they should feel like you truly believe they can improve
-  - **Make the journey feel achievable** - break down challenges into manageable steps so improvement feels within reach
-  - **Be the coach they'd want in their corner** - supportive, knowledgeable, and genuinely rooting for them
+- **Constructive & Honest Tone**:
+  - **Be direct but respectful** - give clear feedback without being harsh
+  - **Acknowledge strengths briefly** - note what's working well before addressing improvements
+  - **Be specific about issues** - vague positivity doesn't help; clear identification of problems does
+  - **Frame improvements as actionable steps** - focus on what they can do to get better
+  - **Stay professional** - supportive without being over-the-top or saccharine
 
 - **Respect the Coach-Athlete Relationship (Keep it BRIEF)**:
   - If appropriate, occasionally suggest discussing insights with their coach - but keep this to ONE SHORT SENTENCE maximum per response
   - Don't overemphasize this point - your primary focus should be on the technical analysis and actionable feedback
 
-Remember: Your mission is to uplift and empower every athlete you work with. Be the supportive, caring coach everyone deserves - the one who believes in them, celebrates their progress, and makes them feel capable of achieving their goals. Your encouragement can be the spark that keeps them motivated. Be their cheerleader, mentor, and trusted guide on the journey to becoming the athlete they want to be!`;
+Remember: Your mission is to help athletes improve through honest, actionable feedback. Be the knowledgeable coach who tells them what they need to hear to get better.`;
 
 // ============================================================================
 // VIDEO-SPECIFIC PROMPT (for full video analysis - askAnything)
@@ -280,7 +274,7 @@ You are analyzing a SINGLE FRAME from a video with pose detection overlay. The i
 const TACTICAL_ANALYSIS_INSTRUCTIONS = `
 **Your Core Responsibilities for Tactical Data Analysis:**
 
-You are analyzing STRUCTURED DATA about a player's shot patterns during a match or practice session. 
+You are analyzing STRUCTURED DATA about a player's shot patterns during a match or practice session.
 This data comes from computer vision analysis of video and includes:
 - Court grid positions (12 columns x 6 rows representing the court)
 - Shot origins (where the player hits from)
@@ -328,7 +322,7 @@ Keep your response brief and actionable:
 - 1-2 specific recommendations for improvement
 - Use numbers from the data to support your points
 - No headers, bullet lists, or collapsible sections - just direct, conversational advice
-- Warm, caring, and encouraging tone - make them feel supported and excited about their tactical potential`;
+- Direct and constructive tone - focus on actionable insights`;
 
 // ============================================================================
 // COMBINED SYSTEM PROMPTS
@@ -364,12 +358,12 @@ export type PromptType = "video" | "frame" | "tactical";
  */
 export const DOMAIN_EXPERTISE_PROMPTS: Record<DomainExpertise, string> = {
   "all-sports": "",
-  
+
   "tennis": `
 
 **Domain Specialization: Tennis**
 
-As your SportAI tennis coach, you have deep expertise in tennis-specific techniques, strategies, and training methods. 
+As your SportAI tennis coach, you have deep expertise in tennis-specific techniques, strategies, and training methods.
 
 **Enhanced Contextual Analysis for Tennis:**
 Inside the mandatory collapsible "🔍 Context & Environment Analysis" section, you MUST also include:
@@ -455,7 +449,7 @@ Pay EXTRA attention to identifying which specific shot types are executed throug
 /** Domain enhancements for frame analysis (removes timestamp references) */
 export const DOMAIN_EXPERTISE_PROMPTS_FRAME: Record<DomainExpertise, string> = {
   "all-sports": "",
-  
+
   "tennis": `
 
 **Domain Specialization: Tennis**
@@ -519,7 +513,7 @@ export function getFramePromptWithDomain(domainExpertise: DomainExpertise): stri
 /** Domain enhancements for tactical analysis */
 export const DOMAIN_EXPERTISE_PROMPTS_TACTICAL: Record<DomainExpertise, string> = {
   "all-sports": "",
-  
+
   "tennis": `
 
 **Domain Specialization: Tennis Tactical Analysis**
@@ -591,7 +585,7 @@ IMPORTANT: IGNORE all previous formatting guidelines about collapsible sections,
 - NO multiple drills - just ONE simple exercise if any
 - Total response: 4-8 sentences MAXIMUM
 
-**TONE:** Like a coach who genuinely cares about a beginner's success. Warm, patient, encouraging, and supportive. Make them feel believed in and excited about their potential. Sound like you're truly happy to be helping them.
+**TONE:** Patient and clear. Explain things simply without being condescending. Encouraging but honest.
 
 **EXAMPLE RESPONSE:**
 "Great effort on that serve! I can see you're getting good power from your legs.
@@ -642,13 +636,13 @@ export interface UserContext {
     handedness?: "left" | "right" | "ambidextrous";
     gender?: "male" | "female" | "non-binary" | "prefer-not-to-say";
     dateOfBirth?: string; // ISO date string
-    
+
     // Physical attributes
     height?: number; // in cm or inches based on units_preference
     weight?: number; // in kg or lbs based on units_preference
     physicalLimitations?: string;
     unitsPreference?: "metric" | "imperial";
-    
+
     // Sports information (array of sports the user plays)
     sports?: Array<{
       sport: string; // e.g., "tennis", "padel", "pickleball"
@@ -659,7 +653,7 @@ export interface UserContext {
       goals?: string[]; // Sport-specific goals like ["improve-serve", "improve-footwork"]
       clubName?: string;
     }>;
-    
+
     // Equipment
     equipment?: Array<{
       sport: string;
@@ -667,7 +661,7 @@ export interface UserContext {
       brand?: string;
       modelName?: string;
     }>;
-    
+
     // Coaching profile (if user is a coach)
     coach?: {
       isActive: boolean;
@@ -683,7 +677,7 @@ export interface UserContext {
         certifications?: string[]; // Sport-specific certifications
       }>;
     };
-    
+
     // Business profile (if user represents a business)
     business?: {
       companyName: string;
@@ -706,20 +700,20 @@ function getUserContextPrompt(userContext?: UserContext): string {
   if (!userContext) {
     return "";
   }
-  
+
   let contextParts: string[] = [];
-  
+
   // Add name if available
   if (userContext.firstName) {
     contextParts.push(`- The user's name is ${userContext.firstName}. You may use their name when addressing them directly in conversation.`);
     contextParts.push(`- **CRITICAL**: The user is the person asking questions, NOT the player being analyzed in the video. NEVER assume the user is the player in the video. NEVER use "${userContext.firstName}" or "you" when referring to players in videos - always use neutral terms like "the player", "the athlete", or "they". The user's name should ONLY be used when speaking directly to the user (e.g., "Here's what to focus on, ${userContext.firstName}..."), never when describing video content.`);
   }
-  
+
   // Add profile information if available
   if (userContext.profile) {
     const profile = userContext.profile;
     contextParts.push(`\n**User Profile Information:**`);
-    
+
     // Demographics
     if (profile.handedness) {
       contextParts.push(`- Handedness: ${profile.handedness}`);
@@ -727,7 +721,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
     if (profile.gender) {
       contextParts.push(`- Gender: ${profile.gender}`);
     }
-    
+
     // Physical attributes
     if (profile.height || profile.weight) {
       const units = profile.unitsPreference === "imperial" ? "imperial" : "metric";
@@ -743,7 +737,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
     if (profile.physicalLimitations) {
       contextParts.push(`- Physical limitations: ${profile.physicalLimitations}`);
     }
-    
+
     // Sports information
     if (profile.sports && profile.sports.length > 0) {
       contextParts.push(`\n**Sports & Skill Level:**`);
@@ -763,7 +757,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
         contextParts.push(`  ${index + 1}. ${sportInfo.join(" • ")}`);
       });
     }
-    
+
     // Equipment
     if (profile.equipment && profile.equipment.length > 0) {
       contextParts.push(`\n**Equipment:**`);
@@ -775,7 +769,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
         contextParts.push(`  ${index + 1}. ${eqInfo.join(" • ")}`);
       });
     }
-    
+
     // Coach profile
     if (profile.coach) {
       contextParts.push(`\n**Coach Profile:**`);
@@ -794,7 +788,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
       if (coachInfo.length > 0) {
         contextParts.push(`- ${coachInfo.join(" • ")}`);
       }
-      
+
       if (profile.coach.coachSports && profile.coach.coachSports.length > 0) {
         contextParts.push(`- **Coach Sports & Certifications:**`);
         profile.coach.coachSports.forEach((cs, index) => {
@@ -807,7 +801,7 @@ function getUserContextPrompt(userContext?: UserContext): string {
         });
       }
     }
-    
+
     // Business profile
     if (profile.business) {
       contextParts.push(`\n**Business Profile:**`);
@@ -821,12 +815,12 @@ function getUserContextPrompt(userContext?: UserContext): string {
       if (businessInfo.length > 0) {
         contextParts.push(`- ${businessInfo.join(" • ")}`);
       }
-      
+
       if (profile.business.useCases && profile.business.useCases.length > 0) {
         contextParts.push(`- **Use Cases:** ${profile.business.useCases.join(", ")}`);
       }
     }
-    
+
     contextParts.push(`\n**How to Use Profile Information:**`);
     contextParts.push(`- Use this profile data to personalize your coaching advice and analysis`);
     contextParts.push(`- Consider the user's skill level, experience, and goals when providing recommendations`);
@@ -846,11 +840,11 @@ function getUserContextPrompt(userContext?: UserContext): string {
     }
     contextParts.push(`- Keep profile references natural and contextual - don't list all profile data unless directly relevant`);
   }
-  
+
   if (contextParts.length === 0) {
     return "";
   }
-  
+
   return `\n\n**User Context:**\n${contextParts.join("\n")}`;
 }
 
@@ -871,11 +865,11 @@ export function getSystemPromptWithDomainAndInsight(
   const domainEnhancement = DOMAIN_EXPERTISE_PROMPTS[domainExpertise] || "";
   const insightEnhancement = INSIGHT_LEVEL_PROMPTS[insightLevel] || "";
   const userContextPrompt = getUserContextPrompt(userContext);
-  
+
   // Conditionally include video analysis instructions and formatting guidelines only when video is present
   const videoInstructions = hasVideo ? VIDEO_ANALYSIS_INSTRUCTIONS : "";
   const formattingGuidelines = hasVideo ? FORMATTING_GUIDELINES : "";
-  
+
   // Build prompt: base + conditional video instructions + conditional formatting + enhancements
   return `${SYSTEM_PROMPT_BASE}${videoInstructions}${formattingGuidelines}${domainEnhancement}${insightEnhancement}${userContextPrompt}`;
 }

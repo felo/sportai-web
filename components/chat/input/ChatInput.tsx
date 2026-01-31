@@ -228,7 +228,7 @@ export function ChatInput({
       // Ensure it starts at exactly base height
       textareaRef.current.style.height = `${BASE_TEXTAREA_HEIGHT}px`;
     }
-  }, []);
+  }, [BASE_TEXTAREA_HEIGHT]);
 
   useEffect(() => {
     // Skip resize on initial mount if empty
@@ -260,7 +260,7 @@ export function ChatInput({
         }
       });
     });
-  }, [prompt]);
+  }, [prompt, BASE_TEXTAREA_HEIGHT]);
 
   // Detect sport names in text and auto-switch domain expertise
   const detectAndSwitchSport = (text: string) => {
@@ -660,7 +660,7 @@ export function ChatInput({
                   />
                   <UploadIcon width="18" height="18" color="#1C1C1C" />
                   <Text size="2" style={{ color: "#1C1C1C", whiteSpace: "nowrap", fontWeight: 500 }}>
-                    {isMobile ? "Upload" : "Upload something"}
+                    {isMobile ? "Record or Upload" : "Upload something"}
                   </Text>
                 </label>
               </Tooltip>

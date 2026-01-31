@@ -15,10 +15,12 @@ import {
 } from "@radix-ui/react-icons";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { usePendingChat } from "@/components/PendingChatContext";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/ui";
 import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat/input/ChatInput";
 import { FileSizeLimitModal } from "@/components/chat/input/FileSizeLimitModal";
+import { VideoUploadModal, VideoFeedbackModal } from "@/components/shared";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -29,21 +31,46 @@ import buttonStyles from "@/styles/buttons.module.css";
 
 const LOGO_URL = "https://res.cloudinary.com/djtxhrly7/image/upload/v1763680386/sai-logo-green_nuuyat.svg";
 
-// Mocked starter prompts for the home page
-const STARTER_PROMPT_BUTTONS = [
-  { id: "video-feedback", label: "Get video feedback", icon: VideoIcon },
-  { id: "analyze-match", label: "Analyze a match", icon: BarChartIcon },
-  { id: "plan-session", label: "Plan a session", icon: CalendarIcon },
-  { id: "discuss-strategy", label: "Discuss strategy", icon: ChatBubbleIcon },
-  { id: "suggest-exercise", label: "Suggest an exercise", icon: LightningBoltIcon },
-  { id: "learn-rules", label: "Learn the rules", icon: ReaderIcon },
-  { id: "get-started", label: "Help me get started", icon: RocketIcon },
+/**
+ * Starter prompt types:
+ * - "directPrompt": Immediately submits the prompt when clicked
+ * - "fillInput": Just fills the input field (default behavior)
+ * - "openModal": Opens a modal dialog (requires modalId)
+ */
+type StarterPromptType = "directPrompt" | "fillInput" | "openModal";
+
+/**
+ * Modal identifiers for openModal type
+ * - "videoFeedback": Video feedback modal - sends video to chat
+ * - "videoUploadMatch": Video upload modal with match analysis as default
+ */
+type ModalId = "videoFeedback" | "videoUploadMatch";
+
+interface StarterPromptButton {
+  id: string;
+  label: string;
+  prompt?: string; // The actual prompt to send (if different from label)
+  icon: React.ComponentType<{ width?: string | number; height?: string | number }>;
+  type?: StarterPromptType; // defaults to "fillInput"
+  modalId?: ModalId; // Required when type is "openModal"
+}
+
+// Starter prompts for the home page
+const STARTER_PROMPT_BUTTONS: StarterPromptButton[] = [
+  { id: "video-feedback", label: "Get video feedback", icon: VideoIcon, type: "openModal", modalId: "videoFeedback" },
+  { id: "analyze-match", label: "Analyze a match", icon: BarChartIcon, type: "openModal", modalId: "videoUploadMatch" },
+  { id: "get-started", label: "Help me get started", prompt: "Help me get started with SportAI Open", icon: RocketIcon, type: "directPrompt" },
+  { id: "learn-rules", label: "Learn the rules", prompt: "Can you teach me the rules of any sport?", icon: ReaderIcon, type: "directPrompt" },
+  { id: "plan-session", label: "Plan a session", prompt: "Can you help me plan a session?", icon: CalendarIcon, type: "directPrompt" },
+  { id: "discuss-strategy", label: "Discuss strategy", prompt: "Are you able to help with strategic advice?", icon: ChatBubbleIcon, type: "directPrompt" },
+  { id: "suggest-exercise", label: "Suggest an exercise", prompt: "Suggest an exercise for me to do with video feedback", icon: LightningBoltIcon, type: "directPrompt" }
 ];
 
 function HomeContent() {
   const router = useRouter();
   const { isCollapsed, isInitialLoad } = useSidebar();
   const { setPendingSubmission } = usePendingChat();
+  const { session } = useAuth();
   const isMobile = useIsMobile();
 
   // Local state for the chat input
@@ -51,6 +78,10 @@ function HomeContent() {
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>("fast");
   const [mediaResolution, setMediaResolution] = useState<MediaResolution>("medium");
   const [domainExpertise, setDomainExpertise] = useState<DomainExpertise>("all-sports");
+
+  // Modal state
+  const [videoUploadModalOpen, setVideoUploadModalOpen] = useState(false);
+  const [videoFeedbackModalOpen, setVideoFeedbackModalOpen] = useState(false);
 
   // Video upload hook
   const {
@@ -104,22 +135,20 @@ function HomeContent() {
     e.target.value = '';
   }, [processVideoFile]);
 
-  // Handle form submission - set pending and navigate to /chat
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Submit prompt and navigate to chat - can be called with custom prompt text
+  const submitPrompt = useCallback((promptText: string) => {
     // Check if there's valid input
-    const videoUrls = extractVideoUrls(prompt);
+    const videoUrls = extractVideoUrls(promptText);
     const hasValidVideoUrl = videoUrls.length === 1;
     const effectiveVideoUrl = detectedVideoUrl || (hasValidVideoUrl ? videoUrls[0] : undefined);
 
-    if (!prompt.trim() && !videoFile && !effectiveVideoUrl) {
+    if (!promptText.trim() && !videoFile && !effectiveVideoUrl) {
       return; // Nothing to submit
     }
 
     // Set pending submission in context (includes pre-analysis to avoid re-analyzing)
     setPendingSubmission({
-      prompt: prompt.trim(),
+      prompt: promptText.trim(),
       videoFile: videoFile || undefined,
       videoPreview: videoPreview || undefined,
       detectedVideoUrl: effectiveVideoUrl || undefined,
@@ -133,7 +162,44 @@ function HomeContent() {
 
     // Navigate to chat page
     router.push("/chat");
-  }, [prompt, videoFile, videoPreview, detectedVideoUrl, thinkingMode, mediaResolution, domainExpertise, setPendingSubmission, router]);
+  }, [videoFile, videoPreview, detectedVideoUrl, thinkingMode, mediaResolution, domainExpertise, setPendingSubmission, router, videoPreAnalysis]);
+
+  // Handle form submission - set pending and navigate to /chat
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    submitPrompt(prompt);
+  }, [prompt, submitPrompt]);
+
+  // Handle starter prompt click
+  const handleStarterPromptClick = useCallback((item: StarterPromptButton) => {
+    const actualPrompt = item.prompt || item.label;
+
+    if (item.type === "directPrompt") {
+      // Immediately submit the prompt
+      submitPrompt(actualPrompt);
+    } else if (item.type === "openModal") {
+      // Open the appropriate modal
+      if (item.modalId === "videoFeedback") {
+        setVideoFeedbackModalOpen(true);
+      } else if (item.modalId === "videoUploadMatch") {
+        setVideoUploadModalOpen(true);
+      }
+    } else {
+      // Default: just fill the input
+      setPrompt(actualPrompt);
+    }
+  }, [submitPrompt]);
+
+  // Handle task created from video upload modal - navigate to library
+  const handleTaskCreated = useCallback(() => {
+    router.push("/library");
+  }, [router]);
+
+  // Handle video feedback submission - attach video to input field
+  const handleVideoFeedbackSubmit = useCallback((file: File) => {
+    // Attach the video to the chat input
+    processVideoFile(file, 'file_picker');
+  }, [processVideoFile]);
 
   // Handle new chat from header - just stay on home page (we're already there)
   const handleNewChat = useCallback(() => {
@@ -200,21 +266,19 @@ function HomeContent() {
           }}
         >
           {/* Logo */}
-          {!isMobile && (
-            <Box style={{ marginBottom: "var(--space-4)" }}>
-              <Image
-                src={LOGO_URL}
-                alt="SportAI"
-                width={80}
-                height={100}
-                style={{
-                  height: "auto",
-                  objectFit: "contain",
-                }}
-                priority
-              />
-            </Box>
-          )}
+          <Box style={{ marginBottom: "var(--space-4)" }}>
+            <Image
+              src={LOGO_URL}
+              alt="SportAI"
+              width={isMobile ? 60 : 80}
+              height={isMobile ? 75 : 100}
+              style={{
+                height: "auto",
+                objectFit: "contain",
+              }}
+              priority
+            />
+          </Box>
 
           {/* Greeting */}
           <Text
@@ -283,9 +347,7 @@ function HomeContent() {
                     size="2"
                     variant="soft"
                     className={`${buttonStyles.actionButtonSecondary} ${buttonStyles.borderless} ${buttonStyles.sentenceCase}`}
-                    onClick={() => {
-                      setPrompt(item.label);
-                    }}
+                    onClick={() => handleStarterPromptClick(item)}
                     style={{
                       cursor: "pointer",
                       display: "flex",
@@ -307,6 +369,22 @@ function HomeContent() {
       <FileSizeLimitModal
         open={showFileSizeLimitModal}
         onOpenChange={setShowFileSizeLimitModal}
+      />
+
+      {/* Video feedback modal - sends video to chat */}
+      <VideoFeedbackModal
+        open={videoFeedbackModalOpen}
+        onOpenChange={setVideoFeedbackModalOpen}
+        onSubmit={handleVideoFeedbackSubmit}
+      />
+
+      {/* Video upload modal for match analysis */}
+      <VideoUploadModal
+        open={videoUploadModalOpen}
+        onOpenChange={setVideoUploadModalOpen}
+        accessToken={session?.access_token ?? null}
+        onTaskCreated={handleTaskCreated}
+        defaultTaskType="statistics"
       />
     </main>
   );

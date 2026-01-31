@@ -20,6 +20,7 @@ import { setCurrentChatId } from "@/utils/storage-unified";
 import { getDeveloperMode, getGuestTasks } from "@/utils/storage";
 import { TaskGridView } from "../TaskGridView";
 import { isSampleTask, useRefreshedSampleTasks } from "../sampleTasks";
+import { VideoUploadModal } from "@/components/shared";
 import type { Task } from "./types";
 import { STATUS_COLORS, SPORT_COLORS, SPORT_LABELS, TASK_TYPES, TICK_INTERVAL_MS } from "./constants";
 import { formatDate, formatDuration, formatElapsed, downloadVideo } from "./utils";
@@ -45,6 +46,7 @@ export function TasksPage() {
   const [developerMode, setDeveloperMode] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   // Form state
   const [videoUrl, setVideoUrl] = useState("");
@@ -158,6 +160,11 @@ export function TasksPage() {
     router.push("/");
   }, [router]);
 
+  // Handle task created from modal
+  const handleTaskCreated = useCallback((task: Task) => {
+    setTasks((prev) => [task, ...prev]);
+  }, [setTasks]);
+
   // Badge helpers
   const getStatusBadge = (status: Task["status"]) => (
     <Badge color={STATUS_COLORS[status]}>{status}</Badge>
@@ -205,6 +212,15 @@ export function TasksPage() {
     <>
       <Sidebar />
       <PageHeader onNewChat={handleNewChat} />
+
+      {/* Video Upload Modal */}
+      <VideoUploadModal
+        open={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        accessToken={session?.access_token ?? null}
+        onTaskCreated={handleTaskCreated}
+        onError={setError}
+      />
       <Box
         style={{
           height: "100vh",
@@ -250,7 +266,17 @@ export function TasksPage() {
             />
           )}
 
-          {/* Filters and View Toggle */}
+          {/* Hidden file input for video upload */}
+          <input
+            ref={videoUpload.fileInputRef}
+            id="library-video-upload"
+            type="file"
+            accept="video/*"
+            onChange={videoUpload.handleFileSelect}
+            style={{ display: "none" }}
+          />
+
+          {/* Filters and View Toggle / Upload Button */}
           <TaskFilters
             filterSport={filterSport}
             onFilterSportChange={setFilterSport}
@@ -260,6 +286,8 @@ export function TasksPage() {
             totalCount={allTasks.length}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            developerMode={developerMode}
+            onUploadClick={() => setUploadModalOpen(true)}
           />
 
           {/* Grid View */}

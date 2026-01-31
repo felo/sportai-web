@@ -64,14 +64,14 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
   });
   const [ttsEnabled, setTTSEnabled] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
-  
+
   // Video element for thumbnail extraction (found from DOM)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   // Track when streaming just completed to trigger fade-in animation
   const wasStreamingRef = useRef(isStreaming);
   const [showSpeakerFadeIn, setShowSpeakerFadeIn] = useState(!isStreaming);
-  
+
   // Find video element from DOM when features are present (for thumbnail extraction)
   useEffect(() => {
     if (features && features.length > 0 && !videoElement) {
@@ -170,12 +170,12 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
     // Pass false for autoPlay - video should pause at the timestamp so user can press play
     ctx.showFloatingVideoAtTime(seconds, false);
   }, []);
-  
+
   // Handle feature thumbnail clicks - seek floating video to timestamp
   const handleFeatureThumbnailClick = useCallback((timestampSeconds: number) => {
     const ctx = floatingCtxRef.current;
     if (!ctx) return;
-    
+
     // Show floating video and seek to the timestamp (paused)
     ctx.showFloatingVideoAtTime(timestampSeconds, false);
   }, []);
