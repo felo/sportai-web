@@ -3,8 +3,8 @@ import { INSIGHT_LEVEL_KEY } from "../constants";
 import { isSSR } from "../helpers";
 import type { InsightLevel } from "../types";
 
-/** Default insight level - simple and approachable for new users */
-const DEFAULT_INSIGHT_LEVEL: InsightLevel = "beginner";
+/** Default insight level - balanced detail for new users */
+const DEFAULT_INSIGHT_LEVEL: InsightLevel = "developing";
 
 /**
  * Get AI Insight Level from localStorage

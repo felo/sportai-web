@@ -60,11 +60,11 @@ const COMPLEX_QUERY_PATTERNS = [
 
 /**
  * Determine which model to use based on query characteristics
- * 
+ *
  * Use Pro model for:
  * - Video analysis (needs visual understanding)
  * - Explicitly complex queries (compare, analyze, summarize, etc.)
- * 
+ *
  * Use Flash model for:
  * - All text-only queries (faster, cheaper)
  * - Including first message without video (likely simple questions)
@@ -78,14 +78,14 @@ function selectModel(
   if (hasVideo) {
     return { modelName: MODEL_NAME_PRO, reason: "video_analysis" };
   }
-  
+
   // Check for explicitly complex queries (even without video)
   for (const pattern of COMPLEX_QUERY_PATTERNS) {
     if (pattern.test(prompt)) {
       return { modelName: MODEL_NAME_PRO, reason: "complex_query" };
     }
   }
-  
+
   // All text-only queries → use Flash for speed
   // This includes first message without video (probably just a simple question)
   return { modelName: MODEL_NAME_FLASH, reason: "text_query" };
@@ -148,23 +148,23 @@ export async function queryLLM(
   promptType: PromptType = "video",
   queryComplexity: "simple" | "complex" = "complex",
   existingCacheName?: string,
-  insightLevel: InsightLevel = "beginner",
+  insightLevel: InsightLevel = "developing",
   userContext?: UserContext
 ): Promise<LLMResponse> {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-  
+
   // Check if video is present
   const hasVideo = !!videoData;
-  
+
   // Get system prompt with domain-specific, insight level, AND user context enhancement
-  const systemPrompt = promptType === "frame" 
+  const systemPrompt = promptType === "frame"
     ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
     : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext, hasVideo);
-  
+
   // Select model based on query characteristics
   const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
   const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
-  
+
   logger.info(`[${requestId}] Starting LLM query`);
   logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
   logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
@@ -173,11 +173,11 @@ export async function queryLLM(
   logger.debug(`[${requestId}] User prompt length: ${prompt.length} characters`);
   logger.debug(`[${requestId}] System prompt length: ${systemPrompt.length} characters`);
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
-  
+
   // Estimate input tokens (system instruction + user prompt + history)
   // Note: systemInstruction is sent separately but still counts toward input
   let estimatedInputTokens = estimateTextTokens(systemPrompt) + estimateTextTokens(prompt);
-  
+
   // Add tokens from conversation history
   if (conversationHistory && conversationHistory.length > 0) {
     const historyTokens = conversationHistory.reduce(
@@ -187,12 +187,12 @@ export async function queryLLM(
     estimatedInputTokens += historyTokens;
     logger.debug(`[${requestId}] History tokens: ${historyTokens.toLocaleString()}`);
   }
-  
+
   if (videoData) {
     const isImage = videoData.mimeType.startsWith("image/");
     const mediaType = isImage ? "image" : "video";
     const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
-    
+
     // Images use different token estimation than videos
     // For images: roughly 257 tokens per image (base) + size-based estimation
     // For videos: use existing video token estimation
@@ -204,7 +204,7 @@ export async function queryLLM(
     } else {
       mediaTokens = estimateVideoTokens(videoData.data.length, videoData.mimeType);
     }
-    
+
     estimatedInputTokens += mediaTokens;
     logger.info(`[${requestId}] ${mediaType} attached: ${videoData.mimeType}, ${mediaSizeMB} MB`);
     logger.debug(`[${requestId}] Estimated ${mediaType} tokens: ${mediaTokens.toLocaleString()}`);
@@ -212,17 +212,17 @@ export async function queryLLM(
     logger.debug(`[${requestId}] No media attached`);
   }
   logger.debug(`[${requestId}] Estimated input tokens: ${estimatedInputTokens.toLocaleString()}`);
-  
+
   logger.time(`[${requestId}] API call duration`);
-  
+
   try {
     // Build generation config
     const generationConfig: any = {};
     const isFlashModel = selectedModel.includes("flash");
-    
+
     // Thinking config only applies to Pro/thinking models, not Flash
     let thinkingBudget: number | undefined;
-    
+
     if (!isFlashModel) {
       // Smart thinking budget for Pro model
       if (thinkingMode === "deep") {
@@ -230,7 +230,7 @@ export async function queryLLM(
       } else {
         const promptTokens = estimateTextTokens(prompt);
         const hasLongHistory = conversationHistory && conversationHistory.length > 5;
-        
+
         if (hasVideo) {
           thinkingBudget = 1024;
         } else if (queryComplexity === "simple") {
@@ -241,13 +241,13 @@ export async function queryLLM(
           thinkingBudget = 64;
         }
       }
-      
+
       generationConfig.thinkingConfig = { thinkingBudget };
       logger.debug(`[${requestId}] Pro model - thinking budget: ${thinkingBudget} tokens`);
     } else {
       logger.debug(`[${requestId}] Flash model - no thinking config`);
     }
-    
+
     // Media resolution only for Pro model with video
     if (hasVideo && !isFlashModel) {
       const mediaResolutionMap: Record<MediaResolution, string> = {
@@ -257,14 +257,14 @@ export async function queryLLM(
       };
       generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
     }
-    
+
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
-    
+
     // Track caching state
     let cacheUsed = false;
     let newCacheName: string | undefined;
     let model: any;
-    
+
     // Try to use existing cache if provided
     if (existingCacheName) {
       try {
@@ -279,7 +279,7 @@ export async function queryLLM(
         logger.warn(`[${requestId}] Cache not found or expired, falling back to normal model`, cacheError);
       }
     }
-    
+
     // If no cache used, check if we should create one for large videos
     if (!cacheUsed && videoData && isEligibleForCaching(videoData.data.length)) {
       try {
@@ -303,7 +303,7 @@ export async function queryLLM(
           ],
           ttlSeconds: CACHE_TTL_SECONDS,
         });
-        
+
         newCacheName = cache.name;
         model = getGenAI().getGenerativeModelFromCachedContent(cache, {
           generationConfig,
@@ -314,26 +314,26 @@ export async function queryLLM(
         logger.warn(`[${requestId}] Failed to create cache, using normal model`, cacheError);
       }
     }
-    
+
     // Fall back to normal model if caching wasn't used
     if (!model) {
-      model = getGenAI().getGenerativeModel({ 
+      model = getGenAI().getGenerativeModel({
         model: selectedModel,
         generationConfig,
         systemInstruction: systemPrompt,
       });
     }
-    
+
     // Build current message parts (user prompt only - system instruction is separate)
     const parts: any[] = [{ text: prompt }];
-    
+
     // Add media (video or image) if provided AND not using cached content
     // Cached content already includes the video
     if (videoData && !cacheUsed) {
       const base64Length = videoData.data.toString("base64").length;
       const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
       logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
-      
+
       parts.push({
         inlineData: {
           data: videoData.data.toString("base64"),
@@ -341,10 +341,10 @@ export async function queryLLM(
         },
       });
     }
-    
+
     // For conversation history, use startChat() if history exists, otherwise use generateContent()
     let result: any;
-    
+
     if (conversationHistory && conversationHistory.length > 0) {
       // Use startChat() for multi-turn conversations
       logger.debug(`[${requestId}] Using chat mode with ${conversationHistory.length} history messages`);
@@ -365,31 +365,31 @@ export async function queryLLM(
         "LLM content generation"
       );
     }
-    
+
     logger.debug(`[${requestId}] Sending request to LLM API...`);
     const response = result.response;
     const responseText = response.text();
-    
+
     logger.timeEnd(`[${requestId}] API call duration`);
     logger.info(`[${requestId}] Response received: ${responseText.length} characters`);
-    
+
     // Estimate output tokens
     const estimatedOutputTokens = estimateTextTokens(responseText);
     logger.debug(`[${requestId}] Estimated output tokens: ${estimatedOutputTokens.toLocaleString()}`);
-    
+
     // Get actual token counts if available
     let actualInputTokens: number | null = null;
     let actualOutputTokens: number | null = null;
-    
+
     if (response.candidates && response.candidates.length > 0) {
       const candidate = response.candidates[0];
       logger.debug(`[${requestId}] Finish reason: ${candidate.finishReason || "unknown"}`);
-      
+
       // Log token count if available (may not be present in all SDK versions)
       if ('tokenCount' in candidate && candidate.tokenCount) {
         const tokenCount = (candidate as any).tokenCount;
         logger.debug(`[${requestId}] Actual token count: ${JSON.stringify(tokenCount)}`);
-        
+
         if (typeof tokenCount === 'object') {
           actualInputTokens = tokenCount.inputTokens || tokenCount.input || null;
           actualOutputTokens = tokenCount.outputTokens || tokenCount.output || null;
@@ -399,11 +399,11 @@ export async function queryLLM(
         }
       }
     }
-    
+
     // Use actual tokens if available, otherwise use estimates
     const inputTokens = actualInputTokens ?? estimatedInputTokens;
     const outputTokens = actualOutputTokens ?? estimatedOutputTokens;
-    
+
     // Calculate pricing
     const pricing = calculatePricing(inputTokens, outputTokens);
     logger.debug(`[${requestId}] Token usage:`);
@@ -414,7 +414,7 @@ export async function queryLLM(
     logger.debug(`[${requestId}]   Input: ${formatCost(pricing.inputCost)} ($${pricing.inputPricePerM}/1M tokens)`);
     logger.debug(`[${requestId}]   Output: ${formatCost(pricing.outputCost)} ($${pricing.outputPricePerM}/1M tokens)`);
     logger.debug(`[${requestId}]   Total: ${formatCost(pricing.totalCost)}`);
-    
+
     return {
       text: responseText,
       cacheName: newCacheName,
@@ -424,20 +424,20 @@ export async function queryLLM(
     };
   } catch (error: any) {
     logger.timeEnd(`[${requestId}] API call duration`);
-    
+
     // If generationConfig fails, try without it (for backwards compatibility)
     // Also catch "Budget 0 is invalid" errors which indicate thinking mode is required
-    if (error?.message?.includes("generationConfig") || 
-        error?.message?.includes("thinkingConfig") || 
-        error?.message?.includes("thinkingBudget") || 
-        error?.message?.includes("mediaResolution") || 
+    if (error?.message?.includes("generationConfig") ||
+        error?.message?.includes("thinkingConfig") ||
+        error?.message?.includes("thinkingBudget") ||
+        error?.message?.includes("mediaResolution") ||
         error?.message?.includes("thinkingMode") ||
         error?.message?.includes("Budget 0 is invalid") ||
         error?.message?.includes("only works in thinking mode")) {
       logger.debug(`[${requestId}] Generation config parameters not supported, falling back to default settings`);
       try {
         // Retry with minimal thinking config (model requires thinking mode)
-        const fallbackModel = getGenAI().getGenerativeModel({ 
+        const fallbackModel = getGenAI().getGenerativeModel({
           model: MODEL_NAME_PRO,
           generationConfig: {
             thinkingConfig: {
@@ -446,7 +446,7 @@ export async function queryLLM(
           } as any,
           systemInstruction: systemPrompt,
         });
-        
+
         // Rebuild parts (user prompt only)
         const parts: any[] = [{ text: prompt }];
         if (videoData) {
@@ -457,7 +457,7 @@ export async function queryLLM(
             },
           });
         }
-        
+
         let result: any;
         if (conversationHistory && conversationHistory.length > 0) {
           const chat = fallbackModel.startChat({ history: conversationHistory });
@@ -473,10 +473,10 @@ export async function queryLLM(
             "LLM fallback content generation"
           );
         }
-        
+
         const response = result.response;
         const responseText = response.text();
-        
+
         logger.info(`[${requestId}] Response received (fallback): ${responseText.length} characters`);
         return {
           text: responseText,
@@ -490,7 +490,7 @@ export async function queryLLM(
         throw fallbackError;
       }
     }
-    
+
     logger.error(`[${requestId}] Error querying LLM:`, {
       message: error?.message,
       status: error?.status,
@@ -498,21 +498,21 @@ export async function queryLLM(
       errorDetails: error?.errorDetails,
       stack: error?.stack,
     });
-    
+
     // Handle Google Generative AI specific errors with user-friendly messages
     // Don't expose raw Google error messages to users
     if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
       logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
-      
+
       // Handle conversation history errors
       if (error?.message?.includes("First content should be with role")) {
         throw new Error("Something went wrong with the conversation. Please try again.");
       }
-      
+
       // Handle other Google-specific errors
       throw new Error("The AI service encountered an issue. Please try again.");
     }
-    
+
     // Handle rate limiting (429) - check both direct and nested status
     const status = error?.status || error?.response?.status;
     if (status === 429) {
@@ -520,14 +520,14 @@ export async function queryLLM(
       logger.error(`[${requestId}] Rate limit exceeded. Retry delay: ${retryDelay}`);
       throw new Error(`Rate limit exceeded. Please wait ${retryDelay} before trying again.`);
     }
-    
+
     // Handle other API errors with status codes
     if (error?.status) {
       const statusText = error?.statusText || error?.message || "Unknown error";
       logger.error(`[${requestId}] API error ${error.status}: ${statusText}`);
       throw new Error(`LLM API error (${error.status}): ${statusText}`);
     }
-    
+
     // Handle errors with errorDetails array
     if (error?.errorDetails && Array.isArray(error.errorDetails) && error.errorDetails.length > 0) {
       const firstError = error.errorDetails[0];
@@ -535,7 +535,7 @@ export async function queryLLM(
       logger.error(`[${requestId}] API error details:`, firstError);
       throw new Error(`LLM API error: ${errorMsg}`);
     }
-    
+
     // Handle generic errors
     const errorMessage = error?.message || error?.toString() || "Failed to query LLM API";
     logger.error(`[${requestId}] Generic error: ${errorMessage}`);
@@ -565,23 +565,23 @@ export async function streamLLM(
   promptType: PromptType = "video",
   queryComplexity: "simple" | "complex" = "complex",
   existingCacheName?: string,
-  insightLevel: InsightLevel = "beginner",
+  insightLevel: InsightLevel = "developing",
   userContext?: UserContext
 ): Promise<StreamLLMResult> {
   const requestId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-  
+
   // Check if video is present
   const hasVideo = !!videoData;
-  
+
   // Get system prompt with domain-specific, insight level, AND user context enhancement
-  const systemPrompt = promptType === "frame" 
+  const systemPrompt = promptType === "frame"
     ? getFramePromptWithDomainAndInsight(domainExpertise, insightLevel, userContext)
     : getSystemPromptWithDomainAndInsight(domainExpertise, insightLevel, userContext, hasVideo);
-  
+
   // Select model based on query characteristics
   const hasHistory = !!(conversationHistory && conversationHistory.length > 0);
   const { modelName: selectedModel, reason: modelReason } = selectModel(hasVideo, hasHistory, prompt);
-  
+
   logger.info(`[${requestId}] Starting LLM stream`);
   logger.debug(`[${requestId}] Model: ${selectedModel} (${modelReason})`);
   logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
@@ -592,22 +592,22 @@ export async function streamLLM(
   logger.debug(`[${requestId}] Conversation history: ${conversationHistory?.length || 0} messages`);
   logger.debug(`[${requestId}] Thinking mode: ${thinkingMode}`);
   logger.debug(`[${requestId}] Media resolution: ${mediaResolution}`);
-  
+
   if (videoData) {
     const isImage = videoData.mimeType.startsWith("image/");
     const mediaType = isImage ? "image" : "video";
     const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
     logger.info(`[${requestId}] ${mediaType} attached: ${videoData.mimeType}, ${mediaSizeMB} MB`);
   }
-  
+
   try {
     // Build generation config
     const generationConfig: any = {};
     const isFlashModel = selectedModel.includes("flash");
-    
+
     // Thinking config only applies to Pro/thinking models, not Flash
     let thinkingBudget: number | undefined;
-    
+
     if (!isFlashModel) {
       // Smart thinking budget for Pro model
       if (thinkingMode === "deep") {
@@ -615,7 +615,7 @@ export async function streamLLM(
       } else {
         const promptTokens = estimateTextTokens(prompt);
         const hasLongHistory = conversationHistory && conversationHistory.length > 5;
-        
+
         if (hasVideo) {
           thinkingBudget = 1024;
         } else if (queryComplexity === "simple") {
@@ -626,13 +626,13 @@ export async function streamLLM(
           thinkingBudget = 64;
         }
       }
-      
+
       generationConfig.thinkingConfig = { thinkingBudget };
       logger.debug(`[${requestId}] Pro model - thinking budget: ${thinkingBudget} tokens`);
     } else {
       logger.debug(`[${requestId}] Flash model - no thinking config`);
     }
-    
+
     // Media resolution only for Pro model with video
     if (hasVideo && !isFlashModel) {
       const mediaResolutionMap: Record<MediaResolution, string> = {
@@ -642,14 +642,14 @@ export async function streamLLM(
       };
       generationConfig.media_resolution = mediaResolutionMap[mediaResolution];
     }
-    
+
     logger.debug(`[${requestId}] Generation config:`, generationConfig);
-    
+
     // Track caching state
     let cacheUsed = false;
     let newCacheName: string | undefined;
     let model: any;
-    
+
     // Try to use existing cache if provided
     if (existingCacheName) {
       try {
@@ -664,7 +664,7 @@ export async function streamLLM(
         logger.warn(`[${requestId}] Cache not found or expired, falling back to normal model`, cacheError);
       }
     }
-    
+
     // If no cache used, check if we should create one for large videos
     if (!cacheUsed && videoData && isEligibleForCaching(videoData.data.length)) {
       try {
@@ -688,7 +688,7 @@ export async function streamLLM(
           ],
           ttlSeconds: CACHE_TTL_SECONDS,
         });
-        
+
         newCacheName = cache.name;
         model = getGenAI().getGenerativeModelFromCachedContent(cache, {
           generationConfig,
@@ -699,26 +699,26 @@ export async function streamLLM(
         logger.warn(`[${requestId}] Failed to create cache, using normal model`, cacheError);
       }
     }
-    
+
     // Fall back to normal model if caching wasn't used
     if (!model) {
-      model = getGenAI().getGenerativeModel({ 
+      model = getGenAI().getGenerativeModel({
         model: selectedModel,
         generationConfig,
         systemInstruction: systemPrompt,
       });
     }
-    
+
     // Build current message parts (user prompt only - system instruction is separate)
     const parts: any[] = [{ text: prompt }];
-    
+
     // Add media (video or image) if provided AND not using cached content
     // Cached content already includes the video
     if (videoData && !cacheUsed) {
       const base64Length = videoData.data.toString("base64").length;
       const mediaType = videoData.mimeType.startsWith("image/") ? "image" : "video";
       logger.debug(`[${requestId}] ${mediaType} base64 length: ${base64Length} characters`);
-      
+
       parts.push({
         inlineData: {
           data: videoData.data.toString("base64"),
@@ -726,10 +726,10 @@ export async function streamLLM(
         },
       });
     }
-    
+
     // For conversation history, use startChat() if history exists, otherwise use generateContentStream()
     let result: any;
-    
+
     if (conversationHistory && conversationHistory.length > 0) {
       // Use startChat() for multi-turn conversations
       logger.debug(`[${requestId}] Using chat mode with ${conversationHistory.length} history messages`);
@@ -750,9 +750,9 @@ export async function streamLLM(
         "LLM streaming content generation"
       );
     }
-    
+
     logger.debug(`[${requestId}] Streaming request to LLM API...`);
-    
+
     // Create the text generator as an inner async generator
     async function* createTextGenerator(): AsyncGenerator<string, void, unknown> {
       let fullText = "";
@@ -765,7 +765,7 @@ export async function streamLLM(
       }
       logger.info(`[${requestId}] Stream completed: ${fullText.length} characters`);
     }
-    
+
     return {
       textGenerator: createTextGenerator(),
       cacheName: newCacheName,
@@ -776,10 +776,10 @@ export async function streamLLM(
   } catch (error: any) {
     // If generationConfig fails, try without it (for backwards compatibility)
     // Also catch "Budget 0 is invalid" errors which indicate thinking mode is required
-    if (error?.message?.includes("generationConfig") || 
-        error?.message?.includes("thinkingConfig") || 
-        error?.message?.includes("thinkingBudget") || 
-        error?.message?.includes("mediaResolution") || 
+    if (error?.message?.includes("generationConfig") ||
+        error?.message?.includes("thinkingConfig") ||
+        error?.message?.includes("thinkingBudget") ||
+        error?.message?.includes("mediaResolution") ||
         error?.message?.includes("thinkingMode") ||
         error?.message?.includes("thinking_level") ||
         error?.message?.includes("media_resolution") ||
@@ -787,7 +787,7 @@ export async function streamLLM(
         error?.message?.includes("only works in thinking mode")) {
       logger.debug(`[${requestId}] Generation config parameters not supported, falling back to default settings`);
       // Retry with minimal thinking config (model requires thinking mode)
-      const fallbackModel = getGenAI().getGenerativeModel({ 
+      const fallbackModel = getGenAI().getGenerativeModel({
         model: MODEL_NAME_PRO,
         generationConfig: {
           thinkingConfig: {
@@ -796,7 +796,7 @@ export async function streamLLM(
         } as any,
         systemInstruction: systemPrompt,
       });
-      
+
       // Rebuild parts (user prompt only)
       const fallbackParts: any[] = [{ text: prompt }];
       if (videoData) {
@@ -807,7 +807,7 @@ export async function streamLLM(
           },
         });
       }
-      
+
       let fallbackResult: any;
       if (conversationHistory && conversationHistory.length > 0) {
         const chat = fallbackModel.startChat({ history: conversationHistory });
@@ -823,7 +823,7 @@ export async function streamLLM(
           "LLM streaming fallback content generation"
         );
       }
-      
+
       async function* fallbackGenerator(): AsyncGenerator<string, void, unknown> {
         let fullText = "";
         for await (const chunk of fallbackResult.stream) {
@@ -835,7 +835,7 @@ export async function streamLLM(
         }
         logger.info(`[${requestId}] Stream completed (fallback): ${fullText.length} characters`);
       }
-      
+
       return {
         textGenerator: fallbackGenerator(),
         cacheName: undefined,
@@ -844,28 +844,28 @@ export async function streamLLM(
         modelReason: "fallback",
       };
     }
-    
+
     logger.error(`[${requestId}] Error streaming LLM:`, {
       message: error?.message,
       status: error?.status,
       statusText: error?.statusText,
       errorDetails: error?.errorDetails,
     });
-    
+
     // Handle Google Generative AI specific errors with user-friendly messages
     // Don't expose raw Google error messages to users
     if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
       logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
-      
+
       // Handle conversation history errors
       if (error?.message?.includes("First content should be with role")) {
         throw new Error("Something went wrong with the conversation. Please try again.");
       }
-      
+
       // Handle other Google-specific errors
       throw new Error("The AI service encountered an issue. Please try again.");
     }
-    
+
     // Provide more helpful error messages for common issues
     if (error?.status === 500 || error?.statusText === "Internal Server Error") {
       if (videoData) {
@@ -879,7 +879,7 @@ export async function streamLLM(
         );
       }
     }
-    
+
     throw error;
   }
 }

@@ -83,21 +83,21 @@ export function VideoFeedbackModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content maxWidth="480px">
-        <Dialog.Title>Get video feedback</Dialog.Title>
+        <Dialog.Title>Get feedback on a video</Dialog.Title>
 
         <Flex direction="column" gap="4" mt="4">
           {/* Description */}
           <Text size="2" color="gray">
-            Capture or upload a short snippet of someone doing an athletic activity.
+           Capture or upload a short athletic clip for feedback.
           </Text>
 
           {/* Recording Tips */}
           <ul style={{ margin: 0, paddingLeft: "var(--space-5)", listStyleType: "disc" }}>
             <Text asChild size="2" color="gray">
-              <li style={{ marginBottom: "var(--space-1)" }}>Ensure the recording has a clear view of the athlete</li>
+              <li style={{ marginBottom: "var(--space-2)" }}>Keep the athlete clearly visible</li>
             </Text>
             <Text asChild size="2" color="gray">
-              <li>For technique, shorter snippets will make it easier for the AI to give valuable feedback</li>
+              <li style={{ marginBottom: "var(--space-2)" }}>Short video clips work best for analysing technique</li>
             </Text>
           </ul>
 
@@ -153,7 +153,7 @@ export function VideoFeedbackModal({
               disabled={!selectedFile}
               size="3"
             >
-              Analyse
+              Add to prompt
             </Button>
           </Flex>
         </Flex>

@@ -36,7 +36,7 @@ export function useSidebarSettings(): SidebarSettingsState {
     speakingRate: 0.75,
     pitch: 0.0,
   });
-  const [insightLevel, setInsightLevel] = useState<InsightLevel>("beginner");
+  const [insightLevel, setInsightLevel] = useState<InsightLevel>("developing");
 
   // Initial load and event listeners
   useEffect(() => {
@@ -174,16 +174,3 @@ export function useSidebarSettings(): SidebarSettingsState {
     handleInsightLevelChange,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

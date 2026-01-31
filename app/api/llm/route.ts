@@ -16,31 +16,31 @@ export const maxDuration = 300; // 5 minutes for video processing
 export async function POST(request: NextRequest) {
   const requestId = `api_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const startTime = Date.now();
-  
+
   logger.info(`[${requestId}] Received POST request to /api/llm`);
-  
+
   // Check content length to catch 413 errors early
   // Note: Vercel has a hard limit of 4.5MB for serverless functions
   // Requests larger than this may return 404 before reaching the handler
   const VERCEL_MAX_SIZE_MB = 4.5;
   const MAX_PAYLOAD_SIZE_MB = 20; // For other deployments
   const contentLength = request.headers.get("content-length");
-  
+
   if (contentLength) {
     const sizeMB = parseInt(contentLength) / (1024 * 1024);
     logger.debug(`[${requestId}] Request size: ${sizeMB.toFixed(2)} MB`);
-    
+
     // Vercel-specific check - return clear error before Vercel rejects it
     if (sizeMB > VERCEL_MAX_SIZE_MB) {
       logger.error(`[${requestId}] Request too large for Vercel: ${sizeMB.toFixed(2)} MB (Vercel limit: ${VERCEL_MAX_SIZE_MB} MB)`);
       return NextResponse.json(
-        { 
-          error: `Request payload too large (${sizeMB.toFixed(2)} MB). Vercel has a ${VERCEL_MAX_SIZE_MB}MB limit for serverless functions. Please use a smaller video file or compress it.` 
+        {
+          error: `Request payload too large (${sizeMB.toFixed(2)} MB). Vercel has a ${VERCEL_MAX_SIZE_MB}MB limit for serverless functions. Please use a smaller video file or compress it.`
         },
         { status: 413 }
       );
     }
-    
+
     if (sizeMB > MAX_PAYLOAD_SIZE_MB) {
       logger.error(`[${requestId}] Request too large: ${sizeMB.toFixed(2)} MB (limit: ${MAX_PAYLOAD_SIZE_MB} MB)`);
       return NextResponse.json(
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
   }
-  
+
   try {
     logger.debug(`[${requestId}] Parsing form data...`);
     const formData = await request.formData();
@@ -66,39 +66,39 @@ export async function POST(request: NextRequest) {
     // Existing cache name for reuse (e.g., on retry)
     const existingCacheName = formData.get("cacheName") as string | null;
     // AI Insight Level - controls complexity and depth of responses
-    const insightLevel = (formData.get("insightLevel") as InsightLevel) || "beginner";
-    
+    const insightLevel = (formData.get("insightLevel") as InsightLevel) || "developing";
+
     // =========================================================================
     // RATE LIMITING - Applied after parsing to determine request type
     // =========================================================================
     // Try to get authenticated user (optional - allows both auth and non-auth usage)
     const user = await getAuthenticatedUser(request);
-    
+
     // Determine if this is a "heavy" or "light" request:
     // - Heavy: Has video OR deep thinking mode (expensive operations)
     // - Light: Text-only AND fast thinking mode (quick flash requests)
     const hasVideo = !!(videoFile || videoUrl);
     const isDeepThinking = thinkingMode === "deep";
     const isHeavyRequest = hasVideo || isDeepThinking;
-    
+
     // Apply rate limiting based on authentication and request type:
     // - Authenticated + heavy: "heavy" tier (10 req/min)
     // - Authenticated + light: "light" tier (30 req/min)
     // - Unauthenticated: "trial" tier (12 req/min per IP)
     const identifier = getRateLimitIdentifier(request, user?.id);
     let rateLimitTier: RateLimitTier;
-    
+
     if (!user) {
       rateLimitTier = "trial";
     } else {
       rateLimitTier = isHeavyRequest ? "heavy" : "light";
     }
-    
+
     const rateLimitResult = await checkRateLimit(identifier, rateLimitTier);
-    
+
     if (!rateLimitResult.success) {
       logger.warn(`[${requestId}] Rate limit exceeded for: ${identifier} (tier: ${rateLimitTier}, heavy: ${isHeavyRequest})`);
-      
+
       // Give helpful message for unauthenticated users
       if (!user) {
         const retryAfter = Math.ceil((rateLimitResult.reset - Date.now()) / 1000);
@@ -112,10 +112,10 @@ export async function POST(request: NextRequest) {
           { status: 429 }
         );
       }
-      
+
       return rateLimitedResponse(rateLimitResult);
     }
-    
+
     logger.debug(`[${requestId}] Rate limit check passed (tier: ${rateLimitTier}, heavy: ${isHeavyRequest}, remaining: ${rateLimitResult.remaining})`);
     // User context for personalization
     const userFirstName = formData.get("userFirstName") as string | null;
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     logger.debug(`[${requestId}] Query complexity: ${queryComplexity}`);
     logger.debug(`[${requestId}] Insight level: ${insightLevel}`);
     logger.debug(`[${requestId}] User: ${userFirstName || "anonymous"}`);
-    
+
     // Parse conversation history if provided
     let conversationHistory: ConversationHistory[] | undefined;
     if (historyJson) {
@@ -142,20 +142,20 @@ export async function POST(request: NextRequest) {
         conversationHistory = undefined;
       }
     }
-    
+
     // Check if this is the first message (no conversation history)
     const isFirstMessage = !conversationHistory || conversationHistory.length === 0;
-    
+
     // Build user context for personalization
     // For first message, fetch full profile if user is authenticated
     let userContext: UserContext | undefined = userFirstName ? { firstName: userFirstName } : undefined;
-    
+
     // Fetch profile data for first message if user is authenticated
     if (isFirstMessage && user) {
       try {
         logger.debug(`[${requestId}] Fetching profile for first message`);
         const supabase = getSupabaseAdmin();
-        
+
         // Fetch all profile data in parallel
         const [
           profileResult,
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
           supabase.from("coach_sports").select("*").eq("coach_profile_id", user.id),
           supabase.from("business_profiles").select("*").eq("profile_id", user.id).maybeSingle(),
         ]);
-        
+
         if (!profileResult.error && profileResult.data) {
           const profileData = profileResult.data;
           const sports = (sportsResult.data || []) as any[];
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
           const coach = coachResult.data as any;
           const coachSports = (coachSportsResult.data || []) as any[];
           const business = businessResult.data as any;
-          
+
           // Transform profile data to UserContext format
           userContext = {
             firstName: userFirstName || profileData.full_name?.split(" ")[0] || undefined,
@@ -240,14 +240,14 @@ export async function POST(request: NextRequest) {
               } : {}),
             },
           };
-          
+
           const profileInfo = [
             `${sports.length} sports`,
             `${equipment.length} equipment items`,
             coach && !coachResult.error ? "coach profile" : null,
             business && !businessResult.error ? "business profile" : null,
           ].filter(Boolean).join(", ");
-          
+
           logger.debug(`[${requestId}] Profile loaded: ${profileInfo}`);
         } else {
           logger.debug(`[${requestId}] No profile found or error: ${profileResult.error?.message || "not found"}`);
@@ -267,18 +267,18 @@ export async function POST(request: NextRequest) {
     }
 
     let videoData: { data: Buffer; mimeType: string } | null = null;
-    
+
     // Priority: videoUrl (S3 or external) > videoFile (direct upload)
     if (videoUrl) {
       // Check if this is an S3 URL or external URL (like Cloudinary)
       const isS3Url = videoUrl.includes('.s3.') && videoUrl.includes('amazonaws.com');
-      
+
       if (isS3Url) {
         // Download from S3 using AWS SDK (efficient server-side download)
         logger.info(`[${requestId}] Downloading media from S3: ${videoUrl}`);
         logger.info(`📥 Downloading from S3 (server-side): ${videoUrl}`);
         logger.time(`[${requestId}] S3 download`);
-        
+
         try {
           videoData = await downloadFromS3(videoUrl);
           logger.timeEnd(`[${requestId}] S3 download`);
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
         // External URL (Cloudinary, etc.) - download via HTTP fetch
         logger.info(`[${requestId}] Downloading media from external URL: ${videoUrl}`);
         logger.time(`[${requestId}] External download`);
-        
+
         try {
           const response = await fetch(videoUrl);
           if (!response.ok) {
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
       const fileType = videoFile.type.startsWith("video/") ? "video" : "image";
       logger.info(`[${requestId}] Processing ${fileType} file: ${videoFile.name}`);
       logger.time(`[${requestId}] ${fileType} processing`);
-      
+
       // Convert file to buffer
       const arrayBuffer = await videoFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -329,17 +329,17 @@ export async function POST(request: NextRequest) {
         data: buffer,
         mimeType: videoFile.type,
       };
-      
+
       logger.timeEnd(`[${requestId}] ${fileType} processing`);
       logger.debug(`[${requestId}] ${fileType} buffer size: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
     }
-    
+
     // Log video size for monitoring
     // Note: The actual size limit check and error response is handled in the streaming/non-streaming
     // branches below to ensure proper response format (streaming vs JSON)
     if (videoData && videoData.mimeType.startsWith("video/")) {
       const sizeMB = videoData.data.length / (1024 * 1024);
-      
+
       if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
         logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds limit (${LARGE_VIDEO_LIMIT_MB} MB)`);
       } else {
@@ -349,10 +349,10 @@ export async function POST(request: NextRequest) {
 
     // Check if streaming is requested (for both text-only and video queries)
     const shouldStream = request.headers.get("x-stream") === "true";
-    
+
     if (shouldStream) {
       logger.info(`[${requestId}] Streaming response...`);
-      
+
       // Create a ReadableStream for streaming
       const stream = new ReadableStream({
         async start(controller) {
@@ -360,12 +360,12 @@ export async function POST(request: NextRequest) {
             // Check if video is too large before streaming
             if (videoData && videoData.mimeType.startsWith("video/")) {
               const sizeMB = videoData.data.length / (1024 * 1024);
-              
+
               if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
                 logger.warn(`[${requestId}] Video size (${sizeMB.toFixed(2)} MB) exceeds limit in streaming mode`);
                 // Stream the natural error response instead
                 const naturalResponse = getVideoSizeErrorMessage(sizeMB);
-                
+
                 // Stream the response character by character for a natural typing effect
                 // Use for...of to properly handle multi-byte Unicode characters (emojis)
                 const encoder = new TextEncoder();
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
                     await new Promise(resolve => setTimeout(resolve, 1));
                   } catch (enqueueError) {
                     const errorMessage = enqueueError instanceof Error ? enqueueError.message : String(enqueueError);
-                    if (enqueueError instanceof TypeError && 
+                    if (enqueueError instanceof TypeError &&
                         (errorMessage.includes("closed") || errorMessage.includes("Invalid state"))) {
                       logger.warn(`[${requestId}] Stream controller closed during natural response`);
                       break;
@@ -384,39 +384,39 @@ export async function POST(request: NextRequest) {
                     throw enqueueError;
                   }
                 }
-                
+
                 try {
                   controller.close();
                 } catch (closeError) {
                   logger.debug(`[${requestId}] Controller already closed`);
                 }
-                
+
                 const duration = Date.now() - startTime;
                 logger.info(`[${requestId}] Natural error response streamed in ${duration}ms`);
                 return;
               }
             }
-            
+
             // Get streaming result (includes cache info and text generator)
             const streamResult = await streamLLM(
-              prompt, 
-              conversationHistory, 
-              videoData, 
-              thinkingMode, 
-              mediaResolution, 
-              domainExpertise, 
-              promptType, 
+              prompt,
+              conversationHistory,
+              videoData,
+              thinkingMode,
+              mediaResolution,
+              domainExpertise,
+              promptType,
               queryComplexity,
               existingCacheName || undefined,
               insightLevel,
               userContext
             );
-            
+
             // Log cache status
             if (streamResult.cacheUsed) {
               logger.info(`[${requestId}] Using cached content${streamResult.cacheName ? ` (new cache: ${streamResult.cacheName})` : ''}`);
             }
-            
+
             // Stream the text chunks
             for await (const chunk of streamResult.textGenerator) {
               // Check if controller is still open before enqueueing
@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
                 // Controller might be closed (e.g., client aborted)
                 // Check for both "closed" and "Invalid state" errors
                 const errorMessage = enqueueError instanceof Error ? enqueueError.message : String(enqueueError);
-                if (enqueueError instanceof TypeError && 
+                if (enqueueError instanceof TypeError &&
                     (errorMessage.includes("closed") || errorMessage.includes("Invalid state"))) {
                   logger.warn(`[${requestId}] Stream controller closed or invalid state, stopping stream:`, errorMessage);
                   break;
@@ -435,7 +435,7 @@ export async function POST(request: NextRequest) {
                 throw enqueueError;
               }
             }
-            
+
             // Send model/cache info as a final metadata chunk (JSON-encoded, prefixed with special marker)
             const streamMetadata = JSON.stringify({
               __metadata__: true,
@@ -450,7 +450,7 @@ export async function POST(request: NextRequest) {
             } catch (e) {
               // Ignore if controller is closed
             }
-            
+
             // Only close if controller is still open
             try {
               controller.close();
@@ -458,23 +458,23 @@ export async function POST(request: NextRequest) {
               // Controller already closed, that's okay
               logger.debug(`[${requestId}] Controller already closed`);
             }
-            
+
             const duration = Date.now() - startTime;
             logger.info(`[${requestId}] Stream completed successfully in ${duration}ms`);
           } catch (error) {
             logger.error(`[${requestId}] Stream error:`, error);
-            
+
             // Send error message as stream content so client can display it
             // This prevents ERR_EMPTY_RESPONSE errors on the client
             const errorMessage = error instanceof Error ? error.message : "Failed to process request";
             const errorResponse = `\n\n⚠️ **Error:** ${errorMessage}`;
-            
+
             try {
               controller.enqueue(new TextEncoder().encode(errorResponse));
             } catch (enqueueError) {
               logger.warn(`[${requestId}] Could not enqueue error message:`, enqueueError);
             }
-            
+
             // Close the stream properly (not with error)
             try {
               controller.close();
@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
           logger.info(`[${requestId}] Stream cancelled by client`);
         },
       });
-      
+
       return new Response(stream, {
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
@@ -496,46 +496,46 @@ export async function POST(request: NextRequest) {
         },
       });
     }
-    
+
     // Non-streaming: Check video size limit and return JSON response if too large
     if (videoData && videoData.mimeType.startsWith("video/")) {
       const sizeMB = videoData.data.length / (1024 * 1024);
-      
+
       if (sizeMB > LARGE_VIDEO_LIMIT_MB) {
         logger.debug(`[${requestId}] Returning JSON response for oversized video (non-streaming)`);
         const naturalResponse = getVideoSizeErrorMessage(sizeMB);
-        
+
         return NextResponse.json(
           { response: naturalResponse, videoTooLarge: true },
           { status: 200 }
         );
       }
     }
-    
+
     logger.info(`[${requestId}] Calling queryLLM...`);
     const llmResponse = await queryLLM(
-      prompt, 
-      videoData, 
-      conversationHistory, 
-      thinkingMode, 
-      mediaResolution, 
-      domainExpertise, 
-      promptType, 
+      prompt,
+      videoData,
+      conversationHistory,
+      thinkingMode,
+      mediaResolution,
+      domainExpertise,
+      promptType,
       queryComplexity,
       existingCacheName || undefined,
       insightLevel,
       userContext
     );
-    
+
     const duration = Date.now() - startTime;
     logger.info(`[${requestId}] Request completed successfully in ${duration}ms`);
     logger.debug(`[${requestId}] Response length: ${llmResponse.text.length} characters`);
-    
+
     if (llmResponse.cacheUsed) {
       logger.info(`[${requestId}] Cache used${llmResponse.cacheName ? ` (new cache: ${llmResponse.cacheName})` : ''}`);
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       response: llmResponse.text,
       cacheName: llmResponse.cacheName,
       cacheUsed: llmResponse.cacheUsed,
@@ -549,14 +549,14 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
-    
+
     const errorMessage = error instanceof Error ? error.message : "Failed to process request";
-    
+
     // Return 429 for rate limiting, 500 for other errors
     const status = errorMessage.includes("Rate limit") ? 429 : 500;
-    
+
     logger.debug(`[${requestId}] Returning error response: ${status} - ${errorMessage}`);
-    
+
     return NextResponse.json(
       { error: errorMessage },
       { status }

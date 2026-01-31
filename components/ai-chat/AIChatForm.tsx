@@ -72,7 +72,7 @@ export function AIChatForm() {
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [poseData, setPoseData] = useState<StarterPromptConfig["poseSettings"] | undefined>(undefined);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [insightLevel, setInsightLevel] = useState<InsightLevel>("beginner");
+  const [insightLevel, setInsightLevel] = useState<InsightLevel>("developing");
 
   // Load and listen for insight level changes
   useEffect(() => {

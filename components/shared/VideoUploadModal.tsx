@@ -39,7 +39,7 @@ const ANALYSIS_TYPES = [
   {
     value: "technique",
     label: "Technique",
-    description: "Analyse one swing in a few seconds",
+    description: "Analyse a short video clip of an athletic activity",
   },
 ] as const;
 

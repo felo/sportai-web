@@ -63,7 +63,7 @@ function NavbarProfile() {
     speakingRate: 0.75,
     pitch: 0.0,
   });
-  const [insightLevel, setInsightLevel] = useState<InsightLevel>("beginner");
+  const [insightLevel, setInsightLevel] = useState<InsightLevel>("developing");
 
   // Load settings on mount
   useEffect(() => {

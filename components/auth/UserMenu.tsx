@@ -45,7 +45,7 @@ export function UserMenu({
   developerMode = false,
   highlightingPrefs = { terminology: true, technique: true, timestamps: true, swings: true },
   ttsSettings = { enabled: false, quality: "studio", gender: "male", language: "en-GB", speakingRate: 0.75, pitch: 0.0 },
-  insightLevel = "beginner",
+  insightLevel = "developing",
   messageCount = 0,
   isMobile = false,
   collapsed = false,
@@ -121,7 +121,7 @@ export function UserMenu({
   const email = user.email || "Unknown";
   const displayName = profile?.full_name || "User";
   const avatarUrl = profile?.avatar_url;
-  
+
   // Generate initials from name (fallback to "U" for User)
   const initials = (profile?.full_name || "U")
     .split(/[\s.]+/)
@@ -145,11 +145,11 @@ export function UserMenu({
         />
       );
     }
-    
+
     return (
-      <div 
+      <div
         className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
-        style={{ 
+        style={{
           backgroundColor: "#7ADB8F",
           color: "#1C1C1C"
         }}
@@ -177,22 +177,22 @@ export function UserMenu({
         >
           <Avatar />
           {!collapsed && (
-            <div style={{ 
-              display: "flex", 
-              flexDirection: "column", 
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
               alignItems: "flex-start",
               minWidth: 0,
               gap: "0",
               paddingLeft: "var(--space-2)",
             }}>
-              <Text size="2" weight="medium" style={{ 
+              <Text size="2" weight="medium" style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
                 {displayName}
               </Text>
-              <Text size="1" weight="medium" style={{ 
+              <Text size="1" weight="medium" style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -568,7 +568,7 @@ export function UserMenu({
                 <>
                   <DropdownMenu.Separator />
 
-                  <DropdownMenu.Item 
+                  <DropdownMenu.Item
                     color="red"
                     disabled={messageCount === 0 || !onClearChat}
                     onSelect={(e) => {
@@ -602,7 +602,7 @@ export function UserMenu({
           <DropdownMenu.Separator />
 
           {/* Sign Out */}
-          <DropdownMenu.Item 
+          <DropdownMenu.Item
             color="red"
             onSelect={handleSignOut}
             disabled={isSigningOut}

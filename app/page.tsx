@@ -57,7 +57,7 @@ interface StarterPromptButton {
 
 // Starter prompts for the home page
 const STARTER_PROMPT_BUTTONS: StarterPromptButton[] = [
-  { id: "video-feedback", label: "Get video feedback", icon: VideoIcon, type: "openModal", modalId: "videoFeedback" },
+  { id: "video-feedback", label: "Get feedback on a video", icon: VideoIcon, type: "openModal", modalId: "videoFeedback" },
   { id: "analyze-match", label: "Analyze a match", icon: BarChartIcon, type: "openModal", modalId: "videoUploadMatch" },
   { id: "get-started", label: "Help me get started", prompt: "Help me get started with SportAI Open", icon: RocketIcon, type: "directPrompt" },
   { id: "learn-rules", label: "Learn the rules", prompt: "Can you teach me the rules of any sport?", icon: ReaderIcon, type: "directPrompt" },

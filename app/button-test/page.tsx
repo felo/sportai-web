@@ -287,7 +287,7 @@ export default function ButtonTestPage() {
             <Flex gap="2" wrap="wrap">
               <Button size="2" variant="soft" className={buttonStyles.actionButton}>
                 <VideoIcon width="16" height="16" />
-                Get video feedback
+                Get feedback on a video
               </Button>
               <Button size="2" variant="soft" className={buttonStyles.actionButton}>
                 <BarChartIcon width="16" height="16" />
