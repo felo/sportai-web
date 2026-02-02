@@ -120,6 +120,14 @@ export default function RootLayout({
           </Script>
         </>
       )}
+      {/* HubSpot Tracking Script */}
+      {process.env.NEXT_PUBLIC_HUBSPOT_PORTAL_ID && process.env.NODE_ENV === 'production' && (
+        <Script
+          id="hs-script-loader"
+          src={`//js-eu1.hs-scripts.com/${process.env.NEXT_PUBLIC_HUBSPOT_PORTAL_ID}.js`}
+          strategy="afterInteractive"
+        />
+      )}
       <body className="font-sans" suppressHydrationWarning>
         <RadixThemeProvider>
           <AuthProvider>
