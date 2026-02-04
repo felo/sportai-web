@@ -519,34 +519,17 @@ export function useAnalysisOptions({
       return;
     }
 
-    // TODO: Consider storing video file in a ref instead of message object
-    // to reduce memory usage for large videos (50-100MB).
-    // Current approach keeps File reference in message until chat is cleared.
+    // Get the S3 video URL from the analysis options (preferred - avoids 413 body size errors)
+    const { videoUrl: s3VideoUrl } = optionsMessage.analysisOptions;
 
-    // Find the video file from previous messages
-    let videoFile: File | null = null;
-    const msgIndex = messages.findIndex(m => m.id === messageId);
-    analysisLogger.info("Searching for video file from message index:", msgIndex, "total messages:", messages.length);
-
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      const prevMsg = messages[i];
-      analysisLogger.debug(`Message [${i}]: role=${prevMsg.role}, hasVideoFile=${!!prevMsg.videoFile}, hasVideoUrl=${!!prevMsg.videoUrl}`);
-      if (prevMsg.role === "assistant") break;
-      if (prevMsg.role === "user" && prevMsg.videoFile) {
-        videoFile = prevMsg.videoFile;
-        analysisLogger.info("Found video file:", { name: videoFile.name, size: videoFile.size, type: videoFile.type });
-        break;
-      }
-    }
-
-    if (!videoFile) {
-      analysisLogger.error("Could not find video file for Shark analysis. Messages:",
-        messages.slice(0, msgIndex + 1).map(m => ({ id: m.id, role: m.role, hasVideoFile: !!m.videoFile }))
-      );
+    if (!s3VideoUrl) {
+      analysisLogger.error("No video URL available for Shark analysis");
       // Fall back to regular PRO analysis
       await handleSelectProPlusQuick(messageId);
       return;
     }
+
+    analysisLogger.info("Using S3 video URL for Shark analysis:", s3VideoUrl);
 
     // Add user message showing their choice
     const userChoiceMessageId = generateMessageId();
@@ -597,14 +580,13 @@ export function useAnalysisOptions({
         timestamp: new Date().toISOString(),
       };
 
-      // Create form data
+      // Create form data with S3 URL (server will fetch video, avoiding client upload size limits)
       const formData = new FormData();
-      formData.append("file", videoFile, videoFile.name);
+      formData.append("videoUrl", s3VideoUrl);
       formData.append("metadata", JSON.stringify(metadata));
 
       analysisLogger.info("Sending to Shark API:", {
-        fileName: videoFile.name,
-        fileSize: videoFile.size,
+        videoUrl: s3VideoUrl,
         metadata
       });
 

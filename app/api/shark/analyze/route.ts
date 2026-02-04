@@ -5,7 +5,8 @@
  * Endpoint: POST /api/shark/analyze
  *
  * Request: multipart/form-data with:
- * - file: Video file (.mp4, .mov, .avi, .mkv)
+ * - file: Video file (.mp4, .mov, .avi, .mkv) OR
+ * - videoUrl: S3 URL to fetch video from (preferred for large files to avoid 413 errors)
  * - metadata: JSON string with analysis parameters
  *
  * Response: Streaming JSON with analysis results
@@ -44,6 +45,29 @@ interface SharkMetadata {
   form_session_id?: string;
 }
 
+/**
+ * Fetch video from S3 URL and return as a Blob
+ * Used when client sends videoUrl instead of file to avoid 413 body size limits
+ */
+async function fetchVideoFromUrl(url: string): Promise<{ blob: Blob; filename: string }> {
+  console.log(`[Shark API] Fetching video from URL: ${url}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch video from URL: ${response.status} ${response.statusText}`);
+  }
+
+  const blob = await response.blob();
+
+  // Extract filename from URL or use default
+  const urlPath = new URL(url).pathname;
+  const filename = urlPath.split('/').pop() || 'video.mp4';
+
+  console.log(`[Shark API] Fetched video: ${filename} (${blob.size} bytes)`);
+
+  return { blob, filename };
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get API configuration
@@ -60,19 +84,39 @@ export async function POST(request: NextRequest) {
     // Parse the incoming form data
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    const videoUrl = formData.get("videoUrl") as string | null;
     const metadataString = formData.get("metadata") as string | null;
 
-    // Validate file
-    if (!file) {
-      return NextResponse.json(
-        { error: "No video file provided" },
-        { status: 400 }
-      );
-    }
+    // Determine video source: prefer videoUrl (avoids 413), fallback to file
+    let videoBlob: Blob;
+    let videoFilename: string;
 
-    if (!SUPPORTED_VIDEO_TYPES.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|mkv)$/i)) {
+    if (videoUrl) {
+      // Fetch video from S3 URL (server-side, avoids client upload size limits)
+      try {
+        const { blob, filename } = await fetchVideoFromUrl(videoUrl);
+        videoBlob = blob;
+        videoFilename = filename;
+      } catch (error) {
+        console.error("[Shark API] Failed to fetch video from URL:", error);
+        return NextResponse.json(
+          { error: "Failed to fetch video from URL", details: String(error) },
+          { status: 400 }
+        );
+      }
+    } else if (file) {
+      // Use directly uploaded file (may fail with 413 for large files)
+      if (!SUPPORTED_VIDEO_TYPES.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|mkv)$/i)) {
+        return NextResponse.json(
+          { error: `Unsupported video format. Supported: .mp4, .mov, .avi, .mkv` },
+          { status: 400 }
+        );
+      }
+      videoBlob = file;
+      videoFilename = file.name;
+    } else {
       return NextResponse.json(
-        { error: `Unsupported video format. Supported: .mp4, .mov, .avi, .mkv` },
+        { error: "No video file or videoUrl provided" },
         { status: 400 }
       );
     }
@@ -109,14 +153,14 @@ export async function POST(request: NextRequest) {
 
     // Build the form data to forward to Shark API
     const forwardFormData = new FormData();
-    forwardFormData.append("file", file, file.name);
+    forwardFormData.append("file", videoBlob, videoFilename);
     forwardFormData.append("metadata", metadataString);
 
     // Make the request to Shark API
     const sharkApiUrl = `${apiUrl}/api/technique_analysis/pickleball`;
 
     console.log(`[Shark API] Sending request to ${sharkApiUrl}`);
-    console.log(`[Shark API] File: ${file.name} (${file.size} bytes)`);
+    console.log(`[Shark API] Video: ${videoFilename} (${videoBlob.size} bytes)${videoUrl ? ' (fetched from S3)' : ' (direct upload)'}`);
     console.log(`[Shark API] Metadata:`, metadata);
 
     const response = await fetch(sharkApiUrl, {
@@ -187,9 +231,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Increase body size limit for video uploads (default is 4MB)
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Note: App Router doesn't use Pages Router config format.
+// For large video uploads, use videoUrl parameter to fetch from S3 server-side,
+// which avoids the client->server body size limit (~4.5MB on Vercel).
