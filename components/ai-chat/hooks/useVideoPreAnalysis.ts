@@ -74,13 +74,6 @@ export function useVideoPreAnalysis({
     cameraAngle: string,
     durationSeconds: number | null
   ): { eligible: boolean; reason: string | undefined } => {
-    // TEMPORARY: Force all videos to be technique eligible for event demo
-    // To revert, uncomment the original logic below and remove the hardcoded return
-    const eligible = true;
-    const reason = "Ready for technique analysis!";
-    return { eligible, reason };
-
-    /* ORIGINAL LOGIC - uncomment to restore normal behavior:
     const isGroundLevelCamera = ["side", "ground_behind", "diagonal"].includes(cameraAngle);
     const eligible = isGroundLevelCamera && durationSeconds !== null && durationSeconds < 20;
 
@@ -94,7 +87,6 @@ export function useVideoPreAnalysis({
     }
 
     return { eligible, reason };
-    */
   }, []);
 
   // Auto-detect sport and eligibility from video file
@@ -146,24 +138,27 @@ export function useVideoPreAnalysis({
         const { frameBlob, durationSeconds } = await extractFirstFrameWithDuration(videoFile, 640, 0.7);
 
         if (!frameBlob) {
-          videoLogger.info("Failed to extract frame");
-          // TEMPORARY: Force technique eligible for event demo
+          videoLogger.info("Failed to extract frame - skipping sport detection");
           setVideoPreAnalysis({
-            sport: "pickleball",
-            cameraAngle: "side",
+            sport: "other",
+            cameraAngle: "other",
             fullCourtVisible: false,
-            confidence: 1,
+            confidence: 0,
             isProEligible: false,
             isAnalyzing: false,
-            proEligibilityReason: undefined,
+            proEligibilityReason: "Could not extract video frame for analysis",
             durationSeconds,
-            isTechniqueLiteEligible: true,
-            techniqueLiteEligibilityReason: "Ready for technique analysis!",
+            isTechniqueLiteEligible: false,
+            techniqueLiteEligibilityReason: "Could not extract video frame",
           });
           return;
         }
 
         videoLogger.info("Frame extracted, duration:", durationSeconds, "s");
+
+        // Create local blob URL for immediate preview (iOS Photos app fix)
+        const localThumbnailBlobUrl = URL.createObjectURL(frameBlob);
+        videoLogger.debug("Created local thumbnail blob URL for preview");
 
         // Upload thumbnail and analyze in parallel
         let thumbnailUrl: string | null = null;
@@ -198,21 +193,20 @@ export function useVideoPreAnalysis({
         const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
 
-        // TEMPORARY: Force technique eligible for event demo
-        // Keep detected sport for proper swing options, but force side view + technique eligible
         setVideoPreAnalysis({
-          sport: data.sport !== "other" ? data.sport : "pickleball",
-          cameraAngle: "side", // Force side view
-          fullCourtVisible: false,
+          sport: data.sport,
+          cameraAngle: data.cameraAngle,
+          fullCourtVisible: data.fullCourtVisible,
           confidence: data.confidence,
-          isProEligible: false, // Force NOT pro eligible (so it goes to technique)
-          proEligibilityReason: undefined,
+          isProEligible: data.isProEligible,
+          proEligibilityReason: data.proEligibilityReason,
           isAnalyzing: false,
           durationSeconds,
-          isTechniqueLiteEligible: true, // Force technique eligible
-          techniqueLiteEligibilityReason: "Ready for technique analysis!",
+          isTechniqueLiteEligible,
+          techniqueLiteEligibilityReason,
           thumbnailUrl,
           thumbnailS3Key,
+          localThumbnailBlobUrl,
         });
 
         // Update domain expertise if sport detected
@@ -229,17 +223,16 @@ export function useVideoPreAnalysis({
 
       } catch (err) {
         videoLogger.error("Pre-analysis failed:", err);
-        // TEMPORARY: Force technique eligible for event demo
         setVideoPreAnalysis({
-          sport: "pickleball",
-          cameraAngle: "side",
+          sport: "other",
+          cameraAngle: "other",
           fullCourtVisible: false,
-          confidence: 1,
+          confidence: 0,
           isProEligible: false,
+          proEligibilityReason: "Could not analyze video",
           isAnalyzing: false,
-          proEligibilityReason: undefined,
-          isTechniqueLiteEligible: true,
-          techniqueLiteEligibilityReason: "Ready for technique analysis!",
+          isTechniqueLiteEligible: false,
+          techniqueLiteEligibilityReason: "Video analysis failed",
         });
       } finally {
         setIsDetectingSport(false);
@@ -319,22 +312,25 @@ export function useVideoPreAnalysis({
         const { frameBlob, durationSeconds } = await extractFirstFrameFromUrl(detectedVideoUrl, 640, 0.7);
 
         if (!frameBlob) {
-          videoLogger.info("URL analysis - client-side extraction failed (CORS)");
-          // TEMPORARY: Force technique eligible for event demo
+          videoLogger.info("URL analysis - client-side extraction failed (CORS), skipping sport detection");
           setVideoPreAnalysis({
-            sport: "pickleball",
-            cameraAngle: "side",
+            sport: "other",
+            cameraAngle: "other",
             fullCourtVisible: false,
-            confidence: 1,
+            confidence: 0,
             isProEligible: false,
             isAnalyzing: false,
-            proEligibilityReason: undefined,
+            proEligibilityReason: "Could not extract video frame for analysis (CORS restriction)",
             durationSeconds,
-            isTechniqueLiteEligible: true,
-            techniqueLiteEligibilityReason: "Ready for technique analysis!",
+            isTechniqueLiteEligible: false,
+            techniqueLiteEligibilityReason: "Could not extract video frame",
           });
           return;
         }
+
+        // Create local blob URL for immediate preview (iOS Photos app fix)
+        const localThumbnailBlobUrl = URL.createObjectURL(frameBlob);
+        videoLogger.debug("Created local thumbnail blob URL for URL preview");
 
         // Upload thumbnail and analyze in parallel
         let thumbnailUrl: string | null = null;
@@ -400,21 +396,20 @@ export function useVideoPreAnalysis({
         const { eligible: isTechniqueLiteEligible, reason: techniqueLiteEligibilityReason } =
           calculateTechniqueLiteEligibility(data.cameraAngle, durationSeconds);
 
-        // TEMPORARY: Force technique eligible for event demo
-        // Keep detected sport for proper swing options, but force side view + technique eligible
         setVideoPreAnalysis({
-          sport: data.sport !== "other" ? data.sport : "pickleball",
-          cameraAngle: "side", // Force side view
-          fullCourtVisible: false,
+          sport: data.sport,
+          cameraAngle: data.cameraAngle,
+          fullCourtVisible: data.fullCourtVisible,
           confidence: data.confidence,
-          isProEligible: false, // Force NOT pro eligible (so it goes to technique)
-          proEligibilityReason: undefined,
+          isProEligible: data.isProEligible,
+          proEligibilityReason: data.proEligibilityReason,
           isAnalyzing: false,
           durationSeconds,
-          isTechniqueLiteEligible: true, // Force technique eligible
-          techniqueLiteEligibilityReason: "Ready for technique analysis!",
+          isTechniqueLiteEligible,
+          techniqueLiteEligibilityReason,
           thumbnailUrl,
           thumbnailS3Key,
+          localThumbnailBlobUrl,
         });
 
         // Update domain expertise if sport detected
@@ -433,17 +428,16 @@ export function useVideoPreAnalysis({
 
       } catch (err) {
         videoLogger.error("URL analysis failed:", err);
-        // TEMPORARY: Force technique eligible for event demo
         setVideoPreAnalysis({
-          sport: "pickleball",
-          cameraAngle: "side",
+          sport: "other",
+          cameraAngle: "other",
           fullCourtVisible: false,
-          confidence: 1,
+          confidence: 0,
           isProEligible: false,
+          proEligibilityReason: "Could not analyze video",
           isAnalyzing: false,
-          proEligibilityReason: undefined,
-          isTechniqueLiteEligible: true,
-          techniqueLiteEligibilityReason: "Ready for technique analysis!",
+          isTechniqueLiteEligible: false,
+          techniqueLiteEligibilityReason: "Video analysis failed",
         });
         isAnalyzingUrlRef.current = false;
       }

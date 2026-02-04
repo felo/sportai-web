@@ -183,7 +183,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
       // and we can get the detected sport from preAnalysis
       if (prevMessage.messageType === "analysis_options") {
         lastVideoIndex = i;
-        sport = prevMessage.analysisOptions?.preAnalysis?.sport || "other";
+        const detectedSport = prevMessage.analysisOptions?.preAnalysis?.sport;
+        // Map DetectedSport to supported follow-up sports (tennis, pickleball, padel, other)
+        sport = detectedSport && ["tennis", "pickleball", "padel"].includes(detectedSport)
+          ? (detectedSport as "tennis" | "pickleball" | "padel")
+          : "other";
         break;
       }
 

@@ -359,8 +359,12 @@ export function useAnalysisOptions({
     const isTechniqueAnalysis = preAnalysis.isTechniqueLiteEligible && !preAnalysis.isProEligible;
     const taskType = isTechniqueAnalysis ? "technique" : "statistics";
 
-    // Map "other" sport to "all" for task storage (valid sports: tennis, padel, pickleball, all)
-    const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
+    // Map sport to valid task storage values (valid sports: tennis, padel, pickleball, all)
+    // Sports not explicitly supported for technique analysis default to "all"
+    const validTaskSports = ["tennis", "padel", "pickleball"] as const;
+    const taskSport = validTaskSports.includes(preAnalysis.sport as typeof validTaskSports[number])
+      ? (preAnalysis.sport as "tennis" | "padel" | "pickleball")
+      : "all";
 
     // Create PRO analysis task
     let taskCreated = false;
@@ -584,7 +588,7 @@ export function useAnalysisOptions({
       // Build Shark metadata (matches api-test page format)
       // Note: player_level is NOT sent to Shark API - it doesn't accept this field
       const metadata: SharkMetadata = {
-        uid: `webapp_${crypto.randomUUID().slice(0, 8)}`,
+        uid: `webapp_${generateMessageId().slice(0, 8)}`,
         sport: "pickleball", // Hardcoded for now (sport available in preAnalysis.sport)
         swing_type: swingType,
         dominant_hand: dominantHand,
@@ -725,7 +729,11 @@ export function useAnalysisOptions({
 
         // Create library task for technique analysis (silently, without typing message)
         let createdTaskId: string | undefined;
-        const taskSport = preAnalysis.sport === "other" ? "all" : preAnalysis.sport;
+        // Map sport to valid task storage values (valid sports: tennis, padel, pickleball, all)
+        const validTaskSports = ["tennis", "padel", "pickleball"] as const;
+        const taskSport = validTaskSports.includes(preAnalysis.sport as typeof validTaskSports[number])
+          ? (preAnalysis.sport as "tennis" | "padel" | "pickleball")
+          : "all";
 
         if (user && accessToken && videoUrl) {
           try {

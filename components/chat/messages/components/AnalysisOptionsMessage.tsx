@@ -118,7 +118,7 @@ export function AnalysisOptionsMessage({
           {/* TECHNIQUE ANALYSIS: Swing selection UI */}
           {isTechniqueAnalysis ? (
             <SwingSelectionCard
-              sport={preAnalysis.sport}
+              sport={["tennis", "pickleball", "padel"].includes(preAnalysis.sport) ? (preAnalysis.sport as "tennis" | "pickleball" | "padel") : "other"}
               isLoading={isLoading}
               showCard={showBoxes}
               showButton={showButtons}

@@ -40,7 +40,7 @@ export async function extractFirstFrameWithDuration(
     }
 
     const video = document.createElement('video');
-    video.preload = 'metadata';
+    video.preload = 'auto'; // Use 'auto' to load more data upfront (iOS Photos app fix)
     video.muted = true;
     video.playsInline = true;
 
@@ -56,7 +56,7 @@ export async function extractFirstFrameWithDuration(
     }, FRAME_EXTRACTION_TIMEOUT);
 
     const cleanup = () => {
-      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('canplaythrough', onCanPlayThrough);
       video.removeEventListener('error', onError);
       video.removeEventListener('seeked', onSeeked);
       if (video.src) {
@@ -118,16 +118,22 @@ export async function extractFirstFrameWithDuration(
       if (resolved) return;
       resolved = true;
       clearTimeout(timeout);
-      extractFrame();
-      cleanup();
+      // Use requestAnimationFrame to ensure the frame is rendered before drawing (iOS Safari fix)
+      requestAnimationFrame(() => {
+        extractFrame();
+        cleanup();
+      });
     };
 
-    const onLoadedData = () => {
+    // Use canplaythrough instead of loadeddata - waits for more data to be buffered
+    // This fixes iOS Photos app which provides files progressively
+    const onCanPlayThrough = () => {
       if (isFinite(video.duration) && video.duration > 0) {
         videoDuration = video.duration;
         videoLogger.debug(`[extractFirstFrameWithDuration] Video duration: ${videoDuration}s`);
       }
-      video.currentTime = 0.001;
+      // Seek to 0.1s instead of 0.001s for better iOS Safari compatibility
+      video.currentTime = 0.1;
     };
 
     const onError = () => {
@@ -138,16 +144,17 @@ export async function extractFirstFrameWithDuration(
       reject(new Error('Error loading video for frame extraction'));
     };
 
-    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('canplaythrough', onCanPlayThrough);
     video.addEventListener('seeked', onSeeked);
     video.addEventListener('error', onError);
 
-    if (video.readyState >= 2) {
-      video.currentTime = 0.001;
+    if (video.readyState >= 4) { // HAVE_ENOUGH_DATA
+      video.currentTime = 0.1;
     }
 
     const url = URL.createObjectURL(file);
     video.src = url;
+    video.load(); // Explicitly trigger loading (iOS Photos app fix)
   });
 }
 
@@ -206,7 +213,7 @@ export async function extractFirstFrameFromUrl(
 ): Promise<VideoFrameExtractionResult> {
   return new Promise((resolve) => {
     const video = document.createElement('video');
-    video.preload = 'metadata';
+    video.preload = 'auto'; // Use 'auto' to load more data upfront (iOS Photos app fix)
     video.muted = true;
     video.playsInline = true;
     video.crossOrigin = 'anonymous';
@@ -224,7 +231,7 @@ export async function extractFirstFrameFromUrl(
     }, FRAME_EXTRACTION_URL_TIMEOUT);
 
     const cleanup = () => {
-      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('canplaythrough', onCanPlayThrough);
       video.removeEventListener('error', onError);
       video.removeEventListener('seeked', onSeeked);
       video.src = '';
@@ -295,16 +302,22 @@ export async function extractFirstFrameFromUrl(
       if (resolved) return;
       resolved = true;
       clearTimeout(timeout);
-      extractFrame();
-      cleanup();
+      // Use requestAnimationFrame to ensure the frame is rendered before drawing (iOS Safari fix)
+      requestAnimationFrame(() => {
+        extractFrame();
+        cleanup();
+      });
     };
 
-    const onLoadedData = () => {
+    // Use canplaythrough instead of loadeddata - waits for more data to be buffered
+    // This fixes iOS Photos app which provides files progressively
+    const onCanPlayThrough = () => {
       if (isFinite(video.duration) && video.duration > 0) {
         videoDuration = video.duration;
         videoLogger.debug(`[extractFirstFrameFromUrl] Video duration: ${videoDuration}s`);
       }
-      video.currentTime = 0.001;
+      // Seek to 0.1s instead of 0.001s for better iOS Safari compatibility
+      video.currentTime = 0.1;
     };
 
     const onError = (e: Event) => {
@@ -316,14 +329,15 @@ export async function extractFirstFrameFromUrl(
       resolve({ frameBlob: null, durationSeconds: videoDuration });
     };
 
-    video.addEventListener('loadeddata', onLoadedData);
+    video.addEventListener('canplaythrough', onCanPlayThrough);
     video.addEventListener('seeked', onSeeked);
     video.addEventListener('error', onError);
 
-    if (video.readyState >= 2) {
-      video.currentTime = 0.001;
+    if (video.readyState >= 4) { // HAVE_ENOUGH_DATA
+      video.currentTime = 0.1;
     }
 
     video.src = videoUrl;
+    video.load(); // Explicitly trigger loading (iOS Photos app fix)
   });
 }

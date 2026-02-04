@@ -51,9 +51,17 @@ export function shouldShowCameraAngle(cameraAngle?: string): boolean {
   return !!cameraAngle && cameraAngle !== "other";
 }
 
-/** Capitalize first letter of a string */
+/** Format sport name for display (e.g., "table_tennis" → "Table Tennis") */
+export function formatSportName(sport: string): string {
+  return sport
+    .split("_")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/** @deprecated Use formatSportName instead */
 export function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+  return formatSportName(str);
 }
 
 // ============================================================================
@@ -86,7 +94,6 @@ export function VideoEligibilityIndicator({
   } = preAnalysis;
 
   const hasSport = sport && sport !== "other";
-  const showCameraAngle = (isProEligible || isTechniqueLiteEligible) && shouldShowCameraAngle(cameraAngle);
 
   return (
     <Flex
@@ -101,24 +108,15 @@ export function VideoEligibilityIndicator({
       {/* Sport detection text */}
       <Text size="2" style={{ flex: 1, color: MINT_COLOR }}>
         {isAnalyzing ? (
-          "Autodetecting sport..."
+          "Detecting sport..."
         ) : hasSport ? (
-          <>
-            {getSportEmoji(sport)} {capitalize(sport)} detected
-          </>
+          formatSportName(sport)
         ) : (
           fallbackText
         )}
       </Text>
 
-      {/* Camera angle label */}
-      {showCameraAngle && (
-        <Text size="1" style={{ color: MINT_COLOR_FADED }}>
-          {getCameraAngleLabel(cameraAngle!)}
-        </Text>
-      )}
-
-      {/* PRO Tactical Analysis badge (elevated back court padel) */}
+      {/* Match Analysis badge (elevated back court camera) */}
       {isProEligible && (
         <Badge
           color="green"
@@ -130,11 +128,11 @@ export function VideoEligibilityIndicator({
             color: MINT_TEXT_DARK
           }}
         >
-          PRO Tactical Analysis ✓
+          Match Analysis ✓
         </Badge>
       )}
 
-      {/* PRO Technique Analysis badge (ground-level camera, short video) */}
+      {/* Technique Analysis badge (ground-level camera, short video) */}
       {isTechniqueLiteEligible && !isProEligible && (
         <Badge
           color="green"
@@ -146,7 +144,7 @@ export function VideoEligibilityIndicator({
             color: MINT_TEXT_DARK
           }}
         >
-          PRO Technique Analysis ✓
+          Technique Analysis ✓
         </Badge>
       )}
     </Flex>

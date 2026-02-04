@@ -330,7 +330,7 @@ export function VideoPoseViewer({
   const [selectedObjectModel, setSelectedObjectModel] = useState<"YOLOv8n" | "YOLOv8s" | "YOLOv8m">("YOLOv8n");
   const [objectConfidenceThreshold, setObjectConfidenceThreshold] = useState(0.5);
   const [objectIoUThreshold, setObjectIoUThreshold] = useState(0.45);
-  const [sportFilter, setSportFilter] = useState<"all" | "tennis" | "pickleball" | "basketball" | "baseball" | "skating">("pickleball");
+  const [sportFilter, setSportFilter] = useState<"all" | "tennis" | "pickleball" | "basketball" | "baseball" | "skating">("all");
   const [showObjectLabels, setShowObjectLabels] = useState(true);
   const [enableObjectTracking, setEnableObjectTracking] = useState(true);
   const [currentObjects, setCurrentObjects] = useState<ObjectDetectionResult[]>([]);
@@ -391,13 +391,13 @@ export function VideoPoseViewer({
     strength: stabilizationStrength,
   });
 
-  const { processPoses: processStabilityFilter, reset: resetStabilityFilter, config: stabilityConfig } = 
+  const { processPoses: processStabilityFilter, reset: resetStabilityFilter, config: stabilityConfig } =
     usePoseStabilityFilter({
       enabled: stabilityFilterEnabled,
       config: stabilityFilterConfig,
     });
 
-  const { recordFrame: recordJointFrame, getSegmentHistory, getAngleHistory, getAccelerationHistory, clearHistory: clearJointHistory } = 
+  const { recordFrame: recordJointFrame, getSegmentHistory, getAngleHistory, getAccelerationHistory, clearHistory: clearJointHistory } =
     useJointHistory({
       enabled: showDisplacementChart || showAccelerationChart,
     });
@@ -438,13 +438,13 @@ export function VideoPoseViewer({
 
   // Protocol selector state
   const [selectedProtocol, setSelectedProtocol] = useState<"serve" | "swings" | "swings-v2">("serve");
-  
+
   // Swing detection config
   const [swingRequireOutwardMotion, setSwingRequireOutwardMotion] = useState(true);
 
   // Computed values
   const videoMaxHeight = compactMode ? "100%" : (isPortraitVideo ? "min(450px, 50vh)" : baseMaxHeight);
-  
+
   // Apply stability filter and stabilization to poses for display
   const displayPoses = useMemo(() => {
     if (currentPoses.length === 0) {
@@ -457,7 +457,7 @@ export function VideoPoseViewer({
     if (stabilityFilterEnabled) {
       const results = processStabilityFilter(currentPoses);
       processedPoses = results.map(r => r.pose);
-      
+
       // Update state for UI (use first pose's state)
       if (results.length > 0) {
         const firstResult = results[0];
@@ -481,18 +481,18 @@ export function VideoPoseViewer({
 
     return processedPoses;
   }, [
-    currentPoses, 
-    stabilityFilterEnabled, 
-    processStabilityFilter, 
-    stabilizationEnabled, 
+    currentPoses,
+    stabilityFilterEnabled,
+    processStabilityFilter,
+    stabilizationEnabled,
     stabilizePoses,
     stabilityState,
     stabilityStableCount,
     stabilitySimilarity,
   ]);
-  
-  const selectedPose = displayPoses.length > 0 
-    ? displayPoses[Math.min(selectedPoseIndex, displayPoses.length - 1)] 
+
+  const selectedPose = displayPoses.length > 0
+    ? displayPoses[Math.min(selectedPoseIndex, displayPoses.length - 1)]
     : null;
   const currentConfidence = CONFIDENCE_PRESETS[confidenceMode];
   const currentResolution = useMemo(() => RESOLUTION_PRESETS[resolutionMode], [resolutionMode]);
@@ -537,11 +537,11 @@ export function VideoPoseViewer({
     result: swingResult,
     detectSwings,
     clearResult: clearSwingResult,
-  } = useSwingDetection({ 
-    preprocessedPoses: preprocessing.preprocessedPoses, 
-    selectedModel, 
-    videoFPS, 
-    selectedPoseIndex 
+  } = useSwingDetection({
+    preprocessedPoses: preprocessing.preprocessedPoses,
+    selectedModel,
+    videoFPS,
+    selectedPoseIndex
   });
 
   // Swing detection protocol V2 (acceleration-based with prominence)
@@ -550,11 +550,11 @@ export function VideoPoseViewer({
     result: swingV2Result,
     detectSwings: detectSwingsV2,
     clearResult: clearSwingV2Result,
-  } = useSwingDetectionV2({ 
-    preprocessedPoses: preprocessing.preprocessedPoses, 
-    selectedModel, 
-    videoFPS, 
-    selectedPoseIndex 
+  } = useSwingDetectionV2({
+    preprocessedPoses: preprocessing.preprocessedPoses,
+    selectedModel,
+    videoFPS,
+    selectedPoseIndex
   });
 
   // Object detection hook
@@ -589,7 +589,7 @@ export function VideoPoseViewer({
   // Hide pose overlay during preprocessing - user shouldn't see the scanning
   const drawingPoses = preprocessing.isBackgroundPreprocessing ? [] : displayPoses;
   const drawingSelectedPose = preprocessing.isBackgroundPreprocessing ? null : selectedPose;
-  
+
   useCanvasDrawing({
     canvasRef,
     videoRef,
@@ -691,15 +691,15 @@ export function VideoPoseViewer({
     async function loadFromServer() {
       // Only try once, need videoS3Key and video must be ready
       if (!videoS3Key || serverPoseDataChecked || !isVideoMetadataLoaded || skipPreprocessing) return;
-      
+
       try {
         detectionLogger.info(`[VideoPoseViewer] Checking for cached pose data: ${videoS3Key}`);
         const result = await loadPoseData(videoS3Key);
-        
+
         if (result.success && result.data) {
           // Convert stored data to Map format
           const posesMap = convertToPreprocessedPoses(result.data);
-          
+
           if (posesMap.size > 0) {
             // Load cached poses into preprocessing hook
             preprocessing.loadExternalPoses(posesMap, result.data.videoFPS || 30);
@@ -717,7 +717,7 @@ export function VideoPoseViewer({
         setServerPoseDataChecked(true);
       }
     }
-    
+
     loadFromServer();
   }, [videoS3Key, serverPoseDataChecked, isVideoMetadataLoaded, skipPreprocessing]);
 
@@ -725,15 +725,15 @@ export function VideoPoseViewer({
   useEffect(() => {
     async function saveToServer() {
       // Only save if: we have videoS3Key, preprocessing completed, and haven't saved yet
-      if (!videoS3Key || 
-          !preprocessing.usePreprocessing || 
+      if (!videoS3Key ||
+          !preprocessing.usePreprocessing ||
           preprocessing.preprocessedPoses.size === 0 ||
           poseDataSaved ||
           serverPoseDataLoaded ||  // Don't save if we loaded from server (already saved)
           skipPreprocessing) {
         return;
       }
-      
+
       try {
         detectionLogger.info(`[VideoPoseViewer] Saving ${preprocessing.preprocessedPoses.size} frames to S3...`);
         const result = await savePoseData(
@@ -742,7 +742,7 @@ export function VideoPoseViewer({
           preprocessing.preprocessingFPS,
           selectedModel
         );
-        
+
         if (result.success) {
           setPoseDataSaved(true);
           onPoseDataSaved?.(result.s3Key || "");
@@ -754,7 +754,7 @@ export function VideoPoseViewer({
         detectionLogger.error(`[VideoPoseViewer] Error saving pose data:`, error);
       }
     }
-    
+
     saveToServer();
   }, [videoS3Key, preprocessing.usePreprocessing, preprocessing.preprocessedPoses.size, preprocessing.preprocessingFPS, poseDataSaved, serverPoseDataLoaded, selectedModel, onPoseDataSaved, skipPreprocessing]);
 
@@ -780,7 +780,7 @@ export function VideoPoseViewer({
   // Object detection during playback
   useEffect(() => {
     const video = videoRef.current;
-    const shouldRun = (isObjectDetectionEnabled || isProjectileDetectionEnabled) && 
+    const shouldRun = (isObjectDetectionEnabled || isProjectileDetectionEnabled) &&
                       !isObjectDetectionLoading && objectDetector !== null && detectObjects !== undefined;
     if (!video || !shouldRun || !isPlaying) return;
 
@@ -871,7 +871,7 @@ export function VideoPoseViewer({
   // Auto-run key frame detections based on selected protocol
   useEffect(() => {
     if (!preprocessing.usePreprocessing || preprocessing.preprocessedPoses.size === 0) return;
-    
+
     if (selectedProtocol === "serve") {
       // Serve protocol: detect trophy, contact, landing
       if (!trophyResult && !contactResult && !landingResult) {
@@ -902,17 +902,17 @@ export function VideoPoseViewer({
       }
     }
   }, [
-    preprocessing.usePreprocessing, 
-    preprocessing.preprocessedPoses.size, 
+    preprocessing.usePreprocessing,
+    preprocessing.preprocessedPoses.size,
     selectedProtocol,
-    trophyResult, 
-    contactResult, 
-    landingResult, 
+    trophyResult,
+    contactResult,
+    landingResult,
     swingResult,
     swingV2Result,
     swingRequireOutwardMotion,
-    detectTrophyPosition, 
-    detectContactPoint, 
+    detectTrophyPosition,
+    detectContactPoint,
     detectLanding,
     detectSwings,
     detectSwingsV2,
@@ -937,12 +937,12 @@ export function VideoPoseViewer({
   // Record frames for displacement/acceleration chart (works independently of stability filter)
   useEffect(() => {
     if ((!showDisplacementChart && !showAccelerationChart) || currentPoses.length === 0) return;
-    
+
     const video = videoRef.current;
     const timestamp = video?.currentTime || 0;
     // Only mark as banana if stability filter is enabled and in recovery
     const isBanana = stabilityFilterEnabled && stabilityState === StabilityState.RECOVERY;
-    
+
     // Record the first pose for charting
     recordJointFrame(currentPoses[0], currentFrame, timestamp, isBanana);
   }, [showDisplacementChart, showAccelerationChart, currentPoses, currentFrame, stabilityFilterEnabled, stabilityState, recordJointFrame]);
@@ -985,7 +985,7 @@ export function VideoPoseViewer({
     if (!video) return;
     if (!video.paused) { video.pause(); setIsPlaying(false); }
     const frameDuration = 1 / videoFPS;
-    video.currentTime = direction === "forward" 
+    video.currentTime = direction === "forward"
       ? Math.min(video.currentTime + frameDuration, video.duration)
       : Math.max(video.currentTime - frameDuration, 0);
     const lookupFPS = preprocessing.usePreprocessing ? preprocessing.preprocessingFPS : videoFPS;
@@ -1511,9 +1511,9 @@ export function VideoPoseViewer({
                       value={selectedProtocol}
                       onValueChange={(value) => setSelectedProtocol(value as "serve" | "swings")}
                     >
-                      <Select.Trigger 
-                        className={selectStyles.selectTriggerStyled} 
-                        style={{ flex: 1 }} 
+                      <Select.Trigger
+                        className={selectStyles.selectTriggerStyled}
+                        style={{ flex: 1 }}
                       />
                       <Select.Content>
                         <Select.Group>
@@ -1598,8 +1598,8 @@ export function VideoPoseViewer({
                             variant="soft"
                             onClick={() => handleSeekToFrame(swing.frame)}
                             style={{
-                              backgroundColor: swing.dominantSide === "left" ? "rgba(78, 205, 196, 0.2)" : 
-                                              swing.dominantSide === "right" ? "rgba(255, 107, 107, 0.2)" : 
+                              backgroundColor: swing.dominantSide === "left" ? "rgba(78, 205, 196, 0.2)" :
+                                              swing.dominantSide === "right" ? "rgba(255, 107, 107, 0.2)" :
                                               "rgba(168, 85, 247, 0.2)",
                             }}
                           >
@@ -1608,7 +1608,7 @@ export function VideoPoseViewer({
                         ))}
                       </Flex>
                       <Text size="1" color="gray">
-                        Max: {swingResult.maxVelocity.toFixed(1)}px/f • 
+                        Max: {swingResult.maxVelocity.toFixed(1)}px/f •
                         Gaps: {swingResult.framesWithGaps} frames
                       </Text>
                     </Flex>
@@ -1809,7 +1809,7 @@ export function VideoPoseViewer({
                               Max joint angle change per frame (degrees)
                             </Text>
                           </Flex>
-                          
+
                           {/* Similarity Threshold */}
                           <Flex direction="column" gap="1">
                             <Flex align="center" justify="between">
@@ -1837,7 +1837,7 @@ export function VideoPoseViewer({
                           </Flex>
                         </>
                       )}
-                      
+
                       {/* In mirror-only mode, show Max Angle Change as it's still used */}
                       {stabilityFilterConfig.mirrorOnlyMode && (
                         <Flex direction="column" gap="1">
@@ -1860,7 +1860,7 @@ export function VideoPoseViewer({
                       )}
 
                       {/* Mirror Only Mode */}
-                      <Flex direction="column" gap="1" p="2" style={{ 
+                      <Flex direction="column" gap="1" p="2" style={{
                         backgroundColor: stabilityFilterConfig.mirrorOnlyMode ? "rgba(76, 175, 80, 0.15)" : "transparent",
                         borderRadius: "var(--radius-2)",
                         border: stabilityFilterConfig.mirrorOnlyMode ? "1px solid rgba(76, 175, 80, 0.3)" : "1px solid transparent",
@@ -1874,8 +1874,8 @@ export function VideoPoseViewer({
                           </Flex>
                           <Switch
                             checked={stabilityFilterConfig.mirrorOnlyMode ?? false}
-                            onCheckedChange={(checked) => setStabilityFilterConfig(prev => ({ 
-                              ...prev, 
+                            onCheckedChange={(checked) => setStabilityFilterConfig(prev => ({
+                              ...prev,
                               mirrorOnlyMode: checked,
                               enableMirrorRecovery: true // Ensure mirroring is on
                             }))}
@@ -1905,9 +1905,9 @@ export function VideoPoseViewer({
                           </Flex>
 
                           {/* Current State Display */}
-                          <Flex align="center" gap="2" p="2" style={{ 
-                            backgroundColor: stabilityState === StabilityState.RECOVERY 
-                              ? "rgba(255, 152, 0, 0.2)" 
+                          <Flex align="center" gap="2" p="2" style={{
+                            backgroundColor: stabilityState === StabilityState.RECOVERY
+                              ? "rgba(255, 152, 0, 0.2)"
                               : "rgba(76, 175, 80, 0.2)",
                             borderRadius: "var(--radius-2)",
                           }}>
@@ -1916,14 +1916,14 @@ export function VideoPoseViewer({
                                 width: "8px",
                                 height: "8px",
                                 borderRadius: "50%",
-                                backgroundColor: stabilityState === StabilityState.RECOVERY 
-                                  ? "#FF9800" 
+                                backgroundColor: stabilityState === StabilityState.RECOVERY
+                                  ? "#FF9800"
                                   : "#4CAF50",
                               }}
                             />
                             <Text size="1" weight="medium">
-                              {stabilityState === StabilityState.RECOVERY 
-                                ? `Recovery Mode (${stabilityStableCount}/${stabilityConfig.N_RECOVERY})` 
+                              {stabilityState === StabilityState.RECOVERY
+                                ? `Recovery Mode (${stabilityStableCount}/${stabilityConfig.N_RECOVERY})`
                                 : "Normal Mode"}
                             </Text>
                           </Flex>

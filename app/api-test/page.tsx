@@ -13,6 +13,19 @@ import { useState, useRef, useCallback } from "react";
 import { Box, Flex, Text, Heading, TextArea, Button, TextField, Card, Code, Badge, Select, Checkbox, Tooltip, Separator, Progress } from "@radix-ui/themes";
 import { formatH36MJoints, formatLimbName, formatH36MJoint } from "@/types/h36m-joints";
 
+/**
+ * Generate a short UID with fallback for older browsers (iOS < 15.4)
+ */
+function generateShortUid(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  // Fallback for older browsers
+  return "xxxxxxxx".replace(/x/g, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  );
+}
+
 // Type for the racket recommendation from SSE
 interface RacketRecommendation {
   racket: {
@@ -416,7 +429,7 @@ export default function ApiTestPage() {
 
     try {
       // Generate a unique ID
-      const uid = `webapp_${crypto.randomUUID().slice(0, 8)}`;
+      const uid = `webapp_${generateShortUid()}`;
 
       // Build metadata
       const metadata = {

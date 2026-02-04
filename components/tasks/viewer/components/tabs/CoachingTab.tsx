@@ -106,15 +106,15 @@ function buildCoachingContext(
   const { validPlayers } = rankings;
   const rallies = result.rallies || [];
   const bounces = result.ball_bounces || [];
-  
+
   let context = `## Match Analysis Data (${sport.charAt(0).toUpperCase() + sport.slice(1)})\n\n`;
-  
+
   // Match overview
   context += `### Match Overview\n`;
   context += `- Total rallies: ${rallies.length}\n`;
   context += `- Players tracked: ${validPlayers.length}\n`;
   context += `- Ball bounces detected: ${bounces.length}\n\n`;
-  
+
   // Player stats
   context += `### Player Statistics\n`;
   validPlayers.forEach((player, idx) => {
@@ -123,21 +123,21 @@ function buildCoachingContext(
     const speeds = swings.map(s => s.ball_speed).filter(s => s > 0);
     const avgSpeed = speeds.length > 0 ? (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1) : "N/A";
     const maxSpeed = speeds.length > 0 ? Math.max(...speeds).toFixed(1) : "N/A";
-    
+
     context += `\n**${name}:**\n`;
     context += `- Total shots: ${swings.length}\n`;
     context += `- Average ball speed: ${avgSpeed} km/h\n`;
     context += `- Max ball speed: ${maxSpeed} km/h\n`;
     context += `- Distance covered: ${player.covered_distance?.toFixed(1) || "N/A"} m\n`;
     context += `- Fastest sprint: ${player.fastest_sprint?.toFixed(1) || "N/A"} km/h\n`;
-    
+
     // Shot distribution
     const swingTypes = player.swing_type_distribution || {};
     if (Object.keys(swingTypes).length > 0) {
       context += `- Shot types: ${Object.entries(swingTypes).map(([type, count]) => `${type}: ${count}`).join(", ")}\n`;
     }
   });
-  
+
   // Rally analysis
   if (rallies.length > 0) {
     context += `\n### Rally Analysis\n`;
@@ -147,7 +147,7 @@ function buildCoachingContext(
     context += `- Average rally duration: ${avgRallyDuration}s\n`;
     context += `- Longest rally: ${maxRallyDuration}s\n`;
   }
-  
+
   // Rankings summary
   context += `\n### Performance Rankings\n`;
   if (Object.keys(rankings.ballSpeedRankings).length > 0) {
@@ -157,7 +157,7 @@ function buildCoachingContext(
       context += `- ${name}: #${rank}\n`;
     });
   }
-  
+
   return context;
 }
 
@@ -206,14 +206,14 @@ function StreamingDots() {
 }
 
 /** Prompt card for quick questions */
-function PromptCard({ 
-  emoji, 
-  label, 
-  onClick, 
-  disabled 
-}: { 
-  emoji: string; 
-  label: string; 
+function PromptCard({
+  emoji,
+  label,
+  onClick,
+  disabled
+}: {
+  emoji: string;
+  label: string;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -241,7 +241,7 @@ function PromptCard({
 /** Chat message bubble */
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
-  
+
   return (
     <Flex
       gap="3"
@@ -294,19 +294,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 }
 
 /** Welcome state with prompt cards */
-function WelcomeState({ 
-  onPromptClick, 
-  isLoading 
-}: { 
+function WelcomeState({
+  onPromptClick,
+  isLoading
+}: {
   onPromptClick: (prompt: string) => void;
   isLoading: boolean;
 }) {
   return (
-    <Flex 
-      direction="column" 
-      gap="4" 
-      align="center" 
-      justify="center" 
+    <Flex
+      direction="column"
+      gap="4"
+      align="center"
+      justify="center"
       style={{ height: "100%", padding: "20px" }}
     >
       <Text size="3" color="gray" align="center" style={{ marginBottom: 8 }}>
@@ -443,7 +443,7 @@ function useCoachingChat(coachingContext: string, sport: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Get auth for rate limiting (authenticated users get higher limits)
   const { session } = useAuth();
   const accessToken = session?.access_token;
@@ -451,8 +451,8 @@ function useCoachingChat(coachingContext: string, sport: string) {
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
-    const userMsgId = crypto.randomUUID();
-    const assistantMsgId = crypto.randomUUID();
+    const userMsgId = generateMessageId();
+    const assistantMsgId = generateMessageId();
 
     // Add user message
     setMessages(prev => [...prev, {
@@ -460,7 +460,7 @@ function useCoachingChat(coachingContext: string, sport: string) {
       role: "user",
       content: userMessage.trim(),
     }]);
-    
+
     setIsLoading(true);
 
     // Add empty assistant message for streaming
@@ -494,7 +494,7 @@ ${coachingContext}`;
       formData.append("prompt", fullPrompt);
       formData.append("thinkingMode", "fast");
       formData.append("domainExpertise", sport === "padel" ? "padel" : sport === "tennis" ? "tennis" : "pickleball");
-      
+
       if (history.length > 0) {
         formData.append("history", JSON.stringify(history));
       }
@@ -504,7 +504,7 @@ ${coachingContext}`;
       if (accessToken) {
         headers["Authorization"] = `Bearer ${accessToken}`;
       }
-      
+
       const response = await fetch("/api/llm", {
         method: "POST",
         headers,
@@ -526,14 +526,14 @@ ${coachingContext}`;
           if (done) break;
 
           let chunk = decoder.decode(value, { stream: true });
-          
+
           // Remove metadata from chunk if present
           if (chunk.includes("__STREAM_META__")) {
             chunk = chunk.slice(0, chunk.indexOf("__STREAM_META__"));
           }
 
           accumulatedText += chunk;
-          
+
           setMessages(prev => prev.map(m =>
             m.id === assistantMsgId
               ? { ...m, content: accumulatedText, isStreaming: true }
@@ -699,6 +699,3 @@ export function CoachingTab({
     </Box>
   );
 }
-
-
-

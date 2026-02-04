@@ -514,6 +514,8 @@ export function ChatInput({
               videoPreview={videoPreview}
               onRemove={onVideoRemove}
               disableTooltips={disableTooltips}
+              extractedThumbnailUrl={videoPreAnalysis?.localThumbnailBlobUrl}
+              isExtractingThumbnail={videoPreAnalysis?.isAnalyzing ?? true}
             />
           )}
 

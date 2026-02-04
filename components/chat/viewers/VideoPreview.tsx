@@ -1,6 +1,6 @@
 "use client";
 
-import { Flex, Tooltip } from "@radix-ui/themes";
+import { Flex, Tooltip, Spinner } from "@radix-ui/themes";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import Image from "next/image";
 
@@ -9,6 +9,10 @@ interface VideoPreviewProps {
   videoPreview: string | null;
   onRemove: () => void;
   disableTooltips?: boolean;
+  /** Optional extracted frame thumbnail URL (used for iOS Photos app compatibility) */
+  extractedThumbnailUrl?: string | null;
+  /** Whether thumbnail extraction is in progress */
+  isExtractingThumbnail?: boolean;
 }
 
 export function VideoPreview({
@@ -16,9 +20,17 @@ export function VideoPreview({
   videoPreview,
   onRemove,
   disableTooltips = false,
+  extractedThumbnailUrl,
+  isExtractingThumbnail = false,
 }: VideoPreviewProps) {
   const isImage = videoFile.type.startsWith("image/");
-  
+
+  // Use extracted thumbnail if available (fixes iOS Photos app video preview)
+  const useExtractedThumbnail = !isImage && extractedThumbnailUrl;
+
+  // Show spinner while extracting thumbnail for videos (not images)
+  const showSpinner = !isImage && isExtractingThumbnail && !extractedThumbnailUrl;
+
   return (
     <Flex
       align="center"
@@ -37,8 +49,8 @@ export function VideoPreview({
     >
       <Tooltip content={videoFile.name} open={disableTooltips ? false : undefined}>
         {isImage ? (
-          <Image 
-            src={videoPreview || ""} 
+          <Image
+            src={videoPreview || ""}
             alt={videoFile.name}
             width={120}
             height={80}
@@ -49,6 +61,33 @@ export function VideoPreview({
               objectFit: "cover",
             }}
             unoptimized
+          />
+        ) : showSpinner ? (
+          // Show spinner while extracting thumbnail
+          <Flex
+            align="center"
+            justify="center"
+            style={{
+              height: "80px",
+              width: "120px",
+              borderRadius: "var(--radius-2)",
+              backgroundColor: "var(--gray-3)",
+            }}
+          >
+            <Spinner size="2" />
+          </Flex>
+        ) : useExtractedThumbnail ? (
+          // Use extracted frame as image (iOS Photos app fix)
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={extractedThumbnailUrl}
+            alt={videoFile.name}
+            style={{
+              height: "80px",
+              width: "auto",
+              borderRadius: "var(--radius-2)",
+              objectFit: "cover",
+            }}
           />
         ) : (
           <video

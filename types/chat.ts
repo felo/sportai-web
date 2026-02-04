@@ -134,8 +134,21 @@ export type Chat = {
  * Video pre-analysis result for PRO and Technique LITE eligibility check
  * This is populated before the user sends their message
  */
+/** All detectable sports */
+export type DetectedSport =
+  // Racket sports
+  | "tennis" | "pickleball" | "padel" | "badminton" | "table_tennis"
+  // Team ball sports
+  | "soccer" | "basketball" | "volleyball" | "baseball" | "cricket" | "rugby" | "american_football" | "hockey"
+  // Individual sports
+  | "golf" | "swimming" | "athletics" | "cycling" | "gymnastics" | "skiing"
+  // Combat sports
+  | "boxing" | "martial_arts"
+  // Fallback
+  | "other";
+
 export type VideoPreAnalysis = {
-  sport: "tennis" | "pickleball" | "padel" | "other";
+  sport: DetectedSport;
   cameraAngle: "elevated_back_court" | "ground_behind" | "side" | "overhead" | "diagonal" | "other";
   fullCourtVisible: boolean;
   confidence: number;
@@ -149,4 +162,6 @@ export type VideoPreAnalysis = {
   // Thumbnail from first frame (stored in S3)
   thumbnailUrl?: string | null;
   thumbnailS3Key?: string | null;
+  // Local blob URL for immediate preview (before S3 upload completes)
+  localThumbnailBlobUrl?: string | null;
 };

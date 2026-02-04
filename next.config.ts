@@ -11,14 +11,14 @@ function getVersionInfo() {
   // Base version (update these for major/minor releases)
   const MAJOR = 0
   const MINOR = 7
-  
+
   // Check for Vercel environment variables first
   const vercelSha = process.env.VERCEL_GIT_COMMIT_SHA
   const vercelBranch = process.env.VERCEL_GIT_COMMIT_REF
-  
+
   let commitCount: string
   let shortSha: string
-  
+
   if (vercelSha) {
     // Running on Vercel - use timestamp-based patch for uniqueness
     shortSha = vercelSha.substring(0, 7)
@@ -35,7 +35,7 @@ function getVersionInfo() {
       shortSha = 'local'
     }
   }
-  
+
   return {
     version: `v${MAJOR}.${MINOR}.${commitCount}`,
     shortSha,
@@ -46,6 +46,13 @@ function getVersionInfo() {
 const versionInfo = getVersionInfo()
 
 const nextConfig: NextConfig = {
+  // Allow local network devices to access dev server (mobile testing)
+  allowedDevOrigins: [
+    'http://192.168.1.*',
+    'http://192.168.0.*',
+    'http://10.0.0.*',
+  ],
+
   // Expose version info and environment to client-side code
   env: {
     NEXT_PUBLIC_APP_VERSION: versionInfo.version,
@@ -64,7 +71,7 @@ const nextConfig: NextConfig = {
     '@tensorflow-models/pose-detection',
     '@mediapipe/pose',
   ],
-  
+
   images: {
     remotePatterns: [
       {
@@ -83,14 +90,14 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000, // 1 year for better caching
   },
-  
+
   // Bundle optimization - remove console logs in production
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
   },
-  
+
   // Optimize package imports - reduces bundle size significantly
   // Note: Don't include packages that are in serverExternalPackages
   experimental: {
@@ -100,7 +107,7 @@ const nextConfig: NextConfig = {
       'three',
     ],
   },
-  
+
   // Webpack optimizations
   webpack: (config, { isServer }) => {
     // Optimize Three.js tree-shaking
@@ -109,7 +116,7 @@ const nextConfig: NextConfig = {
       include: /node_modules\/three/,
       sideEffects: false,
     });
-    
+
     // Don't bundle TensorFlow on server side (it's client-only)
     if (isServer) {
       config.externals = config.externals || [];
@@ -119,7 +126,7 @@ const nextConfig: NextConfig = {
         '@tensorflow-models/pose-detection': 'commonjs @tensorflow-models/pose-detection',
       });
     }
-    
+
     // Provide empty fallback for @tensorflow/tfjs-backend-webgpu
     // The pose-detection library imports it unconditionally but we only use WebGL
     config.resolve = config.resolve || {};
@@ -127,7 +134,7 @@ const nextConfig: NextConfig = {
       ...config.resolve.fallback,
       '@tensorflow/tfjs-backend-webgpu': false,
     };
-    
+
     return config;
   },
 
