@@ -8,6 +8,7 @@ import {
   formatCost,
 } from "./token-utils";
 import { getSystemPromptWithDomainAndInsight, getFramePromptWithDomainAndInsight, type PromptType, type UserContext } from "./prompts";
+import { createUserFriendlyError } from "./llm-error-mapper";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
 
 // Model selection: Gemini 3 Flash for complex, Gemini 2.5 Flash for simple
@@ -491,6 +492,7 @@ export async function queryLLM(
       }
     }
 
+    // Log full error details for debugging (server-side only)
     logger.error(`[${requestId}] Error querying LLM:`, {
       message: error?.message,
       status: error?.status,
@@ -499,47 +501,14 @@ export async function queryLLM(
       stack: error?.stack,
     });
 
-    // Handle Google Generative AI specific errors with user-friendly messages
-    // Don't expose raw Google error messages to users
-    if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
-      logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
-
-      // Handle conversation history errors
-      if (error?.message?.includes("First content should be with role")) {
-        throw new Error("Something went wrong with the conversation. Please try again.");
-      }
-
-      // Handle other Google-specific errors
-      throw new Error("The AI service encountered an issue. Please try again.");
-    }
-
-    // Handle rate limiting (429) - check both direct and nested status
+    // Convert to user-friendly error message (hides technical details)
     const status = error?.status || error?.response?.status;
-    if (status === 429) {
-      const retryDelay = error?.errorDetails?.[0]?.retryDelay || "a moment";
-      logger.error(`[${requestId}] Rate limit exceeded. Retry delay: ${retryDelay}`);
-      throw new Error(`Rate limit exceeded. Please wait ${retryDelay} before trying again.`);
-    }
-
-    // Handle other API errors with status codes
-    if (error?.status) {
-      const statusText = error?.statusText || error?.message || "Unknown error";
-      logger.error(`[${requestId}] API error ${error.status}: ${statusText}`);
-      throw new Error(`LLM API error (${error.status}): ${statusText}`);
-    }
-
-    // Handle errors with errorDetails array
-    if (error?.errorDetails && Array.isArray(error.errorDetails) && error.errorDetails.length > 0) {
-      const firstError = error.errorDetails[0];
-      const errorMsg = firstError?.message || firstError?.reason || "API error";
-      logger.error(`[${requestId}] API error details:`, firstError);
-      throw new Error(`LLM API error: ${errorMsg}`);
-    }
-
-    // Handle generic errors
-    const errorMessage = error?.message || error?.toString() || "Failed to query LLM API";
-    logger.error(`[${requestId}] Generic error: ${errorMessage}`);
-    throw new Error(errorMessage);
+    throw createUserFriendlyError(error, {
+      status,
+      statusText: error?.statusText,
+      hasVideo: !!videoData,
+      requestId,
+    });
   }
 }
 
@@ -845,6 +814,7 @@ export async function streamLLM(
       };
     }
 
+    // Log full error details for debugging (server-side only)
     logger.error(`[${requestId}] Error streaming LLM:`, {
       message: error?.message,
       status: error?.status,
@@ -852,34 +822,12 @@ export async function streamLLM(
       errorDetails: error?.errorDetails,
     });
 
-    // Handle Google Generative AI specific errors with user-friendly messages
-    // Don't expose raw Google error messages to users
-    if (error?.message?.includes("[GoogleGenerativeAI Error]")) {
-      logger.error(`[${requestId}] Google AI error detected, returning user-friendly message`);
-
-      // Handle conversation history errors
-      if (error?.message?.includes("First content should be with role")) {
-        throw new Error("Something went wrong with the conversation. Please try again.");
-      }
-
-      // Handle other Google-specific errors
-      throw new Error("The AI service encountered an issue. Please try again.");
-    }
-
-    // Provide more helpful error messages for common issues
-    if (error?.status === 500 || error?.statusText === "Internal Server Error") {
-      if (videoData) {
-        const mediaSizeMB = (videoData.data.length / (1024 * 1024)).toFixed(2);
-        throw new Error(
-          `LLM API encountered an internal error while processing your ${mediaSizeMB}MB video. This often happens with longer videos. Try: (1) Using a shorter video clip, (2) Compressing the video, or (3) Switching to 'Low' media resolution in settings.`
-        );
-      } else {
-        throw new Error(
-          "LLM API encountered an internal error. Please try again in a few moments."
-        );
-      }
-    }
-
-    throw error;
+    // Convert to user-friendly error message (hides technical details)
+    throw createUserFriendlyError(error, {
+      status: error?.status,
+      statusText: error?.statusText,
+      hasVideo: !!videoData,
+      requestId,
+    });
   }
 }

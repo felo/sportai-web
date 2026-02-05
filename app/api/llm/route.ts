@@ -3,6 +3,7 @@ import { queryLLM, streamLLM, type ConversationHistory } from "@/lib/llm";
 import { logger } from "@/lib/logger";
 import { downloadFromS3 } from "@/lib/s3";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
+import { sanitizeErrorMessage } from "@/lib/llm-error-mapper";
 import { checkRateLimit, getRateLimitIdentifier, rateLimitedResponse, type RateLimitTier } from "@/lib/rate-limit";
 import { getAuthenticatedUser, getSupabaseAdmin } from "@/lib/supabase-server";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
@@ -466,7 +467,9 @@ export async function POST(request: NextRequest) {
 
             // Send error message as stream content so client can display it
             // This prevents ERR_EMPTY_RESPONSE errors on the client
-            const errorMessage = error instanceof Error ? error.message : "Failed to process request";
+            // Sanitize the error message to hide any technical details
+            const rawMessage = error instanceof Error ? error.message : "Failed to process request";
+            const errorMessage = sanitizeErrorMessage(rawMessage);
             const errorResponse = `\n\n⚠️ **Error:** ${errorMessage}`;
 
             try {
@@ -550,10 +553,12 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
     });
 
-    const errorMessage = error instanceof Error ? error.message : "Failed to process request";
+    // Sanitize the error message to hide any technical details before sending to client
+    const rawMessage = error instanceof Error ? error.message : "Failed to process request";
+    const errorMessage = sanitizeErrorMessage(rawMessage);
 
-    // Return 429 for rate limiting, 500 for other errors
-    const status = errorMessage.includes("Rate limit") ? 429 : 500;
+    // Return 429 for rate limiting (check raw message for accurate detection), 500 for other errors
+    const status = rawMessage.includes("Rate limit") || rawMessage.includes("high demand") ? 429 : 500;
 
     logger.debug(`[${requestId}] Returning error response: ${status} - ${errorMessage}`);
 
