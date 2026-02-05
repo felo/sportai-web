@@ -327,15 +327,6 @@ export function useAnalysisOptions({
 
     const { preAnalysis, videoUrl: storedVideoUrl, userPrompt: storedUserPrompt } = optionsMessage.analysisOptions;
 
-    // Add user message showing their choice
-    const userChoiceMessageId = generateMessageId();
-    const userChoiceMessage: Message = {
-      id: userChoiceMessageId,
-      role: "user",
-      content: "Let's go with the PRO Analysis!",
-    };
-    addMessage(userChoiceMessage);
-
     setTimeout(() => scrollToBottom(), 100);
 
     updateMessage(messageId, {
@@ -428,8 +419,8 @@ export function useAnalysisOptions({
       const libraryMessageId = generateMessageId();
       // Technique tasks are immediately completed; tactical tasks need processing time
       const libraryMessageContent = isTechniqueAnalysis
-        ? `I've added this video to your **Library** (in the sidebar) under **Technique**. You can revisit it anytime!\n\nNow let me give you some instant feedback...`
-        : `I've added this video to your **Library** (in the sidebar) for PRO Analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`;
+        ? `I've added this video to your **Studio** (on the top bar) under **Technique**. You can revisit it anytime!\n\nNow let me give you some instant feedback...`
+        : `I've added this video to your **Studio** (on the top bar) for analysis. You can find the detailed results there in approximately **${estimatedTime}**.\n\nIn the meantime, let me give you some instant feedback...`;
 
       // Start with empty content and streaming state
       const libraryMessage: Message = {
@@ -599,7 +590,22 @@ export function useAnalysisOptions({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
         analysisLogger.error("Shark API error response:", errorData);
-        throw new Error(errorData.details || errorData.error || `Shark API request failed with status ${response.status}`);
+
+        // Parse details if it's a JSON string
+        let errorMessage = "";
+        if (errorData.details) {
+          try {
+            const parsedDetails = typeof errorData.details === 'string'
+              ? JSON.parse(errorData.details)
+              : errorData.details;
+            errorMessage = parsedDetails.error || parsedDetails.message || errorData.details;
+          } catch {
+            errorMessage = errorData.details;
+          }
+        }
+        errorMessage = errorMessage || errorData.error || `Request failed with status ${response.status}`;
+
+        throw new Error(errorMessage);
       }
 
       // Parse streaming JSON response
@@ -790,8 +796,25 @@ export function useAnalysisOptions({
         });
       } else {
         analysisLogger.error("Shark analysis failed:", err);
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+
+        // Provide user-friendly message based on error type
+        let userMessage: string;
+        if (errorMessage.toLowerCase().includes("internal server error") ||
+            errorMessage.toLowerCase().includes("no swing") ||
+            errorMessage.toLowerCase().includes("not detected") ||
+            errorMessage.toLowerCase().includes("could not find")) {
+          userMessage = `I couldn't detect a **${swingLabel}** in this video. This might happen if:\n\n` +
+            `- The video contains a different swing type (e.g., a serve instead of a ${swingType})\n` +
+            `- The swing isn't clearly visible in the frame\n` +
+            `- The video quality makes detection difficult\n\n` +
+            `Please try selecting a different swing type or uploading a clearer video.`;
+        } else {
+          userMessage = `Sorry, I encountered an error analyzing your swing: ${errorMessage}. Please try again.`;
+        }
+
         updateMessage(assistantMessageId, {
-          content: `Sorry, I encountered an error analyzing your swing: ${err instanceof Error ? err.message : "Unknown error"}. Please try again.`,
+          content: userMessage,
           isStreaming: false,
         });
       }

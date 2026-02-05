@@ -550,31 +550,31 @@ export function useChatSubmission({
            console.log('[VIDEO_CONVERSION] Skipping conversion - not needed');
          }
 
-         if (videoMessageId) {
-           updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key, videoPreview: null });
-         }
-       } catch (uploadError) {
-         chatLogger.error("Failed to upload video:", uploadError);
-       }
+        if (videoMessageId) {
+          updateMessage(videoMessageId, { videoUrl: s3Url, videoS3Key: s3Key, videoPreview: null });
+        }
+      } catch (uploadError) {
+        chatLogger.error("Failed to upload video:", uploadError);
+      }
 
-       if (s3Url) {
-         updateMessage(assistantMessageId, {
-           messageType: "analysis_options",
-           content: "",
-           analysisOptions: {
-             preAnalysis: effectiveVideoPreAnalysis,
-             selectedOption: null,
-             videoUrl: s3Url,
-             userPrompt: currentPrompt,
-           },
-           isStreaming: false,
-         });
-         setLoading(false);
-         setProgressStage("idle");
-         setUploadProgress(0);
-         return;
-       }
-     }
+      if (s3Url) {
+        updateMessage(assistantMessageId, {
+          messageType: "analysis_options",
+          content: "",
+          analysisOptions: {
+            preAnalysis: effectiveVideoPreAnalysis,
+            selectedOption: null,
+            videoUrl: s3Url,
+            userPrompt: currentPrompt,
+          },
+          isStreaming: false,
+        });
+        setLoading(false);
+        setProgressStage("idle");
+        setUploadProgress(0);
+        return;
+      }
+    }
 
     // Standard video upload
     await sendVideoQuery(
