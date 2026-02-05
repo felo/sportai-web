@@ -37,6 +37,15 @@ export function useVideoUpload() {
     setVideoPreview(previewUrl);
     previousPreviewRef.current = previewUrl;
 
+    // Debug logging for video conversion tracking
+    console.log('[VIDEO_CONVERSION] File selected:', {
+      fileName: file.name,
+      fileType: file.type,
+      fileSizeMB: (file.size / 1024 / 1024).toFixed(2),
+      needsServerConversion: serverConversionNeeded,
+      source,
+    });
+
     // Track successful video upload
     track('video_uploaded', {
       fileSizeMB: Math.round(file.size / 1024 / 1024 * 100) / 100,

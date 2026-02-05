@@ -476,7 +476,15 @@ export function useAIApi(options: UseAIApiOptions = {}) {
         setProgress(80);
         
         // Step 2.5: Convert video on server if needed (for Apple QuickTime/MOV on iOS)
+        console.log('[VIDEO_CONVERSION] (useAIApi) Checking if conversion needed:', {
+          needsServerConversion,
+          s3Key,
+          fileName: videoFile.name,
+          fileType: videoFile.type,
+        });
+        
         if (needsServerConversion) {
+          console.log('[VIDEO_CONVERSION] (useAIApi) Starting server-side conversion...');
           apiLogger.debug("Starting server-side video conversion...");
           setStage("processing");
           updateMessage(assistantMessageId, { 
@@ -496,12 +504,17 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             
             if (!convertResponse.ok) {
               const errorData = await convertResponse.json();
+              console.log('[VIDEO_CONVERSION] (useAIApi) Conversion failed:', errorData);
               apiLogger.error("Conversion failed:", errorData);
               // Continue with original file - Gemini might still work
               apiLogger.debug("Proceeding with original file...");
             } else {
               const convertResult = await convertResponse.json();
               if (convertResult.success && convertResult.downloadUrl) {
+                console.log('[VIDEO_CONVERSION] (useAIApi) Conversion successful!', {
+                  originalKey: s3Key,
+                  convertedKey: convertResult.convertedKey,
+                });
                 apiLogger.debug("Video converted successfully!", {
                   originalKey: s3Key,
                   convertedKey: convertResult.convertedKey,
@@ -512,12 +525,15 @@ export function useAIApi(options: UseAIApiOptions = {}) {
                 if (onVideoUploaded) {
                   onVideoUploaded(s3Url, convertResult.convertedKey);
                 }
+              } else {
+                console.log('[VIDEO_CONVERSION] (useAIApi) Conversion response not successful:', convertResult);
               }
             }
           } catch (convertError) {
             if ((convertError as Error).name === "AbortError") {
               throw convertError; // Re-throw abort errors
             }
+            console.log('[VIDEO_CONVERSION] (useAIApi) Conversion error:', convertError);
             apiLogger.error("Conversion error:", convertError);
             // Continue with original file
             apiLogger.debug("Proceeding with original file...");
@@ -525,6 +541,8 @@ export function useAIApi(options: UseAIApiOptions = {}) {
           
           // Clear the "converting" message
           updateMessage(assistantMessageId, { content: "", isStreaming: true });
+        } else {
+          console.log('[VIDEO_CONVERSION] (useAIApi) Skipping conversion - not needed');
         }
         
         // Step 3: Send S3 URL to Gemini API - backend will download it efficiently
@@ -902,4 +920,3 @@ export function useAIApi(options: UseAIApiOptions = {}) {
     sendVideoQuery,
   };
 }
-

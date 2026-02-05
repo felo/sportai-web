@@ -92,6 +92,7 @@ function HomeContent() {
     setError: setVideoError,
     processVideoFile,
     clearVideo,
+    needsServerConversion,
     showFileSizeLimitModal,
     setShowFileSizeLimitModal,
   } = useVideoUpload();
@@ -151,6 +152,12 @@ function HomeContent() {
     // This prevents loading messages from a previous chat when navigating to /chat
     setCurrentChatId(undefined);
 
+    console.log('[VIDEO_CONVERSION] Setting pending submission:', {
+      hasVideoFile: !!videoFile,
+      fileName: videoFile?.name,
+      needsServerConversion,
+    });
+
     // Set pending submission in context (includes pre-analysis to avoid re-analyzing)
     setPendingSubmission({
       prompt: promptText.trim(),
@@ -158,6 +165,7 @@ function HomeContent() {
       videoPreview: videoPreview || undefined,
       detectedVideoUrl: effectiveVideoUrl || undefined,
       videoPreAnalysis: videoPreAnalysis || undefined,
+      needsServerConversion: needsServerConversion || undefined,
       settings: {
         thinkingMode,
         mediaResolution,
@@ -167,7 +175,7 @@ function HomeContent() {
 
     // Navigate to chat page
     router.push("/chat");
-  }, [videoFile, videoPreview, detectedVideoUrl, thinkingMode, mediaResolution, domainExpertise, setPendingSubmission, router, videoPreAnalysis]);
+  }, [videoFile, videoPreview, detectedVideoUrl, thinkingMode, mediaResolution, domainExpertise, needsServerConversion, setPendingSubmission, router, videoPreAnalysis]);
 
   // Handle form submission - set pending and navigate to /chat
   const handleSubmit = useCallback((e: React.FormEvent) => {

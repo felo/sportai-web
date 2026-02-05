@@ -91,6 +91,8 @@ interface SettingsOverrides {
   thinkingMode?: ThinkingMode;
   mediaResolution?: MediaResolution;
   domainExpertise?: DomainExpertise;
+  /** Whether the video needs server-side conversion (MOV, HEVC, etc.) */
+  needsServerConversion?: boolean;
 }
 
 interface UseChatSubmissionReturn {
@@ -149,6 +151,7 @@ export function useChatSubmission({
     const effectiveThinkingMode = overrideSettings?.thinkingMode ?? thinkingMode;
     const effectiveMediaResolution = overrideSettings?.mediaResolution ?? mediaResolution;
     const effectiveDomainExpertise = overrideSettings?.domainExpertise ?? domainExpertise;
+    const effectiveNeedsServerConversion = overrideSettings?.needsServerConversion ?? needsServerConversion;
     const hasValidInput = effectivePrompt.trim() || effectiveVideoFile || effectiveVideoUrl;
     if (!hasValidInput || loading) return;
 
@@ -352,7 +355,8 @@ export function useChatSubmission({
          await handleVideoFileUpload(
            currentPrompt, currentVideoFile, assistantMessageId, videoMessageId,
            conversationHistory, abortController, requestChatId, effectiveVideoPreAnalysis,
-           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise }
+           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise },
+           effectiveNeedsServerConversion
          );
        }
      } catch (err) {
@@ -470,7 +474,8 @@ export function useChatSubmission({
      abortController: AbortController,
      requestChatId: string,
      effectiveVideoPreAnalysis: VideoPreAnalysis | null,
-     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise }
+     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise },
+     effectiveNeedsServerConversion: boolean
    ) => {
      if (effectiveVideoPreAnalysis && (effectiveVideoPreAnalysis.isProEligible || effectiveVideoPreAnalysis.isTechniqueLiteEligible)) {
        // PRO eligible - upload first then show options
@@ -499,8 +504,16 @@ export function useChatSubmission({
            abortController.signal
          );
 
-         // Convert if needed
-         if (needsServerConversion) {
+        // Convert if needed
+        console.log('[VIDEO_CONVERSION] Checking if conversion needed:', {
+          needsServerConversion: effectiveNeedsServerConversion,
+          s3Key,
+          fileName: currentVideoFile.name,
+          fileType: currentVideoFile.type,
+        });
+        
+        if (effectiveNeedsServerConversion) {
+           console.log('[VIDEO_CONVERSION] Starting server-side conversion...');
            setProgressStage("processing");
            updateMessage(assistantMessageId, { content: "Converting video format for analysis...", isStreaming: true });
 
@@ -515,15 +528,26 @@ export function useChatSubmission({
              if (convertResponse.ok) {
                const convertResult = await convertResponse.json();
                if (convertResult.success && convertResult.downloadUrl) {
+                 console.log('[VIDEO_CONVERSION] Conversion successful!', {
+                   originalKey: s3Key,
+                   convertedKey: convertResult.convertedKey,
+                 });
                  s3Url = convertResult.downloadUrl;
                  s3Key = convertResult.convertedKey;
+               } else {
+                 console.log('[VIDEO_CONVERSION] Conversion response not successful:', convertResult);
                }
+             } else {
+               console.log('[VIDEO_CONVERSION] Conversion failed with status:', convertResponse.status);
              }
            } catch (convertError) {
              if ((convertError as Error).name === "AbortError") throw convertError;
+             console.log('[VIDEO_CONVERSION] Conversion error:', convertError);
            }
 
            updateMessage(assistantMessageId, { content: "", isStreaming: true });
+         } else {
+           console.log('[VIDEO_CONVERSION] Skipping conversion - not needed');
          }
 
          if (videoMessageId) {

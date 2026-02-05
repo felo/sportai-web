@@ -363,7 +363,18 @@ export function AIChatForm() {
       const submissionVideoUrl = pendingSubmission.detectedVideoUrl;
       const submissionVideoPreAnalysis = pendingSubmission.videoPreAnalysis;
       const submissionVideoFile = pendingSubmission.videoFile;
-      const submissionSettings = pendingSubmission.settings;
+      // Merge settings with needsServerConversion flag
+      const submissionSettings = {
+        ...pendingSubmission.settings,
+        needsServerConversion: pendingSubmission.needsServerConversion,
+      };
+      
+      console.log('[VIDEO_CONVERSION] Processing pending submission:', {
+        hasVideoFile: !!submissionVideoFile,
+        fileName: submissionVideoFile?.name,
+        needsServerConversion: pendingSubmission.needsServerConversion,
+      });
+      
       clearPendingSubmission();
 
       // Trigger the submission directly - all data is passed via override parameters

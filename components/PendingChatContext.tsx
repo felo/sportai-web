@@ -16,6 +16,8 @@ export interface PendingSubmission {
   detectedVideoUrl?: string;
   /** Pre-analysis data from home page - avoids re-analyzing on /chat */
   videoPreAnalysis?: VideoPreAnalysis | null;
+  /** Whether the video needs server-side conversion (MOV, HEVC, etc.) */
+  needsServerConversion?: boolean;
   settings?: {
     thinkingMode: ThinkingMode;
     mediaResolution: MediaResolution;
