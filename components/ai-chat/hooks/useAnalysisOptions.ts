@@ -381,7 +381,7 @@ export function useAnalysisOptions({
           },
           body: JSON.stringify({
             taskType,
-            sport: taskSport,
+            sport: 'pickleball',
             videoUrl: videoUrl,
             thumbnailUrl: preAnalysis.thumbnailUrl || null,
             thumbnailS3Key: preAnalysis.thumbnailS3Key || null,
