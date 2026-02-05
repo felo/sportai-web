@@ -186,15 +186,19 @@ export function AIChatForm() {
 
   /**
    * Handles video upload with automatic new chat creation.
-   * If there's already a video attachment or existing user messages,
-   * creates a new chat first to ensure fresh context.
+   * Creates a new chat if we're in an existing chat (has currentChatId) or have any messages,
+   * to ensure fresh context for the new video.
    */
   const handleVideoUploadWithNewChat = useCallback(async (file: File, source: 'file_picker' | 'drag_drop' = 'file_picker') => {
-    // Check if we need a new chat: either we have a video OR we have user messages
+    // Check if we need a new chat:
+    // - We have an existing video attachment
+    // - We have any messages (user or assistant)
+    // - We're in an existing chat (currentChatId is set)
     const hasExistingVideo = !!videoFile;
-    const hasUserMessages = messages.some(m => m.role === "user");
+    const hasAnyMessages = messages.length > 0;
+    const currentChatId = getCurrentChatId();
 
-    if (hasExistingVideo || hasUserMessages) {
+    if (hasExistingVideo || hasAnyMessages || currentChatId) {
       // Create new chat for fresh context
       const newChat = await createNewChat();
       setCurrentChatId(newChat.id);

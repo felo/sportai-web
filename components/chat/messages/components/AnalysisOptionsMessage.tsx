@@ -19,7 +19,7 @@ interface AnalysisOptionsMessageProps {
   preAnalysis: VideoPreAnalysis;
   onSelectProPlusQuick: () => void;
   onSelectQuickOnly: () => void;
-  /** Handler for swing analysis (pickleball uses Shark API) */
+  /** Handler for in-depth swing analysis via Shark API (forehand/backhand only) */
   onSwingAnalyze?: (swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
   isLoading?: boolean;
   selectedOption?: "pro_plus_quick" | "quick_only" | null;
@@ -123,8 +123,11 @@ export function AnalysisOptionsMessage({
               showCard={showBoxes}
               showButton={showButtons}
               onAnalyze={(swingType, swingLabel, dominantHand) => {
-                // Use Shark API handler if provided, otherwise fall back to PRO analysis
-                if (onSwingAnalyze) {
+                // Use Shark API only for forehand_drive and backhand_drive (in-depth analysis)
+                // Other swing types use regular PRO analysis without Shark API
+                const usesSharkAPI = swingType === "forehand_drive" || swingType === "backhand_drive";
+                
+                if (usesSharkAPI && onSwingAnalyze) {
                   onSwingAnalyze(swingType, swingLabel, dominantHand);
                 } else {
                   onSelectProPlusQuick();

@@ -26,6 +26,7 @@ import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useVideoPreAnalysis } from "@/components/ai-chat/hooks";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import { setCurrentChatId } from "@/utils/storage-unified";
 import { extractVideoUrls } from "@/utils/video-utils";
 import buttonStyles from "@/styles/buttons.module.css";
 
@@ -145,6 +146,10 @@ function HomeContent() {
     if (!promptText.trim() && !videoFile && !effectiveVideoUrl) {
       return; // Nothing to submit
     }
+
+    // Clear current chat ID to ensure a fresh chat is created
+    // This prevents loading messages from a previous chat when navigating to /chat
+    setCurrentChatId(undefined);
 
     // Set pending submission in context (includes pre-analysis to avoid re-analyzing)
     setPendingSubmission({

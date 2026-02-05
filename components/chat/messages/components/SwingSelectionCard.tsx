@@ -21,14 +21,14 @@ interface SwingSelectionCardProps {
   onAnalyze: (swingType: string, swingLabel: string, dominantHand: "left" | "right") => void;
 }
 
-// Swing types that are currently enabled for analysis
-const ENABLED_SWING_TYPES = ["forehand_drive", "backhand_drive"];
+// Swing types that support in-depth Shark API analysis
+const IN_DEPTH_SWING_TYPES = ["forehand_drive", "backhand_drive"];
 
 /**
- * Check if a swing type is enabled for selection
+ * Check if a swing type supports in-depth analysis via Shark API
  */
-function isSwingEnabled(swingValue: string): boolean {
-  return ENABLED_SWING_TYPES.includes(swingValue);
+function hasInDepthAnalysis(swingValue: string): boolean {
+  return IN_DEPTH_SWING_TYPES.includes(swingValue);
 }
 
 /**
@@ -84,18 +84,14 @@ export function SwingSelectionCard({
               <Select.Content>
                 <Select.Group>
                   <Select.Label>Common Shots</Select.Label>
-                  {COMMON_SWINGS.map((swing) => {
-                    const enabled = isSwingEnabled(swing.value);
-                    return (
-                      <Select.Item
-                        key={swing.value}
-                        value={swing.value}
-                        disabled={!enabled}
-                      >
-                        {swing.label}{!enabled && " (coming soon)"}
-                      </Select.Item>
-                    );
-                  })}
+                  {COMMON_SWINGS.map((swing) => (
+                    <Select.Item
+                      key={swing.value}
+                      value={swing.value}
+                    >
+                      {swing.label}{hasInDepthAnalysis(swing.value) && " (in-depth analysis)"}
+                    </Select.Item>
+                  ))}
                 </Select.Group>
                 {sport === "tennis" && TENNIS_SWINGS.length > 0 && (
                   <Select.Group>
@@ -104,9 +100,8 @@ export function SwingSelectionCard({
                       <Select.Item
                         key={swing.value}
                         value={swing.value}
-                        disabled
                       >
-                        {swing.label} (coming soon)
+                        {swing.label}{hasInDepthAnalysis(swing.value) && " (in-depth analysis)"}
                       </Select.Item>
                     ))}
                   </Select.Group>
@@ -118,9 +113,8 @@ export function SwingSelectionCard({
                       <Select.Item
                         key={swing.value}
                         value={swing.value}
-                        disabled
                       >
-                        {swing.label} (coming soon)
+                        {swing.label}{hasInDepthAnalysis(swing.value) && " (in-depth analysis)"}
                       </Select.Item>
                     ))}
                   </Select.Group>
@@ -132,9 +126,8 @@ export function SwingSelectionCard({
                       <Select.Item
                         key={swing.value}
                         value={swing.value}
-                        disabled
                       >
-                        {swing.label} (coming soon)
+                        {swing.label}{hasInDepthAnalysis(swing.value) && " (in-depth analysis)"}
                       </Select.Item>
                     ))}
                   </Select.Group>
