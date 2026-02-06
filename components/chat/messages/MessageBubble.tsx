@@ -9,6 +9,7 @@ import { SHOW_PRO_UPSELL_BANNER } from "@/lib/limitations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { ProUpsellBanner, DeveloperInfo, UserMessage, AssistantMessage, AnalysisOptionsMessage, SharkResultDisplay, TechniqueStudioPrompt, CandidateResponsesMessage, FollowUpSuggestions, ProfileCompletionPrompt } from "./components";
+import { AnalysisTagsDisplay } from "./components/AnalysisTagsDisplay";
 import { hasShownProUpsell, markProUpsellShown, THINKING_MESSAGES_VIDEO, getThinkingMessage } from "./utils";
 
 // CSS keyframes for avatar poke animation
@@ -669,6 +670,11 @@ export function MessageBubble({ message, allMessages = [], messageIndex = 0, scr
                     onRetry={onRetryMessage ? () => onRetryMessage(message.id) : undefined}
                     isRetrying={isRetrying}
                   />
+
+                  {/* Analysis Tags (strengths and improvements) */}
+                  {message.analysisTags && !message.isStreaming && (
+                    <AnalysisTagsDisplay tags={message.analysisTags} />
+                  )}
 
                   {/* PRO Membership Upsell */}
                   <ProUpsellBanner show={showProUpsell} />

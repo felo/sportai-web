@@ -5,15 +5,16 @@
   */
 
  import { useCallback, useRef } from "react";
- import { chatLogger } from "@/lib/logger";
- import type { Message, VideoPreAnalysis } from "@/types/chat";
- import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
- import { getCurrentChatId, loadChat } from "@/utils/storage-unified";
- import { uploadToS3 } from "@/lib/s3";
- import { generateMessageId, stripStreamMetadata, calculateUserMessageTokens } from "../utils";
- import type { ProgressStage } from "../types";
- import type { StarterPromptConfig } from "@/utils/prompts";
- import { getDemoVideoByUrl } from "@/components/tasks/sampleTasks";
+import { chatLogger } from "@/lib/logger";
+import type { Message, VideoPreAnalysis } from "@/types/chat";
+import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
+import { getCurrentChatId, loadChat } from "@/utils/storage-unified";
+import { uploadToS3 } from "@/lib/s3";
+import { generateMessageId, stripStreamMetadata, calculateUserMessageTokens } from "../utils";
+import type { ProgressStage } from "../types";
+import type { StarterPromptConfig } from "@/utils/prompts";
+import { getDemoVideoByUrl } from "@/components/tasks/sampleTasks";
+import { parseAnalysisTags, stripAnalysisTags } from "@/utils/analysis-tags";
 
 interface UseChatSubmissionOptions {
   // State
@@ -439,7 +440,16 @@ export function useChatSubmission({
        }
       const chatId = getCurrentChatId();
       if (chatId === requestChatId) {
-        updateMessage(assistantMessageId, { isStreaming: false });
+        // Parse analysis tags from the final content and strip them for display
+        const finalContent = stripStreamMetadata(accumulatedText);
+        const analysisTags = parseAnalysisTags(finalContent);
+        const displayContent = analysisTags ? stripAnalysisTags(finalContent) : finalContent;
+        
+        updateMessage(assistantMessageId, { 
+          content: displayContent,
+          isStreaming: false,
+          ...(analysisTags && { analysisTags }),
+        });
 
         // Add Studio prompt after analysis completes
         await new Promise(resolve => setTimeout(resolve, 300));

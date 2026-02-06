@@ -108,6 +108,11 @@ export type Message = {
   poseDataS3Key?: string | null; // S3 key for preprocessed pose detection data
   // Technique LITE eligibility - enables pose preprocessing when true (side camera + < 20s)
   isTechniqueLiteEligible?: boolean;
+  // Analysis tags extracted from LLM response - for skill profiling
+  analysisTags?: {
+    strengths: string[];    // Technique elements done well
+    improvements: string[]; // Technique elements that need work
+  };
   // Studio prompt (for messageType === "technique_studio_prompt")
   // Note: messageType is still "technique_studio_prompt" for backward compatibility,
   // but analysisType determines which studio (Technique or Match) to show

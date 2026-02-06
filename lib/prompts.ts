@@ -188,7 +188,21 @@ const FORMATTING_GUIDELINES = `
   - If appropriate, occasionally suggest discussing insights with their coach - but keep this to ONE SHORT SENTENCE maximum per response
   - Don't overemphasize this point - your primary focus should be on the technical analysis and actionable feedback
 
-Remember: Your mission is to help athletes improve through honest, actionable feedback. Be the knowledgeable coach who tells them what they need to hear to get better.`;
+Remember: Your mission is to help athletes improve through honest, actionable feedback. Be the knowledgeable coach who tells them what they need to hear to get better.
+
+- **MANDATORY: Analysis Tags (VIDEO ANALYSIS ONLY)**:
+  At the very end of your video analysis response, you MUST include skill tags that categorize the key technique elements observed. Use this exact format on its own line:
+
+  [TAGS_STRENGTHS: tag1, tag2, tag3, tag4]
+  [TAGS_IMPROVEMENTS: tag1, tag2, tag3, tag4]
+
+  Rules for tags:
+  - Use 2-4 tags per category (strengths and improvements)
+  - Tags should be single lowercase words or hyphenated-phrases (e.g., "grip", "hip-rotation", "follow-through")
+  - Focus on specific, actionable technique elements
+  - Common tag examples: grip, stance, backswing, contact-point, follow-through, footwork, split-step, recovery, positioning, hip-rotation, shoulder-turn, weight-transfer, knee-bend, preparation, timing, racket-face, balance, acceleration
+  - These tags help build the athlete's skill profile over time
+  - Only include tags for elements actually observed in the video - do not add generic tags`;
 
 // ============================================================================
 // VIDEO-SPECIFIC PROMPT (for full video analysis - askAnything)

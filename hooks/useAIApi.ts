@@ -11,6 +11,7 @@ import { estimateTextTokens, estimateVideoTokens } from "@/lib/token-utils";
 import { getVideoSizeErrorMessage, LARGE_VIDEO_LIMIT_MB } from "@/lib/video-size-messages";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
+import { parseAnalysisTags, stripAnalysisTags } from "@/utils/analysis-tags";
 
 // Rough estimate for system prompt token count (server-side prompt is not exposed to client)
 // This includes base system prompt + potential domain expertise enhancement
@@ -278,7 +279,12 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             hasContextUsage: !!contextUsageInfo,
           });
           
+          // Parse analysis tags from the final content (if any) and strip them for display
+          const analysisTags = parseAnalysisTags(accumulatedText);
+          const displayContent = analysisTags ? stripAnalysisTags(accumulatedText) : accumulatedText;
+          
           updateMessage(assistantMessageId, {
+            content: displayContent,
             responseDuration: duration,
             timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
@@ -294,6 +300,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
               thinkingBudget,
             },
             contextUsage: contextUsageInfo,
+            ...(analysisTags && { analysisTags }),
           });
         } catch (error) {
           // Also set streaming to false on error
@@ -722,7 +729,12 @@ export function useAIApi(options: UseAIApiOptions = {}) {
             hasContextUsage: !!contextUsageInfo,
           });
           
+          // Parse analysis tags from the final content and strip them for display
+          const analysisTags = parseAnalysisTags(accumulatedText);
+          const displayContent = analysisTags ? stripAnalysisTags(accumulatedText) : accumulatedText;
+          
           updateMessage(assistantMessageId, {
+            content: displayContent,
             responseDuration: duration,
             timeToFirstToken: timeToFirstToken,
             isStreaming: false, // Mark as complete
@@ -738,6 +750,7 @@ export function useAIApi(options: UseAIApiOptions = {}) {
               thinkingBudget,
             },
             contextUsage: contextUsageInfo,
+            ...(analysisTags && { analysisTags }),
           });
         } catch (error) {
           // Also set streaming to false on error

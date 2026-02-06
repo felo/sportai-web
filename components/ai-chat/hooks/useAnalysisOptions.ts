@@ -15,6 +15,7 @@ import { estimateProAnalysisTime } from "@/utils/video-utils";
 import { generateMessageId, stripStreamMetadata } from "../utils";
 import type { ProgressStage } from "../types";
 import type { SharkAnalysisResult, SharkMetadata } from "@/types/shark";
+import { parseAnalysisTags, stripAnalysisTags } from "@/utils/analysis-tags";
 import { calculateAverageScore, getCategoryCount, getTotalFeatureCount, calculateFpsFromFeatures } from "@/types/shark";
 
 /**
@@ -273,9 +274,15 @@ export function useAnalysisOptions({
           });
         }
 
+        // Parse analysis tags from the final content and strip them for display
+        const finalContent = stripStreamMetadata(accumulatedText);
+        const analysisTags = parseAnalysisTags(finalContent);
+        const displayContent = analysisTags ? stripAnalysisTags(finalContent) : finalContent;
+
         updateMessage(assistantMessageId, {
-          content: stripStreamMetadata(accumulatedText),
+          content: displayContent,
           isStreaming: false,
+          ...(analysisTags && { analysisTags }),
         });
 
         // Add Technique Studio prompt if requested and video URL is available
