@@ -7,7 +7,9 @@
  import { useCallback, useRef } from "react";
 import { chatLogger } from "@/lib/logger";
 import type { Message, VideoPreAnalysis } from "@/types/chat";
+import { isRacketDomainSport } from "@/types/chat";
 import type { ThinkingMode, MediaResolution, DomainExpertise, InsightLevel } from "@/utils/storage";
+import { createGuestTechniqueTask } from "@/utils/storage";
 import { getCurrentChatId, loadChat } from "@/utils/storage-unified";
 import { uploadToS3 } from "@/lib/s3";
 import { generateMessageId, stripStreamMetadata, calculateUserMessageTokens } from "../utils";
@@ -55,6 +57,7 @@ interface UseChatSubmissionOptions {
    clearVideo: (keepBlobUrl?: boolean) => void;
    resetAnalysis: () => void;
    scrollMessageToTop: (messageId: string) => void;
+   refreshLibraryTasks: () => void;
   // API
   sendTextOnlyQuery: (
     prompt: string,
@@ -135,6 +138,7 @@ export function useChatSubmission({
    clearVideo,
    resetAnalysis,
    scrollMessageToTop,
+   refreshLibraryTasks,
    sendTextOnlyQuery,
    sendVideoQuery,
  }: UseChatSubmissionOptions): UseChatSubmissionReturn {
@@ -312,7 +316,15 @@ export function useChatSubmission({
 
        if (currentVideoUrl && !currentVideoFile) {
          // Video URL analysis
-         if (effectiveVideoPreAnalysis && (effectiveVideoPreAnalysis.isProEligible || effectiveVideoPreAnalysis.isTechniqueLiteEligible)) {
+         // Show analysis options only when user needs to make a choice:
+         // - Tactical (isProEligible): Free vs PRO
+         // - Technique + racket sport: swing type selection
+         // Non-racket technique videos skip straight to LLM analysis (auto-PRO).
+         const needsAnalysisChoice = effectiveVideoPreAnalysis && (
+           effectiveVideoPreAnalysis.isProEligible ||
+           (effectiveVideoPreAnalysis.isTechniqueLiteEligible && isRacketDomainSport(effectiveVideoPreAnalysis.sport))
+         );
+         if (needsAnalysisChoice) {
            updateMessage(assistantMessageId, {
              messageType: "analysis_options",
              content: "",
@@ -329,10 +341,17 @@ export function useChatSubmission({
            return;
          }
 
+         // Auto-create Studio task for technique-eligible videos that skip the options card
+         let autoTaskId: string | undefined;
+         if (effectiveVideoPreAnalysis?.isTechniqueLiteEligible) {
+           autoTaskId = await createStudioTask(effectiveVideoPreAnalysis, currentVideoUrl);
+         }
+
          await handleVideoUrlAnalysis(
            currentPrompt, currentVideoUrl, assistantMessageId,
            conversationHistory, abortController, requestChatId,
-           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise }
+           { thinkingMode: effectiveThinkingMode, mediaResolution: effectiveMediaResolution, domainExpertise: effectiveDomainExpertise },
+           autoTaskId
          );
       } else if (!currentVideoFile) {
         // Text-only
@@ -377,8 +396,67 @@ export function useChatSubmission({
      addMessage, updateMessage, removeMessage, clearVideo, setVideoError, setApiError,
      setLoading, setProgressStage, setUploadProgress, setShowingVideoSizeError, setShouldAutoScroll,
      scrollMessageToTop, setDetectedVideoUrl, setVideoPreAnalysis, resetAnalysis, sendTextOnlyQuery, sendVideoQuery,
-     setPrompt, setPoseData
+     setPrompt, setPoseData, refreshLibraryTasks
    ]);
+
+   /**
+    * Auto-create a Studio task for technique-eligible videos that skip the options card.
+    * Mirrors the task creation logic in useAnalysisOptions.handleSelectProPlusQuick.
+    * Returns the created task ID (or undefined on failure).
+    */
+   const createStudioTask = async (
+     preAnalysis: VideoPreAnalysis,
+     videoUrl: string,
+   ): Promise<string | undefined> => {
+     const taskSport = isRacketDomainSport(preAnalysis.sport) ? preAnalysis.sport : "all";
+
+     if (accessToken) {
+       try {
+         chatLogger.info("Auto-creating technique task for URL:", videoUrl);
+         const response = await fetch("/api/tasks", {
+           method: "POST",
+           headers: {
+             "Content-Type": "application/json",
+             Authorization: `Bearer ${accessToken}`,
+           },
+           body: JSON.stringify({
+             taskType: "technique",
+             sport: taskSport,
+             videoUrl,
+             thumbnailUrl: preAnalysis.thumbnailUrl || null,
+             thumbnailS3Key: preAnalysis.thumbnailS3Key || null,
+             videoLength: preAnalysis.durationSeconds || null,
+           }),
+         });
+
+         if (response.ok) {
+           const { task } = await response.json();
+           chatLogger.info("Technique task auto-created:", task.id);
+           refreshLibraryTasks();
+           return task.id;
+         } else {
+           chatLogger.error("Failed to auto-create technique task");
+         }
+       } catch (err) {
+         chatLogger.error("Error auto-creating technique task:", err);
+       }
+     } else {
+       try {
+         const guestTask = createGuestTechniqueTask({
+           videoUrl,
+           sport: taskSport,
+           thumbnailUrl: preAnalysis.thumbnailUrl,
+           videoLength: preAnalysis.durationSeconds,
+         });
+         chatLogger.info("Guest technique task auto-created:", guestTask.id);
+         refreshLibraryTasks();
+         return guestTask.id;
+       } catch (err) {
+         chatLogger.error("Error auto-creating guest technique task:", err);
+       }
+     }
+     return undefined;
+   };
 
    // Helper: Handle video URL analysis
    const handleVideoUrlAnalysis = async (
@@ -388,7 +466,9 @@ export function useChatSubmission({
      conversationHistory: Message[],
      abortController: AbortController,
      requestChatId: string,
-     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise }
+     effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise },
+     /** Task ID created earlier (for the Studio button). Falls back to demo config lookup. */
+     createdTaskId?: string
    ) => {
     setProgressStage("analyzing");
 
@@ -454,8 +534,9 @@ export function useChatSubmission({
         // Add Studio prompt after analysis completes
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Look up demo video config to get sample task ID and analysis type
+        // Use the task ID created earlier, falling back to demo video config
         const demoConfig = getDemoVideoByUrl(currentVideoUrl);
+        const studioTaskId = createdTaskId || demoConfig?.sampleTaskId;
 
         const studioPromptId = generateMessageId();
         const studioPromptMessage: Message = {
@@ -465,7 +546,7 @@ export function useChatSubmission({
           messageType: "technique_studio_prompt",
           techniqueStudioPrompt: {
             videoUrl: currentVideoUrl,
-            taskId: demoConfig?.sampleTaskId,
+            taskId: studioTaskId,
             analysisType: demoConfig?.analysisType,
           },
         };
@@ -487,8 +568,20 @@ export function useChatSubmission({
      effectiveSettings: { thinkingMode: ThinkingMode; mediaResolution: MediaResolution; domainExpertise: DomainExpertise },
      effectiveNeedsServerConversion: boolean
    ) => {
-     if (effectiveVideoPreAnalysis && (effectiveVideoPreAnalysis.isProEligible || effectiveVideoPreAnalysis.isTechniqueLiteEligible)) {
-       // PRO eligible - upload first then show options
+     // Determine whether the user needs to make a choice or we auto-proceed.
+     // - Tactical (isProEligible) or racket technique → show options card
+     // - Non-racket technique → auto-proceed (upload to S3, create Studio task, LLM analysis)
+     const needsAnalysisChoice = effectiveVideoPreAnalysis && (
+       effectiveVideoPreAnalysis.isProEligible ||
+       (effectiveVideoPreAnalysis.isTechniqueLiteEligible && isRacketDomainSport(effectiveVideoPreAnalysis.sport))
+     );
+     const isAutoProTechnique = effectiveVideoPreAnalysis &&
+       effectiveVideoPreAnalysis.isTechniqueLiteEligible &&
+       !effectiveVideoPreAnalysis.isProEligible &&
+       !isRacketDomainSport(effectiveVideoPreAnalysis.sport);
+
+     // Both paths need S3 upload first
+     if (needsAnalysisChoice || isAutoProTechnique) {
        setProgressStage("uploading");
        setUploadProgress(0);
 
@@ -568,20 +661,33 @@ export function useChatSubmission({
       }
 
       if (s3Url) {
-        updateMessage(assistantMessageId, {
-          messageType: "analysis_options",
-          content: "",
-          analysisOptions: {
-            preAnalysis: effectiveVideoPreAnalysis,
-            selectedOption: null,
-            videoUrl: s3Url,
-            userPrompt: currentPrompt,
-          },
-          isStreaming: false,
-        });
-        setLoading(false);
-        setProgressStage("idle");
+        if (needsAnalysisChoice) {
+          // Show options card (Free/PRO or swing selection)
+          updateMessage(assistantMessageId, {
+            messageType: "analysis_options",
+            content: "",
+            analysisOptions: {
+              preAnalysis: effectiveVideoPreAnalysis,
+              selectedOption: null,
+              videoUrl: s3Url,
+              userPrompt: currentPrompt,
+            },
+            isStreaming: false,
+          });
+          setLoading(false);
+          setProgressStage("idle");
+          setUploadProgress(0);
+          return;
+        }
+
+        // Auto-proceed for non-racket technique: create Studio task + LLM analysis
+        const autoTaskId = await createStudioTask(effectiveVideoPreAnalysis!, s3Url);
         setUploadProgress(0);
+        await handleVideoUrlAnalysis(
+          currentPrompt, s3Url, assistantMessageId,
+          conversationHistory, abortController, requestChatId, effectiveSettings,
+          autoTaskId
+        );
         return;
       }
     }

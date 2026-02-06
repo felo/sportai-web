@@ -1144,14 +1144,41 @@ export const createMarkdownComponents = (
         }
       }
     }
-    // Normal paragraph rendering
+
+    // Check if children contain [[FEATURE:...]] tags that will render as
+    // block-level TechniqueFeatureCard components. In that case we must use
+    // <div> instead of <p> because <p> cannot contain <div> children.
+    const childrenArr = Array.isArray(children) ? children : [children];
+    const hasFeatureTags = childrenArr.some(
+      (child: any) => typeof child === 'string' && child.includes('[[FEATURE:')
+    );
+
+    const textContent = (
+      <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
+    );
+
+    if (hasFeatureTags) {
+      // Use div to avoid invalid <p> > <div> nesting (hydration error)
+      return (
+        <div
+          className="mb-4 text-base leading-relaxed"
+          style={{ color: "var(--gray-12)" }}
+          role="paragraph"
+          {...props}
+        >
+          {textContent}
+        </div>
+      );
+    }
+
+    // Normal paragraph rendering — keep <p> to preserve theme/prose styling
     return (
       <p
         className="mb-4 text-base leading-relaxed"
         style={{ color: "var(--gray-12)" }}
         {...props}
       >
-        <TextWithTimestamps onSwingClick={onSwingClick} onMetricClick={onMetricClick} highlightingPrefs={highlightingPrefs} onCoordinateClick={onCoordinateClick} onBallSequenceClick={onBallSequenceClick} onCourtZoneClick={onCourtZoneClick} onTimestampClick={onTimestampClick} features={features} videoElement={videoElement} fps={fps} onFeatureThumbnailClick={onFeatureThumbnailClick}>{children}</TextWithTimestamps>
+        {textContent}
       </p>
     );
   },

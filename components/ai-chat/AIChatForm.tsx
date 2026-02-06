@@ -312,6 +312,7 @@ export function AIChatForm() {
     clearVideo,
     resetAnalysis,
     scrollMessageToTop,
+    refreshLibraryTasks,
     sendTextOnlyQuery,
     sendVideoQuery,
   });
