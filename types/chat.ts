@@ -139,18 +139,55 @@ export type Chat = {
  * Video pre-analysis result for PRO and Technique LITE eligibility check
  * This is populated before the user sends their message
  */
-/** All detectable sports */
-export type DetectedSport =
-  // Racket sports
-  | "tennis" | "pickleball" | "padel" | "badminton" | "table_tennis"
-  // Team ball sports
-  | "soccer" | "basketball" | "volleyball" | "baseball" | "cricket" | "rugby" | "american_football" | "hockey"
-  // Individual sports
-  | "golf" | "swimming" | "athletics" | "cycling" | "gymnastics" | "skiing"
-  // Combat sports
-  | "boxing" | "martial_arts"
-  // Fallback
-  | "other";
+/** Single source of truth: all detectable sports. Used by detect-sport and analyze-video-eligibility APIs. Dropdown stays tennis/pickleball/padel/all-sports. */
+export const DETECTED_SPORTS = [
+  "tennis",
+  "pickleball",
+  "padel",
+  "badminton",
+  "table_tennis",
+  "squash",
+  "soccer",
+  "basketball",
+  "volleyball",
+  "baseball",
+  "cricket",
+  "rugby",
+  "american_football",
+  "hockey",
+  "golf",
+  "swimming",
+  "athletics",
+  "cycling",
+  "gymnastics",
+  "weightlifting",
+  "hyrox",
+  "yoga",
+  "pilates",
+  "surfing",
+  "climbing",
+  "skiing",
+  "snowboarding",
+  "skating",
+  "boxing",
+  "martial_arts",
+  "other",
+] as const;
+
+export type DetectedSport = (typeof DETECTED_SPORTS)[number];
+
+/** Sports that have a dedicated dropdown option (domain expertise). All other detected sports use "all-sports". */
+export const RACKET_DOMAIN_SPORTS = ["tennis", "pickleball", "padel"] as const;
+export type RacketDomainSport = (typeof RACKET_DOMAIN_SPORTS)[number];
+
+export function isRacketDomainSport(sport: DetectedSport): sport is RacketDomainSport {
+  return (RACKET_DOMAIN_SPORTS as readonly string[]).includes(sport);
+}
+
+/** Map DetectedSport to DomainExpertise (dropdown value). Only tennis/pickleball/padel are passed through; all others become "all-sports". */
+export function toDomainExpertise(sport: DetectedSport): "all-sports" | "tennis" | "pickleball" | "padel" {
+  return isRacketDomainSport(sport) ? sport : "all-sports";
+}
 
 export type VideoPreAnalysis = {
   sport: DetectedSport;

@@ -30,6 +30,16 @@ export function getSportEmoji(sport: string): string {
     case "padel": return "🏸";
     case "tennis": return "🎾";
     case "pickleball": return "🏓";
+    case "squash": return "🎾";
+    case "weightlifting": return "🏋️";
+    case "hyrox": return "🏃";
+    case "yoga": return "🧘";
+    case "pilates": return "🧘";
+    case "surfing": return "🏄";
+    case "climbing": return "🧗";
+    case "skiing": return "⛷️";
+    case "snowboarding": return "🏂";
+    case "skating": return "🛼";
     default: return "🎥";
   }
 }

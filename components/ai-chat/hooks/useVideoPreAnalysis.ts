@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { videoLogger } from "@/lib/logger";
-import type { VideoPreAnalysis } from "@/types/chat";
+import { isRacketDomainSport, type VideoPreAnalysis, type DetectedSport } from "@/types/chat";
 import type { DomainExpertise } from "@/utils/storage";
 import { updateChatSettings } from "@/utils/storage";
 import { getCurrentChatId } from "@/utils/storage-unified";
@@ -28,7 +28,7 @@ interface UseVideoPreAnalysisReturn {
   videoPreAnalysis: VideoPreAnalysis | null;
   setVideoPreAnalysis: React.Dispatch<React.SetStateAction<VideoPreAnalysis | null>>;
   isDetectingSport: boolean;
-  videoSportDetected: DomainExpertise | null;
+  videoSportDetected: DetectedSport | null;
   detectedVideoUrl: string | null;
   setDetectedVideoUrl: React.Dispatch<React.SetStateAction<string | null>>;
   resetAnalysis: () => void;
@@ -46,7 +46,7 @@ export function useVideoPreAnalysis({
 }: UseVideoPreAnalysisOptions): UseVideoPreAnalysisReturn {
   const [videoPreAnalysis, setVideoPreAnalysis] = useState<VideoPreAnalysis | null>(null);
   const [isDetectingSport, setIsDetectingSport] = useState(false);
-  const [videoSportDetected, setVideoSportDetected] = useState<DomainExpertise | null>(null);
+  const [videoSportDetected, setVideoSportDetected] = useState<DetectedSport | null>(null);
   const [detectedVideoUrl, setDetectedVideoUrl] = useState<string | null>(null);
   const [urlFileSizeTooLarge, setUrlFileSizeTooLarge] = useState(false);
 
@@ -209,16 +209,21 @@ export function useVideoPreAnalysis({
           localThumbnailBlobUrl,
         });
 
-        // Update domain expertise if sport detected
-        if (data.sport !== "other" && data.sport !== domainExpertise) {
+        // Show detected sport in UI (all 25 labels); only tennis/pickleball/padel update dropdown
+        setVideoSportDetected(data.sport);
+        setTimeout(() => setVideoSportDetected(null), 2500);
+        if (isRacketDomainSport(data.sport) && data.sport !== domainExpertise) {
           setDomainExpertise(data.sport);
           const currentChatId = getCurrentChatId();
           if (currentChatId) {
             updateChatSettings(currentChatId, { domainExpertise: data.sport });
           }
-
-          setVideoSportDetected(data.sport);
-          setTimeout(() => setVideoSportDetected(null), 2500);
+        } else if (!isRacketDomainSport(data.sport) && domainExpertise !== "all-sports") {
+          setDomainExpertise("all-sports");
+          const currentChatId = getCurrentChatId();
+          if (currentChatId) {
+            updateChatSettings(currentChatId, { domainExpertise: "all-sports" });
+          }
         }
 
       } catch (err) {
@@ -412,16 +417,21 @@ export function useVideoPreAnalysis({
           localThumbnailBlobUrl,
         });
 
-        // Update domain expertise if sport detected
-        if (data.sport !== "other" && data.sport !== domainExpertise) {
+        // Show detected sport in UI (all 25 labels); only tennis/pickleball/padel update dropdown
+        setVideoSportDetected(data.sport);
+        setTimeout(() => setVideoSportDetected(null), 2500);
+        if (isRacketDomainSport(data.sport) && data.sport !== domainExpertise) {
           setDomainExpertise(data.sport);
           const currentChatId = getCurrentChatId();
           if (currentChatId) {
             updateChatSettings(currentChatId, { domainExpertise: data.sport });
           }
-
-          setVideoSportDetected(data.sport);
-          setTimeout(() => setVideoSportDetected(null), 2500);
+        } else if (!isRacketDomainSport(data.sport) && domainExpertise !== "all-sports") {
+          setDomainExpertise("all-sports");
+          const currentChatId = getCurrentChatId();
+          if (currentChatId) {
+            updateChatSettings(currentChatId, { domainExpertise: "all-sports" });
+          }
         }
 
         isAnalyzingUrlRef.current = false;

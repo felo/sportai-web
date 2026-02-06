@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logger } from "@/lib/logger";
+import { DETECTED_SPORTS, type DetectedSport } from "@/types/chat";
 
 // Ensure this route uses Node.js runtime
 export const runtime = "nodejs";
@@ -22,19 +23,15 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI;
 }
 
-// Valid sport responses
-const VALID_SPORTS = ["tennis", "pickleball", "padel", "other"] as const;
-type DetectedSport = typeof VALID_SPORTS[number];
-
 /**
  * Detect sport from an image frame
  * POST /api/detect-sport
- * 
+ *
  * Expects FormData with:
  * - image: File (JPEG/PNG image of video frame)
- * 
+ *
  * Returns:
- * - { sport: "tennis" | "pickleball" | "padel" | "other" }
+ * - { sport: DetectedSport } (one of DETECTED_SPORTS from @/types/chat)
  */
 export async function POST(request: NextRequest) {
   const requestId = `sport_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -74,23 +71,18 @@ export async function POST(request: NextRequest) {
     const model = getGenAI().getGenerativeModel({
       model: MODEL_NAME,
       generationConfig: {
-        maxOutputTokens: 10, // We only need one word
+        maxOutputTokens: 32, // Allow for underscored labels (e.g. american_football, table_tennis)
         temperature: 0.1, // Low temperature for consistent responses
       },
     });
     
-    // Simple, direct prompt for sport classification
-    const prompt = `Look at this image and identify the racket sport being played.
-Reply with ONLY ONE of these exact words:
-- tennis
-- pickleball  
-- padel
-- other
+    // Prompt lists all sports from single source of truth (DETECTED_SPORTS)
+    const sportList = DETECTED_SPORTS.map((s) => `- ${s}`).join("\n");
+    const prompt = `Look at this image and identify the sport being played.
+Reply with ONLY ONE of these exact words (use underscores where shown):
+${sportList}
 
-If you see a tennis court (larger court, net in middle), say "tennis".
-If you see a pickleball court (smaller court, often with kitchen/non-volley zone), say "pickleball".
-If you see a padel court (enclosed with glass walls), say "padel".
-If unsure or no sport visible, say "other".
+Examples: tennis court → "tennis". Pickleball court (smaller, kitchen zone) → "pickleball". Padel court (glass walls) → "padel". Squash court (enclosed walls, small ball) → "squash". Soccer/football → "soccer". Basketball court → "basketball". Golf → "golf". Swimming pool → "swimming". Barbell, squat rack, gym → "weightlifting". HYROX race, rower, sled push, functional fitness → "hyrox". Yoga mat, poses → "yoga". Reformer, mat pilates → "pilates". Ocean, surfboard → "surfing". Rock wall, climbing gym, harness → "climbing". Skis, snow (cross country or downhill) → "skiing". Snowboard → "snowboarding". Ice rink, skateboard, roller skates → "skating". Boxing ring → "boxing". Martial arts dojo → "martial_arts". If unsure or no sport visible, say "other".
 
 Your response (one word only):`;
     
@@ -113,8 +105,8 @@ Your response (one word only):`;
     // Parse the response to extract sport
     let detectedSport: DetectedSport = "other";
     
-    // Check for each valid sport in the response
-    for (const sport of VALID_SPORTS) {
+    // Check for each valid sport in the response (single source of truth: DETECTED_SPORTS)
+    for (const sport of DETECTED_SPORTS) {
       if (responseText.includes(sport)) {
         detectedSport = sport;
         break;
@@ -137,14 +129,3 @@ Your response (one word only):`;
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-

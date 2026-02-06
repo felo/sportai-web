@@ -10,6 +10,7 @@ import { ThinkingIndicator } from "./ThinkingIndicator";
 import { IncompleteMessageRecovery } from "./IncompleteMessageRecovery";
 import { useEffect, useRef } from "react";
 import type { SharkFeature } from "@/types/shark";
+import type { AnalysisTags } from "@/utils/analysis-tags";
 
 interface AssistantMessageProps {
   messageId: string;
@@ -29,6 +30,7 @@ interface AssistantMessageProps {
   isRetrying?: boolean;
   features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
   fps?: number; // Video FPS for thumbnail extraction (derived from Shark analysis)
+  analysisTags?: AnalysisTags; // Analysis tags (strengths and improvements) to display above feedback buttons
 }
 
 /**
@@ -52,6 +54,7 @@ export function AssistantMessage({
   isRetrying,
   features,
   fps,
+  analysisTags,
 }: AssistantMessageProps) {
   const floatingCtx = useFloatingVideoContextOptional();
   const floatingCtxRef = useRef(floatingCtx);
@@ -140,6 +143,7 @@ export function AssistantMessage({
             isStreaming={isStreaming}
             features={features}
             fps={fps}
+            analysisTags={analysisTags}
             feedbackButtons={!isStreaming && !isIncomplete && !isGreeting ? (
               <FeedbackButtons
                 messageId={messageId}

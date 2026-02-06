@@ -2,7 +2,7 @@
  * Type definitions for AI Chat
  */
 
-import type { Message, VideoPreAnalysis } from "@/types/chat";
+import type { Message, VideoPreAnalysis, DetectedSport } from "@/types/chat";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 import type { StarterPromptConfig } from "@/utils/prompts";
 
@@ -26,7 +26,7 @@ export interface ChatSettings {
 export interface VideoPreAnalysisState {
   videoPreAnalysis: VideoPreAnalysis | null;
   isDetectingSport: boolean;
-  videoSportDetected: DomainExpertise | null;
+  videoSportDetected: DetectedSport | null;
   detectedVideoUrl: string | null;
 }
 

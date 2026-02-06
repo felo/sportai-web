@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import { logger } from "@/lib/logger";
+import { DETECTED_SPORTS, type DetectedSport } from "@/types/chat";
 
 // Ensure this route uses Node.js runtime
 export const runtime = "nodejs";
@@ -22,38 +23,6 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI;
 }
 
-// Valid sport responses - Top 20 most popular sports globally
-const VALID_SPORTS = [
-  // Racket sports (primary focus)
-  "tennis",
-  "pickleball",
-  "padel",
-  "badminton",
-  "table_tennis",
-  // Team ball sports
-  "soccer",
-  "basketball",
-  "volleyball",
-  "baseball",
-  "cricket",
-  "rugby",
-  "american_football",
-  "hockey",
-  // Individual sports
-  "golf",
-  "swimming",
-  "athletics",
-  "cycling",
-  "gymnastics",
-  "skiing",
-  // Combat sports
-  "boxing",
-  "martial_arts",
-  // Fallback
-  "other"
-] as const;
-type DetectedSport = typeof VALID_SPORTS[number];
-
 // Camera angle types
 const CAMERA_ANGLES = [
   "elevated_back_court",  // High behind baseline, full court visible - ideal for PRO
@@ -72,7 +41,7 @@ const ELIGIBILITY_SCHEMA = {
   properties: {
     sport: {
       type: SchemaType.STRING,
-      enum: [...VALID_SPORTS],
+      enum: [...DETECTED_SPORTS],
       description: "The sport being played"
     },
     cameraAngle: {
@@ -166,6 +135,7 @@ export async function POST(request: NextRequest) {
    - padel: Enclosed court with glass walls
    - badminton: Indoor court with high net, shuttlecock
    - table_tennis: Small table with net, ping pong paddles
+   - squash: Enclosed court with walls, small rubber ball, rackets
 
    TEAM BALL SPORTS:
    - soccer: Large grass field, goals at each end (football)
@@ -183,7 +153,15 @@ export async function POST(request: NextRequest) {
    - athletics: Track and field events
    - cycling: Road or velodrome racing
    - gymnastics: Apparatus or floor exercises
-   - skiing: Snow slopes
+   - weightlifting: Barbell, squat rack, gym, powerlifting, strength training
+   - hyrox: HYROX race, running plus functional stations (rower, sled push, burpees, sandbag, etc.)
+   - yoga: Yoga mat, poses, studio or outdoor practice
+   - pilates: Reformer, mat pilates, studio
+   - surfing: Ocean waves, surfboard, beach
+   - climbing: Rock wall, climbing gym, harness, ropes or bouldering
+   - skiing: Cross country or downhill skiing, skis, snow slopes
+   - snowboarding: Snowboard, snow slopes, halfpipe
+   - skating: Ice skating, skateboard, roller skates, skate park or rink
 
    COMBAT SPORTS:
    - boxing: Ring with ropes, boxing gloves
@@ -245,7 +223,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and normalize values
-    const sport: DetectedSport = VALID_SPORTS.includes(parsed.sport as DetectedSport)
+    const sport: DetectedSport = DETECTED_SPORTS.includes(parsed.sport as DetectedSport)
       ? parsed.sport as DetectedSport
       : "other";
 

@@ -13,6 +13,8 @@ import { useFloatingVideoContextOptional } from "@/components/chat/viewers/Float
 import type { SwingExplanation } from "@/database";
 import { getHighlightingPreferences, getTTSSettings, getDeveloperMode, type HighlightingPreferences } from "@/utils/storage";
 import type { SharkFeature } from "@/types/shark";
+import { AnalysisTagsDisplay } from "@/components/chat/messages/components/AnalysisTagsDisplay";
+import type { AnalysisTags } from "@/utils/analysis-tags";
 
 interface MarkdownWithSwingsProps {
   children: string;
@@ -24,6 +26,7 @@ interface MarkdownWithSwingsProps {
   isStreaming?: boolean;
   features?: SharkFeature[]; // Technique features for rendering [[FEATURE:name]] tags
   fps?: number; // Video FPS for thumbnail extraction (derived from Shark analysis)
+  analysisTags?: AnalysisTags; // Analysis tags (strengths and improvements) to display above feedback buttons
 }
 
 /**
@@ -48,7 +51,7 @@ function stripMarkdownForTTS(markdown: string): string {
     .trim();
 }
 
-export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming, features, fps }: MarkdownWithSwingsProps) {
+export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedbackButtons, onTTSUsage, onBallSequenceClick, isStreaming, features, fps, analysisTags }: MarkdownWithSwingsProps) {
   const [selectedSwing, setSelectedSwing] = useState<SwingExplanation | null>(null);
   const [swingModalOpen, setSwingModalOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricConversion | null>(null);
@@ -256,31 +259,41 @@ export function MarkdownWithSwings({ children, messageId, onAskForHelp, feedback
             </div>
           )}
 
-          {/* Last section: speaker button and feedback buttons in same row */}
+          {/* Last section: analysis tags, speaker button and feedback buttons */}
           {index === sections.length - 1 && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '16px',
-            }}>
-              {/* Feedback buttons on the left */}
-              <div>
-                {feedbackButtons}
-              </div>
-
-              {/* Speaker button on the right */}
-              {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
-                <div className="speaker-fade-in">
-                  <SectionSpeaker
-                    sectionText={section.plainText}
-                    sectionId={String(section.id)}
-                    messageId={messageId}
-                    onTTSUsage={onTTSUsage}
-                  />
+            <>
+              {/* Analysis Tags (strengths and improvements) - above feedback buttons */}
+              {analysisTags && !isStreaming && (
+                <div style={{ marginTop: '16px' }}>
+                  <AnalysisTagsDisplay tags={analysisTags} />
                 </div>
               )}
-            </div>
+
+              {/* Feedback buttons and speaker button row */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: analysisTags && !isStreaming ? '16px' : '16px',
+              }}>
+                {/* Feedback buttons on the left */}
+                <div>
+                  {feedbackButtons}
+                </div>
+
+                {/* Speaker button on the right */}
+                {ttsEnabled && messageId && section.plainText && section.plainText.length > 0 && section.plainText.length <= 5000 && showSpeakerFadeIn && (
+                  <div className="speaker-fade-in">
+                    <SectionSpeaker
+                      sectionText={section.plainText}
+                      sectionId={String(section.id)}
+                      messageId={messageId}
+                      onTTSUsage={onTTSUsage}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       ))}

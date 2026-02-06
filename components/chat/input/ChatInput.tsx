@@ -8,7 +8,8 @@ import { ArrowUpIcon, UploadIcon, StopIcon, ExclamationTriangleIcon } from "@rad
 import { VideoPreview } from "../viewers/VideoPreview";
 import { VideoEligibilityIndicator } from "./VideoEligibilityIndicator";
 import { AttachedVideoChip } from "./AttachedVideoChip";
-import type { ProgressStage, VideoPreAnalysis } from "@/types/chat";
+import type { ProgressStage, VideoPreAnalysis, DetectedSport } from "@/types/chat";
+import { isRacketDomainSport } from "@/types/chat";
 import { type ThinkingMode, type MediaResolution, type DomainExpertise, getDeveloperMode } from "@/utils/storage";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { extractVideoUrls } from "@/utils/video-utils";
@@ -36,8 +37,8 @@ interface ChatInputProps {
   disableTooltips?: boolean;
   hideDisclaimer?: boolean; // Hide the "contact us" disclaimer
   noPadding?: boolean; // Remove side padding (for embedded contexts)
-  // Video sport auto-detection - triggers glow effect when sport is detected from video
-  videoSportDetected?: DomainExpertise | null;
+  // Video sport auto-detection - triggers glow when a sport is detected (all 25 labels; glow only for tennis/pickleball/padel)
+  videoSportDetected?: DetectedSport | null;
   // Video URL detection - callback when a video URL is detected in the input
   onVideoUrlDetected?: (url: string | null) => void;
   // Video pre-analysis for PRO eligibility
@@ -159,10 +160,9 @@ export function ChatInput({
     wasAnalyzingRef.current = isCurrentlyAnalyzing;
   }, [videoPreAnalysis?.isAnalyzing]);
 
-  // Trigger glow effect when sport is auto-detected from video
-  // Note: videoSportDetected is only set when a valid sport (tennis/pickleball/padel) is detected
+  // Trigger glow effect when a racket sport is auto-detected (tennis/pickleball/padel only)
   useEffect(() => {
-    if (videoSportDetected) {
+    if (videoSportDetected && isRacketDomainSport(videoSportDetected)) {
       chatLogger.debug("[ChatInput] Video sport auto-detected:", videoSportDetected);
 
       // Trigger glow effect

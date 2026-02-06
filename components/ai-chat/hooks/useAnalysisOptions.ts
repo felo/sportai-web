@@ -7,7 +7,8 @@
 
 import { useCallback, useRef } from "react";
 import { analysisLogger } from "@/lib/logger";
-import type { Message, VideoPreAnalysis } from "@/types/chat";
+import type { Message, VideoPreAnalysis, DetectedSport } from "@/types/chat";
+import { toDomainExpertise } from "@/types/chat";
 import type { ThinkingMode, MediaResolution, DomainExpertise } from "@/utils/storage";
 import { createGuestTechniqueTask } from "@/utils/storage";
 import type { User } from "@supabase/supabase-js";
@@ -237,7 +238,8 @@ export function useAnalysisOptions({
       formData.append("videoUrl", videoUrl);
       formData.append("thinkingMode", thinkingMode);
       formData.append("mediaResolution", mediaResolution);
-      formData.append("domainExpertise", sport as DomainExpertise);
+      const domainExpertiseForApi: DomainExpertise = toDomainExpertise(sport as DetectedSport);
+      formData.append("domainExpertise", domainExpertiseForApi);
 
       const headers: Record<string, string> = { "x-stream": "true" };
       if (accessToken) {
