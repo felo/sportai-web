@@ -79,11 +79,11 @@ export function AnalysisOptionsMessage({
       if (cameraLabel) {
         msg += ` with a ${cameraLabel.toLowerCase()} angle`;
       }
-      msg += `. This qualifies for a PRO ${analysisType} Analysis!`;
+      msg += `. This qualifies for a in-depth ${analysisType} analysis!`;
       return msg;
     }
     // For other sports, use simpler message
-    return `I see you have a video that qualifies for a PRO ${analysisType} Analysis!`;
+    return `I see you have a video that deep ${analysisType} Analysis!`;
   }, [sportName, cameraLabel, analysisType, isTechniqueAnalysis]);
 
   const introText = useTypewriter(introMessage, 18, shouldAnimate);
@@ -115,10 +115,10 @@ export function AnalysisOptionsMessage({
             </p>
           )}
 
-          {/* TECHNIQUE ANALYSIS: Swing selection UI */}
-          {isTechniqueAnalysis ? (
+          {/* TECHNIQUE ANALYSIS: Swing selection UI — only for tennis, padel, pickleball */}
+          {isTechniqueAnalysis && isRacketSport ? (
             <SwingSelectionCard
-              sport={["tennis", "pickleball", "padel"].includes(preAnalysis.sport) ? (preAnalysis.sport as "tennis" | "pickleball" | "padel") : "other"}
+              sport={preAnalysis.sport as "tennis" | "pickleball" | "padel"}
               isLoading={isLoading}
               showCard={showBoxes}
               showButton={showButtons}

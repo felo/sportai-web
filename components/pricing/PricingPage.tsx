@@ -302,7 +302,7 @@ function PlanCard({ plan, onGetStarted, onComingSoonClick, onSignInClick, isSign
 
 export function PricingPage() {
   const router = useRouter();
-  const { isCollapsed, isInitialLoad } = useSidebar();
+  const { isCollapsed, isInitialLoad, closeSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -322,9 +322,10 @@ export function PricingPage() {
 
   // Handle starting a new chat - navigate to home, chat created on first message
   const handleNewChat = useCallback(() => {
+    closeSidebar();
     setCurrentChatId(undefined);
     router.push("/");
-  }, [router]);
+  }, [closeSidebar, router]);
 
   // Track pricing page view on mount
   useEffect(() => {

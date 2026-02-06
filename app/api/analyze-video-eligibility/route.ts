@@ -165,7 +165,10 @@ export async function POST(request: NextRequest) {
 
    COMBAT SPORTS:
    - boxing: Ring with ropes, boxing gloves
-   - martial_arts: MMA cage, dojo, wrestling mat
+   - mma: UFC, octagon cage, mixed martial arts, cage fighting
+   - wrestling: Wrestling mat, singlets, folkstyle/freestyle/Greco-Roman
+   - bjj: Brazilian jiu-jitsu, gi or no-gi, ground grappling
+   - martial_arts: Dojo, karate, judo, taekwondo, kickboxing, Muay Thai (traditional/stand-up)
 
    - other: Cannot identify or not a sport
 

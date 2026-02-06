@@ -227,7 +227,15 @@ export function useVideoPreAnalysis({
         }
 
       } catch (err) {
-        videoLogger.error("Pre-analysis failed:", err);
+        const isFrameExtractionError =
+          err instanceof Error &&
+          (err.message.includes("frame extraction") ||
+            err.message.includes("Timeout extracting first frame"));
+        if (isFrameExtractionError) {
+          videoLogger.warn("Pre-analysis skipped (video could not be loaded for thumbnail):", err.message);
+        } else {
+          videoLogger.error("Pre-analysis failed:", err);
+        }
         setVideoPreAnalysis({
           sport: "other",
           cameraAngle: "other",

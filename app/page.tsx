@@ -69,7 +69,7 @@ const STARTER_PROMPT_BUTTONS: StarterPromptButton[] = [
 
 function HomeContent() {
   const router = useRouter();
-  const { isCollapsed, isInitialLoad } = useSidebar();
+  const { isCollapsed, isInitialLoad, closeSidebar } = useSidebar();
   const { setPendingSubmission } = usePendingChat();
   const { session } = useAuth();
   const isMobile = useIsMobile();
@@ -216,11 +216,12 @@ function HomeContent() {
 
   // Handle new chat from header - just stay on home page (we're already there)
   const handleNewChat = useCallback(() => {
+    closeSidebar();
     // Clear any existing input
     setPrompt("");
     clearVideo();
     resetAnalysis();
-  }, [clearVideo, resetAnalysis]);
+  }, [closeSidebar, clearVideo, resetAnalysis]);
 
   return (
     <main className="h-screen flex flex-col">

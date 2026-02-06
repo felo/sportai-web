@@ -170,6 +170,9 @@ export const DETECTED_SPORTS = [
   "snowboarding",
   "skating",
   "boxing",
+  "mma",
+  "wrestling",
+  "bjj",
   "martial_arts",
   "other",
 ] as const;

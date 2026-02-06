@@ -40,6 +40,11 @@ export function getSportEmoji(sport: string): string {
     case "skiing": return "⛷️";
     case "snowboarding": return "🏂";
     case "skating": return "🛼";
+    case "boxing": return "🥊";
+    case "mma": return "🥊";
+    case "wrestling": return "🤼";
+    case "bjj": return "🥋";
+    case "martial_arts": return "🥋";
     default: return "🎥";
   }
 }

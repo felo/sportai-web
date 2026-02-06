@@ -33,7 +33,7 @@ import { NewTaskForm, TaskFilters, SortableHeader } from "./components";
 export function TasksPage() {
   const router = useRouter();
   const { user, session, loading: authLoading } = useAuth();
-  const { isCollapsed, isInitialLoad } = useSidebar();
+  const { isCollapsed, isInitialLoad, closeSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const { markTaskAsSeen, isTaskNew } = useLibraryTasks();
   const sampleTasks = useRefreshedSampleTasks();
@@ -156,9 +156,10 @@ export function TasksPage() {
 
   // Handle new chat - navigate to home, chat created on first message
   const handleNewChat = useCallback(() => {
+    closeSidebar();
     setCurrentChatId(undefined);
     router.push("/");
-  }, [router]);
+  }, [closeSidebar, router]);
 
   // Handle task created from modal
   const handleTaskCreated = useCallback((task: Task) => {

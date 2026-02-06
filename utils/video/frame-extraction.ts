@@ -141,7 +141,14 @@ export async function extractFirstFrameWithDuration(
       resolved = true;
       clearTimeout(timeout);
       cleanup();
-      reject(new Error('Error loading video for frame extraction'));
+      const mediaError = video.error;
+      const detail =
+        mediaError?.message ||
+        (mediaError?.code !== undefined ? `code ${mediaError.code}` : null);
+      const message = detail
+        ? `Error loading video for frame extraction: ${detail}`
+        : "Error loading video for frame extraction";
+      reject(new Error(message));
     };
 
     video.addEventListener('canplaythrough', onCanPlayThrough);

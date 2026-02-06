@@ -24,6 +24,7 @@ import { ErrorToast } from "@/components/ui/Toast";
 import { AudioPlayerProvider } from "@/components/AudioPlayerContext";
 import { FloatingVideoProvider } from "@/components/chat/viewers/FloatingVideoContext";
 import { FloatingVideoPortal } from "@/components/chat/viewers/FloatingVideoPortal";
+import { useSidebar } from "@/components/SidebarContext";
 import { Sidebar } from "@/components/sidebar";
 import { useLibraryTasks } from "@/components/sidebar/LibraryTasksContext";
 import { PICKLEBALL_COACH_PROMPT, type StarterPromptConfig } from "@/utils/prompts";
@@ -62,6 +63,7 @@ export function AIChatForm() {
   // Extract first name from profile for personalization
   const userFirstName = profile?.full_name?.split(" ")[0];
   const { refresh: refreshLibraryTasks } = useLibraryTasks();
+  const { closeSidebar } = useSidebar();
   const router = useRouter();
 
   // Track if we've processed a pending submission to prevent re-processing
@@ -486,9 +488,10 @@ export function AIChatForm() {
     setCurrentChatId(undefined);
     setShowingVideoSizeError(false);
 
+    closeSidebar();
     // Navigate to home page for new chat
     router.push("/");
-  }, [confirmNavigation, setShowingVideoSizeError, router]);
+  }, [confirmNavigation, setShowingVideoSizeError, closeSidebar, router]);
 
   // Handle candidate response selection (e.g., greeting options)
   const handleSelectCandidateResponse = useCallback(async (messageId: string, index: number, option: CandidateOption) => {
